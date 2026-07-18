@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:17-alpine
+    container_name: eclaim_postgres
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME:-eclaim}
+    # ports:
+    #   - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  api:
+    build: .
+    container_name: eclaim_api
+    ports:
+      - "${PORT:-5000}:${PORT:-5000}"
+    environment:
+      - DB_HOST=${DB_HOST:-db}
+      # - DB_PORT=${DB_PORT:-5432}:5432
+      - DB_USER=${DB_USER:-postgres}
+      - DB_PASSWORD=${DB_PASSWORD:-postgres}
+      - DB_NAME=${DB_NAME:-eclaim}
+      - PORT=${PORT:-5000}
+      - NODE_ENV=${NODE_ENV:-development}
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
+      - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:3000}
+      - SIMRS_API_KEY=${SIMRS_API_KEY}
+      - SIMRS_CALLBACK_URL=${SIMRS_CALLBACK_URL}
+      - SIMRS_CALLBACK_API_KEY=${SIMRS_CALLBACK_API_KEY}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - AI_API_KEY=${AI_API_KEY}
+      - AI_BASE_URL=${AI_BASE_URL}
+      - AI_MODEL=${AI_MODEL}
+    depends_on:
+      - db
+    volumes:
+      - ./uploads:/usr/src/app/uploads
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

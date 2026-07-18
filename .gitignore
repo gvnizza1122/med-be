@@ -1,0 +1,51 @@
+# Node.js dependencies
+node_modules/
+package-lock.json
+
+# Local uploads
+uploads/
+*.TXT
+*.txt
+
+# SQLite Database files
+data/*.db
+data/*.db-wal
+data/*.db-shm
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Logs and system files
+logs/
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Next.js (if applicable)
+.next/
+out/
+
+# Docker
+docker-compose.override.yml
+
+# Build & Coverage
+dist/
+build/
+coverage/
+
+# Misc
+*.pid
+*.seed
+*.pid.lock
