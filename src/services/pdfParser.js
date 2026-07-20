@@ -1,7 +1,8 @@
 const { PDFParse } = require('pdf-parse');
 const fs = require('fs');
+const { extractFromPDF } = require('./pdfExtractionPipeline');
 
-// Regex patterns untuk setiap field
+// Regex patterns untuk setiap field (legacy - digunakan sebagai fallback)
 const FIELD_PATTERNS = {
   noRM: [
     /No\s*\.?\s*RM\s*[:=]?\s*(\d+)/i,

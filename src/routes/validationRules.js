@@ -21,7 +21,8 @@ router.get('/', authenticate, async (req, res) => {
 
     res.json({ rules });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[validationRules] error:', err);
+    res.status(500).json({ error: 'Terjadi gangguan pada sistem. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' });
   }
 });
 
@@ -81,7 +82,8 @@ router.put('/:id', authenticate, authorize('admin'), async (req, res) => {
     });
 
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[validationRules] error:', err);
+    res.status(500).json({ error: 'Terjadi gangguan pada sistem. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' });
   }
 });
 
@@ -145,7 +147,7 @@ recordsRouter.post('/:recordId/audit', authenticate, async (req, res) => {
       } catch (err) {
         // Satu field gagal jangan gugurkan sisanya
         console.error(`[AI Audit] Field ${field} error:`, err.message);
-        audits.push({ field, error: err.message });
+        audits.push({ field, error: 'Terjadi gangguan pada sistem. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' });
       }
     }
 
@@ -172,7 +174,8 @@ recordsRouter.post('/audit/:auditId/feedback', authenticate, async (req, res) =>
     if (result.changes === 0) return res.status(404).json({ error: 'Audit log tidak ditemukan.' });
     res.json({ ok: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[validationRules] error:', err);
+    res.status(500).json({ error: 'Terjadi gangguan pada sistem. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' });
   }
 });
 

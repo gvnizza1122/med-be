@@ -102,7 +102,8 @@ router.get('/summary', authenticate, async (req, res) => {
       available_periods: periods
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[dashboard] error:', err);
+    res.status(500).json({ error: 'Terjadi gangguan pada sistem. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' });
   }
 });
 
@@ -136,7 +137,8 @@ router.get('/error-trends', authenticate, async (req, res) => {
 
     res.json({ trends });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[dashboard] error:', err);
+    res.status(500).json({ error: 'Terjadi gangguan pada sistem. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' });
   }
 });
 

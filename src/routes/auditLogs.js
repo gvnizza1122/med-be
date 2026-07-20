@@ -32,7 +32,8 @@ router.get('/', authenticate, authorize('admin', 'supervisor'), async (req, res)
 
     res.json({ total, page: parseInt(page), limit: parseInt(limit), logs });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[auditLogs] error:', err);
+    res.status(500).json({ error: 'Terjadi gangguan pada sistem. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' });
   }
 });
 

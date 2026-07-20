@@ -19,7 +19,8 @@ router.get('/', authenticate, authorize('admin'), async (req, res) => {
     `).all();
     res.json({ users });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[users] error:', err);
+    res.status(500).json({ error: 'Terjadi gangguan pada sistem. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' });
   }
 });
 
@@ -69,7 +70,8 @@ router.post('/', authenticate, authorize('admin'), async (req, res) => {
       is_active: true
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[users] error:', err);
+    res.status(500).json({ error: 'Terjadi gangguan pada sistem. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' });
   }
 });
 
@@ -106,7 +108,8 @@ router.put('/:id', authenticate, authorize('admin'), async (req, res) => {
     const updated = await db.prepare('SELECT id, email, full_name, nik, role, is_active, hospital_code FROM users WHERE id = ?').get(req.params.id);
     res.json(updated);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[users] error:', err);
+    res.status(500).json({ error: 'Terjadi gangguan pada sistem. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' });
   }
 });
 
@@ -130,7 +133,8 @@ router.delete('/:id', authenticate, authorize('admin'), async (req, res) => {
 
     res.json({ message: 'User berhasil dinonaktifkan.' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[users] error:', err);
+    res.status(500).json({ error: 'Terjadi gangguan pada sistem. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' });
   }
 });
 

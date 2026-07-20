@@ -460,9 +460,9 @@ function _resetTotalUsage() {
  */
 async function runAiAudit(records, onBatchComplete, errorFieldsByRecord = null) {
   _resetTotalUsage();
-  const apiKey = process.env.AI_API_KEY;
-  const baseUrl = process.env.AI_BASE_URL || 'https://opencode.ai/zen/go/v1';
-  const model = process.env.AI_MODEL || 'deepseek-v4-flash';
+  const apiKey = process.env.OPENROUTER_API_KEY || process.env.AI_API_KEY;
+  const baseUrl = process.env.AI_BASE_URL || 'https://openrouter.ai/api/v1';
+  const model = process.env.AI_MODEL || 'google/gemini-2.5-flash-lite';
 
   // No API key configured — use rule-based fallback
   if (!apiKey || apiKey === '') {

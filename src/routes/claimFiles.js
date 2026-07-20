@@ -311,7 +311,8 @@ router.get('/', authenticate, async (req, res) => {
 
     res.json({ total, page: parseInt(page), limit: parseInt(limit), files });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[claimFiles] error:', err);
+    res.status(500).json({ error: 'Terjadi gangguan pada sistem. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' });
   }
 });
 
@@ -360,7 +361,8 @@ router.get('/:id', authenticate, async (req, res) => {
 
     res.json({ ...file, error_summary: errorsByRule });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[claimFiles] error:', err);
+    res.status(500).json({ error: 'Terjadi gangguan pada sistem. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' });
   }
 });
 
@@ -419,7 +421,8 @@ router.get('/:id/records', authenticate, async (req, res) => {
 
     res.json({ total, page: parseInt(page), limit: parseInt(limit), records: recordsWithErrors });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[claimFiles] error:', err);
+    res.status(500).json({ error: 'Terjadi gangguan pada sistem. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' });
   }
 });
 
@@ -564,7 +567,8 @@ router.post('/:id/approve', authenticate, authorize('supervisor', 'admin'), asyn
       callback_error: callbackError
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[claimFiles] error:', err);
+    res.status(500).json({ error: 'Terjadi gangguan pada sistem. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' });
   }
 });
 
@@ -604,7 +608,8 @@ router.get('/:id/export', authenticate, async (req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename=validasi_${file.file_name || 'klaim'}_${new Date().toISOString().split('T')[0]}.xlsx`);
     res.send(buffer);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[claimFiles] error:', err);
+    res.status(500).json({ error: 'Terjadi gangguan pada sistem. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' });
   }
 });
 
@@ -748,7 +753,8 @@ router.post('/:id/auto-fix', authenticate, async (req, res) => {
       }
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[claimFiles] error:', err);
+    res.status(500).json({ error: 'Terjadi gangguan pada sistem. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' });
   }
 });
 
@@ -833,7 +839,8 @@ router.get('/:id/download-fixed', authenticate, async (req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename="${safeName}"`);
     res.send(fileContent);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[claimFiles] error:', err);
+    res.status(500).json({ error: 'Terjadi gangguan pada sistem. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' });
   }
 });
 
@@ -894,7 +901,8 @@ router.get('/:id/comparison', authenticate, async (req, res) => {
       changes
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[claimFiles] error:', err);
+    res.status(500).json({ error: 'Terjadi gangguan pada sistem. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' });
   }
 });
 
@@ -982,7 +990,8 @@ router.delete('/:id', authenticate, authorize('admin', 'supervisor'), async (req
 
     res.json({ message: 'File berhasil dihapus.' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[claimFiles] error:', err);
+    res.status(500).json({ error: 'Terjadi gangguan pada sistem. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' });
   }
 });
 
@@ -1054,7 +1063,8 @@ router.get('/:id/ai-token-estimate', authenticate, async (req, res) => {
       provider: 'deepseek-v4-flash'
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[claimFiles] error:', err);
+    res.status(500).json({ error: 'Terjadi gangguan pada sistem. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' });
   }
 });
 
@@ -1093,41 +1103,33 @@ function validateField(fieldName, value) {
  * POST /api/v1/claim-files/upload-pdf
  * Upload PDF dari SIMRS, extract field digital, SAVE immediately, return untuk user review
  */
+// vClaim pakai DD/MM/YYYY; kolom tanggal di DB pakai YYYY-MM-DD.
+function vclaimDateToISO(v) {
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec((v || '').trim());
+  return m ? `${m[3]}-${m[2]}-${m[1]}` : null;
+}
+
 router.post('/upload-pdf', authenticate, pdfUpload.single('file'), async (req, res) => {
   try {
-    if (!req.file) return res.status(400).json({ error: 'File PDF tidak ditemukan.' });
+    if (!req.file) {
+      return res.status(400).json({ error: 'Belum ada berkas yang dipilih. Silakan pilih berkas PDF terlebih dahulu.' });
+    }
 
-    const { parsePDF } = require('../services/pdfParser');
-    const result = await parsePDF(req.file.path);
+    const { extractFromPDF } = require('../services/pdfExtractionPipeline');
+    const result = await extractFromPDF(req.file.path);
 
     if (!result.success) {
-      return res.status(400).json({ error: 'Gagal membaca PDF', details: result.errors });
+      // Detail teknis hanya untuk log server, tidak dikirim ke pengguna.
+      console.error('[upload-pdf] gagal:', req.file.originalname, JSON.stringify(result.errors));
+      return res.status(400).json({ error: result.pesan });
     }
 
     const db = getDb();
     const fileId = uuidv4();
     const recordId = uuidv4();
 
-    // Map to vClaim format for storage
-    const vf = result.vclaimFormat;
-    const extractedData = {
-      KODE_RS: vf.KODE_RS || '3371084',
-      KELAS_RAWAT: vf.KELAS_RAWAT || '',
-      ADMISSION_DATE: vf.ADMISSION_DATE || '',
-      DISCHARGE_DATE: vf.DISCHARGE_DATE || '',
-      BIRTH_DATE: vf.BIRTH_DATE || '',
-      SEX: vf.SEX || '',
-      DISCHARGE_STATUS: vf.DISCHARGE_STATUS || '1',
-      DIAGLIST: vf.DIAGLIST || '',
-      PROCLIST: vf.PROCLIST || '',
-      TARIF_RS: vf.TARIF_RS || '',
-      NAMA_PASIEN: vf.NAMA_PASIEN || '',
-      MRN: vf.MRN || '',
-      SEP: vf.SEP || '',
-      NOKARTU: vf.NOKARTU || '',
-      DPJP: vf.DPJP || '',
-      ALAMAT: vf.ALAMAT || '',
-    };
+    // Record vClaim lengkap 60 kolom (urutan & format sesuai output vClaim asli).
+    const extractedData = result.record;
 
     // Save file record with status='uploaded' (data extraction complete)
     await db.prepare(`
@@ -1145,12 +1147,14 @@ router.post('/upload-pdf', authenticate, pdfUpload.single('file'), async (req, r
       ) VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       recordId, fileId, extractedData.KODE_RS, extractedData.SEP, extractedData.NOKARTU,
-      extractedData.NAMA_PASIEN, extractedData.MRN, extractedData.BIRTH_DATE, extractedData.SEX,
-      extractedData.KELAS_RAWAT ? parseInt(extractedData.KELAS_RAWAT) : null,
-      extractedData.ADMISSION_DATE, extractedData.DISCHARGE_DATE,
-      extractedData.DISCHARGE_STATUS ? parseInt(extractedData.DISCHARGE_STATUS) : 1,
+      extractedData.NAMA_PASIEN, extractedData.MRN,
+      vclaimDateToISO(extractedData.BIRTH_DATE), extractedData.SEX,
+      /^\d+$/.test(extractedData.KELAS_RAWAT) ? parseInt(extractedData.KELAS_RAWAT) : null,
+      vclaimDateToISO(extractedData.ADMISSION_DATE), vclaimDateToISO(extractedData.DISCHARGE_DATE),
+      /^\d+$/.test(extractedData.DISCHARGE_STATUS) ? parseInt(extractedData.DISCHARGE_STATUS) : 1,
       extractedData.DIAGLIST, extractedData.PROCLIST,
-      extractedData.DPJP, extractedData.TARIF_RS ? parseInt(extractedData.TARIF_RS) : null, 'RAWAT_INAP',
+      extractedData.DPJP,
+      /^\d+$/.test(extractedData.TARIF_RS) ? parseInt(extractedData.TARIF_RS) : null, 'RAWAT_INAP',
       'pending', 0, JSON.stringify(extractedData)
     );
 
@@ -1163,8 +1167,8 @@ router.post('/upload-pdf', authenticate, pdfUpload.single('file'), async (req, r
       metadata: result.metadata,
     });
   } catch (err) {
-    console.error('PDF upload error:', err);
-    res.status(500).json({ error: err.message });
+    console.error('[upload-pdf] error tak terduga:', err);
+    res.status(500).json({ error: 'Terjadi gangguan saat memproses berkas. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' });
   }
 });
 
@@ -1188,7 +1192,7 @@ router.get('/:file_id/extracted', authenticate, async (req, res) => {
     res.json(data);
   } catch (err) {
     console.error('Fetch extracted error:', err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Terjadi gangguan pada sistem. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' });
   }
 });
 
@@ -1310,7 +1314,7 @@ router.post('/validate-pdf', authenticate, async (req, res) => {
     });
   } catch (err) {
     console.error('PDF validate error:', err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Terjadi gangguan pada sistem. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' });
   }
 });
 
