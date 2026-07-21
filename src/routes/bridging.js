@@ -25,7 +25,16 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  limits: { fileSize: 10 * 1024 * 1024 } 
+  limits: { fileSize: 10 * 1024 * 1024 }
+});
+
+const pdfUpload = multer({
+  storage,
+  limits: { fileSize: 20 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (path.extname(file.originalname).toLowerCase() === '.pdf') cb(null, true);
+    else cb(new Error('Hanya file PDF yang diperbolehkan.'));
+  }
 });
 
 const authenticateApiKey = (req, res, next) => {
@@ -172,6 +181,116 @@ router.post('/validate-file', authenticateApiKey, upload.single('file'), async (
       try { fs.unlinkSync(tempFilePath); } catch (e) { /* ignore */ }
     }
     res.status(500).json({ error: 'Internal server error: ' + err.message });
+  }
+});
+
+/**
+ * POST /api/v1/bridging/upload-pdf
+ * Terima PDF klaim langsung dari sistem SIMRS (bukan login manusia — pakai X-API-Key).
+ * Pipeline SAMA PERSIS dengan upload manual di aplikasi (ekstraksi AI + validasi rule
+ * engine RV-01–17), supaya hasilnya konsisten dan bisa langsung dilihat verifikator
+ * di aplikasi eClaim (cari lewat Riwayat Upload, atau pakai record_id di response ini).
+ *
+ * Body: multipart/form-data, field "file" = berkas PDF (maks 20MB)
+ * Header wajib: X-API-Key
+ *
+ * Response sukses (200):
+ * {
+ *   "status": "success",
+ *   "file_id": "...",
+ *   "record_id": "...",
+ *   "validation_status": "valid" | "error" | "pending",
+ *   "error_count": 0,
+ *   "nama_pasien": "...",
+ *   "sep": "...",
+ *   "view_url": "https://<host-eclaim>/results/<file_id>"
+ * }
+ */
+router.post('/upload-pdf', authenticateApiKey, pdfUpload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'Berkas PDF tidak ditemukan. Kirim pada field "file".' });
+    }
+
+    const { extractFromPDF } = require('../services/pdfExtractionPipeline');
+    const { vclaimToDbFormat, vclaimDateToISO } = require('./claimFiles');
+    const result = await extractFromPDF(req.file.path);
+
+    if (!result.success) {
+      console.error('[bridging/upload-pdf] gagal:', req.file.originalname, JSON.stringify(result.errors));
+      return res.status(400).json({ error: result.pesan });
+    }
+
+    const db = getDb();
+    const fileId = uuidv4();
+    const recordId = uuidv4();
+    const extractedData = result.record;
+    const hospitalCode = req.body.hospital_code || process.env.SIMRS_DEFAULT_HOSPITAL_CODE || '3371084';
+
+    const dbRecord = vclaimToDbFormat(extractedData);
+    const activeRules = await db.prepare('SELECT * FROM validation_rules WHERE is_active = 1').all();
+    const validationErrors = validateRecord(dbRecord, activeRules);
+    const validationStatus = determineStatus(validationErrors);
+
+    // uploaded_by dibiarkan NULL (bukan user login) — jejak sumbernya dicatat di description.
+    await db.prepare(`
+      INSERT INTO claim_files (id, hospital_code, file_name, file_path, status, uploaded_by, total_records, description)
+      VALUES (?, ?, ?, ?, 'uploaded', NULL, 1, 'Diterima via SIMRS Bridging API')
+    `).run(fileId, hospitalCode, req.file.originalname, req.file.path);
+
+    await db.transaction(async (tx) => {
+      const txInsertRecord = tx.prepare(`
+        INSERT INTO claim_records (
+          id, file_id, row_number, kode_rs, sep, nokartu, nama_pasien, mrn,
+          birth_date, gender, kelas_rawat, admission_date, discharge_date,
+          discharge_status, diagnosa_list, prosedur_list, dpjp_name,
+          tarif_rs, jenis_klaim, validation_status, error_count, raw_data
+        ) VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+
+      await txInsertRecord.run(
+        recordId, fileId, extractedData.KODE_RS, extractedData.SEP, extractedData.NOKARTU,
+        extractedData.NAMA_PASIEN, extractedData.MRN,
+        vclaimDateToISO(extractedData.BIRTH_DATE), extractedData.SEX,
+        /^\d+$/.test(extractedData.KELAS_RAWAT) ? parseInt(extractedData.KELAS_RAWAT) : null,
+        vclaimDateToISO(extractedData.ADMISSION_DATE), vclaimDateToISO(extractedData.DISCHARGE_DATE),
+        /^\d+$/.test(extractedData.DISCHARGE_STATUS) ? parseInt(extractedData.DISCHARGE_STATUS) : 1,
+        extractedData.DIAGLIST, extractedData.PROCLIST,
+        extractedData.DPJP,
+        /^\d+$/.test(extractedData.TARIF_RS) ? parseInt(extractedData.TARIF_RS) : null, 'RAWAT_INAP',
+        validationStatus, validationErrors.length, JSON.stringify(extractedData)
+      );
+
+      if (validationErrors.length > 0) {
+        const txInsertError = tx.prepare(`
+          INSERT INTO validation_errors (id, record_id, rule_id, field_name, error_message, expected_value, actual_value, severity)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+        for (const err of validationErrors) {
+          await txInsertError.run(
+            uuidv4(), recordId, err.rule_id, err.field_name,
+            err.error_message, err.expected_value || '', err.actual_value || '',
+            err.severity
+          );
+        }
+      }
+    });
+
+    const host = process.env.ECLAIM_PUBLIC_URL || `${req.protocol}://${req.get('host').replace(/:\d+$/, ':60132')}`;
+
+    res.json({
+      status: 'success',
+      file_id: fileId,
+      record_id: recordId,
+      validation_status: validationStatus,
+      error_count: validationErrors.length,
+      nama_pasien: extractedData.NAMA_PASIEN,
+      sep: extractedData.SEP,
+      view_url: `${host}/results/${fileId}`,
+    });
+  } catch (err) {
+    console.error('[bridging/upload-pdf] error tak terduga:', err);
+    res.status(500).json({ error: 'Terjadi gangguan saat memproses berkas di sisi eClaim. Coba lagi, atau hubungi tim eClaim bila terus berulang.' });
   }
 });
 

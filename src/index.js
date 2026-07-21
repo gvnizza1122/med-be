@@ -151,10 +151,19 @@ app.use((err, req, res, next) => {
   console.error('Unhandled error:', err);
 
   if (err.code === 'LIMIT_FILE_SIZE') {
-    return res.status(400).json({ error: 'File terlalu besar. Maksimum 10MB.' });
+    // Batas beda-beda per endpoint (upload-pdf 20MB, upload-batch 50MB, lainnya 10MB) —
+    // jangan hardcode satu angka, salah untuk endpoint lain (dulu selalu bilang "10MB").
+    const path = req.originalUrl || req.path || '';
+    let maxMb = 10;
+    if (path.includes('/upload-pdf')) maxMb = 20;
+    else if (path.includes('/upload-batch')) maxMb = 50;
+    return res.status(400).json({ error: `File terlalu besar. Maksimum ${maxMb}MB.` });
   }
 
-  if (err.message && err.message.includes('Hanya file TXT')) {
+  // Pesan penolakan tipe file dari fileFilter multer (mis. "Hanya file TXT...",
+  // "Hanya file PDF yang diperbolehkan.") — selalu tampilkan apa adanya ke user,
+  // ini bahasa awam yang sudah ramah, jangan jatuh ke 500 generic.
+  if (err.message && /^Hanya file/i.test(err.message)) {
     return res.status(400).json({ error: err.message });
   }
 

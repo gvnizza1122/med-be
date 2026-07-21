@@ -1,0 +1,274 @@
+/**
+ * OCR Service — Extract text from scanned PDF pages
+ *
+ * Uses tesseract.js (WASM-based OCR, works on Windows without admin)
+ * Supports Indonesian language (ind) for medical documents
+ *
+ * NOTE: Requires tesseract.js to be installed:
+ * npm install tesseract.js
+ */
+
+let Tesseract;
+try {
+  Tesseract = require('tesseract.js');
+} catch (err) {
+  console.warn('[OCR] tesseract.js not installed. OCR features disabled.');
+  console.warn('[OCR] To enable, run: npm install tesseract.js');
+  Tesseract = null;
+}
+
+const fs = require('fs');
+const path = require('path');
+
+// OCR Configuration
+const OCR_CONFIG = {
+  language: 'ind', // 'ind' for Indonesian, 'eng+ind' for English+Indonesian
+  confidence_threshold: 50, // Minimum confidence to mark as 'readable' (percent)
+  timeout_ms: 60000, // 60s per page max
+  log_performance: true
+};
+
+/**
+ * OCR a single PDF or image file
+ * @param {string|Buffer} input - File path or Buffer
+ * @param {string} language - Language code ('ind', 'eng+ind', etc.)
+ * @returns {Promise<OCRResult>}
+ */
+async function ocrSingleFile(input, language = OCR_CONFIG.language) {
+  if (!Tesseract) {
+    throw new Error('[OCR] tesseract.js not available. Install with: npm install tesseract.js');
+  }
+
+  const startTime = Date.now();
+
+  try {
+    const result = await Tesseract.recognize(input, language);
+
+    const duration = Date.now() - startTime;
+
+    return {
+      success: true,
+      text: result.data.text || '',
+      confidence: Math.round(result.data.confidence * 100) / 100, // percentage
+      block_count: result.data.blocks?.length || 0,
+      duration_ms: duration,
+      blocks: (result.data.blocks || []).map(block => ({
+        text: block.text,
+        confidence: Math.round(block.confidence * 100) / 100,
+        bounds: block.bbox || {}
+      }))
+    };
+  } catch (err) {
+    const duration = Date.now() - startTime;
+    throw {
+      success: false,
+      error: err.message,
+      duration_ms: duration
+    };
+  }
+}
+
+/**
+ * OCR specific pages from a PDF.
+ *
+ * RISET TERVERIFIKASI (21 Jul 2026): tesseract.js TIDAK bisa baca PDF langsung
+ * ("Error in pixReadStream: Pdf reading is not supported" — dites langsung ke
+ * 5 PDF sample). Solusi: render tiap halaman ke PNG pakai `mupdf` (WASM murni,
+ * tanpa native binary/compile — beda dengan `canvas`/`pdf-img-convert` yang
+ * butuh node-gyp dan gagal compile di mesin ini), baru PNG-nya di-OCR.
+ * `mupdf` adalah paket ESM — WAJIB pakai `await import('mupdf')`, `require()`
+ * akan gagal (ERR_REQUIRE_ASYNC_MODULE), sama seperti kasus pdfjs-dist v4.
+ *
+ * @param {string} pdfPath - Path to PDF file
+ * @param {number[]|string} pageNumbers - Page numbers (1-indexed) or 'all' or 'auto-scan'
+ * @param {string} language - Language code
+ * @returns {Promise<{success, pages: {page_number, text, confidence, block_count, duration_ms}[]}>}
+ */
+async function ocrPdfPages(pdfPath, pageNumbers = 'auto-scan', language = OCR_CONFIG.language) {
+  if (!Tesseract) {
+    throw new Error('[OCR] tesseract.js not available. Install with: npm install tesseract.js');
+  }
+
+  if (!fs.existsSync(pdfPath)) {
+    throw new Error(`[OCR] File not found: ${pdfPath}`);
+  }
+
+  const result = {
+    success: false,
+    pdfPath,
+    pages: [],
+    errors: [],
+    total_duration_ms: 0
+  };
+
+  const startTime = Date.now();
+
+  try {
+    const mupdf = await import('mupdf');
+    const buf = fs.readFileSync(pdfPath);
+    const doc = mupdf.Document.openDocument(buf, 'application/pdf');
+    const totalPages = doc.countPages();
+
+    // Tentukan halaman mana yang mau di-OCR
+    let targetPages;
+    if (Array.isArray(pageNumbers)) {
+      targetPages = pageNumbers;
+    } else if (pageNumbers === 'all') {
+      targetPages = Array.from({ length: totalPages }, (_, i) => i + 1);
+    } else {
+      // 'auto-scan' (default): pakai klasifikasi halaman yang sudah ada —
+      // cuma halaman SCAN (bukan hasil ketik/NATIVE) yang perlu di-OCR.
+      const { classifyPdfPages } = require('./pdfPageClassifier');
+      const classified = await classifyPdfPages(buf);
+      if (!classified.success) {
+        throw new Error('Gagal klasifikasi halaman: ' + (classified.errors[0]?.message || 'unknown'));
+      }
+      targetPages = classified.pages.filter(p => p.type === 'SCAN').map(p => p.page_num);
+    }
+
+    for (const pageNum of targetPages) {
+      if (pageNum < 1 || pageNum > totalPages) {
+        result.errors.push({ type: 'invalid_page', message: `Halaman ${pageNum} di luar jangkauan (total ${totalPages})` });
+        continue;
+      }
+
+      const pageStart = Date.now();
+      try {
+        const page = doc.loadPage(pageNum - 1); // mupdf 0-indexed
+        const matrix = mupdf.Matrix.scale(2.0, 2.0); // ~144 DPI, cukup untuk OCR
+        const pixmap = page.toPixmap(matrix, mupdf.ColorSpace.DeviceRGB, false, true);
+        const pngBuffer = Buffer.from(pixmap.asPNG());
+
+        const ocrResult = await ocrSingleFile(pngBuffer, language);
+
+        result.pages.push({
+          page_number: pageNum,
+          text: ocrResult.text,
+          confidence: ocrResult.confidence,
+          confidence_status: ocrResult.confidence >= OCR_CONFIG.confidence_threshold ? 'readable' : 'unclear',
+          // 'readable': confidence >= threshold (likely correct)
+          // 'unclear': confidence < threshold (needs human review, often handwriting)
+          block_count: ocrResult.block_count,
+          duration_ms: Date.now() - pageStart
+        });
+      } catch (pageErr) {
+        result.errors.push({
+          type: 'page_ocr_error',
+          page_number: pageNum,
+          message: pageErr.message || String(pageErr)
+        });
+      }
+    }
+
+    result.success = result.pages.length > 0 || targetPages.length === 0;
+
+  } catch (err) {
+    result.errors.push({
+      type: 'ocr_error',
+      message: err.message || String(err)
+    });
+  }
+
+  result.total_duration_ms = Date.now() - startTime;
+  return result;
+}
+
+/**
+ * OCR with retry logic
+ * @param {string} filePath - File path
+ * @param {number} maxAttempts - Max retry attempts
+ * @param {number} backoffMs - Backoff delay between retries
+ * @returns {Promise<OCRResult>}
+ */
+async function ocrWithRetry(filePath, maxAttempts = 3, backoffMs = 1000) {
+  let lastError;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      console.log(`[OCR] Attempt ${attempt}/${maxAttempts}: ${path.basename(filePath)}`);
+      return await ocrSingleFile(filePath);
+    } catch (err) {
+      lastError = err;
+      console.warn(`[OCR] Attempt ${attempt} failed: ${err.message || err}`);
+
+      if (attempt < maxAttempts) {
+        console.log(`[OCR] Retrying in ${backoffMs}ms...`);
+        await new Promise(resolve => setTimeout(resolve, backoffMs));
+      }
+    }
+  }
+
+  throw lastError;
+}
+
+/**
+ * Batch OCR multiple files
+ * @param {string[]} filePaths - Array of file paths
+ * @param {string} language - Language code
+ * @param {Object} options - { maxParallel, timeout, onProgress }
+ * @returns {Promise<Object[]>}
+ */
+async function ocrBatch(filePaths, language = OCR_CONFIG.language, options = {}) {
+  const {
+    maxParallel = 2, // Don't overwhelm memory with too many parallel OCRs
+    timeout = OCR_CONFIG.timeout_ms,
+    onProgress = null
+  } = options;
+
+  const results = [];
+  const queue = [...filePaths];
+  const running = new Set();
+
+  return new Promise((resolve, reject) => {
+    const processNext = async () => {
+      if (queue.length === 0 && running.size === 0) {
+        resolve(results);
+        return;
+      }
+
+      if (queue.length > 0 && running.size < maxParallel) {
+        const filePath = queue.shift();
+        running.add(filePath);
+
+        try {
+          const result = await ocrWithRetry(filePath);
+          results.push({ filePath, ...result });
+
+          if (onProgress) {
+            onProgress({
+              completed: filePaths.length - queue.length,
+              total: filePaths.length
+            });
+          }
+        } catch (err) {
+          results.push({ filePath, success: false, error: err.message });
+        }
+
+        running.delete(filePath);
+        setImmediate(processNext);
+      }
+    };
+
+    // Start processing
+    for (let i = 0; i < maxParallel && queue.length > 0; i++) {
+      setImmediate(processNext);
+    }
+  });
+}
+
+/**
+ * Health check: verify tesseract.js is available
+ * @returns {boolean}
+ */
+function isAvailable() {
+  return Tesseract !== null;
+}
+
+module.exports = {
+  ocrSingleFile,
+  ocrPdfPages,
+  ocrWithRetry,
+  ocrBatch,
+  isAvailable,
+  OCR_CONFIG
+};

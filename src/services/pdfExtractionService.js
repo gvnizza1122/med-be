@@ -1,8 +1,5 @@
 const { PDF_FIELDS, SYSTEM_FIELDS, buildRecord, toTSV, COLUMNS } = require('./vclaimSchema');
 
-// OpenRouter OpenAI-compatible endpoint
-const OPENROUTER_API_BASE = 'https://openrouter.ai/api/v1';
-
 /**
  * Ekstrak teks halaman claim-data → 1 record vClaim (60 kolom, format asli vClaim).
  * Kolom bersumber 'system' (CODER_ID, C1-C4, TARIF_RS, dst) TIDAK diminta ke AI —
@@ -21,10 +18,11 @@ async function extractClaimData(claimDataText) {
     errors: [],
   };
 
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  const model = process.env.AI_MODEL || 'openrouter/free';
+  const apiKey = process.env.AI_PROVIDER_API_KEY;
+  const baseUrl = process.env.AI_PROVIDER_BASE_URL || 'https://api.openai.com/v1';
+  const model = process.env.AI_MODEL || 'gpt-4o-mini';
 
-  if (!apiKey) { result.errors.push('OPENROUTER_API_KEY tidak diisi di .env'); return result; }
+  if (!apiKey) { result.errors.push('AI_PROVIDER_API_KEY tidak diisi di .env'); return result; }
   if (!claimDataText || !claimDataText.trim()) { result.errors.push('claimDataText kosong'); return result; }
 
   const prompt = `Kamu ekstraktor data klaim BPJS dari halaman "Berkas Klaim Individual" (output E-Klaim Indonesia).
@@ -55,14 +53,12 @@ JSON:`;
       const timer = setTimeout(() => ac.abort(), timeoutMs);
       let respText;
       try {
-        const response = await fetch(`${OPENROUTER_API_BASE}/chat/completions`, {
+        const response = await fetch(`${baseUrl}/chat/completions`, {
           method: 'POST',
           signal: ac.signal,
           headers: {
             'Authorization': `Bearer ${apiKey}`,
             'Content-Type': 'application/json',
-            'HTTP-Referer': 'http://localhost:3000',
-            'X-Title': 'eClaim PDF Extraction',
           },
           body: JSON.stringify({
             model,

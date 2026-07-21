@@ -460,9 +460,9 @@ function _resetTotalUsage() {
  */
 async function runAiAudit(records, onBatchComplete, errorFieldsByRecord = null) {
   _resetTotalUsage();
-  const apiKey = process.env.OPENROUTER_API_KEY || process.env.AI_API_KEY;
-  const baseUrl = process.env.AI_BASE_URL || 'https://openrouter.ai/api/v1';
-  const model = process.env.AI_MODEL || 'google/gemini-2.5-flash-lite';
+  const apiKey = process.env.AI_PROVIDER_API_KEY;
+  const baseUrl = process.env.AI_PROVIDER_BASE_URL || 'https://api.openai.com/v1';
+  const model = process.env.AI_MODEL || 'gpt-4o-mini';
 
   // No API key configured — use rule-based fallback
   if (!apiKey || apiKey === '') {
@@ -544,7 +544,7 @@ const STYLE_DESCRIPTIONS = {
   neutral: 'formal dan lengkap untuk perawat verifikator',
 };
 
-const OPENROUTER_SYSTEM_PROMPT = `You are an expert medical claim auditor for the Indonesian BPJS Kesehatan E-Claim system. Your task is to analyze a specific field in a medical record that has failed validation and provide a clear, actionable correction suggestion for the hospital administration or coding team.
+const AI_AUDIT_SYSTEM_PROMPT = `You are an expert medical claim auditor for the Indonesian BPJS Kesehatan E-Claim system. Your task is to analyze a specific field in a medical record that has failed validation and provide a clear, actionable correction suggestion for the hospital administration or coding team.
 
 You must strictly output your analysis in a valid JSON format. Do not include any markdown formatting (like \`\`\`json), no backticks, and no conversational text outside the JSON.
 
@@ -557,7 +557,7 @@ Expected JSON structure:
   "confidence_score": float (a value between 0.0 and 1.0 representing your confidence)
 }`;
 
-function buildOpenRouterUserPrompt(fieldName, currentValue, errorMessage, medicalContext, auditStyle) {
+function buildAiAuditUserPrompt(fieldName, currentValue, errorMessage, medicalContext, auditStyle) {
   return `Please audit the following failed record field details:
 - Field to Audit: ${fieldName}
 - Current Value: ${currentValue || '(kosong/NULL)'}
@@ -603,12 +603,12 @@ function fallbackAuditResponse(fieldName, errorReason = '') {
 async function auditRecordField(record, fieldName, style = 'ponytail', validationError = null) {
   if (!['ponytail', 'caveman', 'neutral'].includes(style)) style = 'neutral';
 
-  // Baca dari env dengan fallback ke default OpenRouter
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  if (!apiKey) throw new Error('[AI Audit] OPENROUTER_API_KEY belum dikonfigurasi.');
+  // Baca dari unified AI provider environment variables
+  const apiKey = process.env.AI_PROVIDER_API_KEY;
+  if (!apiKey) throw new Error('[AI Audit] AI_PROVIDER_API_KEY belum dikonfigurasi.');
 
-  const baseUrl = process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1';
-  const model = process.env.OPENROUTER_MODEL || 'openai/gpt-oss-20b:free';
+  const baseUrl = process.env.AI_PROVIDER_BASE_URL || 'https://api.openai.com/v1';
+  const model = process.env.AI_MODEL || 'gpt-4o-mini';
 
   const fieldKey = fieldName.toLowerCase();
   const currentValue = String(record[fieldKey] ?? '');
@@ -617,7 +617,7 @@ async function auditRecordField(record, fieldName, style = 'ponytail', validatio
   const medicalContext = record.deskripsi_inacbg || record.diagnosa_list || '';
 
   // Build user prompt menggunakan template yang diberikan
-  const userMessage = buildOpenRouterUserPrompt(
+  const userMessage = buildAiAuditUserPrompt(
     fieldName,
     currentValue,
     validationError || '(tidak diberikan)',
@@ -625,11 +625,11 @@ async function auditRecordField(record, fieldName, style = 'ponytail', validatio
     style
   );
 
-  // POST dengan custom headers OpenRouter
+  // POST ke AI provider API
   const body = JSON.stringify({
     model,
     messages: [
-      { role: 'system', content: OPENROUTER_SYSTEM_PROMPT },
+      { role: 'system', content: AI_AUDIT_SYSTEM_PROMPT },
       { role: 'user', content: userMessage },
     ],
     temperature: 0.2,
@@ -662,8 +662,6 @@ async function auditRecordField(record, fieldName, style = 'ponytail', validatio
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${apiKey}`,
-        'HTTP-Referer': 'http://localhost:3000',
-        'X-Title': 'E-Claim AI Auditor',
         'Content-Length': Buffer.byteLength(body),
         'Host': url.hostname,
       },
@@ -683,21 +681,21 @@ async function auditRecordField(record, fieldName, style = 'ponytail', validatio
   });
 
   if (response.status !== 200) {
-    throw new Error(`[OpenRouter] HTTP ${response.status}: ${response.body.substring(0, 150)}`);
+    throw new Error(`[AI Audit] HTTP ${response.status}: ${response.body.substring(0, 150)}`);
   }
 
   let data;
   try {
     data = JSON.parse(response.body);
   } catch (e) {
-    throw new Error(`[OpenRouter] Invalid JSON response: ${e.message}`);
+    throw new Error(`[AI Audit] Invalid JSON response: ${e.message}`);
   }
 
   const usage = data?.usage || {};
   const content = data?.choices?.[0]?.message?.content || '';
 
   if (!content) {
-    throw new Error('[OpenRouter] Empty response content');
+    throw new Error('[AI Audit] Empty response content');
   }
 
   // Manual JSON parsing dari content (fallback dari markdown blocks)

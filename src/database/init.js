@@ -286,6 +286,18 @@ async function initializeSchema() {
         tokens_output INTEGER DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+
+      CREATE TABLE IF NOT EXISTS ocr_results (
+        id TEXT PRIMARY KEY,
+        record_id TEXT NOT NULL REFERENCES claim_records(id) ON DELETE CASCADE,
+        page_number INTEGER NOT NULL,
+        ocr_text TEXT,
+        confidence DOUBLE PRECISION,
+        block_count INTEGER DEFAULT 0,
+        processing_duration_ms INTEGER,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(record_id, page_number)
+      );
     `);
 
     // Create Indexes
@@ -301,6 +313,8 @@ async function initializeSchema() {
     await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_ai_audit_record ON ai_audit_log(record_id)`);
     await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_ai_audit_file ON ai_audit_log(file_id)`);
     await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_ai_audit_style_action ON ai_audit_log(style, nurse_action)`);
+    await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_ocr_results_record_id ON ocr_results(record_id)`);
+    await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_ocr_results_page ON ocr_results(record_id, page_number)`);
 
     await migrateSchema(dbHelper);
   } catch (err) {

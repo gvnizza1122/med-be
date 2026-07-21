@@ -41,7 +41,7 @@ async function classifyPdfPages(filePath) {
       const hasClaimData = isClaimDataPage(text);
       const pageNum = i + 1;
       if (hasClaimData) result.claimDataPages.push({ page_num: pageNum, text });
-      result.pages.push({ page_num: pageNum, type, text_length: text.length, has_claim_data: hasClaimData, text_sample: text.slice(0, 200) });
+      result.pages.push({ page_num: pageNum, type, text_length: text.length, has_claim_data: hasClaimData, text_sample: text.slice(0, 200), text_full: text });
       if (type === 'NATIVE') result.summary.nativeCount++; else result.summary.scanCount++;
     });
     result.totalPages = chunks.length;
