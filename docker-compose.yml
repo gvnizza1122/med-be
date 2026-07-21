@@ -14,13 +14,6 @@ services:
       - postgres_data:/var/lib/postgresql/data
     restart: unless-stopped
 
-  redis:
-    image: redis:7-alpine
-    container_name: eclaim_redis
-    ports:
-      - "${REDIS_PORT:-6379}:6379"
-    restart: unless-stopped
-
   api:
     build: .
     container_name: eclaim_api
@@ -40,15 +33,14 @@ services:
       - SIMRS_API_KEY=${SIMRS_API_KEY}
       - SIMRS_CALLBACK_URL=${SIMRS_CALLBACK_URL}
       - SIMRS_CALLBACK_API_KEY=${SIMRS_CALLBACK_API_KEY}
-      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
-      - AI_API_KEY=${AI_API_KEY}
-      - AI_BASE_URL=${AI_BASE_URL}
+      - AI_PROVIDER_BASE_URL=${AI_PROVIDER_BASE_URL}
+      - AI_PROVIDER_API_KEY=${AI_PROVIDER_API_KEY}
       - AI_MODEL=${AI_MODEL}
-      - REDIS_HOST=${REDIS_HOST:-redis}
-      - REDIS_PORT=${REDIS_PORT:-6379}
+      - AI_MAX_ATTEMPTS=${AI_MAX_ATTEMPTS:-3}
+      - AI_TIMEOUT_MS=${AI_TIMEOUT_MS:-60000}
+      - ECLAIM_PUBLIC_URL=${ECLAIM_PUBLIC_URL}
     depends_on:
       - db
-      - redis
     volumes:
       - ./uploads:/usr/src/app/uploads
     restart: unless-stopped
