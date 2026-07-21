@@ -167,6 +167,10 @@ app.use((err, req, res, next) => {
     return res.status(400).json({ error: err.message });
   }
 
+  if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+    return res.status(400).json({ error: 'Jumlah berkas melebihi batas maksimum. Kirim maksimal 10 berkas per permintaan.' });
+  }
+
   res.status(500).json({ error: 'Terjadi kesalahan internal server.' });
 });
 
