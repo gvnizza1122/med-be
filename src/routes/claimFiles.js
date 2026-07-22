@@ -13,6 +13,56 @@ const { validateRecordWithAI, runAiAudit, getTotalUsage, extractErrorFields, est
 
 const router = express.Router();
 
+// OCR (tesseract.js) berat di CPU dan makan waktu tak terduga. Sebelumnya tiap
+// panggilan ke /ocr-pages yang belum ada hasilnya langsung memicu proses baru
+// dengan Promise.race + setTimeout — tapi setTimeout cuma membuat REQUEST-nya
+// "gagal" duluan, proses tesseract di baliknya TETAP jalan tak bisa dibatalkan,
+// dan hasilnya dibuang (tidak pernah disimpan). Akibatnya: tiap kali user buka
+// ulang panel OCR (karena kelihatan gagal), proses baru menumpuk di atas yang
+// lama tanpa henti — CPU 100%+ terus-menerus dan tidak pernah ada yang selesai.
+// Map ini memastikan HANYA SATU proses OCR berjalan per record: request lain
+// yang datang saat proses masih berjalan ikut menunggu proses YANG SAMA, dan
+// hasilnya tetap disimpan ke DB begitu selesai — walau request HTTP asal yang
+// memicunya sudah keburu timeout duluan di sisi client.
+const ocrJobsInFlight = new Map(); // record_id -> Promise<ocrResult>
+
+async function saveOcrResultsToDb(db, recordId, ocrResult) {
+  if (!ocrResult.success || !ocrResult.pages || ocrResult.pages.length === 0) return;
+  const insertOcrResult = db.prepare(`
+    INSERT INTO ocr_results (id, record_id, page_number, ocr_text, confidence, block_count, processing_duration_ms)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(record_id, page_number) DO UPDATE SET
+      ocr_text = excluded.ocr_text,
+      confidence = excluded.confidence,
+      block_count = excluded.block_count,
+      processing_duration_ms = excluded.processing_duration_ms
+  `);
+  for (const page of ocrResult.pages) {
+    await insertOcrResult.run(
+      uuidv4(), recordId, page.page_number,
+      page.text || '', page.confidence || 0, page.block_count || 0,
+      page.duration_ms || 0
+    );
+  }
+}
+
+// Jalankan (atau gabung ke) satu-satunya proses OCR aktif untuk record ini.
+// Hasil SELALU disimpan ke DB begitu proses benar-benar selesai, terlepas dari
+// apakah request HTTP yang memicunya masih menunggu atau sudah timeout duluan.
+function runDedupedOcr(db, recordId, filePath, pageNumbers, ocrPdfPages) {
+  let job = ocrJobsInFlight.get(recordId);
+  if (!job) {
+    job = ocrPdfPages(filePath, pageNumbers)
+      .then(async (result) => {
+        await saveOcrResultsToDb(db, recordId, result);
+        return result;
+      })
+      .finally(() => ocrJobsInFlight.delete(recordId));
+    ocrJobsInFlight.set(recordId, job);
+  }
+  return job;
+}
+
 const UPLOAD_DIR = process.env.UPLOAD_DIR || './uploads';
 if (!fs.existsSync(UPLOAD_DIR)) {
   fs.mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -1619,37 +1669,16 @@ router.post('/:record_id/ocr', authenticate, async (req, res) => {
       return res.status(400).json({ error: 'File PDF tidak ditemukan di sistem' });
     }
 
-    // Request OCR (async job for now, returns status)
-    // In production, this would queue a background job
-    // For MVP, we'll run synchronously with timeout
+    // Request OCR — proses sesungguhnya di-dedupe per record_id (lihat
+    // runDedupedOcr di atas), request ini cuma menunggu maksimal 2 menit lalu
+    // menyerah kalau belum selesai; proses & penyimpanan hasilnya tetap lanjut.
     try {
       const ocrResult = await Promise.race([
-        ocrPdfPages(record.file_path, pageNumbers || 'auto-scan'),
+        runDedupedOcr(db, record_id, record.file_path, pageNumbers || 'auto-scan', ocrPdfPages),
         new Promise((_, reject) =>
           setTimeout(() => reject(new Error('OCR timeout')), 120000) // 2min max
         )
       ]);
-
-      // Save OCR results to database
-      if (ocrResult.success && ocrResult.pages && ocrResult.pages.length > 0) {
-        const insertOcrResult = db.prepare(`
-          INSERT INTO ocr_results (id, record_id, page_number, ocr_text, confidence, block_count, processing_duration_ms)
-          VALUES (?, ?, ?, ?, ?, ?, ?)
-          ON CONFLICT(record_id, page_number) DO UPDATE SET
-            ocr_text = excluded.ocr_text,
-            confidence = excluded.confidence,
-            block_count = excluded.block_count,
-            processing_duration_ms = excluded.processing_duration_ms
-        `);
-
-        for (const page of ocrResult.pages) {
-          await insertOcrResult.run(
-            uuidv4(), record_id, page.page_number,
-            page.text || '', page.confidence || 0, page.block_count || 0,
-            page.duration_ms || 0
-          );
-        }
-      }
 
       res.json({
         status: ocrResult.success ? 'completed' : 'error',
@@ -1714,32 +1743,14 @@ router.get('/:record_id/ocr-pages', authenticate, async (req, res) => {
 
       try {
         const ocrResult = await Promise.race([
-          ocrPdfPages(record.file_path, 'auto-scan'),
+          runDedupedOcr(db, record_id, record.file_path, 'auto-scan', ocrPdfPages),
           new Promise((_, reject) =>
             setTimeout(() => reject(new Error('OCR timeout')), 120000) // 2min max
           )
         ]);
 
-        // Save OCR results to database
+        // runDedupedOcr sudah menyimpan hasilnya sendiri — cukup baca ulang kalau berhasil
         if (ocrResult.success && ocrResult.pages && ocrResult.pages.length > 0) {
-          const insertOcrResult = db.prepare(`
-            INSERT INTO ocr_results (id, record_id, page_number, ocr_text, confidence, block_count, processing_duration_ms)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(record_id, page_number) DO UPDATE SET
-              ocr_text = excluded.ocr_text,
-              confidence = excluded.confidence,
-              block_count = excluded.block_count,
-              processing_duration_ms = excluded.processing_duration_ms
-          `);
-
-          for (const page of ocrResult.pages) {
-            await insertOcrResult.run(
-              uuidv4(), record_id, page.page_number,
-              page.text || '', page.confidence || 0, page.block_count || 0,
-              page.duration_ms || 0
-            );
-          }
-
           // Fetch newly saved results
           ocrResults = await db.prepare(`
             SELECT page_number, ocr_text, confidence, block_count, processing_duration_ms, created_at
