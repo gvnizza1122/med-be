@@ -1366,16 +1366,41 @@ router.post('/:record_id/update-values', authenticate, async (req, res) => {
 
     const db = getDb();
     const existing = await db.prepare(`
-      SELECT id, file_id, raw_data FROM claim_records WHERE id = ?
+      SELECT id, file_id, raw_data, kode_rs, sep, nokartu, nama_pasien, mrn,
+        birth_date, gender, kelas_rawat, admission_date, discharge_date,
+        discharge_status, diagnosa_list, prosedur_list, dpjp_name, tarif_rs
+      FROM claim_records WHERE id = ?
     `).get(req.params.record_id);
 
     if (!existing) {
       return res.status(404).json({ error: 'Record tidak ditemukan' });
     }
 
-    // Gabung data lama (60 kolom vClaim) dengan perubahan dari verifikator
-    const currentData = existing.raw_data ? JSON.parse(existing.raw_data) : {};
-    const mergedData = { ...currentData, ...updates };
+    // raw_data adalah salinan PRISTINE dari upload asli (dipakai untuk perbandingan
+    // auto-fix) — bukan status terkini record. Kolom-kolom yang punya field
+    // tersendiri di claim_records (dpjp_name, dst.) bisa saja sudah dikoreksi
+    // sejak upload dan tidak ada/berbeda di raw_data. Kalau merge langsung dari
+    // raw_data, field yang tidak ikut di-edit verifikator bisa ke-null-kan.
+    // Jadi: mulai dari raw_data (sumber untuk ~44 kolom yang cuma ada di JSON),
+    // timpa dengan nilai kolom terkini punya field khusus, baru terapkan updates.
+    // Tanggal SENGAJA tidak ikut ditimpa di sini: kolom DB menyimpannya dalam
+    // format ISO (YYYY-MM-DD), sedangkan vclaimDateToISO() di bawah hanya
+    // mengerti format vClaim asli (DD/MM/YYYY) dari raw_data — kalau ISO ikut
+    // dioper ke sana hasilnya null dan tanggal malah hilang.
+    const CURRENT_FIELD_KEY_MAP = {
+      kode_rs: 'KODE_RS', sep: 'SEP', nokartu: 'NOKARTU', nama_pasien: 'NAMA_PASIEN', mrn: 'MRN',
+      gender: 'SEX', kelas_rawat: 'KELAS_RAWAT', discharge_status: 'DISCHARGE_STATUS',
+      diagnosa_list: 'DIAGLIST', prosedur_list: 'PROCLIST', dpjp_name: 'DPJP', tarif_rs: 'TARIF_RS',
+    };
+    const currentColumnValues = {};
+    for (const [dbField, vclaimKey] of Object.entries(CURRENT_FIELD_KEY_MAP)) {
+      if (existing[dbField] !== null && existing[dbField] !== undefined) {
+        currentColumnValues[vclaimKey] = existing[dbField];
+      }
+    }
+
+    const pristineData = existing.raw_data ? JSON.parse(existing.raw_data) : {};
+    const mergedData = { ...pristineData, ...currentColumnValues, ...updates };
 
     // Convert ke format database, lalu validasi ulang dengan rule engine
     const dbRecord = vclaimToDbFormat(mergedData);
