@@ -54,8 +54,43 @@ async function extractFromPDF(filePath, options = {}) {
     }
 
     if (classification.claimDataPages.length === 0) {
-      result.pesan = PESAN.bukanBerkasKlaim;
-      return result;
+      // Fallback OCR: kalau pdf-parse tidak menemukan teks (PDF scan/gambar),
+      // coba OCR semua halaman lalu re-classify
+      let ocrFallbackWorked = false;
+      try {
+        const { ocrPdfPages } = require('./ocrService');
+        const totalText = classification.pages.reduce((sum, p) => sum + p.text_length, 0);
+        if (totalText < 200 && classification.totalPages > 0) {
+          console.log(`[Pipeline] Teks pdf-parse terlalu sedikit (${totalText} chars), mencoba OCR...`);
+          const ocrResult = await ocrPdfPages(filePath, 'all');
+          if (ocrResult.success && ocrResult.pages.length > 0) {
+            const ocrTexts = ocrResult.pages
+              .filter(p => p.text && p.text.trim().length > 30)
+              .map(p => p.text);
+            if (ocrTexts.length > 0) {
+              const { isClaimDataPage } = require('./pdfPageClassifier');
+              const combinedText = ocrTexts.join('\n\n---\n\n');
+              if (isClaimDataPage(combinedText)) {
+                classification.claimDataText = combinedText;
+                classification.claimDataPages = ocrResult.pages.map((p, i) => ({
+                  page_num: p.page_number, text: p.text
+                }));
+                result.metadata.claimDataPagesFound = classification.claimDataPages.length;
+                result.metadata.ocrFallback = true;
+                ocrFallbackWorked = true;
+                console.log(`[Pipeline] OCR fallback berhasil, ${ocrTexts.length} halaman terbaca.`);
+              }
+            }
+          }
+        }
+      } catch (ocrErr) {
+        console.warn('[Pipeline] OCR fallback gagal:', ocrErr.message || ocrErr);
+      }
+
+      if (!ocrFallbackWorked) {
+        result.pesan = PESAN.bukanBerkasKlaim;
+        return result;
+      }
     }
 
     if (skipAI) {

@@ -5,12 +5,17 @@ const fs = require('fs');
 // 'DPJP' & 'Dokter Penanggung Jawab' ikut: nama dokter ada di layer teks (halaman SPRI/SEP),
 // bukan di halaman E-Klaim — tanpa ini kolom DPJP vClaim selalu kosong.
 const CLAIM_DATA_KEYWORDS = ['Nomor SEP', 'Berkas Klaim Individual', 'INA-CBG', 'Total Tarif', 'Rincian Biaya', 'DPJP', 'Dokter Penanggung Jawab'];
+// Keyword tambahan untuk format PDF RS yang bervariasi
+const EXTRA_KEYWORDS = ['Klaim Individual', 'Data Klaim', 'Resume Medis', 'Ringkasan Pasien Keluar', 'INACBG', 'INA CBG', 'Diagnosa', 'Prosedur', 'Kode ICD', 'Nomor Kartu'];
 const PRIMARY_KEYWORD = 'Berkas Klaim Individual'; // halaman E-Klaim summary = sumber utama
 const SCAN_CHAR_THRESHOLD = 50;
 
 function isClaimDataPage(text) {
   const t = text.toLowerCase();
-  return CLAIM_DATA_KEYWORDS.some(kw => t.includes(kw.toLowerCase()));
+  if (CLAIM_DATA_KEYWORDS.some(kw => t.includes(kw.toLowerCase()))) return true;
+  // Fallback: cocokkan minimal 2 keyword tambahan (menghindari false positive)
+  const extraHits = EXTRA_KEYWORDS.filter(kw => t.includes(kw.toLowerCase()));
+  return extraHits.length >= 2;
 }
 
 async function classifyPdfPages(filePath) {
