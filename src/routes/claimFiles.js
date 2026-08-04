@@ -397,7 +397,7 @@ router.post('/upload', authenticate, upload.single('file'), async (req, res) => 
 router.get('/', authenticate, async (req, res) => {
   try {
     const db = getDb();
-    const { page = 1, limit = 20, status } = req.query;
+    const { page = 1, limit = 20, status, jenis_klaim } = req.query;
     const offset = (parseInt(page) - 1) * parseInt(limit);
 
     let where = 'WHERE 1=1';
@@ -406,6 +406,11 @@ router.get('/', authenticate, async (req, res) => {
     if (status) {
       where += ' AND cf.status = ?';
       params.push(status);
+    }
+
+    if (jenis_klaim) {
+      where += ' AND cf.jenis_klaim = ?';
+      params.push(jenis_klaim);
     }
 
     const totalResult = await db.prepare(`SELECT COUNT(*) as count FROM claim_files cf ${where}`).get(...params);
@@ -1029,11 +1034,20 @@ function vclaimToDbFormat(vclaimRecord) {
   return dbRecord;
 }
 
+// Kategori pelayanan yang bisa dipilih user di halaman Extract PDF. Dulu
+// jenis_klaim SELALU di-hardcode 'RAWAT_INAP' untuk upload PDF, tak peduli
+// isi dokumennya rawat jalan/IGD - akibatnya rule RV-17 (odontektomi) salah
+// nyala untuk klaim rawat jalan, dan AI review menyarankan hal-hal rawat
+// inap (ruangan, dst) untuk klaim yang sebenarnya rawat jalan.
+const JENIS_KLAIM_OPTIONS = ['RAWAT_JALAN', 'RAWAT_INAP', 'GAWAT_DARURAT'];
+
 router.post('/upload-pdf', authenticate, pdfUpload.single('file'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'Belum ada berkas yang dipilih. Silakan pilih berkas PDF terlebih dahulu.' });
     }
+
+    const jenisKlaim = JENIS_KLAIM_OPTIONS.includes(req.body?.jenis_klaim) ? req.body.jenis_klaim : 'RAWAT_INAP';
 
     const { extractFromPDF } = require('../services/pdfExtractionPipeline');
     const result = await extractFromPDF(req.file.path);
@@ -1050,10 +1064,13 @@ router.post('/upload-pdf', authenticate, pdfUpload.single('file'), async (req, r
     const resolvedFilePath = path.resolve(req.file.path);
 
     // Record vClaim lengkap 60 kolom (urutan & format sesuai output vClaim asli).
-    const extractedData = result.record;
+    // jenis_klaim ditambahkan dari pilihan user (AI ekstraksi tidak pernah
+    // menghasilkan field ini) - jadi konteks "memory" untuk AI review nanti.
+    const extractedData = { ...result.record, JENIS_KLAIM: jenisKlaim };
 
     // Convert vClaim format to database format for validation
     const dbRecord = vclaimToDbFormat(extractedData);
+    dbRecord.jenis_klaim = jenisKlaim;
 
     // Run validation on extracted record
     const activeRules = await db.prepare('SELECT * FROM validation_rules WHERE is_active = 1').all();
@@ -1062,9 +1079,9 @@ router.post('/upload-pdf', authenticate, pdfUpload.single('file'), async (req, r
 
     // Save file record with status='uploaded' (data extraction complete)
     await db.prepare(`
-      INSERT INTO claim_files (id, hospital_code, file_name, file_path, status, uploaded_by, total_records, description)
-      VALUES (?, ?, ?, ?, 'uploaded', ?, 1, 'Extracted from PDF')
-    `).run(fileId, req.user.hospital_code || '3371084', req.file.originalname, resolvedFilePath, req.user.id);
+      INSERT INTO claim_files (id, hospital_code, file_name, file_path, status, uploaded_by, total_records, description, jenis_klaim)
+      VALUES (?, ?, ?, ?, 'uploaded', ?, 1, 'Extracted from PDF', ?)
+    `).run(fileId, req.user.hospital_code || '3371084', req.file.originalname, resolvedFilePath, req.user.id, jenisKlaim);
 
     // Save extracted record with validation results using transaction
     await db.transaction(async (tx) => {
@@ -1086,7 +1103,7 @@ router.post('/upload-pdf', authenticate, pdfUpload.single('file'), async (req, r
         /^\d+$/.test(extractedData.DISCHARGE_STATUS) ? parseInt(extractedData.DISCHARGE_STATUS) : 1,
         extractedData.DIAGLIST, extractedData.PROCLIST,
         extractedData.DPJP,
-        /^\d+$/.test(extractedData.TARIF_RS) ? parseInt(extractedData.TARIF_RS) : null, 'RAWAT_INAP',
+        /^\d+$/.test(extractedData.TARIF_RS) ? parseInt(extractedData.TARIF_RS) : null, jenisKlaim,
         validationStatus, validationErrors.length, JSON.stringify(extractedData)
       );
 

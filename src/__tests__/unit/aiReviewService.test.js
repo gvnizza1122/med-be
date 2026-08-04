@@ -114,4 +114,19 @@ describe('generateAiReview — dengan AI dikonfigurasi (fetch dimock)', () => {
     const entry = result.code_evidence.find(e => e.code === 'E11.9');
     expect(entry.found).toBe(true);
   });
+
+  test('jenis_klaim (kategori pelayanan pilihan user) disertakan eksplisit di prompt AI', async () => {
+    mockFetchOk({ field_notes: {}, code_evidence: [], suggested_codes: [] });
+
+    await generateAiReview(
+      { sep: 'ABC', JENIS_KLAIM: 'RAWAT_JALAN' },
+      [{ field_name: 'sep', error_message: 'harus uppercase', actual_value: 'abc', expected_value: 'ABC' }],
+      []
+    );
+
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    const sentBody = JSON.parse(global.fetch.mock.calls[0][1].body);
+    const userMessage = sentBody.messages.find(m => m.role === 'user').content;
+    expect(userMessage).toContain('JENIS_KLAIM: RAWAT_JALAN');
+  });
 });

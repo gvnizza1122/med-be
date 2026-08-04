@@ -19,10 +19,18 @@ const AI_REVIEW_SYSTEM_PROMPT = `Kamu asisten audit klaim BPJS E-Claim untuk per
 Kamu diberi data lengkap satu rekam klaim (hasil ekstraksi), daftar field yang gagal validasi otomatis,
 dan (kalau ada) teks bukti dokumen pendukung (hasil OCR/teks asli PDF).
 
+PENTING — jenis klaim: field "JENIS_KLAIM"/"jenis_klaim" pada data rekam menunjukkan kategori
+pelayanan (RAWAT_JALAN, RAWAT_INAP, atau GAWAT_DARURAT), dipilih sendiri oleh perawat saat upload —
+selalu akurat, jangan diragukan. SEMUA catatan/saran yang kamu beri WAJIB konsisten dengan kategori
+ini. Untuk klaim RAWAT_JALAN: JANGAN sarankan/singgung ruangan rawat inap, kelas rawat inap, ICU,
+lama hari rawat (LOS) sebagai rawat inap, atau hal lain yang cuma relevan untuk pasien yang menginap.
+Untuk klaim RAWAT_INAP/GAWAT_DARURAT: kembali ke penilaian normal.
+
 TUGAS:
 1. Untuk setiap field yang gagal validasi (daftar "FIELD_ERRORS"): beri catatan singkat dalam Bahasa
    Indonesia yang menjelaskan MENGAPA field itu gagal dan LANGKAH konkret memperbaikinya, dengan
-   mempertimbangkan seluruh data rekam klaim sebagai konteks (bukan field itu saja).
+   mempertimbangkan seluruh data rekam klaim (termasuk JENIS_KLAIM di atas) sebagai konteks (bukan
+   field itu saja).
 2. Kalau ada BUKTI_DOKUMEN dan ada kode diagnosis (DIAGLIST) / prosedur (PROCLIST) yang diklaim:
    verifikasi tiap kode terhadap bukti dokumen.
    - HANYA nyatakan "ada bukti" (found:true) kalau kamu bisa kutip kalimat PERSIS dari teks yang
@@ -53,7 +61,9 @@ function pickCodes(record) {
 }
 
 function buildPrompt(record, validationErrors, evidencePool, codes) {
-  let prompt = `DATA REKAM KLAIM (hasil ekstraksi, jadikan konteks — "memory"):\n`;
+  const jenisKlaim = record.JENIS_KLAIM || record.jenis_klaim || '(tidak diketahui)';
+  let prompt = `JENIS_KLAIM: ${jenisKlaim} — WAJIB dipatuhi, lihat instruksi di atas.\n\n`;
+  prompt += `DATA REKAM KLAIM (hasil ekstraksi, jadikan konteks — "memory"):\n`;
   prompt += JSON.stringify(record, null, 0) + '\n\n';
 
   if (validationErrors.length > 0) {

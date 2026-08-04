@@ -174,6 +174,7 @@ async function initializeSchema() {
         approved_at TIMESTAMP,
         description TEXT,
         column_count INTEGER DEFAULT 0,
+        jenis_klaim TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
@@ -405,6 +406,15 @@ async function migrateSchema(db) {
       if (!fileCols.includes('ai_total_tokens')) {
         try {
           await db.query(`ALTER TABLE claim_files ADD COLUMN ai_total_tokens INTEGER DEFAULT 0`);
+        } catch (e) {}
+      }
+      // Kategori pelayanan (RAWAT_JALAN/RAWAT_INAP/GAWAT_DARURAT) dipilih user
+      // saat upload PDF di halaman Extract - dipakai sebagai konteks AI review
+      // (supaya tidak salah saran, mis. saran ruangan rawat inap untuk klaim
+      // rawat jalan) dan untuk filter/tampilan di Riwayat Upload.
+      if (!fileCols.includes('jenis_klaim')) {
+        try {
+          await db.query(`ALTER TABLE claim_files ADD COLUMN jenis_klaim TEXT`);
         } catch (e) {}
       }
     }
