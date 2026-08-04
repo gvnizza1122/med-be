@@ -64,12 +64,16 @@ function runDedupedOcr(db, recordId, filePath, pageNumbers, ocrPdfPages) {
 }
 
 const UPLOAD_DIR = process.env.UPLOAD_DIR || './uploads';
-if (!fs.existsSync(UPLOAD_DIR)) {
-  fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+// Absolut & tidak bergantung CWD proses (pm2/systemd/docker): diresolusi dari
+// lokasi file ini, bukan dari direktori aktif. Multer dan pencarian file (baik
+// path baru maupun fallback) memakai basis yang sama.
+const RESOLVED_UPLOAD_DIR = path.resolve(__dirname, '..', '..', UPLOAD_DIR);
+if (!fs.existsSync(RESOLVED_UPLOAD_DIR)) {
+  fs.mkdirSync(RESOLVED_UPLOAD_DIR, { recursive: true });
 }
 
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, UPLOAD_DIR),
+  destination: (req, file, cb) => cb(null, RESOLVED_UPLOAD_DIR),
   filename: (req, file, cb) => {
     // path.basename meniadakan upaya traversal (..\ atau ../) lewat originalname.
     const uniqueName = `${Date.now()}-${uuidv4().substring(0, 8)}-${path.basename(file.originalname)}`;
@@ -106,8 +110,8 @@ router.post('/upload', authenticate, upload.single('file'), async (req, res) => 
 
     await db.prepare(`
       INSERT INTO claim_files (id, hospital_code, file_name, file_path, period, status, uploaded_by, description)
-      VALUES (?, ?, ?, ?, ?, 'uploaded', ?, ?)
-    `).run(fileId, req.user.hospital_code, req.file.originalname, req.file.path, period || null, req.user.id, description || null);
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(fileId, req.user.hospital_code, req.file.originalname, path.resolve(req.file.path), period || null, req.user.id, description || null);
 
     if (io) io.emit('validation:status', { fileId, status: 'parsing', progress: 10, message: 'Membaca file...' });
 
@@ -1263,7 +1267,7 @@ router.post('/upload-pdf', authenticate, pdfUpload.single('file'), async (req, r
     await db.prepare(`
       INSERT INTO claim_files (id, hospital_code, file_name, file_path, status, uploaded_by, total_records, description)
       VALUES (?, ?, ?, ?, 'uploaded', ?, 1, 'Extracted from PDF')
-    `).run(fileId, req.user.hospital_code || '3371084', req.file.originalname, req.file.path, req.user.id);
+    `).run(fileId, req.user.hospital_code || '3371084', req.file.originalname, path.resolve(req.file.path), req.user.id);
 
     // Save extracted record with validation results using transaction
     await db.transaction(async (tx) => {
@@ -1346,14 +1350,27 @@ router.get('/:file_id/extracted', authenticate, async (req, res) => {
   }
 });
 
+// Batasi akses antar rumah sakit: file milik RS lain dianggap "tidak ditemukan"
+// (tidak bocorkan keberadaan). Data lama tanpa hospital_code tetap diizinkan.
+function canAccessFile(file, user) {
+  if (!file || !user) return false;
+  if (!file.hospital_code || !user.hospital_code) return true;
+  return file.hospital_code === user.hospital_code;
+}
+
 // Bantu validasi/penyajian PDF asli: kembalikan path absolut jika file valid
 // (path-nya ada, ekstensi .pdf, dan benar-benar ada di disk), selain itu null.
+// Data lama bisa menyimpan path relatif (mis. "./uploads/x.pdf") dari sebelum
+// commit ini — fallback ke RESOLVED_UPLOAD_DIR + basename biar tetap ketemu
+// walau CWD proses sudah berubah sejak file di-upload.
 function resolvePdfPath(file) {
   if (!file || !file.file_path) return null;
-  const filePath = String(file.file_path);
+  let filePath = String(file.file_path);
   if (path.extname(filePath).toLowerCase() !== '.pdf') return null;
-  if (!fs.existsSync(filePath)) return null;
-  return path.resolve(process.cwd(), filePath);
+  if (fs.existsSync(filePath)) return path.resolve(process.cwd(), filePath);
+  const fallback = path.join(RESOLVED_UPLOAD_DIR, path.basename(filePath));
+  if (fs.existsSync(fallback)) return fallback;
+  return null;
 }
 
 /**
@@ -1369,6 +1386,10 @@ router.get('/:file_id/file', authenticate, async (req, res) => {
     `).get(req.params.file_id);
 
     if (!file) {
+      return res.status(404).json({ error: 'File tidak ditemukan.' });
+    }
+
+    if (!canAccessFile(file, req.user)) {
       return res.status(404).json({ error: 'File tidak ditemukan.' });
     }
 
@@ -1402,6 +1423,45 @@ router.get('/:file_id/file', authenticate, async (req, res) => {
     });
   } catch (err) {
     console.error('[claimFiles] error:', err);
+    res.status(500).json({ error: 'Terjadi gangguan pada sistem. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' });
+  }
+});
+
+/**
+ * GET /api/v1/claim-files/:file_id/pdf-info
+ * Diagnostik untuk debugging di VPS: status file PDF (path mentah vs ter-resolve,
+ * apakah benar-benar ada di disk). Dipakai tim IT bila tombol PDF tidak muncul.
+ */
+router.get('/:file_id/pdf-info', authenticate, async (req, res) => {
+  try {
+    const db = getDb();
+    const file = await db.prepare(`
+      SELECT * FROM claim_files WHERE id = ?
+    `).get(req.params.file_id);
+
+    if (!file) {
+      return res.status(404).json({ error: 'File tidak ditemukan.' });
+    }
+
+    if (!canAccessFile(file, req.user)) {
+      return res.status(404).json({ error: 'File tidak ditemukan.' });
+    }
+
+    const raw = file.file_path ? String(file.file_path) : null;
+    const resolved = resolvePdfPath(file);
+    res.json({
+      file_id: file.id,
+      file_name: file.file_name,
+      file_path_raw: raw,
+      file_path_resolved: resolved,
+      exists: !!resolved,
+      extension: raw ? path.extname(raw).toLowerCase() : null,
+      upload_dir: RESOLVED_UPLOAD_DIR,
+      cwd: process.cwd(),
+      has_pdf: !!resolved,
+    });
+  } catch (err) {
+    console.error('[claimFiles] pdf-info error:', err);
     res.status(500).json({ error: 'Terjadi gangguan pada sistem. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' });
   }
 });
@@ -1942,3 +2002,4 @@ module.exports = router;
 module.exports.vclaimToDbFormat = vclaimToDbFormat;
 module.exports.vclaimDateToISO = vclaimDateToISO;
 module.exports.resolvePdfPath = resolvePdfPath;
+module.exports.RESOLVED_UPLOAD_DIR = RESOLVED_UPLOAD_DIR;

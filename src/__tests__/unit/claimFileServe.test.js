@@ -31,4 +31,18 @@ describe('resolvePdfPath', () => {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
   });
+
+  test('falls back to upload dir when stored path is legacy relative', () => {
+    const { RESOLVED_UPLOAD_DIR } = require('../../routes/claimFiles');
+    const pdfName = `legacy-${Date.now()}.pdf`;
+    const target = path.join(RESOLVED_UPLOAD_DIR, pdfName);
+    fs.writeFileSync(target, '%PDF-1.4 dummy');
+    try {
+      // Path relatif lama yang tidak lagi ada di lokasinya, tapi basename-nya
+      // ada di upload dir → fallback harus menemukannya.
+      expect(resolvePdfPath({ file_path: `./unrelated/dir/${pdfName}` })).toBe(target);
+    } finally {
+      fs.rmSync(target, { force: true });
+    }
+  });
 });
