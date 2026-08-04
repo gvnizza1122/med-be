@@ -71,7 +71,8 @@ if (!fs.existsSync(UPLOAD_DIR)) {
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, UPLOAD_DIR),
   filename: (req, file, cb) => {
-    const uniqueName = `${Date.now()}-${uuidv4().substring(0, 8)}-${file.originalname}`;
+    // path.basename meniadakan upaya traversal (..\ atau ../) lewat originalname.
+    const uniqueName = `${Date.now()}-${uuidv4().substring(0, 8)}-${path.basename(file.originalname)}`;
     cb(null, uniqueName);
   }
 });
@@ -382,8 +383,12 @@ router.get('/:id', authenticate, async (req, res) => {
 
     if (!fileRaw) return res.status(404).json({ error: 'File tidak ditemukan.' });
 
+    // PDF asli tersimpan & bisa disajikan ke halaman review (path valid, .pdf, ada di disk).
+    const has_pdf = !!resolvePdfPath(fileRaw);
+
     const file = {
       ...fileRaw,
+      has_pdf,
       total_records: Number(fileRaw.total_records || 0),
       valid_count: Number(fileRaw.valid_count || 0),
       error_count: Number(fileRaw.error_count || 0),
@@ -1341,6 +1346,66 @@ router.get('/:file_id/extracted', authenticate, async (req, res) => {
   }
 });
 
+// Bantu validasi/penyajian PDF asli: kembalikan path absolut jika file valid
+// (path-nya ada, ekstensi .pdf, dan benar-benar ada di disk), selain itu null.
+function resolvePdfPath(file) {
+  if (!file || !file.file_path) return null;
+  const filePath = String(file.file_path);
+  if (path.extname(filePath).toLowerCase() !== '.pdf') return null;
+  if (!fs.existsSync(filePath)) return null;
+  return path.resolve(process.cwd(), filePath);
+}
+
+/**
+ * GET /api/v1/claim-files/:file_id/file
+ * Sajikan file PDF asli yang di-upload agar bisa ditampilkan berdampingan
+ * dengan data klaim yang sudah diekstrak di halaman review.
+ */
+router.get('/:file_id/file', authenticate, async (req, res) => {
+  try {
+    const db = getDb();
+    const file = await db.prepare(`
+      SELECT * FROM claim_files WHERE id = ?
+    `).get(req.params.file_id);
+
+    if (!file) {
+      return res.status(404).json({ error: 'File tidak ditemukan.' });
+    }
+
+    const pdfPath = resolvePdfPath(file);
+    if (!pdfPath) {
+      return res.status(404).json({ error: 'Dokumen PDF tidak ditemukan di sistem.' });
+    }
+
+    // Nama file asli dipakai di Content-Disposition — buang karakter kontrol dan
+    // kutip supaya tidak bisa dipakai untuk injeksi header; fallback ke nama netral.
+    let safeFileName = String(file.file_name || '').replace(/[\x00-\x1f\x7f"]+/g, '');
+    if (!safeFileName) safeFileName = 'file.pdf';
+
+    res.sendFile(pdfPath, {
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `inline; filename="${safeFileName}"`
+      }
+    }, (err) => {
+      // File bisa saja dihapus antara pengecekan dan pengiriman (TOCTOU) — tangani
+      // dengan JSON 404 yang sama, bukan halaman error default Express.
+      if (err && err.code === 'ENOENT') {
+        if (!res.headersSent) {
+          return res.status(404).json({ error: 'Dokumen PDF tidak ditemukan di sistem.' });
+        }
+      }
+      if (err && !res.headersSent) {
+        console.error('[claimFiles] error:', err);
+        return res.status(500).json({ error: 'Terjadi gangguan pada sistem. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' });
+      }
+    });
+  } catch (err) {
+    console.error('[claimFiles] error:', err);
+    res.status(500).json({ error: 'Terjadi gangguan pada sistem. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' });
+  }
+});
+
 /**
  * GET /api/v1/claim-files/:record_id/validation-errors
  * Fetch validation errors untuk record (form verifikasi berbasis eksepsi)
@@ -1876,3 +1941,4 @@ router.post('/:record_id/audit-suggestions', authenticate, async (req, res) => {
 module.exports = router;
 module.exports.vclaimToDbFormat = vclaimToDbFormat;
 module.exports.vclaimDateToISO = vclaimDateToISO;
+module.exports.resolvePdfPath = resolvePdfPath;

@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
-    "seed": "node src/database/seed.js"
+    "seed": "node src/database/seed.js",
+    "test": "jest"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
