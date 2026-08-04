@@ -1,0 +1,256 @@
+/**
+ * AI Review Service — tahap AI kedua dalam alur AI ekstraksi → rule engine → AI review.
+ *
+ * Menggantikan dua service lama yang terpisah:
+ * - aiValidationService.runAiAudit  (saran per-field, tanpa bukti dokumen)
+ * - auditSuggestionsService.generateAuditSuggestions (cek bukti kode vs OCR)
+ * ...jadi SATU pemanggilan AI per record yang menghasilkan keduanya sekaligus,
+ * dijalankan otomatis saat upload/validasi (bukan tombol manual) supaya saat
+ * halaman hasil dibuka semua saran sudah tersimpan di DB — tidak ada AI call
+ * lagi saat itu.
+ *
+ * "Memory": prompt selalu menyertakan seluruh nilai field record (hasil
+ * ekstraksi AI tahap 1 / data DB saat ini) sebagai konteks, bukan menilai
+ * field yang error secara terisolasi — supaya saran konsisten dan akurat,
+ * dengan trade-off token lebih besar (disetujui pengguna).
+ */
+
+const AI_REVIEW_SYSTEM_PROMPT = `Kamu asisten audit klaim BPJS E-Claim untuk perawat/verifikator rumah sakit.
+Kamu diberi data lengkap satu rekam klaim (hasil ekstraksi), daftar field yang gagal validasi otomatis,
+dan (kalau ada) teks bukti dokumen pendukung (hasil OCR/teks asli PDF).
+
+TUGAS:
+1. Untuk setiap field yang gagal validasi (daftar "FIELD_ERRORS"): beri catatan singkat dalam Bahasa
+   Indonesia yang menjelaskan MENGAPA field itu gagal dan LANGKAH konkret memperbaikinya, dengan
+   mempertimbangkan seluruh data rekam klaim sebagai konteks (bukan field itu saja).
+2. Kalau ada BUKTI_DOKUMEN dan ada kode diagnosis (DIAGLIST) / prosedur (PROCLIST) yang diklaim:
+   verifikasi tiap kode terhadap bukti dokumen.
+   - HANYA nyatakan "ada bukti" (found:true) kalau kamu bisa kutip kalimat PERSIS dari teks yang
+     diberikan (bukan parafrase, bukan simpulan) yang mendukung kode itu, sertakan nomor halaman.
+   - DILARANG KERAS menyebut nominal rupiah/biaya/tarif dalam kutipan atau alasan apapun.
+   - DILARANG mengarang/menyimpulkan kode dari konteks umum — hanya dari bukti eksplisit di teks.
+   - Kalau ragu, tandai found:false — lebih baik tidak menyarankan daripada salah.
+3. suggested_codes HANYA diisi kalau ada bukti KUAT kode itu relevan tapi belum diklaim.
+
+Output HANYA JSON, tanpa markdown/penjelasan, format:
+{
+  "field_notes": { "<field_name>": "catatan & saran Indonesia" },
+  "code_evidence": [
+    { "code": "...", "type": "diagnosis|procedure", "found": true/false, "page_number": N, "quotation": "..." }
+  ],
+  "suggested_codes": [
+    { "code": "...", "type": "diagnosis|procedure", "page_number": N, "quotation": "...", "reasoning": "..." }
+  ]
+}`;
+
+function pickCodes(record) {
+  const diag = record.DIAGLIST || record.diagnosa_list || '';
+  const proc = record.PROCLIST || record.prosedur_list || '';
+  return {
+    diagnosis: diag.split(';').map(c => c.trim()).filter(Boolean),
+    procedure: proc.split(';').map(c => c.trim()).filter(Boolean),
+  };
+}
+
+function buildPrompt(record, validationErrors, evidencePool, codes) {
+  let prompt = `DATA REKAM KLAIM (hasil ekstraksi, jadikan konteks — "memory"):\n`;
+  prompt += JSON.stringify(record, null, 0) + '\n\n';
+
+  if (validationErrors.length > 0) {
+    prompt += `FIELD_ERRORS (field yang gagal validasi, wajib diisi field_notes):\n`;
+    prompt += validationErrors.map(e =>
+      `- ${e.field_name}: ${e.error_message} (nilai saat ini: "${e.actual_value ?? ''}", diharapkan: "${e.expected_value ?? ''}")`
+    ).join('\n') + '\n\n';
+  } else {
+    prompt += `FIELD_ERRORS: (kosong — tidak ada field yang gagal validasi format)\n\n`;
+  }
+
+  if (codes.diagnosis.length > 0) prompt += `Kode diagnosis diklaim (ICD-10): ${codes.diagnosis.join(', ')}\n`;
+  if (codes.procedure.length > 0) prompt += `Kode prosedur diklaim (ICD-9-CM): ${codes.procedure.join(', ')}\n`;
+
+  if (evidencePool.length > 0) {
+    prompt += `\nBUKTI_DOKUMEN (teks per halaman):\n================================\n`;
+    const sorted = [...evidencePool].sort((a, b) => a.page_number - b.page_number);
+    for (const ev of sorted) {
+      prompt += `=== Halaman ${ev.page_number} (confidence ${ev.confidence ?? 100}%) ===\n${ev.ocr_text}\n\n`;
+    }
+  } else {
+    prompt += `\nBUKTI_DOKUMEN: (tidak ada — jangan isi code_evidence/suggested_codes)\n`;
+  }
+
+  return prompt;
+}
+
+/**
+ * Normalisasi whitespace/newline sebelum substring check — kutipan AI yang
+ * benar tapi melintasi baris OCR/PDF (whitespace berbeda) sebelumnya gagal
+ * match dan ditandai "tidak ada bukti" padahal buktinya memang ada.
+ */
+function normalizeText(text) {
+  return String(text || '').toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+function validateQuotation(quotation, pageNumber, evidencePool) {
+  if (!quotation || typeof quotation !== 'string') return false;
+  const page = evidencePool.find(e => e.page_number === pageNumber);
+  if (!page || !page.ocr_text) return false;
+  return normalizeText(page.ocr_text).includes(normalizeText(quotation));
+}
+
+function hasFinancialTerms(text) {
+  if (!text || typeof text !== 'string') return false;
+  const patterns = [
+    /rupiah/i, /biaya/i, /tarif/i, /\bRp\b/, /\bbayar\b/i, /\bnilai\b/i,
+    /\bharga\b/i, /\bongkos\b/i, /\bcost\b/i, /\bfee\b/i,
+    /\d+\s*(?:juta|ribu|rb)/i,
+  ];
+  return patterns.some(p => p.test(text));
+}
+
+/**
+ * @param {Object} record - Field values rekam klaim saat ini (memory) — bisa
+ *   format vClaim (DIAGLIST, SEP, ...) atau format DB (diagnosa_list, sep, ...).
+ * @param {Array} validationErrors - Error dari rule engine (field_name, error_message, dst).
+ * @param {Array} evidencePool - [{page_number, ocr_text, confidence}] — OCR + teks native, boleh kosong.
+ * @returns {Promise<{field_notes: object, code_evidence: Array, suggested_codes: Array, tokens_used: number}|null>}
+ *   null kalau tidak ada apapun untuk direview, atau AI tidak dikonfigurasi/gagal total.
+ */
+async function generateAiReview(record, validationErrors = [], evidencePool = []) {
+  const codes = pickCodes(record);
+  const hasCodesToCheck = evidencePool.length > 0 && (codes.diagnosis.length > 0 || codes.procedure.length > 0);
+
+  if (validationErrors.length === 0 && !hasCodesToCheck) {
+    return null; // tidak ada yang perlu direview
+  }
+
+  const apiKey = process.env.AI_PROVIDER_API_KEY;
+  if (!apiKey) return null; // fallback ke rule-engine saja, seperti sebelumnya
+
+  const baseUrl = process.env.AI_PROVIDER_BASE_URL || 'https://api.openai.com/v1';
+  const model = process.env.AI_MODEL || 'gpt-4o-mini';
+  const maxAttempts = Number(process.env.AI_MAX_ATTEMPTS || 3);
+  const timeoutMs = Number(process.env.AI_TIMEOUT_MS || 60000);
+
+  const userPrompt = buildPrompt(record, validationErrors, evidencePool, codes);
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const ac = new AbortController();
+      const timer = setTimeout(() => ac.abort(), timeoutMs);
+      let respText;
+      try {
+        const response = await fetch(`${baseUrl}/chat/completions`, {
+          method: 'POST',
+          signal: ac.signal,
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model,
+            messages: [
+              { role: 'system', content: AI_REVIEW_SYSTEM_PROMPT },
+              { role: 'user', content: userPrompt },
+            ],
+            temperature: 0,
+            max_tokens: 4000,
+            response_format: { type: 'json_object' },
+          }),
+        });
+        respText = await response.text();
+        if (!response.ok) throw new Error(`HTTP ${response.status}: ${respText.slice(0, 160)}`);
+      } finally {
+        clearTimeout(timer);
+      }
+
+      const data = JSON.parse(respText);
+      const content = data.choices?.[0]?.message?.content || '';
+      const tokensUsed = data.usage?.total_tokens || 0;
+      if (!content) throw new Error('Model membalas kosong');
+
+      let aiResult;
+      try {
+        aiResult = JSON.parse(content);
+      } catch {
+        const m = content.match(/\{[\s\S]*\}/);
+        if (!m) throw new Error('Model tidak mengembalikan JSON');
+        aiResult = JSON.parse(m[0]);
+      }
+
+      const result = { field_notes: {}, code_evidence: [], suggested_codes: [], tokens_used: tokensUsed };
+
+      // field_notes: hanya field yang benar-benar ada di validationErrors yang dipertahankan
+      const errorFieldNames = new Set(validationErrors.map(e => e.field_name));
+      if (aiResult.field_notes && typeof aiResult.field_notes === 'object') {
+        for (const [field, note] of Object.entries(aiResult.field_notes)) {
+          if (errorFieldNames.has(field) && typeof note === 'string' && note.trim()) {
+            result.field_notes[field] = note.trim();
+          }
+        }
+      }
+
+      // code_evidence — validasi server-side setiap kutipan (anti-halusinasi AI)
+      if (Array.isArray(aiResult.code_evidence)) {
+        for (const entry of aiResult.code_evidence) {
+          if (!entry.found) {
+            result.code_evidence.push({ code: entry.code, type: entry.type, found: false, page_number: null, quotation: null });
+            continue;
+          }
+          const { page_number: pageNum, quotation } = entry;
+          if (!quotation || !pageNum) continue;
+          if (!validateQuotation(quotation, pageNum, evidencePool)) {
+            console.warn(`[AI-REVIEW] Kutipan tidak cocok (AI halusinasi?): code=${entry.code}, page=${pageNum}`);
+            continue;
+          }
+          if (hasFinancialTerms(quotation)) continue;
+          result.code_evidence.push({
+            code: entry.code, type: entry.type, found: true,
+            page_number: pageNum, quotation: quotation.substring(0, 200),
+          });
+        }
+      }
+
+      // Pengaman: pastikan SEMUA kode yang diklaim tercatat (found:false kalau AI diam)
+      if (hasCodesToCheck) {
+        const covered = new Set(result.code_evidence.map(e => e.code));
+        codes.diagnosis.forEach(code => {
+          if (!covered.has(code)) result.code_evidence.push({ code, type: 'diagnosis', found: false, page_number: null, quotation: null });
+        });
+        codes.procedure.forEach(code => {
+          if (!covered.has(code)) result.code_evidence.push({ code, type: 'procedure', found: false, page_number: null, quotation: null });
+        });
+      }
+
+      // suggested_codes
+      if (Array.isArray(aiResult.suggested_codes)) {
+        for (const entry of aiResult.suggested_codes) {
+          const { page_number: pageNum, quotation } = entry;
+          if (!quotation || !pageNum) continue;
+          if (!validateQuotation(quotation, pageNum, evidencePool)) continue;
+          if (hasFinancialTerms(quotation) || hasFinancialTerms(entry.reasoning)) continue;
+          result.suggested_codes.push({
+            code: entry.code, type: entry.type, page_number: pageNum,
+            quotation: quotation.substring(0, 200),
+            reasoning: (entry.reasoning || '').substring(0, 200),
+          });
+        }
+      }
+
+      result.generated_at = new Date().toISOString();
+      return result;
+    } catch (error) {
+      const msg = error.name === 'AbortError' ? `timeout ${timeoutMs}ms` : error.message;
+      console.warn(`[AI-REVIEW] percobaan ${attempt} gagal: ${msg}`);
+      if (attempt < maxAttempts) await new Promise(r => setTimeout(r, 800 * attempt));
+    }
+  }
+
+  return null; // gagal total setelah semua percobaan — biarkan rule-engine saja
+}
+
+module.exports = {
+  generateAiReview,
+  validateQuotation,
+  normalizeText,
+  AI_REVIEW_SYSTEM_PROMPT,
+};

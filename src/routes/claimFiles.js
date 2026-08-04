@@ -9,7 +9,8 @@ const { parseClaimFile, normalizeColumnName } = require('../services/fileParser'
 const { validateRecord, determineStatus } = require('../services/ruleEngine');
 const { generateExcel } = require('../services/exportService');
 const { logAudit } = require('../services/auditService');
-const { validateRecordWithAI, runAiAudit, getTotalUsage, extractErrorFields, estimatePromptTokens, estimateCompletionTokens } = require('../services/aiValidationService');
+const { estimatePromptTokens, estimateCompletionTokens } = require('../services/aiValidationService');
+const { generateAiReview } = require('../services/aiReviewService');
 
 const router = express.Router();
 
@@ -61,6 +62,82 @@ function runDedupedOcr(db, recordId, filePath, pageNumbers, ocrPdfPages) {
     ocrJobsInFlight.set(recordId, job);
   }
   return job;
+}
+
+/**
+ * Kumpulkan bukti dokumen (OCR halaman scan + teks native non-klaim) untuk
+ * satu record — dipakai AI review tahap kedua untuk verifikasi kode
+ * diagnosis/prosedur. Sebelumnya logika ini ada di route /audit-suggestions
+ * (dipicu manual oleh tombol UI yang sudah dihapus); sekarang dipanggil
+ * langsung dari server sebagai bagian dari alur upload/validasi otomatis.
+ */
+async function gatherEvidencePool(db, recordId, filePath) {
+  if (!filePath || !fs.existsSync(filePath)) return [];
+
+  let ocrResults = await db.prepare(`
+    SELECT page_number, ocr_text, confidence FROM ocr_results
+    WHERE record_id = ? ORDER BY page_number ASC
+  `).all(recordId);
+
+  // Kalau belum pernah di-OCR, coba jalankan sekarang (dibatasi waktu — kalau
+  // lama, lanjut tanpa bukti OCR daripada bikin upload menggantung).
+  if (ocrResults.length === 0) {
+    try {
+      const { isAvailable, ocrPdfPages } = require('../services/ocrService');
+      if (isAvailable()) {
+        const ocrResult = await Promise.race([
+          runDedupedOcr(db, recordId, filePath, 'auto-scan', ocrPdfPages),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('OCR timeout')), 120000)),
+        ]);
+        if (ocrResult.success && ocrResult.pages?.length > 0) {
+          ocrResults = await db.prepare(`
+            SELECT page_number, ocr_text, confidence FROM ocr_results
+            WHERE record_id = ? ORDER BY page_number ASC
+          `).all(recordId);
+        }
+      }
+    } catch (ocrErr) {
+      console.warn(`[gatherEvidencePool] OCR gagal/timeout untuk record ${recordId}: ${ocrErr.message}`);
+    }
+  }
+
+  let evidencePool = [...ocrResults];
+  try {
+    const { classifyPdfPages } = require('../services/pdfPageClassifier');
+    const classified = await classifyPdfPages(filePath);
+    if (classified.success) {
+      const scanPageNumbers = new Set(ocrResults.map(o => o.page_number));
+      // PENTING: kecualikan halaman "Berkas Klaim Individual" (has_claim_data) —
+      // itu SUMBER ASLI ekstraksi DIAGLIST/PROCLIST. Kalau ikut dimasukkan, audit
+      // jadi sirkular (kode "terbukti" cuma karena tertulis di halaman asalnya
+      // sendiri) — meniadakan tujuan anti-upcoding.
+      const nativePages = classified.pages
+        .filter(p => p.type === 'NATIVE' && !p.has_claim_data && !scanPageNumbers.has(p.page_num) && p.text_length > 0)
+        .map(p => ({ page_number: p.page_num, ocr_text: p.text_full, confidence: 100 }));
+      evidencePool = [...evidencePool, ...nativePages];
+    }
+  } catch (classifyErr) {
+    console.warn(`[gatherEvidencePool] Gagal ambil halaman NATIVE: ${classifyErr.message}`);
+  }
+
+  return evidencePool;
+}
+
+// Batasi jumlah panggilan AI review paralel saat upload bulk — evidence
+// pool kosong untuk bulk (tanpa PDF) jadi ini murni field_notes, tapi tetap
+// dibatasi supaya file besar dengan banyak record error tidak membanjiri
+// provider AI sekaligus.
+async function runWithConcurrencyLimit(items, limit, worker) {
+  const results = new Array(items.length);
+  let nextIndex = 0;
+  async function runNext() {
+    const i = nextIndex++;
+    if (i >= items.length) return;
+    results[i] = await worker(items[i], i);
+    return runNext();
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, runNext));
+  return results;
 }
 
 const UPLOAD_DIR = process.env.UPLOAD_DIR || './uploads';
@@ -212,59 +289,49 @@ router.post('/upload', authenticate, upload.single('file'), async (req, res) => 
       }
     });
 
-    // Run AI validation audit — ONLY error/pending records (skip valid to save tokens)
+    // Alur AI ekstraksi -> rule engine -> AI review — ONLY error/pending
+    // records (skip valid, hemat token). Evidence pool selalu kosong di sini
+    // (upload bulk TXT/CSV tidak punya PDF), jadi AI review cuma hasilkan
+    // field_notes, bukan verifikasi kode diagnosa/prosedur.
     if (io) io.emit('validation:status', { fileId, status: 'ai_auditing', progress: 30, message: 'Menghubungkan ke AI Auditor...' });
 
     const allRecords = await db.prepare('SELECT * FROM claim_records WHERE file_id = ? ORDER BY row_number ASC').all(fileId);
-    
-    // Mark valid records as AI-valid (skip AI audit to save tokens)
-    const validRecords = allRecords.filter(r => r.validation_status === 'valid');
     const recordsToAudit = allRecords.filter(r => r.validation_status !== 'valid');
 
-    // Auto-set AI status for valid records (no AI call needed)
-    if (validRecords.length > 0) {
-      const updateValidStmt = db.prepare("UPDATE claim_records SET ai_status = 'valid', ai_notes = 'Data valid - tidak ada masalah.' WHERE id = ?");
-      for (const r of validRecords) {
-        await updateValidStmt.run(r.id);
-      }
-    }
-
+    let totalAiTokens = 0;
     if (recordsToAudit.length > 0) {
-      const updateRecordStmt = db.prepare('UPDATE claim_records SET ai_status = ?, ai_notes = ?, ai_suggestions = ? WHERE id = ?');
+      const allErrorsRaw = await db.prepare('SELECT * FROM validation_errors WHERE record_id IN (SELECT id FROM claim_records WHERE file_id = ?)').all(fileId);
+      const errorsByRecordId = allErrorsRaw.reduce((acc, e) => {
+        (acc[e.record_id] ||= []).push(e);
+        return acc;
+      }, {});
 
-      // ponytail: Extract error fields for field-specific audit (hemat token)
-      const errors = await db.prepare('SELECT * FROM validation_errors WHERE record_id IN (SELECT id FROM claim_records WHERE file_id = ?)').all(fileId);
-      const errorFieldsByRecord = extractErrorFields(recordsToAudit, [errors]);
-
-      // Log token estimation
-      const estimatedPrompt = estimatePromptTokens(recordsToAudit, errorFieldsByRecord);
-      const estimatedCompletion = estimateCompletionTokens(recordsToAudit.length);
-      console.log(`[AI Audit] Estimated tokens - Prompt: ${estimatedPrompt}, Completion: ${estimatedCompletion}, Total: ${estimatedPrompt + estimatedCompletion}`);
-      console.log(`[AI Audit] Per-record avg: ~${Math.round((estimatedPrompt + estimatedCompletion) / recordsToAudit.length)} tokens`);
-
-      const onBatchComplete = async (batchResults, completedCount) => {
-        for (const res of batchResults) {
-          try {
-            await updateRecordStmt.run(res.ai_status, res.ai_notes, res.ai_suggestions || null, res.recordId);
-          } catch (dbErr) {
-            console.error(`Failed to update DB for record ${res.recordId}:`, dbErr);
+      let completedCount = 0;
+      await runWithConcurrencyLimit(recordsToAudit, 5, async (record) => {
+        try {
+          const aiReview = await generateAiReview(record, errorsByRecordId[record.id] || [], []);
+          if (aiReview) {
+            totalAiTokens += aiReview.tokens_used || 0;
+            await db.prepare('UPDATE claim_records SET ai_review = ? WHERE id = ?')
+              .run(JSON.stringify(aiReview), record.id);
+          }
+        } catch (aiErr) {
+          console.warn(`[AI Review] gagal untuk record ${record.id}: ${aiErr.message}`);
+        } finally {
+          completedCount++;
+          if (io) {
+            const progress = 30 + Math.round((completedCount / recordsToAudit.length) * 65);
+            io.emit('validation:status', { fileId, status: 'ai_auditing', progress, message: `AI Review: ${completedCount}/${recordsToAudit.length} record` });
           }
         }
-        if (io) {
-          const progress = 30 + Math.round((completedCount / recordsToAudit.length) * 65);
-          io.emit('validation:status', { fileId, status: 'ai_auditing', progress, message: `AI Audit: ${completedCount}/${recordsToAudit.length} record` });
-        }
-      };
-
-      await runAiAudit(recordsToAudit, onBatchComplete, errorFieldsByRecord);
+      });
     }
 
     // Save token usage
-    const usage = getTotalUsage();
-    if (usage.total_tokens > 0) {
+    if (totalAiTokens > 0) {
       await db.prepare(`
-        UPDATE claim_files SET ai_prompt_tokens = ?, ai_completion_tokens = ?, ai_total_tokens = ? WHERE id = ?
-      `).run(usage.prompt_tokens, usage.completion_tokens, usage.total_tokens, fileId);
+        UPDATE claim_files SET ai_total_tokens = ? WHERE id = ?
+      `).run(totalAiTokens, fileId);
     }
 
     // Update file status to completed
@@ -462,21 +529,29 @@ router.get('/:id/records', authenticate, async (req, res) => {
       LIMIT ? OFFSET ?
     `).all(...params, parseInt(limit), offset);
 
-    // Attach errors to each record
-    const getErrors = db.prepare(`
-      SELECT ve.*, vr.rule_name FROM validation_errors ve
-      JOIN validation_rules vr ON ve.rule_id = vr.id
-      WHERE ve.record_id = ?
-    `);
+    // Attach errors to each record — satu query IN(...) untuk semua record di
+    // halaman ini, bukan satu query per record (N+1 yang bikin loading lambat
+    // untuk file dengan banyak record per halaman).
+    let errorsByRecordId = {};
+    if (records.length > 0) {
+      const recordIds = records.map(r => r.id);
+      const placeholders = recordIds.map(() => '?').join(',');
+      const allErrors = await db.prepare(`
+        SELECT ve.*, vr.rule_name FROM validation_errors ve
+        JOIN validation_rules vr ON ve.rule_id = vr.id
+        WHERE ve.record_id IN (${placeholders})
+      `).all(...recordIds);
 
-    const recordsWithErrors = [];
-    for (const rec of records) {
-      const errors = await getErrors.all(rec.id);
-      recordsWithErrors.push({
-        ...rec,
-        errors
-      });
+      errorsByRecordId = allErrors.reduce((acc, err) => {
+        (acc[err.record_id] ||= []).push(err);
+        return acc;
+      }, {});
     }
+
+    const recordsWithErrors = records.map(rec => ({
+      ...rec,
+      errors: errorsByRecordId[rec.id] || [],
+    }));
 
     res.json({ total, page: parseInt(page), limit: parseInt(limit), records: recordsWithErrors });
   } catch (err) {
@@ -673,299 +748,6 @@ router.get('/:id/export', authenticate, async (req, res) => {
 });
 
 /**
- * POST /api/v1/claim-files/:id/auto-fix
- * Automatically fix eligible errors (specifically lowercase SEP RV-01 and invalid NOKARTU format RV-02)
- * Keeps raw_data column strictly pristine as original reference point.
- */
-router.post('/:id/auto-fix', authenticate, async (req, res) => {
-  try {
-    const db = getDb();
-    const fileId = req.params.id;
-    const file = await db.prepare('SELECT * FROM claim_files WHERE id = ?').get(fileId);
-    if (!file) return res.status(404).json({ error: 'File tidak ditemukan.' });
-
-    const records = await db.prepare('SELECT * FROM claim_records WHERE file_id = ?').all(fileId);
-    const activeRules = await db.prepare('SELECT * FROM validation_rules WHERE is_active = 1').all();
-
-    let autoFixedCount = 0;
-    let validCount = 0;
-    let errorCount = 0;
-    let pendingCount = 0;
-
-    await db.transaction(async (tx) => {
-      const updateRecordStmt = tx.prepare(`
-        UPDATE claim_records 
-        SET sep = ?, nokartu = ?, validation_status = ?, error_count = ?
-        WHERE id = ?
-      `);
-
-      const deleteErrorsStmt = tx.prepare('DELETE FROM validation_errors WHERE record_id = ?');
-
-      const insertErrorStmt = tx.prepare(`
-        INSERT INTO validation_errors (id, record_id, rule_id, field_name, error_message, expected_value, actual_value, severity)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `);
-
-      const updateFileStmt = tx.prepare(`
-        UPDATE claim_files
-        SET valid_count = ?, error_count = ?, pending_count = ?, updated_at = datetime('now')
-        WHERE id = ?
-      `);
-
-      for (const rec of records) {
-        let isModified = false;
-        let updatedSep = rec.sep;
-        let updatedNokartu = rec.nokartu;
-
-        // Fix RV-01: Lowercase SEP
-        if (rec.sep && rec.sep !== rec.sep.toUpperCase()) {
-          updatedSep = rec.sep.toUpperCase();
-          isModified = true;
-        }
-
-        // Fix RV-02: NOKARTU format with spaces/dashes
-        if (rec.nokartu && !/^\d{13}$/.test(rec.nokartu)) {
-          const cleaned = rec.nokartu.replace(/\D/g, '');
-          if (cleaned.length === 13) {
-            updatedNokartu = cleaned;
-            isModified = true;
-          }
-        }
-
-        let errors = [];
-        let status = rec.validation_status;
-
-        if (isModified) {
-          autoFixedCount++;
-          
-          // Re-validate the record with fixed values
-          const tempRecord = {
-            ...rec,
-            sep: updatedSep,
-            nokartu: updatedNokartu,
-            diagnosa_list: rec.diagnosa_list,
-            prosedur_list: rec.prosedur_list,
-            umur_tahun: rec.umur_tahun,
-            admission_date: rec.admission_date,
-            discharge_date: rec.discharge_date,
-            nama_pasien: rec.nama_pasien,
-            kelas_rawat: rec.kelas_rawat,
-            discharge_status: rec.discharge_status,
-            tarif_rs: rec.tarif_rs,
-            total_tarif: rec.total_tarif
-          };
-          
-          errors = validateRecord(tempRecord, activeRules);
-          status = determineStatus(errors);
-
-          // Update record
-          await updateRecordStmt.run(updatedSep, updatedNokartu, status, errors.length, rec.id);
-
-          // Delete old errors
-          await deleteErrorsStmt.run(rec.id);
-
-          // Insert new errors
-          for (const err of errors) {
-            await insertErrorStmt.run(
-              uuidv4(), rec.id, err.rule_id, err.field_name,
-              err.error_message, err.expected_value || '', err.actual_value || '',
-              err.severity
-            );
-          }
-        } else {
-          // If not modified, just count the existing status
-          status = rec.validation_status;
-        }
-
-        if (status === 'valid') validCount++;
-        else if (status === 'error') errorCount++;
-        else pendingCount++;
-      }
-
-      // Update the main claim file record
-      await updateFileStmt.run(validCount, errorCount, pendingCount, fileId);
-    });
-
-    logAudit({
-      userId: req.user.id,
-      userEmail: req.user.email,
-      action: 'auto_fix',
-      resourceType: 'claim_file',
-      resourceId: fileId,
-      details: {
-        autoFixedRecords: autoFixedCount,
-        newValid: validCount,
-        newError: errorCount,
-        newPending: pendingCount
-      },
-      ipAddress: req.ip
-    });
-
-    res.json({
-      message: `Auto-fix berhasil diterapkan pada ${autoFixedCount} rekor.`,
-      auto_fixed_count: autoFixedCount,
-      summary: {
-        total_records: file.total_records,
-        valid: validCount,
-        error: errorCount,
-        pending: pendingCount
-      }
-    });
-  } catch (err) {
-    console.error('[claimFiles] error:', err);
-    res.status(500).json({ error: 'Terjadi gangguan pada sistem. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' });
-  }
-});
-
-/**
- * GET /api/v1/claim-files/:id/download-fixed
- * Reconstruct the original TSV file with all applied auto-fixes dynamically injected
- */
-router.get('/:id/download-fixed', authenticate, async (req, res) => {
-  try {
-    const db = getDb();
-    const fileId = req.params.id;
-    const file = await db.prepare('SELECT * FROM claim_files WHERE id = ?').get(fileId);
-    if (!file) return res.status(404).json({ error: 'File tidak ditemukan.' });
-
-    const records = await db.prepare('SELECT * FROM claim_records WHERE file_id = ? ORDER BY row_number ASC').all(fileId);
-    if (records.length === 0) {
-      return res.status(400).json({ error: 'Tidak ada rekor data untuk diunduh.' });
-    }
-
-    // Determine original column headers from the first record's raw_data keys
-    let headers = [];
-    try {
-      const firstRaw = JSON.parse(records[0].raw_data || '{}');
-      headers = Object.keys(firstRaw);
-    } catch (e) {
-      // Fallback standard 60-column headers if raw_data parsing fails
-      headers = [
-        'KODE_RS', 'KELAS_RS', 'KELAS_RAWAT', 'KODE_TARIF', 'PTD', 'ADMISSION_DATE', 'DISCHARGE_DATE',
-        'BIRTH_DATE', 'BIRTH_WEIGHT', 'SEX', 'DISCHARGE_STATUS', 'DIAGLIST', 'PROCLIST', 'ADL1', 'ADL2',
-        'IN_SP', 'IN_SR', 'IN_SI', 'IN_SD', 'INACBG', 'SUBACUTE', 'CHRONIC', 'SP', 'SR', 'SI', 'SD',
-        'DESKRIPSI_INACBG', 'TARIF_INACBG', 'TARIF_SUBACUTE', 'TARIF_CHRONIC', 'DESKRIPSI_SP', 'TARIF_SP',
-        'DESKRIPSI_SR', 'TARIF_SR', 'DESKRIPSI_SI', 'TARIF_SI', 'DESKRIPSI_SD', 'TARIF_SD', 'TOTAL_TARIF',
-        'TARIF_RS', 'TARIF_POLI_EKS', 'LOS', 'ICU_INDIKATOR', 'ICU_LOS', 'VENT_HOUR', 'NAMA_PASIEN',
-        'MRN', 'UMUR_TAHUN', 'UMUR_HARI', 'DPJP', 'SEP', 'NOKARTU', 'PAYOR_ID', 'CODER_ID', 'VERSI_INACBG',
-        'VERSI_GROUPER', 'C1', 'C2', 'C3', 'C4'
-      ];
-    }
-
-    // Generate output lines
-    const outputLines = [];
-    
-    // Header line
-    outputLines.push(headers.join('\t'));
-
-    // Data lines
-    records.forEach(rec => {
-      let rawDataObj = {};
-      try {
-        rawDataObj = JSON.parse(rec.raw_data || '{}');
-      } catch (e) { /* ignore */ }
-
-      // DYNAMICALLY SUBSTITUTE CORRECTED DATABASE VALUES INTO TSV OUTPUT BEFORE GENERATION
-      const sepKey = Object.keys(rawDataObj).find(k => normalizeColumnName(k) === 'sep') || 'SEP';
-      rawDataObj[sepKey] = rec.sep;
-
-      const nokartuKey = Object.keys(rawDataObj).find(k => normalizeColumnName(k) === 'nokartu') || 'NOKARTU';
-      rawDataObj[nokartuKey] = rec.nokartu;
-
-      const rowValues = headers.map(header => {
-        const val = rawDataObj[header];
-        return val !== undefined && val !== null ? val : '';
-      });
-
-      outputLines.push(rowValues.join('\t'));
-    });
-
-    const fileContent = outputLines.join('\r\n');
-    
-    logAudit({
-      userId: req.user.id,
-      userEmail: req.user.email,
-      action: 'download_fixed',
-      resourceType: 'claim_file',
-      resourceId: fileId,
-      details: { fileName: `fixed_${file.file_name}` },
-      ipAddress: req.ip
-    });
-
-    // Make filename extremely clear that it is the fixed version
-    const safeName = "PERBAIKAN_" + file.file_name.replace(/\.[^/.]+$/, "") + ".TXT";
-    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="${safeName}"`);
-    res.send(fileContent);
-  } catch (err) {
-    console.error('[claimFiles] error:', err);
-    res.status(500).json({ error: 'Terjadi gangguan pada sistem. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' });
-  }
-});
-
-/**
- * GET /api/v1/claim-files/:id/comparison
- * Compares pristine original values in raw_data with corrected columns in claim_records
- */
-router.get('/:id/comparison', authenticate, async (req, res) => {
-  try {
-    const db = getDb();
-    const fileId = req.params.id;
-    const file = await db.prepare('SELECT * FROM claim_files WHERE id = ?').get(fileId);
-    if (!file) return res.status(404).json({ error: 'File tidak ditemukan.' });
-
-    const records = await db.prepare('SELECT id, row_number, nama_pasien, mrn, sep, nokartu, raw_data FROM claim_records WHERE file_id = ? ORDER BY row_number ASC').all(fileId);
-
-    const changes = [];
-
-    records.forEach(rec => {
-      let rawDataObj = {};
-      try {
-        rawDataObj = JSON.parse(rec.raw_data || '{}');
-      } catch (e) { /* ignore */ }
-
-      // Compare SEP
-      const sepKey = Object.keys(rawDataObj).find(k => k.toUpperCase() === 'SEP' || k.toUpperCase() === 'NOSEP');
-      const originalSep = sepKey ? rawDataObj[sepKey] : null;
-      if (originalSep && rec.sep !== originalSep) {
-        changes.push({
-          row_number: rec.row_number,
-          nama_pasien: rec.nama_pasien,
-          mrn: rec.mrn,
-          field_name: 'SEP',
-          before: originalSep,
-          after: rec.sep
-        });
-      }
-
-      // Compare NOKARTU
-      const nokartuKey = Object.keys(rawDataObj).find(k => k.toUpperCase() === 'NOKARTU' || k.toUpperCase() === 'NO_KARTU');
-      const originalNokartu = nokartuKey ? rawDataObj[nokartuKey] : null;
-      if (originalNokartu && rec.nokartu !== originalNokartu) {
-        changes.push({
-          row_number: rec.row_number,
-          nama_pasien: rec.nama_pasien,
-          mrn: rec.mrn,
-          field_name: 'NOKARTU',
-          before: originalNokartu,
-          after: rec.nokartu
-        });
-      }
-    });
-
-    res.json({
-      file_id: fileId,
-      file_name: file.file_name,
-      total_changes: changes.length,
-      changes
-    });
-  } catch (err) {
-    console.error('[claimFiles] error:', err);
-    res.status(500).json({ error: 'Terjadi gangguan pada sistem. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' });
-  }
-});
-
-/**
  * POST /api/v1/claim-files/:id/ai-audit
  * Runs AI-assisted medical audit on all records of a claim file.
  */
@@ -989,27 +771,41 @@ router.post('/:id/ai-audit', authenticate, async (req, res) => {
     // Emit start status
     if (io) io.emit('ai-audit:status', { fileId, status: 'auditing', progress: 0 });
 
-    const updateRecordStmt = db.prepare('UPDATE claim_records SET ai_status = ?, ai_notes = ?, ai_suggestions = ? WHERE id = ?');
+    // Kalau file ini punya PDF asli, kumpulkan bukti dokumen sekali (dipakai
+    // untuk semua record file ini — biasanya cuma 1 record untuk upload PDF).
+    const pdfPath = resolvePdfPath(file);
+    const evidencePoolCache = new Map(); // record_id -> evidencePool (reuse kalau lebih dari 1 record)
 
-    // Callback to process and update each batch in real-time
-    const onBatchComplete = async (batchResults, completedCount) => {
-      for (const res of batchResults) {
-        try {
-          await updateRecordStmt.run(res.ai_status, res.ai_notes, res.ai_suggestions || null, res.recordId);
-        } catch (dbErr) {
-          console.error(`Failed to update DB for record ${res.recordId}:`, dbErr);
+    const allErrorsRaw = await db.prepare('SELECT * FROM validation_errors WHERE record_id IN (SELECT id FROM claim_records WHERE file_id = ?)').all(fileId);
+    const errorsByRecordId = allErrorsRaw.reduce((acc, e) => {
+      (acc[e.record_id] ||= []).push(e);
+      return acc;
+    }, {});
+
+    let completedCount = 0;
+    await runWithConcurrencyLimit(records, 5, async (record) => {
+      try {
+        let evidencePool = [];
+        if (pdfPath) {
+          evidencePool = evidencePoolCache.get(record.id)
+            || await gatherEvidencePool(db, record.id, pdfPath);
+          evidencePoolCache.set(record.id, evidencePool);
+        }
+        const aiReview = await generateAiReview(record, errorsByRecordId[record.id] || [], evidencePool);
+        if (aiReview) {
+          await db.prepare('UPDATE claim_records SET ai_review = ? WHERE id = ?')
+            .run(JSON.stringify(aiReview), record.id);
+        }
+      } catch (aiErr) {
+        console.warn(`[AI Review] gagal untuk record ${record.id}: ${aiErr.message}`);
+      } finally {
+        completedCount++;
+        if (io) {
+          const progress = Math.round((completedCount / records.length) * 100);
+          io.emit('ai-audit:status', { fileId, status: 'auditing', progress });
         }
       }
-
-      // Emit progress updates
-      if (io) {
-        const progress = Math.round((completedCount / records.length) * 100);
-        io.emit('ai-audit:status', { fileId, status: 'auditing', progress });
-      }
-    };
-
-    // Run the batch-based audit (internally handles batch of 10 and rule fallback)
-    await runAiAudit(records, onBatchComplete);
+    });
 
     logAudit({
       userId: req.user.id, userEmail: req.user.email,
@@ -1251,6 +1047,7 @@ router.post('/upload-pdf', authenticate, pdfUpload.single('file'), async (req, r
     const db = getDb();
     const fileId = uuidv4();
     const recordId = uuidv4();
+    const resolvedFilePath = path.resolve(req.file.path);
 
     // Record vClaim lengkap 60 kolom (urutan & format sesuai output vClaim asli).
     const extractedData = result.record;
@@ -1267,7 +1064,7 @@ router.post('/upload-pdf', authenticate, pdfUpload.single('file'), async (req, r
     await db.prepare(`
       INSERT INTO claim_files (id, hospital_code, file_name, file_path, status, uploaded_by, total_records, description)
       VALUES (?, ?, ?, ?, 'uploaded', ?, 1, 'Extracted from PDF')
-    `).run(fileId, req.user.hospital_code || '3371084', req.file.originalname, path.resolve(req.file.path), req.user.id);
+    `).run(fileId, req.user.hospital_code || '3371084', req.file.originalname, resolvedFilePath, req.user.id);
 
     // Save extracted record with validation results using transaction
     await db.transaction(async (tx) => {
@@ -1310,6 +1107,22 @@ router.post('/upload-pdf', authenticate, pdfUpload.single('file'), async (req, r
       }
     });
 
+    // Alur AI ekstraksi -> rule engine -> AI review: setelah record tersimpan
+    // (dibutuhkan supaya ocr_results punya record_id valid untuk FK), kumpulkan
+    // bukti dokumen dan jalankan AI review sekali, simpan hasilnya supaya saat
+    // halaman hasil dibuka nanti tidak perlu AI call lagi.
+    let aiReview = null;
+    try {
+      const evidencePool = await gatherEvidencePool(db, recordId, resolvedFilePath);
+      aiReview = await generateAiReview(extractedData, validationErrors, evidencePool);
+      if (aiReview) {
+        await db.prepare('UPDATE claim_records SET ai_review = ? WHERE id = ?')
+          .run(JSON.stringify(aiReview), recordId);
+      }
+    } catch (aiErr) {
+      console.warn(`[upload-pdf] AI review gagal untuk record ${recordId}: ${aiErr.message}`);
+    }
+
     res.json({
       status: 'success',
       file_id: fileId,
@@ -1318,6 +1131,7 @@ router.post('/upload-pdf', authenticate, pdfUpload.single('file'), async (req, r
       vclaimFormat: extractedData,
       validation_status: validationStatus,
       validation_errors: validationErrors,
+      ai_review: aiReview,
       metadata: result.metadata,
     });
   } catch (err) {
@@ -1757,244 +1571,6 @@ router.post('/validate-pdf', authenticate, async (req, res) => {
   } catch (err) {
     console.error('PDF validate error:', err);
     res.status(500).json({ error: 'Terjadi gangguan pada sistem. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' });
-  }
-});
-
-/**
- * POST /api/v1/claim-files/:record_id/ocr
- * Request OCR processing for a claim record
- * Body: { pageNumbers?: [1,2,3] }  // if empty, process all available pages
- */
-router.post('/:record_id/ocr', authenticate, async (req, res) => {
-  try {
-    const { isAvailable, ocrPdfPages } = require('../services/ocrService');
-    if (!isAvailable()) {
-      return res.status(503).json({
-        error: 'OCR service tidak tersedia. Silakan hubungi administrator.'
-      });
-    }
-
-    const db = getDb();
-    const { record_id } = req.params;
-    const { pageNumbers } = req.body || {};
-
-    // Verify record exists
-    const record = await db.prepare(`
-      SELECT f.*, c.id as record_id FROM claim_files f
-      JOIN claim_records c ON c.file_id = f.id
-      WHERE c.id = ?
-    `).get(record_id);
-
-    if (!record) {
-      return res.status(404).json({ error: 'Record tidak ditemukan' });
-    }
-
-    // Check if file still exists
-    if (!fs.existsSync(record.file_path)) {
-      return res.status(400).json({ error: 'File PDF tidak ditemukan di sistem' });
-    }
-
-    // Request OCR — proses sesungguhnya di-dedupe per record_id (lihat
-    // runDedupedOcr di atas), request ini cuma menunggu maksimal 2 menit lalu
-    // menyerah kalau belum selesai; proses & penyimpanan hasilnya tetap lanjut.
-    try {
-      const ocrResult = await Promise.race([
-        runDedupedOcr(db, record_id, record.file_path, pageNumbers || 'auto-scan', ocrPdfPages),
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('OCR timeout')), 120000) // 2min max
-        )
-      ]);
-
-      res.json({
-        status: ocrResult.success ? 'completed' : 'error',
-        record_id,
-        pages_processed: ocrResult.pages?.length || 0,
-        total_duration_ms: ocrResult.total_duration_ms,
-        errors: ocrResult.errors || []
-      });
-
-    } catch (ocrErr) {
-      console.error('[OCR] Processing failed:', ocrErr);
-      res.status(500).json({
-        error: 'Gagal memproses OCR. Silakan coba lagi.',
-        details: process.env.NODE_ENV === 'development' ? ocrErr.message : undefined
-      });
-    }
-
-  } catch (err) {
-    console.error('[OCR] Unexpected error:', err);
-    res.status(500).json({ error: 'Terjadi gangguan pada sistem. Silakan coba lagi.' });
-  }
-});
-
-/**
- * GET /api/v1/claim-files/:record_id/ocr-pages
- * Fetch OCR results for a record
- * AUTO-TRIGGERS OCR if no results exist yet (lazy evaluation)
- */
-router.get('/:record_id/ocr-pages', authenticate, async (req, res) => {
-  try {
-    const { isAvailable, ocrPdfPages } = require('../services/ocrService');
-    const db = getDb();
-    const { record_id } = req.params;
-
-    // Verify record exists and get file path
-    const record = await db.prepare(`
-      SELECT c.id as record_id, f.file_path
-      FROM claim_records c
-      JOIN claim_files f ON c.file_id = f.id
-      WHERE c.id = ?
-    `).get(record_id);
-
-    if (!record) {
-      return res.status(404).json({ error: 'Record tidak ditemukan' });
-    }
-
-    // Check if OCR results already exist
-    let ocrResults = await db.prepare(`
-      SELECT page_number, ocr_text, confidence, block_count, processing_duration_ms, created_at
-      FROM ocr_results
-      WHERE record_id = ?
-      ORDER BY page_number ASC
-    `).all(record_id);
-
-    // If no results AND OCR service is available, auto-trigger OCR
-    if (ocrResults.length === 0 && isAvailable()) {
-      console.log(`[OCR-PAGES] Auto-triggering OCR for record ${record_id}`);
-
-      if (!fs.existsSync(record.file_path)) {
-        return res.status(400).json({ error: 'File PDF tidak ditemukan di sistem' });
-      }
-
-      try {
-        const ocrResult = await Promise.race([
-          runDedupedOcr(db, record_id, record.file_path, 'auto-scan', ocrPdfPages),
-          new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('OCR timeout')), 120000) // 2min max
-          )
-        ]);
-
-        // runDedupedOcr sudah menyimpan hasilnya sendiri — cukup baca ulang kalau berhasil
-        if (ocrResult.success && ocrResult.pages && ocrResult.pages.length > 0) {
-          // Fetch newly saved results
-          ocrResults = await db.prepare(`
-            SELECT page_number, ocr_text, confidence, block_count, processing_duration_ms, created_at
-            FROM ocr_results
-            WHERE record_id = ?
-            ORDER BY page_number ASC
-          `).all(record_id);
-        }
-
-      } catch (ocrErr) {
-        console.warn(`[OCR-PAGES] Auto-trigger failed: ${ocrErr.message}`);
-        // Continue with empty results instead of failing
-      }
-    }
-
-    res.json({
-      record_id,
-      page_count: ocrResults.length,
-      pages: ocrResults.map(r => ({
-        page_number: r.page_number,
-        ocr_text: r.ocr_text,
-        confidence: r.confidence,
-        confidence_status: r.confidence >= 50 ? 'readable' : 'unclear',
-        // 'readable': confidence >= 50% (likely correct, suitable for audit)
-        // 'unclear': confidence < 50% (needs verification, typically handwritten)
-        block_count: r.block_count,
-        processing_duration_ms: r.processing_duration_ms,
-        created_at: r.created_at
-      }))
-    });
-
-  } catch (err) {
-    console.error('[OCR-PAGES] Error:', err);
-    res.status(500).json({ error: 'Terjadi gangguan pada sistem. Silakan coba lagi.' });
-  }
-});
-
-/**
- * Tahap 4 — Audit suggestions endpoint (AI semantic matching with anti-upcoding validation)
- * POST /api/v1/claim-files/:record_id/audit-suggestions
- *
- * Logic:
- * 1. Get record (DIAGLIST, PROCLIST)
- * 2. Get all OCR results for this record
- * 3. If no OCR → return available: false
- * 4. Call AI to match codes against OCR text
- * 5. Validate all quotations server-side
- * 6. Filter financial terms
- * 7. Return validated results
- */
-router.post('/:record_id/audit-suggestions', authenticate, async (req, res) => {
-  try {
-    const { generateAuditSuggestions } = require('../services/auditSuggestionsService');
-    const db = getDb();
-    const { record_id } = req.params;
-
-    // Get record with diagnosis and procedure codes + file_path (untuk baca halaman NATIVE)
-    const record = await db.prepare(`
-      SELECT c.id, c.diagnosa_list, c.prosedur_list, c.raw_data, f.file_path
-      FROM claim_records c
-      JOIN claim_files f ON c.file_id = f.id
-      WHERE c.id = ?
-    `).get(record_id);
-
-    if (!record) {
-      return res.status(404).json({ error: 'Record tidak ditemukan' });
-    }
-
-    // Get all OCR results (halaman SCAN) untuk record ini
-    const ocrResults = await db.prepare(`
-      SELECT page_number, ocr_text, confidence, block_count, processing_duration_ms
-      FROM ocr_results
-      WHERE record_id = ?
-      ORDER BY page_number ASC
-    `).all(record_id);
-
-    // Sertakan juga halaman NATIVE (teks bersih, tanpa OCR, gratis) sebagai bukti —
-    // sebelumnya cuma halaman SCAN yang dicek, padahal NATIVE bisa berisi bukti klinis
-    // (resume medis, catatan, dll) yang sama validnya. Confidence 100 karena teks asli.
-    let evidencePool = [...ocrResults];
-    if (record.file_path && fs.existsSync(record.file_path)) {
-      try {
-        const { classifyPdfPages } = require('../services/pdfPageClassifier');
-        const classified = await classifyPdfPages(record.file_path);
-        if (classified.success) {
-          const scanPageNumbers = new Set(ocrResults.map(o => o.page_number));
-          // PENTING: kecualikan halaman "Berkas Klaim Individual" (has_claim_data) —
-          // itu SUMBER ASLI ekstraksi DIAGLIST/PROCLIST (Tahap 1). Kalau ikut dimasukkan,
-          // audit jadi sirkular (kode "terbukti" cuma karena tertulis di halaman asalnya
-          // sendiri, bukan diverifikasi lewat dokumen klinis independen) — meniadakan
-          // tujuan anti-upcoding. Hanya halaman NATIVE non-klaim (rekam medis, surat
-          // keterangan, dst) yang boleh jadi bukti pendukung.
-          const nativePages = classified.pages
-            .filter(p => p.type === 'NATIVE' && !p.has_claim_data && !scanPageNumbers.has(p.page_num) && p.text_length > 0)
-            .map(p => ({ page_number: p.page_num, ocr_text: p.text_full, confidence: 100 }));
-          evidencePool = [...evidencePool, ...nativePages];
-        }
-      } catch (classifyErr) {
-        console.warn('[AUDIT-SUGGESTIONS] Gagal ambil halaman NATIVE:', classifyErr.message);
-      }
-    }
-
-    // Generate audit suggestions
-    const suggestions = await generateAuditSuggestions(record, evidencePool);
-
-    // Return to frontend
-    res.json({
-      record_id,
-      available: suggestions.available,
-      message: suggestions.message,
-      claimed_evidence: suggestions.claimed_evidence || [],
-      suggested_codes: suggestions.suggested_codes || [],
-      tokens_used: suggestions.tokens_used,
-      errors: suggestions.errors && suggestions.errors.length > 0 ? suggestions.errors : undefined,
-    });
-
-  } catch (err) {
-    console.error('[AUDIT-SUGGESTIONS] Error:', err);
-    res.status(500).json({ error: 'Terjadi gangguan pada sistem. Silakan coba lagi.' });
   }
 });
 

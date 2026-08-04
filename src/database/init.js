@@ -228,6 +228,7 @@ async function initializeSchema() {
         ai_status TEXT DEFAULT 'pending' CHECK(ai_status IN ('valid','dispute','warning','pending')),
         ai_notes TEXT,
         ai_suggestions TEXT,
+        ai_review TEXT,
         raw_data TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
@@ -359,7 +360,12 @@ async function migrateSchema(db) {
       'jenis_klaim': 'TEXT DEFAULT \'RAWAT_INAP\'',
       'ai_status': 'TEXT DEFAULT \'pending\'',
       'ai_notes': 'TEXT',
-      'ai_suggestions': 'TEXT'
+      'ai_suggestions': 'TEXT',
+      // Hasil AI review tahap kedua (alur AI ekstraksi -> rule engine -> AI
+      // review) — JSON string {field_notes, code_evidence, suggested_codes,
+      // generated_at}. Diisi otomatis saat upload/validasi, dibaca langsung
+      // oleh tabel hasil validasi tanpa perlu AI call lagi saat halaman dibuka.
+      'ai_review': 'TEXT'
     };
 
     for (const [col, type] of Object.entries(newCols)) {
