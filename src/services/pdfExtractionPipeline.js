@@ -10,6 +10,42 @@
 const { classifyPdfPages } = require('./pdfPageClassifier');
 const { extractClaimData } = require('./pdfExtractionService');
 
+/**
+ * Jaring pengaman deterministik (regex, BUKAN AI) untuk SEP/NOKARTU/KELAS_RAWAT
+ * — dijalankan SETELAH ekstraksi AI, cuma mengisi field yang AI kembalikan
+ * kosong (tidak pernah menimpa nilai yang sudah terisi AI). Berjalan di
+ * SELURUH teks halaman (bukan cuma yang lolos klasifikasi claim-data), jadi
+ * tetap bekerja walau kata kunci klasifikasi halaman meleset atau AI lalai
+ * mengikuti instruksi prompt — dua kegagalan yang pernah terjadi sebelumnya.
+ */
+function applyDeterministicFallback(record, allPagesText, jenisKlaim) {
+  if (!record.SEP) {
+    const m = /no\.?\s*sep\s*:?\s*([0-9A-Za-z]{10,30})\b/i.exec(allPagesText);
+    if (m) {
+      record.SEP = m[1].toUpperCase();
+      console.log('[Pipeline] Fallback regex mengisi SEP (AI mengembalikan kosong).');
+    }
+  }
+  if (!record.NOKARTU) {
+    const m = /no\.?\s*kartu\s*:?\s*\(?\s*(\d{13})\b/i.exec(allPagesText);
+    if (m) {
+      record.NOKARTU = m[1];
+      console.log('[Pipeline] Fallback regex mengisi NOKARTU (AI mengembalikan kosong).');
+    }
+  }
+  if (!record.KELAS_RAWAT && jenisKlaim === 'RAWAT_JALAN') {
+    // Label field bervariasi "Kelas Hak"/"Kls Hak", nilainya bisa "Kelas 2" atau
+    // langsung "2" — regex ini tangani kombinasi label singkat/panjang x nilai
+    // dengan/tanpa kata "Kelas" di depan angka.
+    const m = /(?:kelas|kls\.?)\s*hak\s*:?\s*(?:kelas\s*)?(\d)\b/i.exec(allPagesText);
+    if (m) {
+      record.KELAS_RAWAT = m[1];
+      console.log('[Pipeline] Fallback regex mengisi KELAS_RAWAT dari Kelas Hak (rawat jalan, AI mengembalikan kosong).');
+    }
+  }
+  return record;
+}
+
 // Pesan untuk pengguna akhir (perawat/verifikator) — tanpa istilah teknis.
 const PESAN = {
   tidakTerbaca: 'Dokumen tidak dapat dibaca. Pastikan berkas PDF tidak rusak, lalu unggah ulang.',
@@ -21,13 +57,14 @@ const PESAN = {
 
 /**
  * @param {string|Buffer} filePath - path PDF atau Buffer
- * @param {{skipAI?: boolean}} options
+ * @param {{skipAI?: boolean, jenisKlaim?: string}} options - jenisKlaim dipakai
+ *   untuk instruksi khusus KELAS_RAWAT (rawat jalan -> fallback ke Kelas Hak).
  * @returns {Promise<{success, record, classification, pesan, tokens, attempts, metadata, errors}>}
  *          `pesan` = teks siap tampil ke pengguna (kosong bila sukses).
  *          `errors` = detail teknis untuk log, JANGAN ditampilkan ke pengguna.
  */
 async function extractFromPDF(filePath, options = {}) {
-  const { skipAI = false } = options;
+  const { skipAI = false, jenisKlaim } = options;
   const mulai = Date.now();
 
   const result = {
@@ -103,7 +140,7 @@ async function extractFromPDF(filePath, options = {}) {
       return result;
     }
 
-    const extraction = await extractClaimData(classification.claimDataText);
+    const extraction = await extractClaimData(classification.claimDataText, jenisKlaim);
     result.tokens = extraction.tokens;
     result.attempts = extraction.attempts;
 
@@ -115,7 +152,8 @@ async function extractFromPDF(filePath, options = {}) {
       return result;
     }
 
-    result.record = extraction.record;
+    const allPagesText = classification.pages.map(p => p.text_full).join('\n\n');
+    result.record = applyDeterministicFallback(extraction.record, allPagesText, jenisKlaim);
     result.success = true;
   } catch (error) {
     result.errors.push(error.message);

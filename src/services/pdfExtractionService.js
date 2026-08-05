@@ -6,9 +6,11 @@ const { PDF_FIELDS, SYSTEM_FIELDS, buildRecord, toTSV, COLUMNS } = require('./vc
  * data itu tidak ada di PDF; mengarang nilainya = data palsu.
  *
  * @param {string} claimDataText - hasil classifyPdfPages().claimDataText
+ * @param {string} [jenisKlaim] - kategori pelayanan (RAWAT_JALAN/RAWAT_INAP/GAWAT_DARURAT),
+ *   dipilih user saat upload — dipakai untuk instruksi khusus KELAS_RAWAT (lihat prompt).
  * @returns {Promise<{success, record, tokens, missingSystemFields, errors}>}
  */
-async function extractClaimData(claimDataText) {
+async function extractClaimData(claimDataText, jenisKlaim) {
   const result = {
     success: false,
     record: {},
@@ -25,7 +27,12 @@ async function extractClaimData(claimDataText) {
   if (!apiKey) { result.errors.push('AI_PROVIDER_API_KEY tidak diisi di .env'); return result; }
   if (!claimDataText || !claimDataText.trim()) { result.errors.push('claimDataText kosong'); return result; }
 
-  const prompt = `Kamu ekstraktor data klaim BPJS dari halaman "Berkas Klaim Individual" (output E-Klaim Indonesia).
+  const kelasRawatRule = jenisKlaim === 'RAWAT_JALAN'
+    ? `8. KELAS_RAWAT khusus rawat jalan: pasien rawat jalan TIDAK dirawat inap, jadi field "Kelas Rawat"/"Kls Rawat" di dokumen wajar KOSONG atau "-". Untuk kasus ini, isi KELAS_RAWAT dari NOMOR KELAS di field "Kelas Hak"/"Kls Hak" (kelas hak kepesertaan BPJS pasien, BUKAN kelas ruangan rawat inap) — ambil hanya angkanya (contoh: "Kelas 2" -> "2"). Kalau "Kelas Hak" juga tidak ada, baru isi KELAS_RAWAT dengan "".`
+    : `8. KELAS_RAWAT: ambil dari field "Kelas Rawat"/"Kls Rawat" (kelas ruangan rawat inap pasien), ambil hanya angkanya (contoh: "Kelas 2" -> "2"). JANGAN pakai "Kelas Hak" untuk field ini.`;
+
+  const prompt = `Kamu ekstraktor data klaim BPJS dari halaman "Berkas Klaim Individual" (output E-Klaim Indonesia)
+dan halaman pendukung seperti "Surat Eligibilitas Peserta" (SEP) dalam dokumen yang sama.
 Data sudah ter-kode (ICD-10 diagnosa, ICD-9 prosedur, INA-CBG). Tugasmu HANYA MENYALIN, bukan menyimpulkan.
 
 ATURAN KETAT:
@@ -35,7 +42,11 @@ ATURAN KETAT:
 4. Angka tarif: digit polos tanpa Rp/titik/koma (contoh: 3287300).
 5. SEX: 1=laki-laki, 2=perempuan. KODE_TARIF: kode singkat saja (TARIF RS KELAS D SWASTA -> DS).
 6. Kalau sebuah field TIDAK ADA di teks, isi string kosong "". JANGAN menebak, JANGAN menyalin dari field lain.
-7. Isi HANYA field berikut: ${PDF_FIELDS.join(', ')}.
+7. SEP dan NOKARTU boleh diambil dari halaman "Surat Eligibilitas Peserta" kalau ada — di
+   halaman itu labelnya sering disingkat "No. SEP" (bukan "Nomor SEP") dan "No. Kartu"
+   (bukan "Nomor Kartu"). Tetap SAMA PERSIS field SEP dan NOKARTU, cuma beda halaman sumber.
+${kelasRawatRule}
+9. Isi HANYA field berikut: ${PDF_FIELDS.join(', ')}.
 
 TEKS KLAIM:
 ${claimDataText}

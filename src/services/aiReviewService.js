@@ -135,6 +135,61 @@ function validateQuotation(quotation, pageNumber, evidencePool) {
   return normalizeText(page.ocr_text).includes(normalizeText(quotation));
 }
 
+/**
+ * Fallback deterministik untuk code_evidence: kalau AI bilang tidak ada bukti
+ * (atau kutipannya gagal validasi), cek ULANG apakah kode itu sendiri muncul
+ * literal di salah satu halaman evidence pool — TANPA bergantung pada kutipan
+ * AI. PDF berlayout tabel kompleks (mis. catatan S-O-A-P) sering bikin urutan
+ * teks hasil ekstraksi (pdf-parse atau OCR) berantakan, jadi kutipan kontinu
+ * persis kadang gagal cocok walau kodenya beneran ada di halaman itu.
+ *
+ * Tetap deterministik/anti-halusinasi: bukan AI yang menilai "ada bukti",
+ * tapi regex yang secara langsung menemukan lokasi kode di teks asli — kutipan
+ * yang dikembalikan adalah potongan teks ASLI di sekitar kode (bukan karangan
+ * AI), lalu tetap disaring hasFinancialTerms seperti kutipan dari AI.
+ */
+function findCodeInEvidencePool(code, evidencePool) {
+  if (!code || typeof code !== 'string') return null;
+  const escaped = code.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const re = new RegExp(`(?<![\\w.])${escaped}(?![\\w.])`, 'i');
+  for (const page of evidencePool) {
+    if (!page.ocr_text) continue;
+    const idx = page.ocr_text.search(re);
+    if (idx === -1) continue;
+    const start = Math.max(0, idx - 80);
+    const end = Math.min(page.ocr_text.length, idx + code.length + 80);
+    const quotation = page.ocr_text.slice(start, end).replace(/\s+/g, ' ').trim();
+    if (hasFinancialTerms(quotation)) continue;
+    return { page_number: page.page_number, quotation: quotation.substring(0, 200) };
+  }
+  return null;
+}
+
+/**
+ * Jaring pengaman deterministik untuk kebocoran istilah rawat inap ke catatan
+ * klaim RAWAT_JALAN — system prompt sudah melarang ini eksplisit, tapi
+ * instruksi prompt bersifat probabilistik (tidak 100% dijamin dipatuhi,
+ * pola yang sama dengan kasus KELAS_RAWAT sebelumnya). Kalau catatan/saran
+ * masih menyinggung konsep yang cuma berlaku untuk pasien menginap, catatan
+ * itu DIBUANG (bukan diedit sebagian) — lebih aman tidak ada catatan sama
+ * sekali daripada catatan yang menyesatkan verifikator rawat jalan.
+ *
+ * Frasa dibuat spesifik (bukan cuma "rawat inap" polos) supaya tidak salah
+ * buang kalimat yang justru BENAR menegaskan "ini bukan rawat inap".
+ */
+function hasInpatientOnlyTerms(text) {
+  if (!text || typeof text !== 'string') return false;
+  const patterns = [
+    /ruang(?:an)?\s*rawat\s*inap/i,
+    /kelas\s*rawat\s*inap/i,
+    /\bICU\b/i,
+    /ventilator|ventilasi\s*mekanik/i,
+    /lama\s*hari\s*rawat/i,
+    /\bLOS\b/,
+  ];
+  return patterns.some(p => p.test(text));
+}
+
 function hasFinancialTerms(text) {
   if (!text || typeof text !== 'string') return false;
   const patterns = [
@@ -218,32 +273,52 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
       }
 
       const result = { field_notes: {}, code_evidence: [], suggested_codes: [], knowledge_updates: [], tokens_used: tokensUsed };
+      const jenisKlaimRecord = record.JENIS_KLAIM || record.jenis_klaim;
 
-      // field_notes: hanya field yang benar-benar ada di validationErrors yang dipertahankan
+      // field_notes: hanya field yang benar-benar ada di validationErrors yang dipertahankan.
+      // Untuk RAWAT_JALAN, catatan yang masih menyinggung konsep rawat inap
+      // (walau sudah dilarang di system prompt) dibuang di sini — lihat
+      // hasInpatientOnlyTerms.
       const errorFieldNames = new Set(validationErrors.map(e => e.field_name));
       const errorRuleIds = new Set(validationErrors.map(e => e.rule_id));
       if (aiResult.field_notes && typeof aiResult.field_notes === 'object') {
         for (const [field, note] of Object.entries(aiResult.field_notes)) {
-          if (errorFieldNames.has(field) && typeof note === 'string' && note.trim()) {
-            result.field_notes[field] = note.trim();
+          if (!errorFieldNames.has(field) || typeof note !== 'string' || !note.trim()) continue;
+          if (jenisKlaimRecord === 'RAWAT_JALAN' && hasInpatientOnlyTerms(note)) {
+            console.warn(`[AI-REVIEW] Catatan field "${field}" dibuang (menyinggung rawat inap untuk klaim RAWAT_JALAN).`);
+            continue;
           }
+          result.field_notes[field] = note.trim();
         }
       }
 
-      // code_evidence — validasi server-side setiap kutipan (anti-halusinasi AI)
+      // code_evidence — validasi server-side setiap kutipan (anti-halusinasi AI).
+      // Setiap kali AI menyimpulkan "tidak ada bukti" (langsung, atau kutipannya
+      // gagal validasi), coba dulu findCodeInEvidencePool sebelum benar-benar
+      // dicatat found:false — kutipan AI dari tabel kompleks (PDF/OCR) sering
+      // gagal cocok persis walau kodenya benar-benar ada di halaman itu.
       if (Array.isArray(aiResult.code_evidence)) {
         for (const entry of aiResult.code_evidence) {
           if (!entry.found) {
-            result.code_evidence.push({ code: entry.code, type: entry.type, found: false, page_number: null, quotation: null });
+            const fallback = findCodeInEvidencePool(entry.code, evidencePool);
+            result.code_evidence.push(fallback
+              ? { code: entry.code, type: entry.type, found: true, page_number: fallback.page_number, quotation: fallback.quotation }
+              : { code: entry.code, type: entry.type, found: false, page_number: null, quotation: null });
             continue;
           }
           const { page_number: pageNum, quotation } = entry;
-          if (!quotation || !pageNum) continue;
-          if (!validateQuotation(quotation, pageNum, evidencePool)) {
-            console.warn(`[AI-REVIEW] Kutipan tidak cocok (AI halusinasi?): code=${entry.code}, page=${pageNum}`);
+          const quotationValid = quotation && pageNum
+            && validateQuotation(quotation, pageNum, evidencePool) && !hasFinancialTerms(quotation);
+          if (!quotationValid) {
+            if (quotation && pageNum) {
+              console.warn(`[AI-REVIEW] Kutipan tidak cocok (AI halusinasi?): code=${entry.code}, page=${pageNum}`);
+            }
+            const fallback = findCodeInEvidencePool(entry.code, evidencePool);
+            if (fallback) {
+              result.code_evidence.push({ code: entry.code, type: entry.type, found: true, page_number: fallback.page_number, quotation: fallback.quotation });
+            }
             continue;
           }
-          if (hasFinancialTerms(quotation)) continue;
           result.code_evidence.push({
             code: entry.code, type: entry.type, found: true,
             page_number: pageNum, quotation: quotation.substring(0, 200),
@@ -251,24 +326,34 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
         }
       }
 
-      // Pengaman: pastikan SEMUA kode yang diklaim tercatat (found:false kalau AI diam)
+      // Pengaman: pastikan SEMUA kode yang diklaim tercatat — coba fallback
+      // deterministik dulu sebelum dicatat found:false (kalau AI diam total).
       if (hasCodesToCheck) {
         const covered = new Set(result.code_evidence.map(e => e.code));
-        codes.diagnosis.forEach(code => {
-          if (!covered.has(code)) result.code_evidence.push({ code, type: 'diagnosis', found: false, page_number: null, quotation: null });
-        });
-        codes.procedure.forEach(code => {
-          if (!covered.has(code)) result.code_evidence.push({ code, type: 'procedure', found: false, page_number: null, quotation: null });
-        });
+        const pushWithFallback = (code, type) => {
+          if (covered.has(code)) return;
+          const fallback = findCodeInEvidencePool(code, evidencePool);
+          result.code_evidence.push(fallback
+            ? { code, type, found: true, page_number: fallback.page_number, quotation: fallback.quotation }
+            : { code, type, found: false, page_number: null, quotation: null });
+        };
+        codes.diagnosis.forEach(code => pushWithFallback(code, 'diagnosis'));
+        codes.procedure.forEach(code => pushWithFallback(code, 'procedure'));
       }
 
-      // suggested_codes
+      // suggested_codes — quotation adalah kutipan VERBATIM dari dokumen (tidak
+      // difilter istilah rawat inap, itu fakta dokumen bukan opini AI); reasoning
+      // adalah opini AI, difilter sama seperti field_notes untuk RAWAT_JALAN.
       if (Array.isArray(aiResult.suggested_codes)) {
         for (const entry of aiResult.suggested_codes) {
           const { page_number: pageNum, quotation } = entry;
           if (!quotation || !pageNum) continue;
           if (!validateQuotation(quotation, pageNum, evidencePool)) continue;
           if (hasFinancialTerms(quotation) || hasFinancialTerms(entry.reasoning)) continue;
+          if (jenisKlaimRecord === 'RAWAT_JALAN' && hasInpatientOnlyTerms(entry.reasoning)) {
+            console.warn(`[AI-REVIEW] Saran kode "${entry.code}" dibuang (reasoning menyinggung rawat inap untuk klaim RAWAT_JALAN).`);
+            continue;
+          }
           result.suggested_codes.push({
             code: entry.code, type: entry.type, page_number: pageNum,
             quotation: quotation.substring(0, 200),
@@ -280,6 +365,10 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
       // knowledge_updates — anti-halusinasi: rule_id wajib salah satu dari
       // validationErrors record ini (bukan rule_id yang dikarang AI), dan
       // dilarang keras memuat data finansial/identitas (heuristik sederhana).
+      // Untuk RAWAT_JALAN, pola yang menyinggung rawat inap TIDAK boleh masuk
+      // basis pengetahuan — kalau lolos tersimpan, bisa "mencemari" referensi
+      // PENGETAHUAN_TERDAHULU untuk record RAWAT_JALAN lain di masa depan
+      // (rule_id sama dipakai lintas kategori, tidak ada pemisahan per kategori).
       if (Array.isArray(aiResult.knowledge_updates)) {
         for (const entry of aiResult.knowledge_updates.slice(0, 10)) {
           const { rule_id: ruleId, field_name: fieldName, pattern_summary: pattern, solution } = entry || {};
@@ -287,6 +376,7 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
           if (typeof pattern !== 'string' || typeof solution !== 'string') continue;
           if (!pattern.trim() || !solution.trim()) continue;
           if (hasFinancialTerms(pattern) || hasFinancialTerms(solution)) continue;
+          if (jenisKlaimRecord === 'RAWAT_JALAN' && (hasInpatientOnlyTerms(pattern) || hasInpatientOnlyTerms(solution))) continue;
           result.knowledge_updates.push({
             rule_id: ruleId,
             field_name: typeof fieldName === 'string' ? fieldName.trim() || null : null,

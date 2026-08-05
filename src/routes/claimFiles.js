@@ -1063,7 +1063,7 @@ const JENIS_KLAIM_OPTIONS = ['RAWAT_JALAN', 'RAWAT_INAP', 'GAWAT_DARURAT'];
 async function processSinglePdfUpload(db, { filePath, originalName, jenisKlaim, userId, hospitalCode }) {
   try {
     const { extractFromPDF } = require('../services/pdfExtractionPipeline');
-    const result = await extractFromPDF(filePath);
+    const result = await extractFromPDF(filePath, { jenisKlaim });
 
     if (!result.success) {
       // Detail teknis hanya untuk log server, tidak dikirim ke pengguna.

@@ -4,9 +4,14 @@ const fs = require('fs');
 // ponytail: classifier pakai pdf-parse (sudah terpasang) — pdfjs-dist v4 tak jalan di CommonJS.
 // 'DPJP' & 'Dokter Penanggung Jawab' ikut: nama dokter ada di layer teks (halaman SPRI/SEP),
 // bukan di halaman E-Klaim — tanpa ini kolom DPJP vClaim selalu kosong.
-const CLAIM_DATA_KEYWORDS = ['Nomor SEP', 'Berkas Klaim Individual', 'INA-CBG', 'Total Tarif', 'Rincian Biaya', 'DPJP', 'Dokter Penanggung Jawab'];
+// 'Surat Eligibilitas Peserta' ikut: halaman SEP cetakan RS (bukan "Berkas Klaim
+// Individual" E-Klaim) — sering pakai label singkat "No. SEP"/"No. Kartu" yang
+// tidak cocok dengan keyword "Nomor SEP"/"Nomor Kartu" di bawah. Tanpa ini,
+// halaman SEP tidak ikut masuk claimDataText, jadi AI extraction "buta" nilai
+// SEP/NOKARTU walau sebenarnya ada di dokumen — muncul sebagai error "wajib diisi".
+const CLAIM_DATA_KEYWORDS = ['Nomor SEP', 'Berkas Klaim Individual', 'INA-CBG', 'Total Tarif', 'Rincian Biaya', 'DPJP', 'Dokter Penanggung Jawab', 'Surat Eligibilitas Peserta'];
 // Keyword tambahan untuk format PDF RS yang bervariasi
-const EXTRA_KEYWORDS = ['Klaim Individual', 'Data Klaim', 'Resume Medis', 'Ringkasan Pasien Keluar', 'INACBG', 'INA CBG', 'Diagnosa', 'Prosedur', 'Kode ICD', 'Nomor Kartu'];
+const EXTRA_KEYWORDS = ['Klaim Individual', 'Data Klaim', 'Resume Medis', 'Ringkasan Pasien Keluar', 'INACBG', 'INA CBG', 'Diagnosa', 'Prosedur', 'Kode ICD', 'Nomor Kartu', 'No. SEP', 'No. Kartu', 'No Kartu'];
 const PRIMARY_KEYWORD = 'Berkas Klaim Individual'; // halaman E-Klaim summary = sumber utama
 const SCAN_CHAR_THRESHOLD = 50;
 
