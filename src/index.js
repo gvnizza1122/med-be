@@ -17,7 +17,6 @@ const claimFileRoutes = require('./routes/claimFiles');
 const validationRuleRoutes = require('./routes/validationRules');
 const dashboardRoutes = require('./routes/dashboard');
 const userRoutes = require('./routes/users');
-const auditLogRoutes = require('./routes/auditLogs');
 const bridgingRoutes = require('./routes/bridging');
 
 const app = express();
@@ -125,7 +124,6 @@ app.use('/api/v1/claim-files', claimFileRoutes);
 app.use('/api/v1/validation-rules', validationRuleRoutes);
 app.use('/api/v1/dashboard', dashboardRoutes);
 app.use('/api/v1/users', userRoutes);
-app.use('/api/v1/audit-logs', auditLogRoutes);
 app.use('/api/v1/bridging', bridgingRoutes);
 
 // Health check

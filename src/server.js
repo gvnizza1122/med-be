@@ -9,7 +9,6 @@ const claimFilesRoutes = require('./routes/claimFiles');
 const claimFilesBatchRoutes = require('./routes/claimFilesBatch');
 const dashboardRoutes = require('./routes/dashboard');
 const validationRulesRoutes = require('./routes/validationRules');
-const auditLogsRoutes = require('./routes/auditLogs');
 const simrsRoutes = require('./routes/simrs');
 const { redisClient } = require('./config/queue');
 
@@ -42,7 +41,6 @@ app.use('/api/v1/claim-files', claimFilesBatchRoutes);
 app.use('/api/v1/dashboard', dashboardRoutes);
 app.use('/api/v1/validation-rules', validationRulesRoutes);
 app.use('/api/v1/records', validationRulesRoutes.recordsRouter);
-app.use('/api/v1/audit-logs', auditLogsRoutes);
 app.use('/api/v1/simrs', simrsRoutes);
 
 // Error handling
