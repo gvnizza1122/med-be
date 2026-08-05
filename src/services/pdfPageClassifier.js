@@ -49,9 +49,18 @@ async function classifyPdfPages(filePath) {
       const text = chunk.trim();
       const type = text.length < SCAN_CHAR_THRESHOLD ? 'SCAN' : 'NATIVE';
       const hasClaimData = isClaimDataPage(text);
+      // is_primary_source: HANYA halaman "Berkas Klaim Individual" (E-Klaim
+      // summary) yang sungguhan — beda dari has_claim_data yang sengaja luas
+      // (mencakup halaman SEP/Resume Medis/SPRI supaya field SEP/NOKARTU/DPJP
+      // ikut terbaca saat ekstraksi). Dipakai KHUSUS untuk kecualikan halaman
+      // dari evidence pool (cegah audit sirkular) — kalau pakai has_claim_data
+      // yang luas di situ, halaman Resume Medis/SPRI yang punya bukti klinis
+      // ASLI (bukan sumber ekstraksi DIAGLIST/PROCLIST) ikut ter-eksklusi
+      // secara tidak sengaja, padahal itu justru bukti yang valid.
+      const isPrimarySource = text.toLowerCase().includes(PRIMARY_KEYWORD.toLowerCase());
       const pageNum = i + 1;
       if (hasClaimData) result.claimDataPages.push({ page_num: pageNum, text });
-      result.pages.push({ page_num: pageNum, type, text_length: text.length, has_claim_data: hasClaimData, text_sample: text.slice(0, 200), text_full: text });
+      result.pages.push({ page_num: pageNum, type, text_length: text.length, has_claim_data: hasClaimData, is_primary_source: isPrimarySource, text_sample: text.slice(0, 200), text_full: text });
       if (type === 'NATIVE') result.summary.nativeCount++; else result.summary.scanCount++;
     });
     result.totalPages = chunks.length;

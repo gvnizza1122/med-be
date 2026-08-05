@@ -108,12 +108,17 @@ async function gatherEvidencePool(db, recordId, filePath) {
     const classified = await classifyPdfPages(filePath);
     if (classified.success) {
       const scanPageNumbers = new Set(ocrResults.map(o => o.page_number));
-      // PENTING: kecualikan halaman "Berkas Klaim Individual" (has_claim_data) —
-      // itu SUMBER ASLI ekstraksi DIAGLIST/PROCLIST. Kalau ikut dimasukkan, audit
-      // jadi sirkular (kode "terbukti" cuma karena tertulis di halaman asalnya
-      // sendiri) — meniadakan tujuan anti-upcoding.
+      // PENTING: kecualikan HANYA halaman "Berkas Klaim Individual" sungguhan
+      // (is_primary_source) — itu SUMBER ASLI ekstraksi DIAGLIST/PROCLIST, kalau
+      // ikut dimasukkan audit jadi sirkular (kode "terbukti" cuma karena
+      // tertulis di halaman asalnya sendiri). SENGAJA BUKAN has_claim_data (itu
+      // sengaja luas — mencakup halaman SEP/Resume Medis/SPRI supaya field
+      // SEP/NOKARTU/DPJP ikut terbaca saat ekstraksi) — kalau exclude pakai
+      // has_claim_data di sini, halaman Resume Medis/SPRI yang justru berisi
+      // bukti klinis ASLI (diagnosa, tindakan) ikut ter-buang secara tidak
+      // sengaja dari evidence pool, padahal bukan sumber sirkular.
       const nativePages = classified.pages
-        .filter(p => p.type === 'NATIVE' && !p.has_claim_data && !scanPageNumbers.has(p.page_num) && p.text_length > 0)
+        .filter(p => p.type === 'NATIVE' && !p.is_primary_source && !scanPageNumbers.has(p.page_num) && p.text_length > 0)
         .map(p => ({ page_number: p.page_num, ocr_text: p.text_full, confidence: 100 }));
       evidencePool = [...evidencePool, ...nativePages];
     }
