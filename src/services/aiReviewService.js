@@ -13,6 +13,15 @@
  * ekstraksi AI tahap 1 / data DB saat ini) sebagai konteks, bukan menilai
  * field yang error secara terisolasi — supaya saran konsisten dan akurat,
  * dengan trade-off token lebih besar (disetujui pengguna).
+ *
+ * "Basis pengetahuan" (error_knowledge_base, lihat errorKnowledgeService.js):
+ * berbeda dari "memory" di atas — ini bukan histori record, tapi pola error
+ * & solusi yang sudah DIGENERALISASI (tanpa data pasien) dari review-review
+ * sebelumnya, dikelompokkan per rule_id. Cuma entri untuk rule_id yang
+ * relevan dengan record ini yang diikutkan ke prompt (lihat PENGETAHUAN_
+ * TERDAHULU), supaya AI tak perlu menafsir ulang dari nol untuk pola error
+ * yang sudah sering ditemui — tapi tetap wajib menyesuaikan ke data record
+ * ini, bukan menyalin mentah.
  */
 
 const AI_REVIEW_SYSTEM_PROMPT = `Kamu asisten audit klaim BPJS E-Claim untuk perawat/verifikator rumah sakit.
@@ -39,6 +48,15 @@ TUGAS:
    - DILARANG mengarang/menyimpulkan kode dari konteks umum — hanya dari bukti eksplisit di teks.
    - Kalau ragu, tandai found:false — lebih baik tidak menyarankan daripada salah.
 3. suggested_codes HANYA diisi kalau ada bukti KUAT kode itu relevan tapi belum diklaim.
+4. Kalau ada PENGETAHUAN_TERDAHULU (pola error serupa yang pernah ditemukan): jadikan referensi
+   supaya konsisten dengan penilaian sebelumnya, TAPI jangan disalin mentah — selalu sesuaikan
+   dengan data record ini.
+5. Untuk field yang gagal validasi (FIELD_ERRORS), samping catatan di field_notes, buat JUGA versi
+   GENERALISASI-nya (tanpa nama pasien/nomor SEP/nomor kartu/data identitas apapun — cuma pola
+   penyebab & solusi umum yang berlaku untuk kasus serupa) di "knowledge_updates", supaya bisa
+   dipakai sebagai referensi untuk record lain dengan rule_id sama di masa depan. Kalau catatan
+   di field_notes SUDAH sama persis dengan salah satu PENGETAHUAN_TERDAHULU yang diberikan (tidak
+   ada hal baru), JANGAN buat entri knowledge_updates duplikat untuk rule_id itu.
 
 Output HANYA JSON, tanpa markdown/penjelasan, format:
 {
@@ -48,6 +66,9 @@ Output HANYA JSON, tanpa markdown/penjelasan, format:
   ],
   "suggested_codes": [
     { "code": "...", "type": "diagnosis|procedure", "page_number": N, "quotation": "...", "reasoning": "..." }
+  ],
+  "knowledge_updates": [
+    { "rule_id": "...", "field_name": "...", "pattern_summary": "pola penyebab, tanpa data pasien", "solution": "langkah perbaikan umum" }
   ]
 }`;
 
@@ -60,7 +81,7 @@ function pickCodes(record) {
   };
 }
 
-function buildPrompt(record, validationErrors, evidencePool, codes) {
+function buildPrompt(record, validationErrors, evidencePool, codes, knowledgeEntries = []) {
   const jenisKlaim = record.JENIS_KLAIM || record.jenis_klaim || '(tidak diketahui)';
   let prompt = `JENIS_KLAIM: ${jenisKlaim} — WAJIB dipatuhi, lihat instruksi di atas.\n\n`;
   prompt += `DATA REKAM KLAIM (hasil ekstraksi, jadikan konteks — "memory"):\n`;
@@ -73,6 +94,13 @@ function buildPrompt(record, validationErrors, evidencePool, codes) {
     ).join('\n') + '\n\n';
   } else {
     prompt += `FIELD_ERRORS: (kosong — tidak ada field yang gagal validasi format)\n\n`;
+  }
+
+  if (knowledgeEntries.length > 0) {
+    prompt += `PENGETAHUAN_TERDAHULU (pola error serupa & solusi yang pernah tercatat — referensi saja, sesuaikan ke data record ini):\n`;
+    prompt += knowledgeEntries.map(k =>
+      `- [rule ${k.rule_id}${k.field_name ? ` / ${k.field_name}` : ''}] Pola: ${k.pattern_summary} → Solusi: ${k.solution}`
+    ).join('\n') + '\n\n';
   }
 
   if (codes.diagnosis.length > 0) prompt += `Kode diagnosis diklaim (ICD-10): ${codes.diagnosis.join(', ')}\n`;
@@ -122,10 +150,12 @@ function hasFinancialTerms(text) {
  *   format vClaim (DIAGLIST, SEP, ...) atau format DB (diagnosa_list, sep, ...).
  * @param {Array} validationErrors - Error dari rule engine (field_name, error_message, dst).
  * @param {Array} evidencePool - [{page_number, ocr_text, confidence}] — OCR + teks native, boleh kosong.
- * @returns {Promise<{field_notes: object, code_evidence: Array, suggested_codes: Array, tokens_used: number}|null>}
+ * @param {Array} knowledgeEntries - [{rule_id, field_name, pattern_summary, solution}] dari
+ *   error_knowledge_base untuk rule_id yang relevan — referensi ringkas, bukan histori penuh.
+ * @returns {Promise<{field_notes: object, code_evidence: Array, suggested_codes: Array, knowledge_updates: Array, tokens_used: number}|null>}
  *   null kalau tidak ada apapun untuk direview, atau AI tidak dikonfigurasi/gagal total.
  */
-async function generateAiReview(record, validationErrors = [], evidencePool = []) {
+async function generateAiReview(record, validationErrors = [], evidencePool = [], knowledgeEntries = []) {
   const codes = pickCodes(record);
   const hasCodesToCheck = evidencePool.length > 0 && (codes.diagnosis.length > 0 || codes.procedure.length > 0);
 
@@ -141,7 +171,7 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
   const maxAttempts = Number(process.env.AI_MAX_ATTEMPTS || 3);
   const timeoutMs = Number(process.env.AI_TIMEOUT_MS || 60000);
 
-  const userPrompt = buildPrompt(record, validationErrors, evidencePool, codes);
+  const userPrompt = buildPrompt(record, validationErrors, evidencePool, codes, knowledgeEntries);
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
@@ -187,10 +217,11 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
         aiResult = JSON.parse(m[0]);
       }
 
-      const result = { field_notes: {}, code_evidence: [], suggested_codes: [], tokens_used: tokensUsed };
+      const result = { field_notes: {}, code_evidence: [], suggested_codes: [], knowledge_updates: [], tokens_used: tokensUsed };
 
       // field_notes: hanya field yang benar-benar ada di validationErrors yang dipertahankan
       const errorFieldNames = new Set(validationErrors.map(e => e.field_name));
+      const errorRuleIds = new Set(validationErrors.map(e => e.rule_id));
       if (aiResult.field_notes && typeof aiResult.field_notes === 'object') {
         for (const [field, note] of Object.entries(aiResult.field_notes)) {
           if (errorFieldNames.has(field) && typeof note === 'string' && note.trim()) {
@@ -242,6 +273,25 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
             code: entry.code, type: entry.type, page_number: pageNum,
             quotation: quotation.substring(0, 200),
             reasoning: (entry.reasoning || '').substring(0, 200),
+          });
+        }
+      }
+
+      // knowledge_updates — anti-halusinasi: rule_id wajib salah satu dari
+      // validationErrors record ini (bukan rule_id yang dikarang AI), dan
+      // dilarang keras memuat data finansial/identitas (heuristik sederhana).
+      if (Array.isArray(aiResult.knowledge_updates)) {
+        for (const entry of aiResult.knowledge_updates.slice(0, 10)) {
+          const { rule_id: ruleId, field_name: fieldName, pattern_summary: pattern, solution } = entry || {};
+          if (!ruleId || !errorRuleIds.has(ruleId)) continue;
+          if (typeof pattern !== 'string' || typeof solution !== 'string') continue;
+          if (!pattern.trim() || !solution.trim()) continue;
+          if (hasFinancialTerms(pattern) || hasFinancialTerms(solution)) continue;
+          result.knowledge_updates.push({
+            rule_id: ruleId,
+            field_name: typeof fieldName === 'string' ? fieldName.trim() || null : null,
+            pattern_summary: pattern.trim().substring(0, 500),
+            solution: solution.trim().substring(0, 500),
           });
         }
       }

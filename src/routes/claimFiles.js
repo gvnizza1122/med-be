@@ -11,6 +11,7 @@ const { generateExcel } = require('../services/exportService');
 const { logAudit } = require('../services/auditService');
 const { estimatePromptTokens, estimateCompletionTokens } = require('../services/aiValidationService');
 const { generateAiReview } = require('../services/aiReviewService');
+const { getRelevantKnowledge, recordKnowledge } = require('../services/errorKnowledgeService');
 
 const router = express.Router();
 
@@ -309,11 +310,15 @@ router.post('/upload', authenticate, upload.single('file'), async (req, res) => 
       let completedCount = 0;
       await runWithConcurrencyLimit(recordsToAudit, 5, async (record) => {
         try {
-          const aiReview = await generateAiReview(record, errorsByRecordId[record.id] || [], []);
+          const recordErrors = errorsByRecordId[record.id] || [];
+          const knowledgeEntries = await getRelevantKnowledge(db, recordErrors.map(e => e.rule_id));
+          const aiReview = await generateAiReview(record, recordErrors, [], knowledgeEntries);
           if (aiReview) {
             totalAiTokens += aiReview.tokens_used || 0;
             await db.prepare('UPDATE claim_records SET ai_review = ? WHERE id = ?')
               .run(JSON.stringify(aiReview), record.id);
+            recordKnowledge(db, aiReview.knowledge_updates).catch(kbErr =>
+              console.warn(`[AI Review] Gagal simpan knowledge base: ${kbErr.message}`));
           }
         } catch (aiErr) {
           console.warn(`[AI Review] gagal untuk record ${record.id}: ${aiErr.message}`);
@@ -796,10 +801,14 @@ router.post('/:id/ai-audit', authenticate, async (req, res) => {
             || await gatherEvidencePool(db, record.id, pdfPath);
           evidencePoolCache.set(record.id, evidencePool);
         }
-        const aiReview = await generateAiReview(record, errorsByRecordId[record.id] || [], evidencePool);
+        const recordErrors = errorsByRecordId[record.id] || [];
+        const knowledgeEntries = await getRelevantKnowledge(db, recordErrors.map(e => e.rule_id));
+        const aiReview = await generateAiReview(record, recordErrors, evidencePool, knowledgeEntries);
         if (aiReview) {
           await db.prepare('UPDATE claim_records SET ai_review = ? WHERE id = ?')
             .run(JSON.stringify(aiReview), record.id);
+          recordKnowledge(db, aiReview.knowledge_updates).catch(kbErr =>
+            console.warn(`[AI Review] Gagal simpan knowledge base: ${kbErr.message}`));
         }
       } catch (aiErr) {
         console.warn(`[AI Review] gagal untuk record ${record.id}: ${aiErr.message}`);
@@ -1041,27 +1050,30 @@ function vclaimToDbFormat(vclaimRecord) {
 // inap (ruangan, dst) untuk klaim yang sebenarnya rawat jalan.
 const JENIS_KLAIM_OPTIONS = ['RAWAT_JALAN', 'RAWAT_INAP', 'GAWAT_DARURAT'];
 
-router.post('/upload-pdf', authenticate, pdfUpload.single('file'), async (req, res) => {
+/**
+ * Proses SATU PDF end-to-end: AI extraction -> rule engine -> simpan DB ->
+ * AI review (+ basis pengetahuan). Dipakai bersama oleh /upload-pdf (1 file)
+ * dan /upload-pdf-batch (banyak file, 1 kategori pelayanan yang sama untuk
+ * semua file — verifikator diasumsikan sudah memisahkan file per kategori
+ * sebelum upload batch).
+ * @returns {Promise<{success:boolean, original_name:string, error?:string, file_id?, record_id?, vclaimFormat?, validation_status?, validation_errors?, ai_review?, metadata?}>}
+ *   Selalu resolve (tidak throw) — kegagalan 1 file ditandai success:false supaya
+ *   tidak menghentikan file lain dalam batch.
+ */
+async function processSinglePdfUpload(db, { filePath, originalName, jenisKlaim, userId, hospitalCode }) {
   try {
-    if (!req.file) {
-      return res.status(400).json({ error: 'Belum ada berkas yang dipilih. Silakan pilih berkas PDF terlebih dahulu.' });
-    }
-
-    const jenisKlaim = JENIS_KLAIM_OPTIONS.includes(req.body?.jenis_klaim) ? req.body.jenis_klaim : 'RAWAT_INAP';
-
     const { extractFromPDF } = require('../services/pdfExtractionPipeline');
-    const result = await extractFromPDF(req.file.path);
+    const result = await extractFromPDF(filePath);
 
     if (!result.success) {
       // Detail teknis hanya untuk log server, tidak dikirim ke pengguna.
-      console.error('[upload-pdf] gagal:', req.file.originalname, JSON.stringify(result.errors));
-      return res.status(400).json({ error: result.pesan });
+      console.error('[upload-pdf] gagal:', originalName, JSON.stringify(result.errors));
+      return { success: false, original_name: originalName, error: result.pesan };
     }
 
-    const db = getDb();
     const fileId = uuidv4();
     const recordId = uuidv4();
-    const resolvedFilePath = path.resolve(req.file.path);
+    const resolvedFilePath = path.resolve(filePath);
 
     // Record vClaim lengkap 60 kolom (urutan & format sesuai output vClaim asli).
     // jenis_klaim ditambahkan dari pilihan user (AI ekstraksi tidak pernah
@@ -1081,7 +1093,7 @@ router.post('/upload-pdf', authenticate, pdfUpload.single('file'), async (req, r
     await db.prepare(`
       INSERT INTO claim_files (id, hospital_code, file_name, file_path, status, uploaded_by, total_records, description, jenis_klaim)
       VALUES (?, ?, ?, ?, 'uploaded', ?, 1, 'Extracted from PDF', ?)
-    `).run(fileId, req.user.hospital_code || '3371084', req.file.originalname, resolvedFilePath, req.user.id, jenisKlaim);
+    `).run(fileId, hospitalCode || '3371084', originalName, resolvedFilePath, userId, jenisKlaim);
 
     // Save extracted record with validation results using transaction
     await db.transaction(async (tx) => {
@@ -1131,29 +1143,127 @@ router.post('/upload-pdf', authenticate, pdfUpload.single('file'), async (req, r
     let aiReview = null;
     try {
       const evidencePool = await gatherEvidencePool(db, recordId, resolvedFilePath);
-      aiReview = await generateAiReview(extractedData, validationErrors, evidencePool);
+      const knowledgeEntries = await getRelevantKnowledge(db, validationErrors.map(e => e.rule_id));
+      aiReview = await generateAiReview(extractedData, validationErrors, evidencePool, knowledgeEntries);
       if (aiReview) {
         await db.prepare('UPDATE claim_records SET ai_review = ? WHERE id = ?')
           .run(JSON.stringify(aiReview), recordId);
+        recordKnowledge(db, aiReview.knowledge_updates).catch(kbErr =>
+          console.warn(`[upload-pdf] Gagal simpan knowledge base: ${kbErr.message}`));
       }
     } catch (aiErr) {
       console.warn(`[upload-pdf] AI review gagal untuk record ${recordId}: ${aiErr.message}`);
     }
 
-    res.json({
-      status: 'success',
+    return {
+      success: true,
       file_id: fileId,
       record_id: recordId,
-      original_name: req.file.originalname,
+      original_name: originalName,
       vclaimFormat: extractedData,
       validation_status: validationStatus,
       validation_errors: validationErrors,
       ai_review: aiReview,
       metadata: result.metadata,
+    };
+  } catch (err) {
+    console.error('[upload-pdf] error tak terduga:', originalName, err);
+    return { success: false, original_name: originalName, error: 'Terjadi gangguan saat memproses berkas. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' };
+  }
+}
+
+router.post('/upload-pdf', authenticate, pdfUpload.single('file'), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'Belum ada berkas yang dipilih. Silakan pilih berkas PDF terlebih dahulu.' });
+  }
+
+  const jenisKlaim = JENIS_KLAIM_OPTIONS.includes(req.body?.jenis_klaim) ? req.body.jenis_klaim : 'RAWAT_INAP';
+  const db = getDb();
+
+  const result = await processSinglePdfUpload(db, {
+    filePath: req.file.path,
+    originalName: req.file.originalname,
+    jenisKlaim,
+    userId: req.user.id,
+    hospitalCode: req.user.hospital_code,
+  });
+
+  if (!result.success) {
+    return res.status(400).json({ error: result.error });
+  }
+  res.json({ status: 'success', ...result });
+});
+
+// PDF batch upload config — sama seperti pdfUpload (single) tapi terima banyak file sekaligus
+const MAX_BATCH_PDF_FILES = 30;
+const pdfUploadBatch = multer({
+  storage,
+  limits: { fileSize: 20 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (path.extname(file.originalname).toLowerCase() === '.pdf') cb(null, true);
+    else cb(new Error('Hanya file PDF yang diperbolehkan.'));
+  }
+});
+
+/**
+ * POST /api/v1/claim-files/upload-pdf-batch
+ * Upload banyak PDF sekaligus, SATU kategori pelayanan untuk semua file dalam
+ * batch (verifikator upload PDF yang sudah dipisah per kategori). Tiap file
+ * diproses lewat pipeline yang SAMA PERSIS dengan upload single-PDF
+ * (processSinglePdfUpload) — konsisten, tanpa infrastruktur queue terpisah.
+ * Concurrency dibatasi (bukan Promise.all semua sekaligus) supaya provider AI
+ * (extraction + review, tiap file 2 kali panggil AI) & OCR (CPU-heavy) tidak
+ * kebanjiran request paralel. Progress per file di-emit lewat socket supaya
+ * FE bisa tampilkan status real-time tanpa polling.
+ */
+router.post('/upload-pdf-batch', authenticate, pdfUploadBatch.array('files', MAX_BATCH_PDF_FILES), async (req, res) => {
+  const io = req.app.get('io');
+  try {
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ error: 'Belum ada berkas yang dipilih. Silakan pilih minimal satu berkas PDF.' });
+    }
+
+    const jenisKlaim = JENIS_KLAIM_OPTIONS.includes(req.body?.jenis_klaim) ? req.body.jenis_klaim : 'RAWAT_INAP';
+    const db = getDb();
+    const batchId = uuidv4();
+    const total = req.files.length;
+    let completed = 0;
+
+    if (io) io.emit('pdf-batch:status', { batchId, status: 'processing', total, completed: 0 });
+
+    const results = await runWithConcurrencyLimit(req.files, 3, async (file) => {
+      const result = await processSinglePdfUpload(db, {
+        filePath: file.path,
+        originalName: file.originalname,
+        jenisKlaim,
+        userId: req.user.id,
+        hospitalCode: req.user.hospital_code,
+      });
+      completed++;
+      if (io) {
+        io.emit('pdf-batch:file-done', {
+          batchId, fileName: file.originalname, success: result.success,
+          error: result.success ? null : result.error, file_id: result.file_id || null,
+        });
+        io.emit('pdf-batch:status', { batchId, status: 'processing', total, completed });
+      }
+      return result;
+    });
+
+    const successCount = results.filter(r => r.success).length;
+    if (io) io.emit('pdf-batch:status', { batchId, status: 'completed', total, completed: total, successful: successCount, failed: total - successCount });
+
+    res.json({
+      status: 'success',
+      batch_id: batchId,
+      total_files: total,
+      successful: successCount,
+      failed: total - successCount,
+      results,
     });
   } catch (err) {
-    console.error('[upload-pdf] error tak terduga:', err);
-    res.status(500).json({ error: 'Terjadi gangguan saat memproses berkas. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' });
+    console.error('[upload-pdf-batch] error tak terduga:', err);
+    res.status(500).json({ error: 'Terjadi gangguan saat memproses batch. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' });
   }
 });
 

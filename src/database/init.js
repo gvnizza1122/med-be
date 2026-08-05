@@ -300,6 +300,17 @@ async function initializeSchema() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(record_id, page_number)
       );
+
+      -- Mirror dari migrations/003-error-knowledge-base.sql (auto-init untuk deployment tanpa migration runner)
+      CREATE TABLE IF NOT EXISTS error_knowledge_base (
+        id TEXT PRIMARY KEY,
+        rule_id TEXT NOT NULL REFERENCES validation_rules(id) ON DELETE CASCADE,
+        field_name TEXT,
+        pattern_summary TEXT NOT NULL,
+        solution TEXT NOT NULL,
+        hit_count INTEGER DEFAULT 1,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
     `);
 
     // Create Indexes
@@ -317,6 +328,8 @@ async function initializeSchema() {
     await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_ai_audit_style_action ON ai_audit_log(style, nurse_action)`);
     await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_ocr_results_record_id ON ocr_results(record_id)`);
     await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_ocr_results_page ON ocr_results(record_id, page_number)`);
+    await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_error_kb_rule ON error_knowledge_base(rule_id)`);
+    await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_error_kb_rule_hits ON error_knowledge_base(rule_id, hit_count DESC, created_at DESC)`);
 
     await migrateSchema(dbHelper);
   } catch (err) {
