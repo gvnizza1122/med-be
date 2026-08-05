@@ -77,8 +77,9 @@ JSON:`;
               { role: 'system', content: 'Kamu mengembalikan HANYA satu JSON object. Dilarang menulis penjelasan, penalaran, atau markdown.' },
               { role: 'user', content: prompt },
             ],
-            temperature: 0,
-            max_tokens: 2000,
+            // max_completion_tokens (bukan max_tokens) & tanpa temperature custom
+            // — lihat catatan sama di aiReviewService.js.
+            max_completion_tokens: 2000,
             response_format: { type: 'json_object' },
           }),
         });

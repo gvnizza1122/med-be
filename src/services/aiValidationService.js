@@ -383,8 +383,9 @@ async function callAiApi(records, apiKey, baseUrl, model, errorFieldsByRecord = 
       { role: 'system', content: SYSTEM_PROMPT },
       { role: 'user', content: userMessage },
     ],
-    temperature: 0.1,
-    max_tokens: 4096,
+    // max_completion_tokens (bukan max_tokens) & tanpa temperature custom —
+    // lihat catatan sama di aiReviewService.js.
+    max_completion_tokens: 4096,
   }, apiKey, baseUrl);
 
   const msg = data?.choices?.[0]?.message || {};
@@ -626,14 +627,15 @@ async function auditRecordField(record, fieldName, style = 'ponytail', validatio
   );
 
   // POST ke AI provider API
+  // max_completion_tokens (bukan max_tokens) & tanpa temperature custom —
+  // lihat catatan sama di aiReviewService.js.
   const body = JSON.stringify({
     model,
     messages: [
       { role: 'system', content: AI_AUDIT_SYSTEM_PROMPT },
       { role: 'user', content: userMessage },
     ],
-    temperature: 0.2,
-    max_tokens: 400,
+    max_completion_tokens: 400,
     response_format: { type: 'json_object' }, // hint ke model untuk JSON output
   });
 

@@ -247,8 +247,12 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
               { role: 'system', content: AI_REVIEW_SYSTEM_PROMPT },
               { role: 'user', content: userPrompt },
             ],
-            temperature: 0,
-            max_tokens: 4000,
+            // max_completion_tokens (bukan max_tokens) & tanpa temperature custom
+            // — sebagian model (mis. GPT-5.6 Luna) menolak keduanya dengan HTTP 400
+            // "Unsupported parameter: 'max_tokens'". max_completion_tokens aman
+            // dipakai untuk model lama (gpt-4o-mini dkk) juga, jadi tidak perlu
+            // deteksi model.
+            max_completion_tokens: 4000,
             response_format: { type: 'json_object' },
           }),
         });
