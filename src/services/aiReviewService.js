@@ -48,8 +48,11 @@ TUGAS:
      kata dari deskripsi resmi kode (Bahasa Inggris), selama secara medis jelas setara. Contoh:
      kutipan "Hipertensi Heart Disease" tetap valid sebagai bukti kode "I11.9 — Hypertensive heart
      disease..."; kutipan "DARAH RUTIN" tetap valid sebagai bukti kode "90.59 — Microscopic
-     examination of blood...". Jangan berhenti cari cuma karena istilah dokumennya beda bahasa/gaya
-     dari deskripsi kode — tapi kutipannya SENDIRI tetap harus benar-benar ada persis di teks.
+     examination of blood..."; kutipan/label alat seperti "ECG", "EKG", atau "CHILD ECG" (nama
+     model alat) tetap valid sebagai bukti kode "89.52 — Electrocardiogram" — termasuk kalau
+     kutipannya cuma berupa label/parameter di sekitar hasil cetak alat (RATE, QRS, dst), bukan
+     kalimat naratif utuh. Jangan berhenti cari cuma karena istilah dokumennya beda bahasa/gaya/
+     bentuk dari deskripsi kode — tapi kutipannya SENDIRI tetap harus benar-benar ada persis di teks.
    - DILARANG KERAS menyebut nominal rupiah/biaya/tarif dalam kutipan atau alasan apapun.
    - DILARANG mengarang/menyimpulkan kode dari konteks umum — hanya dari bukti eksplisit di teks.
    - Kalau ragu, tandai found:false — lebih baik tidak menyarankan daripada salah.
