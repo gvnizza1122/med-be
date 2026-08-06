@@ -44,6 +44,12 @@ TUGAS:
    verifikasi tiap kode terhadap bukti dokumen.
    - HANYA nyatakan "ada bukti" (found:true) kalau kamu bisa kutip kalimat PERSIS dari teks yang
      diberikan (bukan parafrase, bukan simpulan) yang mendukung kode itu, sertakan nomor halaman.
+     KUTIPANNYA sendiri wajib verbatim dari dokumen — tapi istilah di dalam kutipan itu BOLEH beda
+     kata dari deskripsi resmi kode (Bahasa Inggris), selama secara medis jelas setara. Contoh:
+     kutipan "Hipertensi Heart Disease" tetap valid sebagai bukti kode "I11.9 — Hypertensive heart
+     disease..."; kutipan "DARAH RUTIN" tetap valid sebagai bukti kode "90.59 — Microscopic
+     examination of blood...". Jangan berhenti cari cuma karena istilah dokumennya beda bahasa/gaya
+     dari deskripsi kode — tapi kutipannya SENDIRI tetap harus benar-benar ada persis di teks.
    - DILARANG KERAS menyebut nominal rupiah/biaya/tarif dalam kutipan atau alasan apapun.
    - DILARANG mengarang/menyimpulkan kode dari konteks umum — hanya dari bukti eksplisit di teks.
    - Kalau ragu, tandai found:false — lebih baik tidak menyarankan daripada salah.

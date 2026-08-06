@@ -64,8 +64,8 @@ describe('OCR Service', () => {
       expect(OCR_CONFIG.confidence_threshold).toBe(50);
     });
 
-    it('should support Indonesian language', () => {
-      expect(OCR_CONFIG.language).toBe('ind');
+    it('should support Indonesian + English language (dokumen medis sering campur istilah Inggris)', () => {
+      expect(OCR_CONFIG.language).toBe('eng+ind');
     });
   });
 

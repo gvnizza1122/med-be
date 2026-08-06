@@ -22,7 +22,12 @@ const path = require('path');
 
 // OCR Configuration
 const OCR_CONFIG = {
-  language: 'ind', // 'ind' for Indonesian, 'eng+ind' for English+Indonesian
+  // eng+ind (bukan cuma ind): banyak dokumen medis RS campur istilah Inggris
+  // (label alat EKG/lab seperti "RATE", "QRS", "Electrocardiogram", dst) di
+  // tengah teks Indonesia — model bahasa Indonesia-saja sering gagal baca
+  // istilah itu, bikin confidence rendah/hasil kacau di halaman seperti
+  // strip EKG. eng.traineddata sudah tersedia lokal, tidak perlu download.
+  language: 'eng+ind',
   confidence_threshold: 50, // Minimum confidence to mark as 'readable' (percent)
   timeout_ms: 60000, // 60s per page max
   log_performance: true
@@ -135,7 +140,10 @@ async function ocrPdfPages(pdfPath, pageNumbers = 'auto-scan', language = OCR_CO
       const pageStart = Date.now();
       try {
         const page = doc.loadPage(pageNum - 1); // mupdf 0-indexed
-        const matrix = mupdf.Matrix.scale(2.0, 2.0); // ~144 DPI, cukup untuk OCR
+        // 3.0 (~216 DPI, naik dari 2.0/~144 DPI) — halaman padat/print kecil
+        // (mis. label parameter di sekitar strip EKG) sering gagal terbaca
+        // di resolusi lebih rendah. Trade-off: OCR sedikit lebih lambat.
+        const matrix = mupdf.Matrix.scale(3.0, 3.0);
         const pixmap = page.toPixmap(matrix, mupdf.ColorSpace.DeviceRGB, false, true);
         const pngBuffer = Buffer.from(pixmap.asPNG());
 
