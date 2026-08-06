@@ -407,7 +407,7 @@ router.post('/upload', authenticate, upload.single('file'), async (req, res) => 
 router.get('/', authenticate, async (req, res) => {
   try {
     const db = getDb();
-    const { page = 1, limit = 20, status, jenis_klaim } = req.query;
+    const { page = 1, limit = 20, status, jenis_klaim, from_date, to_date } = req.query;
     const offset = (parseInt(page) - 1) * parseInt(limit);
 
     let where = 'WHERE 1=1';
@@ -421,6 +421,18 @@ router.get('/', authenticate, async (req, res) => {
     if (jenis_klaim) {
       where += ' AND cf.jenis_klaim = ?';
       params.push(jenis_klaim);
+    }
+
+    // from_date/to_date: filter berdasar tanggal upload (created_at), inklusif
+    // kedua ujung — to_date ditambah 'T23:59:59' supaya hari itu ikut penuh
+    // (bukan cuma sampai 00:00:00-nya).
+    if (from_date) {
+      where += ' AND cf.created_at >= ?';
+      params.push(from_date);
+    }
+    if (to_date) {
+      where += ' AND cf.created_at <= ?';
+      params.push(to_date + 'T23:59:59');
     }
 
     const totalResult = await db.prepare(`SELECT COUNT(*) as count FROM claim_files cf ${where}`).get(...params);
