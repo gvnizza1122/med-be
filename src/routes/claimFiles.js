@@ -1369,7 +1369,19 @@ router.post('/upload-pdf-batch', authenticate, pdfUploadBatch.array('files', MAX
       return res.status(400).json({ error: 'Belum ada berkas yang dipilih. Silakan pilih minimal satu berkas PDF.' });
     }
 
-    const jenisKlaim = JENIS_KLAIM_OPTIONS.includes(req.body?.jenis_klaim) ? req.body.jenis_klaim : 'RAWAT_INAP';
+    // Kategori BISA BEDA per file dalam 1 batch — dulu 1 nilai `jenis_klaim`
+    // dipaksa untuk seluruh batch (verifikator harus pisah upload 3x kalau
+    // berkasnya campur RJ/RI/IGD). Sekarang FE kirim `jenis_klaim_list`
+    // (JSON array, urutan sama dengan `files`); tiap file dipasangkan by
+    // index. Fallback tetap disediakan (klien lama/tanpa list) supaya tidak
+    // ada request yang gagal total gara-gara field ini belum terisi semua.
+    let jenisKlaimList = [];
+    try {
+      const parsed = req.body?.jenis_klaim_list ? JSON.parse(req.body.jenis_klaim_list) : null;
+      if (Array.isArray(parsed)) jenisKlaimList = parsed;
+    } catch { /* biarkan kosong, jatuh ke fallback di bawah */ }
+    const fallbackJenisKlaim = JENIS_KLAIM_OPTIONS.includes(req.body?.jenis_klaim) ? req.body.jenis_klaim : 'RAWAT_INAP';
+
     const db = getDb();
     const batchId = uuidv4();
     const total = req.files.length;
@@ -1377,11 +1389,14 @@ router.post('/upload-pdf-batch', authenticate, pdfUploadBatch.array('files', MAX
 
     if (io) io.emit('pdf-batch:status', { batchId, status: 'processing', total, completed: 0 });
 
-    const results = await runWithConcurrencyLimit(req.files, 3, async (file) => {
+    const results = await runWithConcurrencyLimit(req.files, 3, async (file, index) => {
+      const jenisKlaimForFile = JENIS_KLAIM_OPTIONS.includes(jenisKlaimList[index])
+        ? jenisKlaimList[index]
+        : fallbackJenisKlaim;
       const result = await processSinglePdfUpload(db, {
         filePath: file.path,
         originalName: file.originalname,
-        jenisKlaim,
+        jenisKlaim: jenisKlaimForFile,
         userId: req.user.id,
         hospitalCode: req.user.hospital_code,
       });
