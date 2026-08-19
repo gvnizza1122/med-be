@@ -1038,6 +1038,15 @@ function vclaimToDbFormat(vclaimRecord) {
     'FLAG_RUJUK_BALIK_PRB': 'flag_rujuk_balik_prb',
     'URUTAN_ITERASI': 'urutan_iterasi',
     'JENIS_KLAIM': 'jenis_klaim',
+    // POTENSI_PRB_SEP: BUKAN kolom vClaim resmi — flag "Potensi PRB" yang
+    // dicetak sistem BPJS sendiri di halaman SEP (lihat pdfExtractionService.js
+    // aturan 10a). Dipetakan ke kolom flag_rujuk_balik_prb yang SUDAH ADA di
+    // skema DB (dipakai RV-15) tapi sebelum ini selalu kosong karena tidak ada
+    // sumber datanya sama sekali — field ini baru dipetakan.
+    'POTENSI_PRB_SEP': 'flag_rujuk_balik_prb',
+    // KLINIK_SEP: nama klinik/poli dari SEP/Resume Medis (aturan 10c) — dipakai
+    // detectInternalEpisodes() di bawah untuk cross-check RV-13/14.
+    'KLINIK_SEP': 'klinik_poli',
   };
 
   const dbRecord = {};
@@ -1046,6 +1055,13 @@ function vclaimToDbFormat(vclaimRecord) {
     if (value !== undefined && value !== null) {
       if (['admission_date', 'discharge_date', 'birth_date'].includes(dbKey)) {
         dbRecord[dbKey] = vclaimDateToISO(value);
+      } else if (dbKey === 'flag_rujuk_balik_prb') {
+        // Dari FLAG_RUJUK_BALIK_PRB (jarang diisi AI) ATAU POTENSI_PRB_SEP ("YA"/"").
+        // MAPPING di-loop berurutan, jadi kalau kedua key ada di vclaimRecord,
+        // yang terakhir menang — POTENSI_PRB_SEP ditaruh paling akhir supaya
+        // sumber SEP (lebih dapat diandalkan) yang diprioritaskan.
+        const truthy = /^(ya|yes|true|1)$/i.test(String(value).trim());
+        dbRecord[dbKey] = truthy ? 1 : 0;
       } else if (['kelas_rawat', 'discharge_status', 'umur_tahun', 'umur_hari', 'los', 'icu_indikator', 'icu_los', 'vent_hour', 'birth_weight'].includes(dbKey)) {
         const num = parseInt(value, 10);
         dbRecord[dbKey] = isNaN(num) ? null : num;
@@ -1058,6 +1074,93 @@ function vclaimToDbFormat(vclaimRecord) {
     }
   }
   return dbRecord;
+}
+
+/**
+ * RV-13/14 (gabung episode konsul/rujukan internal) butuh tahu apakah 1
+ * pasien (NOKARTU sama) punya >1 kunjungan pada TANGGAL yang sama — data ini
+ * tidak ada di 1 dokumen PDF saja, tapi BISA disimpulkan dengan cross-check
+ * ke record lain yang sudah ada di database untuk RS yang sama. Dipanggil
+ * setelah tiap upload PDF berhasil disimpan (lihat processSinglePdfUpload).
+ *
+ * Kalau ditemukan >1 record NOKARTU+tanggal sama, DAN klinik/poli-nya BEDA
+ * (indikasi kunjungan lintas-poli, bukan cuma duplikat/kunjungan susulan di
+ * poli yang sama): tandai jenis_konsultasi='KONSUL_INTERNAL' di SEMUA record
+ * dalam grup itu (termasuk yang sudah lama tersimpan, bukan cuma yang baru
+ * diupload), lalu validasi ulang supaya RV-13/14 bisa benar-benar menyala.
+ * Kalau klinik-nya SAMA (kemungkinan cuma kontrol ulang di poli yang sama),
+ * jumlah_episode_klaim tetap diperbarui (angka faktual, bukan simpulan) tapi
+ * jenis_konsultasi TIDAK diisi — hindari overclaim dari sinyal yang lemah.
+ *
+ * SENGAJA hanya menandai, bukan memblokir/otomatis-error tanpa dasar kuat —
+ * konsisten dengan filosofi aplikasi ini (AI/sistem menyarankan, verifikator
+ * yang memutuskan).
+ */
+async function detectAndFlagInternalEpisodes(db, { hospitalCode, nokartu, admissionDate }) {
+  if (!nokartu || !admissionDate) return;
+  try {
+    const siblings = await db.prepare(`
+      SELECT cr.id, cr.klinik_poli, cr.jenis_konsultasi, cr.raw_data, cr.kode_rs, cr.sep,
+             cr.nokartu, cr.nama_pasien, cr.mrn, cr.birth_date, cr.gender, cr.kelas_rawat,
+             cr.admission_date, cr.discharge_date, cr.discharge_status, cr.diagnosa_list,
+             cr.prosedur_list, cr.dpjp_name, cr.tarif_rs, cr.jenis_klaim
+      FROM claim_records cr
+      JOIN claim_files cf ON cf.id = cr.file_id
+      WHERE cr.nokartu = ? AND cr.admission_date = ? AND cf.hospital_code = ?
+    `).all(nokartu, admissionDate, hospitalCode || '3371084');
+
+    if (!siblings || siblings.length < 2) return; // cuma 1 kunjungan, tidak ada yang perlu digabung
+
+    const klinikValues = [...new Set(siblings.map(s => (s.klinik_poli || '').trim()).filter(Boolean))];
+    const isCrossPoli = klinikValues.length > 1;
+    const episodeCount = siblings.length;
+
+    const activeRules = await db.prepare('SELECT * FROM validation_rules WHERE is_active = 1').all();
+
+    for (const sib of siblings) {
+      const dbRecord = {
+        kode_rs: sib.kode_rs, sep: sib.sep, nokartu: sib.nokartu, nama_pasien: sib.nama_pasien,
+        mrn: sib.mrn, birth_date: sib.birth_date, gender: sib.gender, kelas_rawat: sib.kelas_rawat,
+        admission_date: sib.admission_date, discharge_date: sib.discharge_date,
+        discharge_status: sib.discharge_status, diagnosa_list: sib.diagnosa_list,
+        prosedur_list: sib.prosedur_list, dpjp_name: sib.dpjp_name, tarif_rs: sib.tarif_rs,
+        jenis_klaim: sib.jenis_klaim,
+        jumlah_episode_klaim: episodeCount,
+        is_same_day: 1,
+        jenis_konsultasi: isCrossPoli ? 'KONSUL_INTERNAL' : (sib.jenis_konsultasi || null),
+      };
+
+      const validationErrors = validateRecord(dbRecord, activeRules);
+      const validationStatus = determineStatus(validationErrors);
+
+      await db.transaction(async (tx) => {
+        await tx.prepare(`
+          UPDATE claim_records
+          SET jumlah_episode_klaim = ?, is_same_day = ?, jenis_konsultasi = ?,
+              validation_status = ?, error_count = ?
+          WHERE id = ?
+        `).run(episodeCount, 1, dbRecord.jenis_konsultasi, validationStatus, validationErrors.length, sib.id);
+
+        await tx.prepare('DELETE FROM validation_errors WHERE record_id = ?').run(sib.id);
+        if (validationErrors.length > 0) {
+          const txInsertError = tx.prepare(`
+            INSERT INTO validation_errors (id, record_id, rule_id, field_name, error_message, expected_value, actual_value, severity)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          `);
+          for (const err of validationErrors) {
+            await txInsertError.run(
+              uuidv4(), sib.id, err.rule_id, err.field_name,
+              err.error_message, err.expected_value || '', err.actual_value || '', err.severity
+            );
+          }
+        }
+      });
+    }
+  } catch (err) {
+    // Cross-check ini tambahan (best-effort) — kegagalannya TIDAK BOLEH
+    // menggagalkan upload utama, cukup log.
+    console.warn(`[detectAndFlagInternalEpisodes] gagal untuk nokartu=${nokartu}: ${err.message}`);
+  }
 }
 
 // Kategori pelayanan yang bisa dipilih user di halaman Extract PDF. Dulu
@@ -1135,8 +1238,8 @@ async function processSinglePdfUpload(db, { filePath, originalName, jenisKlaim, 
           id, file_id, row_number, kode_rs, sep, nokartu, nama_pasien, mrn,
           birth_date, gender, kelas_rawat, admission_date, discharge_date,
           discharge_status, diagnosa_list, prosedur_list, dpjp_name,
-          tarif_rs, jenis_klaim, validation_status, error_count, raw_data
-        ) VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          tarif_rs, jenis_klaim, validation_status, error_count, raw_data, klinik_poli
+        ) VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
 
       await txInsertRecord.run(
@@ -1149,7 +1252,7 @@ async function processSinglePdfUpload(db, { filePath, originalName, jenisKlaim, 
         extractedData.DIAGLIST, extractedData.PROCLIST,
         extractedData.DPJP,
         /^\d+$/.test(extractedData.TARIF_RS) ? parseInt(extractedData.TARIF_RS) : null, jenisKlaim,
-        validationStatus, validationErrors.length, JSON.stringify(extractedData)
+        validationStatus, validationErrors.length, JSON.stringify(extractedData), extractedData.KLINIK_SEP || null
       );
 
       // Save validation errors if any
@@ -1167,6 +1270,16 @@ async function processSinglePdfUpload(db, { filePath, originalName, jenisKlaim, 
           );
         }
       }
+    });
+
+    // Cross-check RV-13/14 (episode konsul/rujukan internal) terhadap record
+    // lain yang sudah ada di DB untuk NOKARTU+tanggal yang sama — lihat
+    // dokumentasi lengkap di detectAndFlagInternalEpisodes(). Best-effort,
+    // tidak menggagalkan upload kalau error.
+    await detectAndFlagInternalEpisodes(db, {
+      hospitalCode,
+      nokartu: extractedData.NOKARTU,
+      admissionDate: vclaimDateToISO(extractedData.ADMISSION_DATE),
     });
 
     // Alur AI ekstraksi -> rule engine -> AI review: setelah record tersimpan

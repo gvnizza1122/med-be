@@ -76,6 +76,39 @@ TUGAS:
    dipakai sebagai referensi untuk record lain dengan rule_id sama di masa depan. Kalau catatan
    di field_notes SUDAH sama persis dengan salah satu PENGETAHUAN_TERDAHULU yang diberikan (tidak
    ada hal baru), JANGAN buat entri knowledge_updates duplikat untuk rule_id itu.
+6. POLA_RISIKO_PENDING — di luar validasi format (rule engine), berikut pola yang PALING SERING
+   bikin klaim RS ini di-pending verifikator BPJS (diambil dari data pending riil Juni 2026, sudah
+   diurutkan dari yang paling sering). Rule engine TIDAK bisa mendeteksi pola ini secara otomatis
+   (butuh penilaian klinis atas isi dokumen), jadi tugasmu: periksa BUKTI_DOKUMEN apakah rekam ini
+   menunjukkan indikasi salah satu pola berikut. Kalau YA dan kamu bisa kutip kalimat PERSIS dari
+   dokumen sebagai dasarnya, laporkan di "pending_risk_notes" (bukan field_notes — field_notes HANYA
+   untuk field yang gagal validasi format). Kalau TIDAK ada indikasi, atau tidak ada kutipan pasti,
+   JANGAN laporkan apa pun untuk pola itu — lebih baik diam daripada menuduh salah.
+   a. [kegawatan_lemah] — Khusus GAWAT_DARURAT (atau kunjungan IGD): keluhan/subjektif pasien HANYA
+      menyebut nyeri/tidak nyaman tanpa tanda objektif pendukung, DAN tanda vital (TTV) yang tercatat
+      normal semua. Kombinasi ini sering ditolak BPJS dengan alasan "tidak memenuhi kriteria gawat
+      darurat". Jangan laporkan kalau ada tanda objektif abnormal (mis. TTV di luar normal, temuan
+      pemeriksaan fisik abnormal) yang mendukung kegawatan — itu justru bukti kuat, bukan pola risiko.
+   b. [manifestasi_ikut_du] — Diagnosis sekunder (DS) di DIAGLIST (kode kedua dst.) yang secara medis
+      cuma manifestasi/gejala langsung dari diagnosis utama (DU/kode pertama), bukan kondisi berdiri
+      sendiri. BPJS sering minta kode manifestasi begini dihapus/tidak dikode terpisah dari DU-nya.
+   c. [tb_level_fktp] — Diagnosis tuberkulosis (TB) tanpa komplikasi/penyulit yang tercatat, dengan
+      tatalaksana berupa obat program TB rutin (OAT) — pelayanan ini biasanya cukup di FKTP
+      (Puskesmas), bukan RS, kecuali ada bukti komplikasi/kegawatan di dokumen.
+   d. [usg_berulang_tanpa_indikasi] — Prosedur USG obstetri (kehamilan) yang tercatat dilakukan lagi
+      dalam kunjungan ini TANPA keluhan spesifik terkait kehamilan (mis. perdarahan, flek, nyeri perut
+      hebat) yang tercatat di dokumen — USG rutin berulang tanpa indikasi klinis baru sering dipending.
+   e. [rujuk_saja_tanpa_tindakan] — Dokumen menunjukkan kunjungan ini murni untuk MERUJUK pasien ke
+      faskes lain (tanpa tindakan/terapi definitif di RS ini), tapi DIAGLIST belum/tidak memuat kode
+      Z71.9 (konsultasi medis lain yang tidak diklasifikasikan) sebagai kode yang seharusnya dipakai
+      untuk kunjungan rujukan-saja.
+   Field "basis" WAJIB kutipan verbatim dari BUKTI_DOKUMEN (sama seperti aturan quotation code_evidence
+   di atas) — tanpa kutipan valid, jangan laporkan pola itu sama sekali. Field "note" tulis dalam Bahasa
+   Indonesia, singkat, jelaskan kaitan bukti -> pola risiko, dan sebutkan bahwa ini SARAN untuk dicek
+   verifikator/koder, BUKAN keputusan final (rule engine tidak menolak klaim karena ini). DILARANG KERAS
+   menyebut nominal rupiah/dampak biaya. Catatan lengkap tentang pola kunjungan berulang lintas-episode
+   (konsul internal, PRB/iterasi obat kronis, irisan RS lain) TIDAK termasuk di sini — itu butuh riwayat
+   kunjungan lain yang tidak ada di satu dokumen ini, sudah ditangani terpisah lewat RV-13 s.d. RV-16.
 
 Output HANYA JSON, tanpa markdown/penjelasan, format:
 {
@@ -88,6 +121,9 @@ Output HANYA JSON, tanpa markdown/penjelasan, format:
   ],
   "knowledge_updates": [
     { "rule_id": "...", "field_name": "...", "pattern_summary": "pola penyebab, tanpa data pasien", "solution": "langkah perbaikan umum" }
+  ],
+  "pending_risk_notes": [
+    { "pattern": "kegawatan_lemah|manifestasi_ikut_du|tb_level_fktp|usg_berulang_tanpa_indikasi|rujuk_saja_tanpa_tindakan", "page_number": N, "basis": "kutipan verbatim dari dokumen", "note": "penjelasan singkat Indonesia" }
   ]
 }`;
 
@@ -296,7 +332,7 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
         aiResult = JSON.parse(m[0]);
       }
 
-      const result = { field_notes: {}, code_evidence: [], suggested_codes: [], knowledge_updates: [], tokens_used: tokensUsed };
+      const result = { field_notes: {}, code_evidence: [], suggested_codes: [], knowledge_updates: [], pending_risk_notes: [], tokens_used: tokensUsed };
       const jenisKlaimRecord = record.JENIS_KLAIM || record.jenis_klaim;
 
       // field_notes: hanya field yang benar-benar ada di validationErrors yang dipertahankan.
@@ -406,6 +442,32 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
             field_name: typeof fieldName === 'string' ? fieldName.trim() || null : null,
             pattern_summary: pattern.trim().substring(0, 500),
             solution: solution.trim().substring(0, 500),
+          });
+        }
+      }
+
+      // pending_risk_notes — sama seperti code_evidence: kutipan wajib ada
+      // verbatim di evidencePool (anti-halusinasi), tanpa istilah finansial.
+      // "kegawatan_lemah" cuma masuk akal untuk GAWAT_DARURAT — dibuang untuk
+      // kategori lain kalau AI salah tempatkan.
+      const KNOWN_PENDING_PATTERNS = new Set([
+        'kegawatan_lemah', 'manifestasi_ikut_du', 'tb_level_fktp',
+        'usg_berulang_tanpa_indikasi', 'rujuk_saja_tanpa_tindakan',
+      ]);
+      if (Array.isArray(aiResult.pending_risk_notes)) {
+        for (const entry of aiResult.pending_risk_notes.slice(0, 10)) {
+          const { pattern, page_number: pageNum, basis, note } = entry || {};
+          if (!KNOWN_PENDING_PATTERNS.has(pattern)) continue;
+          if (pattern === 'kegawatan_lemah' && jenisKlaimRecord !== 'GAWAT_DARURAT') continue;
+          if (typeof note !== 'string' || !note.trim()) continue;
+          if (!basis || !pageNum || !validateQuotation(basis, pageNum, evidencePool)) continue;
+          if (hasFinancialTerms(basis) || hasFinancialTerms(note)) continue;
+          if (jenisKlaimRecord === 'RAWAT_JALAN' && hasInpatientOnlyTerms(note)) continue;
+          result.pending_risk_notes.push({
+            pattern,
+            page_number: pageNum,
+            basis: basis.substring(0, 200),
+            note: note.trim().substring(0, 300),
           });
         }
       }

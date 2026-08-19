@@ -27,13 +27,41 @@ async function extractClaimData(claimDataText, jenisKlaim) {
   if (!apiKey) { result.errors.push('AI_PROVIDER_API_KEY tidak diisi di .env'); return result; }
   if (!claimDataText || !claimDataText.trim()) { result.errors.push('claimDataText kosong'); return result; }
 
-  const kelasRawatRule = jenisKlaim === 'RAWAT_JALAN'
-    ? `8. KELAS_RAWAT khusus rawat jalan: pasien rawat jalan TIDAK dirawat inap, jadi field "Kelas Rawat"/"Kls Rawat" di dokumen wajar KOSONG atau "-". Untuk kasus ini, isi KELAS_RAWAT dari NOMOR KELAS di field "Kelas Hak"/"Kls Hak" (kelas hak kepesertaan BPJS pasien, BUKAN kelas ruangan rawat inap) — ambil hanya angkanya (contoh: "Kelas 2" -> "2"). Kalau "Kelas Hak" juga tidak ada, baru isi KELAS_RAWAT dengan "".`
+  // RAWAT_JALAN dan GAWAT_DARURAT (IGD tanpa lanjut rawat inap) sama-sama
+  // pasien tidak menginap — diverifikasi dari sampel PDF IGD asli (Resume
+  // Medis IGD/Triage IGD, Juni-Juli 2026): sama sekali tidak ada field
+  // "Kelas Rawat" atau "Tanggal Masuk"/"Tanggal Keluar" terpisah, cuma
+  // "Tgl Periksa" tunggal — persis pola rawat jalan.
+  const isOutpatientLike = jenisKlaim === 'RAWAT_JALAN' || jenisKlaim === 'GAWAT_DARURAT';
+
+  const kelasRawatRule = isOutpatientLike
+    ? `8. KELAS_RAWAT khusus rawat jalan/IGD (tanpa rawat inap): pasien TIDAK dirawat inap, jadi field "Kelas Rawat"/"Kls Rawat" di dokumen wajar KOSONG atau "-". Untuk kasus ini, isi KELAS_RAWAT dari NOMOR KELAS di field "Kelas Hak"/"Kls Hak" (kelas hak kepesertaan BPJS pasien, BUKAN kelas ruangan rawat inap) — ambil hanya angkanya (contoh: "Kelas 2" -> "2"). Kalau "Kelas Hak" juga tidak ada, baru isi KELAS_RAWAT dengan "".`
     : `8. KELAS_RAWAT: ambil dari field "Kelas Rawat"/"Kls Rawat" (kelas ruangan rawat inap pasien), ambil hanya angkanya (contoh: "Kelas 2" -> "2"). JANGAN pakai "Kelas Hak" untuk field ini.`;
 
-  const prompt = `Kamu ekstraktor data klaim BPJS dari halaman "Berkas Klaim Individual" (output E-Klaim Indonesia)
-dan halaman pendukung seperti "Surat Eligibilitas Peserta" (SEP) dalam dokumen yang sama.
-Data sudah ter-kode (ICD-10 diagnosa, ICD-9 prosedur, INA-CBG). Tugasmu HANYA MENYALIN, bukan menyimpulkan.
+  // Rawat jalan & IGD-tanpa-inap tidak punya konsep "tanggal masuk"/"tanggal
+  // keluar" terpisah — dokumennya cuma mencantumkan satu tanggal pelayanan/
+  // kunjungan/periksa. Tanpa aturan ini, rule 6 ("jangan menebak, jangan
+  // menyalin dari field lain") bikin AI membiarkan ADMISSION_DATE &
+  // DISCHARGE_DATE kosong terus meski tanggalnya sebetulnya ada di dokumen,
+  // cuma labelnya beda — persis kasus yang sama dengan KELAS_RAWAT di atas.
+  const tanggalRawatJalanRule = isOutpatientLike
+    ? `\n8b. ADMISSION_DATE & DISCHARGE_DATE khusus rawat jalan/IGD (tanpa rawat inap): dokumen jenis ini biasanya TIDAK punya field "Tanggal Masuk"/"Tanggal Keluar" terpisah (pasien tidak menginap). Kalau field itu tidak ada tapi ada "Tanggal Pelayanan", "Tanggal Kunjungan", "Tgl Periksa", atau tanggal pada SEP yang menunjukkan kapan pasien dilayani, isi ADMISSION_DATE dan DISCHARGE_DATE dengan tanggal yang SAMA itu (satu hari kunjungan = tanggal masuk = tanggal keluar). Kalau memang tidak ada tanggal pelayanan/kunjungan sama sekali di dokumen, baru isi keduanya dengan "".`
+    : '';
+
+  const prompt = `Kamu ekstraktor data klaim BPJS dari dokumen scan/print RS. Bentuk dokumennya BUKAN
+"Berkas Klaim Individual" (ringkasan E-Klaim terkode rapi) — itu jarang/tidak pernah ada di berkas
+asli. Yang SUNGGUHAN ada dan jadi sumber utamamu:
+- "RESUME MEDIS RJ" atau "RESUME MEDIS IGD": catatan dokter format S/O/A/P bebas (Subjektif =
+  keluhan pasien, Objektif = pemeriksaan fisik & tanda vital, Assessment = diagnosa, Plan =
+  tindakan/terapi). Kode ICD-10/ICD-9 KADANG tertulis eksplisit di bagian Assessment/Diagnosa
+  (contoh: "G44 - Other headache syndromes", "39.95 - Hemodialysis") — kalau ada, salin persis;
+  kalau assessment cuma teks diagnosis tanpa kode (mis. "Cefalgia Berat" tanpa "G44"), JANGAN
+  mengarang kodenya sendiri, ikuti aturan 6 di bawah (kosongkan).
+- "SURAT ELEGIBILITAS PESERTA" (SEP): halaman administratif BPJS, sumber SEP/NOKARTU/nama/kelas
+  hak/jenis kunjungan/flag PRB (lihat aturan 7 & 10 di bawah).
+- "RESEP": kadang ikut, berisi daftar obat — bukan sumber utama field klaim, boleh diabaikan
+  kecuali diminta eksplisit.
+Tugasmu HANYA MENYALIN apa yang benar-benar tertulis, bukan menyimpulkan atau mengarang.
 
 ATURAN KETAT:
 1. Output HANYA JSON object. Tanpa markdown, tanpa backtick, tanpa penjelasan.
@@ -45,8 +73,22 @@ ATURAN KETAT:
 7. SEP dan NOKARTU boleh diambil dari halaman "Surat Eligibilitas Peserta" kalau ada — di
    halaman itu labelnya sering disingkat "No. SEP" (bukan "Nomor SEP") dan "No. Kartu"
    (bukan "Nomor Kartu"). Tetap SAMA PERSIS field SEP dan NOKARTU, cuma beda halaman sumber.
-${kelasRawatRule}
-9. Isi HANYA field berikut: ${PDF_FIELDS.join(', ')}.
+${kelasRawatRule}${tanggalRawatJalanRule}
+9. Isi HANYA field vClaim berikut: ${PDF_FIELDS.join(', ')}.
+10. DUA FIELD TAMBAHAN (bukan kolom vClaim resmi, dipakai internal RS buat cek pola pending
+    BPJS — tetap WAJIB diisi kalau ada, ikuti aturan 6 kalau tidak ada di teks):
+    a. POTENSI_PRB_SEP: di halaman "Surat Eligibilitas Peserta" (SEP), kadang ada tulisan
+       "Potensi PRB" tercetak persis di sebelah/dekat baris "No. SEP" — flag ini dihitung
+       sendiri oleh sistem BPJS (bukan RS), artinya pasien berpotensi program rujuk balik.
+       Isi "YA" kalau tulisan "Potensi PRB" itu ADA di teks, isi "" kalau tidak ada/tidak yakin.
+       JANGAN simpulkan dari diagnosis atau isi resume — HANYA dari tulisan literal di SEP.
+    b. JENIS_KUNJUNGAN_SEP: di halaman SEP, ada field berlabel "Jns Kunj" — salin APA ADANYA
+       isinya (contoh nilai yang sering muncul: "Konsultasi dokter (pertama)", "Tujuan Kontrol").
+       Kalau field itu kosong atau tidak ketemu, isi "".
+    c. KLINIK_SEP: di halaman SEP ATAU di header Resume Medis, ada field berlabel "Klinik"
+       (contoh nilai: "INSTALASI GAWAT DARURAT", "UGD", "HEMODIALISA", nama poli spesialis).
+       Salin APA ADANYA, jangan disingkat/diseragamkan. Dipakai untuk mendeteksi kunjungan
+       lintas-poli hari yang sama (bukan kamu yang memutuskan itu, cuma salin nama kliniknya).
 
 TEKS KLAIM:
 ${claimDataText}
@@ -110,6 +152,14 @@ JSON:`;
       for (const k of SYSTEM_FIELDS) delete extracted[k];
 
       result.record = buildRecord(extracted);
+      // POTENSI_PRB_SEP, JENIS_KUNJUNGAN_SEP & KLINIK_SEP BUKAN kolom vClaim resmi (tidak ada
+      // di VCLAIM_SCHEMA), jadi buildRecord() di atas selalu membuangnya — tempel
+      // manual di sini supaya ikut ke raw_data & bisa dipetakan ke kolom DB
+      // (flag_rujuk_balik_prb) di claimFiles.js. TIDAK ikut COLUMNS/toTSV, jadi
+      // aman, tidak mengubah format ekspor vClaim resmi ke BPJS.
+      if (extracted.POTENSI_PRB_SEP) result.record.POTENSI_PRB_SEP = String(extracted.POTENSI_PRB_SEP).trim();
+      if (extracted.JENIS_KUNJUNGAN_SEP) result.record.JENIS_KUNJUNGAN_SEP = String(extracted.JENIS_KUNJUNGAN_SEP).trim();
+      if (extracted.KLINIK_SEP) result.record.KLINIK_SEP = String(extracted.KLINIK_SEP).trim();
       result.success = true;
       result.errors = [];
       return result;

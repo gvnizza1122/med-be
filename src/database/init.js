@@ -214,7 +214,8 @@ async function initializeSchema() {
         payor_id TEXT,
         coder_id TEXT,
         jenis_rawat TEXT,
-        
+        klinik_poli TEXT,
+
         jenis_konsultasi TEXT,
         jumlah_episode_klaim INTEGER DEFAULT 1,
         is_same_day INTEGER DEFAULT 0,
@@ -392,7 +393,14 @@ async function migrateSchema(db) {
       // review) — JSON string {field_notes, code_evidence, suggested_codes,
       // generated_at}. Diisi otomatis saat upload/validasi, dibaca langsung
       // oleh tabel hasil validasi tanpa perlu AI call lagi saat halaman dibuka.
-      'ai_review': 'TEXT'
+      'ai_review': 'TEXT',
+      // Nama klinik/poli dari SEP (mis. "INSTALASI GAWAT DARURAT", "POLI
+      // PENYAKIT DALAM") — dipakai cross-check RV-13/14 (episode konsul/
+      // rujukan internal): kalau ada >1 record NOKARTU sama + tanggal sama
+      // dengan klinik BEDA, itu indikasi kunjungan lintas-poli hari yang
+      // sama yang seharusnya digabung 1 episode klaim. Lihat
+      // detectInternalEpisodes() di claimFiles.js.
+      'klinik_poli': 'TEXT'
     };
 
     for (const [col, type] of Object.entries(newCols)) {

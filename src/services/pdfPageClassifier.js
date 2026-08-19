@@ -12,6 +12,23 @@ const fs = require('fs');
 const CLAIM_DATA_KEYWORDS = ['Nomor SEP', 'Berkas Klaim Individual', 'INA-CBG', 'Total Tarif', 'Rincian Biaya', 'DPJP', 'Dokter Penanggung Jawab', 'Surat Eligibilitas Peserta'];
 // Keyword tambahan untuk format PDF RS yang bervariasi
 const EXTRA_KEYWORDS = ['Klaim Individual', 'Data Klaim', 'Resume Medis', 'Ringkasan Pasien Keluar', 'INACBG', 'INA CBG', 'Diagnosa', 'Prosedur', 'Kode ICD', 'Nomor Kartu', 'No. SEP', 'No. Kartu', 'No Kartu'];
+// CATATAN AUDIT (belum diperbaiki, sengaja — lihat pertimbangan di bawah):
+// is_primary_source dipakai claimFiles.js buat exclude halaman sumber ekstraksi
+// DIAGLIST/PROCLIST dari evidence pool (cegah audit sirkular: kode "terbukti"
+// cuma karena tertulis di halaman asalnya sendiri). PRIMARY_KEYWORD di bawah
+// ('Berkas Klaim Individual') TIDAK PERNAH ditemukan di 150 sampel PDF produksi
+// asli (RS Lestari Raharja, Jun-Jul 2026) — dokumen sungguhannya "RESUME MEDIS
+// RJ"/"RESUME MEDIS IGD" (assessment dokter S/O/A/P). Sempat dicoba tambahkan
+// "Resume Medis RJ/IGD" ke sini supaya exclude-nya sungguhan jalan — TAPI
+// DIBATALKAN: untuk klaim rawat jalan biasa, halaman itu SATU-SATUNYA halaman
+// berisi konten klinis (tidak ada halaman kedua terpisah seperti Triage IGD di
+// kasus gawat darurat) — exclude itu bikin evidence pool jadi KOSONG TOTAL,
+// audit malah lebih rusak (semua code_evidence/pending_risk_notes jadi
+// found:false, bukan cuma "berpotensi sirkular"). Keputusan: pertahankan
+// PRIMARY_KEYWORD apa adanya (circular-exclusion ini pada praktiknya sudah
+// tidak pernah aktif untuk RS ini), TAPI catat sebagai known-issue —
+// perbaikan yang benar butuh redesain lebih halus (exclude PER-KUTIPAN yang
+// persis sama dengan teks asal ekstraksi, bukan exclude SELURUH halaman).
 const PRIMARY_KEYWORD = 'Berkas Klaim Individual'; // halaman E-Klaim summary = sumber utama
 const SCAN_CHAR_THRESHOLD = 50;
 
