@@ -94,4 +94,60 @@ async function classifyPdfPages(filePath) {
   return result;
 }
 
-module.exports = { classifyPdfPages, isClaimDataPage };
+/**
+ * Deteksi kategori pelayanan (jenis_klaim) dari ISI dokumen — dipakai buat
+ * upload batch kategori-campur, supaya verifikator tidak perlu pilih
+ * kategori satu-satu per file (lihat detectAndAssignJenisKlaim di
+ * pdfExtractionPipeline.js untuk pemanggilnya).
+ *
+ * Urutan prioritas (dari yang paling pasti ke paling lemah), diverifikasi
+ * terhadap 150+ sampel PDF produksi asli RS Lestari Raharja (Jun-Jul 2026):
+ * 1. Penanda IGD eksplisit ("RESUME MEDIS IGD", "TRIAGE IGD", klinik
+ *    "INSTALASI GAWAT DARURAT"/"UGD") — paling reliabel, selalu ada
+ *    kata-kata khas ini di berkas IGD.
+ * 2. Field "Jns Rawat" di halaman SEP — dicetak resmi oleh sistem BPJS,
+ *    isinya literal "Rawat Jalan" atau "Rawat Inap". CATATAN: field ini
+ *    TIDAK membedakan IGD vs rawat jalan biasa (keduanya sama-sama bisa
+ *    "Rawat Jalan" di SEP) — makanya cek IGD (poin 1) HARUS didahulukan.
+ * 3. Fallback kata kunci umum ("Resume Medis Rawat Inap", "Laporan
+ *    Operasi" utk rawat inap; "Resume Medis RJ" utk rawat jalan) —
+ *    dipakai kalau field SEP tidak ketemu/tidak terbaca.
+ *
+ * @param {string} fullText - gabungan teks semua halaman (bukan cuma
+ *   claimDataText, supaya penanda IGD di halaman Triage tetap kena walau
+ *   halaman itu tidak lolos klasifikasi claim-data).
+ * @returns {'RAWAT_JALAN'|'RAWAT_INAP'|'GAWAT_DARURAT'|null} null = tidak yakin.
+ */
+function detectJenisKlaim(fullText) {
+  if (!fullText) return null;
+
+  const igdMarkers = [
+    'resume medis igd', 'triage igd', 'instalasi gawat darurat',
+  ];
+  const lower = fullText.toLowerCase();
+  if (igdMarkers.some(k => lower.includes(k))) return 'GAWAT_DARURAT';
+  // Klinik : UGD — cek terpisah (bukan cuma substring "ugd" yang gampang
+  // false-positive, mis. singkatan lain) — harus persis pola "Klinik : UGD".
+  if (/klinik[ \t]*:[ \t]*ugd\b/i.test(fullText)) return 'GAWAT_DARURAT';
+
+  // Field resmi SEP — WAJIB pakai [ \t]* (bukan \s*) sebelum capture group:
+  // \s* melahap newline kalau field-nya kosong, jadi nyerempet ke baris
+  // berikutnya (bug nyata yang pernah ditemukan & diperbaiki di sesi ini).
+  const jnsRawatMatch = fullText.match(/Jns[ \t]*Rawat[ \t]*:[ \t]*([^\n]*)/i);
+  if (jnsRawatMatch) {
+    const val = jnsRawatMatch[1].trim().toLowerCase();
+    if (val.includes('rawat inap')) return 'RAWAT_INAP';
+    if (val.includes('rawat jalan')) return 'RAWAT_JALAN';
+  }
+
+  if (/resume medis rawat inap|ringkasan pasien pulang|resume pasien pulang|laporan operasi/i.test(fullText)) {
+    return 'RAWAT_INAP';
+  }
+  if (/resume medis rj\b|resume medis rawat jalan/i.test(fullText)) {
+    return 'RAWAT_JALAN';
+  }
+
+  return null;
+}
+
+module.exports = { classifyPdfPages, isClaimDataPage, detectJenisKlaim };

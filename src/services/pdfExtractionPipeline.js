@@ -7,7 +7,7 @@
  * Env: AI_PROVIDER_API_KEY (wajib), AI_PROVIDER_BASE_URL, AI_MODEL, AI_MAX_ATTEMPTS, AI_TIMEOUT_MS.
  */
 
-const { classifyPdfPages } = require('./pdfPageClassifier');
+const { classifyPdfPages, detectJenisKlaim } = require('./pdfPageClassifier');
 const { extractClaimData } = require('./pdfExtractionService');
 
 /**
@@ -33,7 +33,8 @@ function applyDeterministicFallback(record, allPagesText, jenisKlaim) {
       console.log('[Pipeline] Fallback regex mengisi NOKARTU (AI mengembalikan kosong).');
     }
   }
-  if (!record.KELAS_RAWAT && jenisKlaim === 'RAWAT_JALAN') {
+  const isOutpatientLike = jenisKlaim === 'RAWAT_JALAN' || jenisKlaim === 'GAWAT_DARURAT';
+  if (!record.KELAS_RAWAT && isOutpatientLike) {
     // Label field bervariasi "Kelas Hak"/"Kls Hak", nilainya bisa "Kelas 2" atau
     // langsung "2" — regex ini tangani kombinasi label singkat/panjang x nilai
     // dengan/tanpa kata "Kelas" di depan angka.
@@ -43,8 +44,8 @@ function applyDeterministicFallback(record, allPagesText, jenisKlaim) {
       console.log('[Pipeline] Fallback regex mengisi KELAS_RAWAT dari Kelas Hak (rawat jalan, AI mengembalikan kosong).');
     }
   }
-  if (jenisKlaim === 'RAWAT_JALAN' && (!record.ADMISSION_DATE || !record.DISCHARGE_DATE)) {
-    // Rawat jalan cuma 1 hari kunjungan — dokumen (SEP/resume medis poliklinik)
+  if (isOutpatientLike && (!record.ADMISSION_DATE || !record.DISCHARGE_DATE)) {
+    // Rawat jalan/IGD-tanpa-inap cuma 1 hari kunjungan — dokumen (SEP/resume medis poliklinik)
     // hampir tidak pernah punya field "Tanggal Masuk"/"Tanggal Keluar" eksplisit,
     // yang ada cuma "Tgl Periksa" atau "Tgl. SEP". AI ekstraksi sengaja menolak
     // menyalin dari field lain (aturan umum di pdfExtractionService.js), jadi
@@ -78,14 +79,23 @@ const PESAN = {
 
 /**
  * @param {string|Buffer} filePath - path PDF atau Buffer
- * @param {{skipAI?: boolean, jenisKlaim?: string}} options - jenisKlaim dipakai
- *   untuk instruksi khusus KELAS_RAWAT (rawat jalan -> fallback ke Kelas Hak).
- * @returns {Promise<{success, record, classification, pesan, tokens, attempts, metadata, errors}>}
+ * @param {{skipAI?: boolean, jenisKlaim?: string, allowedJenisKlaim?: string[]}} options
+ *   - jenisKlaim: kategori SUDAH PASTI (dipilih manual, mis. upload 1 file) —
+ *     dipakai apa adanya, TIDAK ada deteksi otomatis.
+ *   - allowedJenisKlaim: dipakai kalau kategori BELUM PASTI dan perlu
+ *     dideteksi dari isi dokumen (upload batch kategori-campur) — daftar
+ *     kategori yang verifikator toggle di awal sebagai "kemungkinan ada di
+ *     batch ini". Hasil deteksi divalidasi terhadap daftar ini (lihat
+ *     result.jenisKlaimDetection di bawah); kalau jenisKlaim juga diisi,
+ *     jenisKlaim menang (allowedJenisKlaim diabaikan).
+ * @returns {Promise<{success, record, classification, pesan, tokens, attempts, metadata, errors, jenisKlaimDetection}>}
  *          `pesan` = teks siap tampil ke pengguna (kosong bila sukses).
  *          `errors` = detail teknis untuk log, JANGAN ditampilkan ke pengguna.
+ *          `jenisKlaimDetection` = { value, source, confident } — cuma diisi
+ *          kalau `allowedJenisKlaim` dipakai (lihat detectAndResolveJenisKlaim).
  */
 async function extractFromPDF(filePath, options = {}) {
-  const { skipAI = false, jenisKlaim } = options;
+  const { skipAI = false, jenisKlaim: fixedJenisKlaim, allowedJenisKlaim } = options;
   const mulai = Date.now();
 
   const result = {
@@ -97,6 +107,7 @@ async function extractFromPDF(filePath, options = {}) {
     attempts: 0,
     metadata: { processingTimeMs: 0, pagesProcessed: 0, claimDataPagesFound: 0 },
     errors: [],
+    jenisKlaimDetection: null,
   };
 
   try {
@@ -148,6 +159,35 @@ async function extractFromPDF(filePath, options = {}) {
       if (!ocrFallbackWorked) {
         result.pesan = PESAN.bukanBerkasKlaim;
         return result;
+      }
+    }
+
+    // Resolusi kategori pelayanan — jenisKlaim TETAP (dipilih manual) menang
+    // kalau diisi; kalau tidak, deteksi otomatis dari isi dokumen (upload
+    // batch kategori-campur) dibatasi ke allowedJenisKlaim yang verifikator
+    // toggle di awal. Dilakukan di sini (setelah klasifikasi, sebelum
+    // ekstraksi AI) karena butuh teks dokumen tapi ekstraksi AI sendiri
+    // butuh tau jenisKlaim dulu (aturan KELAS_RAWAT/tanggal beda per
+    // kategori) — jadi urutannya wajib klasifikasi -> deteksi -> ekstraksi.
+    let jenisKlaim = fixedJenisKlaim;
+    if (!jenisKlaim && Array.isArray(allowedJenisKlaim) && allowedJenisKlaim.length > 0) {
+      const allPagesTextForDetection = classification.pages.map(p => p.text_full).join('\n\n');
+      const detected = detectJenisKlaim(allPagesTextForDetection);
+      if (detected && allowedJenisKlaim.includes(detected)) {
+        jenisKlaim = detected;
+        result.jenisKlaimDetection = { value: detected, source: 'auto', confident: true };
+      } else if (allowedJenisKlaim.length === 1) {
+        // Cuma 1 kategori ditoggle -> tidak ambigu sama sekali biarpun
+        // deteksi konten gagal/kosong, langsung pakai itu tanpa tanda ragu.
+        jenisKlaim = allowedJenisKlaim[0];
+        result.jenisKlaimDetection = { value: jenisKlaim, source: 'single-allowed', confident: true };
+      } else {
+        // Terdeteksi tapi di luar daftar yang ditoggle, ATAU gagal terdeteksi
+        // sama sekali, DAN ada >1 kandidat — jangan menebak, pakai kandidat
+        // pertama tapi tandai TIDAK yakin supaya verifikator diberi tahu
+        // untuk cek manual (bukan disembunyikan sebagai hasil pasti).
+        jenisKlaim = allowedJenisKlaim[0];
+        result.jenisKlaimDetection = { value: jenisKlaim, source: detected ? 'detected-not-in-allowed-list' : 'undetected', confident: false };
       }
     }
 

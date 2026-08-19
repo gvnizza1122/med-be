@@ -1180,16 +1180,23 @@ const JENIS_KLAIM_OPTIONS = ['RAWAT_JALAN', 'RAWAT_INAP', 'GAWAT_DARURAT'];
  *   Selalu resolve (tidak throw) — kegagalan 1 file ditandai success:false supaya
  *   tidak menghentikan file lain dalam batch.
  */
-async function processSinglePdfUpload(db, { filePath, originalName, jenisKlaim, userId, hospitalCode }) {
+async function processSinglePdfUpload(db, { filePath, originalName, jenisKlaim: fixedJenisKlaim, allowedJenisKlaim, userId, hospitalCode }) {
   try {
     const { extractFromPDF } = require('../services/pdfExtractionPipeline');
-    const result = await extractFromPDF(filePath, { jenisKlaim });
+    const result = await extractFromPDF(filePath, { jenisKlaim: fixedJenisKlaim, allowedJenisKlaim });
 
     if (!result.success) {
       // Detail teknis hanya untuk log server, tidak dikirim ke pengguna.
       console.error('[upload-pdf] gagal:', originalName, JSON.stringify(result.errors));
       return { success: false, original_name: originalName, error: result.pesan };
     }
+
+    // jenisKlaim final: dipilih manual (upload 1 file) ATAU hasil deteksi
+    // otomatis dari isi dokumen (upload batch kategori-campur, lihat
+    // detectJenisKlaim di pdfPageClassifier.js + resolusinya di
+    // extractFromPDF). Semua pemakaian jenisKlaim di bawah ini otomatis
+    // pakai nilai final ini.
+    const jenisKlaim = fixedJenisKlaim || result.jenisKlaimDetection?.value || 'RAWAT_INAP';
 
     const fileId = uuidv4();
     const recordId = uuidv4();
@@ -1310,6 +1317,12 @@ async function processSinglePdfUpload(db, { filePath, originalName, jenisKlaim, 
       validation_status: validationStatus,
       validation_errors: validationErrors,
       ai_review: aiReview,
+      // jenis_klaim final + info deteksi (cuma ada kalau lewat jalur
+      // allowedJenisKlaim/batch kategori-campur) — dipakai FE untuk
+      // menampilkan status "IGD" dkk setelah proses selesai, dan flag
+      // confident:false kalau harus dicek manual (ambigu/gagal terdeteksi).
+      jenis_klaim: jenisKlaim,
+      jenis_klaim_detection: result.jenisKlaimDetection,
       metadata: result.metadata,
     };
   } catch (err) {
@@ -1369,18 +1382,23 @@ router.post('/upload-pdf-batch', authenticate, pdfUploadBatch.array('files', MAX
       return res.status(400).json({ error: 'Belum ada berkas yang dipilih. Silakan pilih minimal satu berkas PDF.' });
     }
 
-    // Kategori BISA BEDA per file dalam 1 batch — dulu 1 nilai `jenis_klaim`
-    // dipaksa untuk seluruh batch (verifikator harus pisah upload 3x kalau
-    // berkasnya campur RJ/RI/IGD). Sekarang FE kirim `jenis_klaim_list`
-    // (JSON array, urutan sama dengan `files`); tiap file dipasangkan by
-    // index. Fallback tetap disediakan (klien lama/tanpa list) supaya tidak
-    // ada request yang gagal total gara-gara field ini belum terisi semua.
-    let jenisKlaimList = [];
+    // Kategori bisa CAMPUR dalam 1 batch — verifikator toggle di awal kategori
+    // mana saja yang MUNGKIN ada di batch ini (1, 2, atau 3 kategori), lalu
+    // tiap file dideteksi otomatis dari isi dokumennya (lihat detectJenisKlaim
+    // di pdfPageClassifier.js) dan divalidasi terhadap daftar yang ditoggle
+    // itu. Verifikator TIDAK perlu pilih kategori satu-satu per file lagi.
+    // `jenis_klaim` tunggal (lama) tetap didukung sebagai fallback kalau
+    // `allowed_jenis_klaim` tidak dikirim (klien lama / cuma 1 kategori).
+    let allowedJenisKlaim = [];
     try {
-      const parsed = req.body?.jenis_klaim_list ? JSON.parse(req.body.jenis_klaim_list) : null;
-      if (Array.isArray(parsed)) jenisKlaimList = parsed;
+      const parsed = req.body?.allowed_jenis_klaim ? JSON.parse(req.body.allowed_jenis_klaim) : null;
+      if (Array.isArray(parsed)) allowedJenisKlaim = parsed.filter(v => JENIS_KLAIM_OPTIONS.includes(v));
     } catch { /* biarkan kosong, jatuh ke fallback di bawah */ }
-    const fallbackJenisKlaim = JENIS_KLAIM_OPTIONS.includes(req.body?.jenis_klaim) ? req.body.jenis_klaim : 'RAWAT_INAP';
+    const fallbackJenisKlaim = JENIS_KLAIM_OPTIONS.includes(req.body?.jenis_klaim) ? req.body.jenis_klaim : null;
+    if (allowedJenisKlaim.length === 0 && fallbackJenisKlaim) allowedJenisKlaim = [fallbackJenisKlaim];
+    if (allowedJenisKlaim.length === 0) {
+      return res.status(400).json({ error: 'Pilih minimal satu kategori pelayanan yang mungkin ada di batch ini.' });
+    }
 
     const db = getDb();
     const batchId = uuidv4();
@@ -1389,14 +1407,15 @@ router.post('/upload-pdf-batch', authenticate, pdfUploadBatch.array('files', MAX
 
     if (io) io.emit('pdf-batch:status', { batchId, status: 'processing', total, completed: 0 });
 
-    const results = await runWithConcurrencyLimit(req.files, 3, async (file, index) => {
-      const jenisKlaimForFile = JENIS_KLAIM_OPTIONS.includes(jenisKlaimList[index])
-        ? jenisKlaimList[index]
-        : fallbackJenisKlaim;
+    const results = await runWithConcurrencyLimit(req.files, 3, async (file) => {
       const result = await processSinglePdfUpload(db, {
         filePath: file.path,
         originalName: file.originalname,
-        jenisKlaim: jenisKlaimForFile,
+        // jenisKlaim TIDAK diisi manual di sini — biarkan processSinglePdfUpload
+        // & extractFromPDF mendeteksi otomatis dari allowedJenisKlaim, KECUALI
+        // cuma 1 kategori yang ditoggle (tidak ambigu, langsung pasti).
+        jenisKlaim: allowedJenisKlaim.length === 1 ? allowedJenisKlaim[0] : undefined,
+        allowedJenisKlaim,
         userId: req.user.id,
         hospitalCode: req.user.hospital_code,
       });
@@ -1405,6 +1424,11 @@ router.post('/upload-pdf-batch', authenticate, pdfUploadBatch.array('files', MAX
         io.emit('pdf-batch:file-done', {
           batchId, fileName: file.originalname, success: result.success,
           error: result.success ? null : result.error, file_id: result.file_id || null,
+          // Kategori yang terdeteksi/dipakai untuk file ini + info keyakinan
+          // deteksinya — FE tampilkan sebagai status ("✓ Selesai — IGD") dan
+          // kasih tanda kalau confident:false (verifikator perlu cek manual).
+          jenis_klaim: result.jenis_klaim || null,
+          jenis_klaim_detection: result.jenis_klaim_detection || null,
         });
         io.emit('pdf-batch:status', { batchId, status: 'processing', total, completed });
       }
