@@ -56,7 +56,17 @@ TUGAS:
    - DILARANG KERAS menyebut nominal rupiah/biaya/tarif dalam kutipan atau alasan apapun.
    - DILARANG mengarang/menyimpulkan kode dari konteks umum — hanya dari bukti eksplisit di teks.
    - Kalau ragu, tandai found:false — lebih baik tidak menyarankan daripada salah.
-3. suggested_codes HANYA diisi kalau ada bukti KUAT kode itu relevan tapi belum diklaim.
+3. suggested_codes HANYA diisi kalau ada bukti KUAT kode itu relevan tapi belum diklaim. Ini termasuk
+   kasus DIAGLIST kosong TOTAL (lihat FIELD_ERRORS rule RV-05): kalau DIAGLIST kosong tapi
+   BUKTI_DOKUMEN memuat istilah diagnosis eksplisit (mis. label "Diag Awal", "Diagnosa",
+   "Assessment"/"A:", "Diagnosa Kerja"),
+   WAJIB usulkan minimal 1 kode ICD-10 di suggested_codes berdasarkan istilah itu — jangan biarkan
+   suggested_codes kosong hanya karena belum ada kode yang diklaim sama sekali. quotation WAJIB kutipan
+   VERBATIM istilah diagnosis dari dokumen (bukan kode ICD-10 itu sendiri, karena kodenya memang tidak
+   tercetak di dokumen — itulah sebabnya diusulkan); reasoning jelaskan pemetaan istilah -> kode secara
+   singkat. Kalau istilah diagnosisnya ambigu/terlalu umum untuk dipetakan ke 1 kode pasti, boleh usulkan
+   lebih dari 1 kandidat kode dengan reasoning masing-masing, atau lewati kalau benar-benar tidak yakin —
+   jangan mengarang kode hanya supaya field ini terisi.
 4. Kalau ada PENGETAHUAN_TERDAHULU (pola error serupa yang pernah ditemukan): jadikan referensi
    supaya konsisten dengan penilaian sebelumnya, TAPI jangan disalin mentah — selalu sesuaikan
    dengan data record ini.
@@ -113,6 +123,7 @@ function buildPrompt(record, validationErrors, evidencePool, codes, knowledgeEnt
   }
 
   if (codes.diagnosis.length > 0) prompt += `Kode diagnosis diklaim (ICD-10): ${codes.diagnosis.join(', ')}\n`;
+  else prompt += `Kode diagnosis diklaim (ICD-10): (KOSONG — DIAGLIST belum diisi sama sekali, lihat instruksi soal suggested_codes)\n`;
   if (codes.procedure.length > 0) prompt += `Kode prosedur diklaim (ICD-9-CM): ${codes.procedure.join(', ')}\n`;
 
   if (evidencePool.length > 0) {

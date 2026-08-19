@@ -301,6 +301,19 @@ async function initializeSchema() {
         UNIQUE(record_id, page_number)
       );
 
+      -- Profil RS per hospital_code — saat ini cuma kelas_rs (kelas akreditasi
+      -- RS, mis. A/B/C/D). KODE_RS TIDAK disimpan di sini karena sudah ada di
+      -- users.hospital_code/claim_files.hospital_code (dipakai sejak awal untuk
+      -- pemisahan data antar RS) — field itu memang identik dengan KODE_RS vClaim.
+      -- kelas_rs tidak pernah tercetak di SEP/Resume Medis pasien, jadi diisi
+      -- sekali oleh admin di sini lalu dipakai otomatis untuk semua klaim RS itu.
+      CREATE TABLE IF NOT EXISTS hospital_settings (
+        hospital_code TEXT PRIMARY KEY,
+        kelas_rs TEXT,
+        updated_by TEXT REFERENCES users(id),
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
       -- Mirror dari migrations/003-error-knowledge-base.sql (auto-init untuk deployment tanpa migration runner)
       CREATE TABLE IF NOT EXISTS error_knowledge_base (
         id TEXT PRIMARY KEY,

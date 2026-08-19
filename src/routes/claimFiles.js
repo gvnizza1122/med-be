@@ -1097,6 +1097,22 @@ async function processSinglePdfUpload(db, { filePath, originalName, jenisKlaim, 
     // menghasilkan field ini) - jadi konteks "memory" untuk AI review nanti.
     const extractedData = { ...result.record, JENIS_KLAIM: jenisKlaim };
 
+    // KODE_RS & KELAS_RS TIDAK PERNAH tercetak di SEP/Resume Medis pasien —
+    // keduanya atribut RS itu sendiri, bukan per-klaim, jadi AI ekstraksi wajar
+    // mengembalikannya kosong. Isi dari profil RS, bukan minta verifikator
+    // mengetik ulang tiap klaim:
+    // - KODE_RS = hospitalCode (users.hospital_code), sudah dipakai sejak awal
+    //   untuk memisahkan data antar RS — identik dengan KODE_RS vClaim.
+    // - KELAS_RS = hospital_settings.kelas_rs, diisi sekali oleh admin di
+    //   halaman Aturan Validasi > Profil Rumah Sakit.
+    if (!extractedData.KODE_RS && hospitalCode) {
+      extractedData.KODE_RS = hospitalCode;
+    }
+    if (!extractedData.KELAS_RS) {
+      const hospitalSettings = await db.prepare('SELECT kelas_rs FROM hospital_settings WHERE hospital_code = ?').get(hospitalCode || '3371084');
+      if (hospitalSettings?.kelas_rs) extractedData.KELAS_RS = hospitalSettings.kelas_rs;
+    }
+
     // Convert vClaim format to database format for validation
     const dbRecord = vclaimToDbFormat(extractedData);
     dbRecord.jenis_klaim = jenisKlaim;

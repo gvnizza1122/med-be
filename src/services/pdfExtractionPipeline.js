@@ -43,6 +43,27 @@ function applyDeterministicFallback(record, allPagesText, jenisKlaim) {
       console.log('[Pipeline] Fallback regex mengisi KELAS_RAWAT dari Kelas Hak (rawat jalan, AI mengembalikan kosong).');
     }
   }
+  if (jenisKlaim === 'RAWAT_JALAN' && (!record.ADMISSION_DATE || !record.DISCHARGE_DATE)) {
+    // Rawat jalan cuma 1 hari kunjungan — dokumen (SEP/resume medis poliklinik)
+    // hampir tidak pernah punya field "Tanggal Masuk"/"Tanggal Keluar" eksplisit,
+    // yang ada cuma "Tgl Periksa" atau "Tgl. SEP". AI ekstraksi sengaja menolak
+    // menyalin dari field lain (aturan umum di pdfExtractionService.js), jadi
+    // dua field ini butuh fallback deterministik sendiri, sama pola dengan
+    // KELAS_RAWAT di atas: tanggal masuk = tanggal keluar = tanggal pelayanan.
+    const m = /tgl\.?\s*periksa\s*:?\s*(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/i.exec(allPagesText)
+      || /tgl\.?\s*sep\s*:?\s*(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/i.exec(allPagesText);
+    if (m) {
+      const tglPelayanan = `${m[1].padStart(2, '0')}/${m[2].padStart(2, '0')}/${m[3]}`;
+      if (!record.ADMISSION_DATE) {
+        record.ADMISSION_DATE = tglPelayanan;
+        console.log('[Pipeline] Fallback regex mengisi ADMISSION_DATE dari tanggal pelayanan (rawat jalan, AI mengembalikan kosong).');
+      }
+      if (!record.DISCHARGE_DATE) {
+        record.DISCHARGE_DATE = tglPelayanan;
+        console.log('[Pipeline] Fallback regex mengisi DISCHARGE_DATE dari tanggal pelayanan (rawat jalan, AI mengembalikan kosong).');
+      }
+    }
+  }
   return record;
 }
 
