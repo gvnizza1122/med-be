@@ -443,30 +443,54 @@ router.get('/', authenticate, async (req, res) => {
       params.push(to_date + 'T23:59:59');
     }
 
-    // search: cocokkan nama pasien atau SEP dari record pertama file ini
-    // (1 file PDF = 1 record, lihat subquery sep/nama_pasien di bawah).
+    // search: cocokkan nama pasien atau SEP. Untuk file PDF (1 file = 1 record)
+    // ini selalu record itu sendiri, tapi file legacy TXT/Excel bisa berisi
+    // RATUSAN record — subquery SEP/nama_pasien di bawah HARUS menampilkan
+    // record yang BENAR-BENAR cocok dengan pencarian, bukan selalu record
+    // pertama (row_number=1) seperti sebelumnya. Sebelumnya ini bug: cari SEP
+    // manapun yang ada di dalam file itu tetap menampilkan SEP record #1 —
+    // jadi kelihatan seperti "hasil pencarian salah" padahal filenya memang
+    // benar ketemu, cuma kolomnya yang salah tampil.
+    let displaySepSubquery = `(SELECT sep FROM claim_records WHERE file_id = cf.id ORDER BY row_number LIMIT 1) as sep`;
+    let displayNamaSubquery = `(SELECT nama_pasien FROM claim_records WHERE file_id = cf.id ORDER BY row_number LIMIT 1) as nama_pasien`;
+
     if (search) {
+      const like = `%${search}%`;
       where += ` AND cf.id IN (
         SELECT file_id FROM claim_records
         WHERE nama_pasien LIKE ? OR sep LIKE ?
       )`;
-      const like = `%${search}%`;
       params.push(like, like);
+
+      displaySepSubquery = `(
+        SELECT sep FROM claim_records WHERE file_id = cf.id
+        ORDER BY CASE WHEN nama_pasien LIKE ? OR sep LIKE ? THEN 0 ELSE 1 END, row_number
+        LIMIT 1
+      ) as sep`;
+      displayNamaSubquery = `(
+        SELECT nama_pasien FROM claim_records WHERE file_id = cf.id
+        ORDER BY CASE WHEN nama_pasien LIKE ? OR sep LIKE ? THEN 0 ELSE 1 END, row_number
+        LIMIT 1
+      ) as nama_pasien`;
     }
 
     const totalResult = await db.prepare(`SELECT COUNT(*) as count FROM claim_files cf ${where}`).get(...params);
     const total = Number(totalResult ? totalResult.count : 0);
 
+    // Urutan parameter di SELECT list (subquery SEP dulu, baru nama_pasien)
+    // harus PERSIS sama dengan urutan placeholder ? di string SQL-nya.
+    const selectParams = search ? [`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`] : [];
+
     const filesRaw = await db.prepare(`
       SELECT cf.*, u.full_name as uploaded_by_name,
-        (SELECT sep FROM claim_records WHERE file_id = cf.id ORDER BY row_number LIMIT 1) as sep,
-        (SELECT nama_pasien FROM claim_records WHERE file_id = cf.id ORDER BY row_number LIMIT 1) as nama_pasien
+        ${displaySepSubquery},
+        ${displayNamaSubquery}
       FROM claim_files cf
       LEFT JOIN users u ON cf.uploaded_by = u.id
       ${where}
       ORDER BY cf.created_at DESC
       LIMIT ? OFFSET ?
-    `).all(...params, parseInt(limit), offset);
+    `).all(...selectParams, ...params, parseInt(limit), offset);
 
     const files = filesRaw.map(f => ({
       ...f,
@@ -1582,8 +1606,13 @@ router.post('/upload-pdf', authenticate, pdfUpload.single('file'), async (req, r
   res.json({ status: 'success', ...result });
 });
 
-// PDF batch upload config — sama seperti pdfUpload (single) tapi terima banyak file sekaligus
-const MAX_BATCH_PDF_FILES = 30;
+// PDF batch upload config — sama seperti pdfUpload (single) tapi terima banyak file sekaligus.
+// Naik dari 30 ke 100 (atas permintaan user) — concurrency pemrosesan tetap 5
+// (lihat runWithConcurrencyLimit di bawah), jadi 100 file cuma bikin batch-nya
+// lebih lama selesai (antre lebih banyak), bukan membebani server lebih berat
+// per saat. Server requestTimeout & timeout fetch FE sudah dinaikkan mengikuti
+// (lihat index.js & lib/api.ts) supaya batch besar tidak keputusan di tengah.
+const MAX_BATCH_PDF_FILES = 100;
 const pdfUploadBatch = multer({
   storage,
   limits: { fileSize: 20 * 1024 * 1024 },

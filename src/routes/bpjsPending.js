@@ -438,20 +438,30 @@ router.get('/pending', authenticate, async (req, res) => {
     const db = getDb();
     const { status, outcome, jenis_klaim, search, pending_file_id, page = 1, limit = 50 } = req.query;
     const offset = (parseInt(page) - 1) * parseInt(limit);
+    // Prefix bpr. dari awal (bukan tempel belakangan) — bpjs_pending_responses
+    // dan claim_records SAMA-SAMA punya kolom "sep", jadi begitu di-JOIN nama
+    // kolom itu jadi ambigu kalau tidak di-qualify eksplisit.
     let where = 'WHERE 1=1';
     const params = [];
-    if (status) { where += ' AND status = ?'; params.push(status); }
-    if (outcome) { where += ' AND outcome = ?'; params.push(outcome); }
-    if (jenis_klaim) { where += ' AND jenis_klaim = ?'; params.push(jenis_klaim); }
-    if (pending_file_id) { where += ' AND pending_file_id = ?'; params.push(pending_file_id); }
+    if (status) { where += ' AND bpr.status = ?'; params.push(status); }
+    if (outcome) { where += ' AND bpr.outcome = ?'; params.push(outcome); }
+    if (jenis_klaim) { where += ' AND bpr.jenis_klaim = ?'; params.push(jenis_klaim); }
+    if (pending_file_id) { where += ' AND bpr.pending_file_id = ?'; params.push(pending_file_id); }
     if (search) {
-      where += ' AND (sep LIKE ? OR nama_peserta LIKE ?)';
+      where += ' AND (bpr.sep LIKE ? OR bpr.nama_peserta LIKE ?)';
       const like = `%${search}%`;
       params.push(like, like);
     }
-    const totalResult = await db.prepare(`SELECT COUNT(*) as count FROM bpjs_pending_responses ${where}`).get(...params);
+    const totalResult = await db.prepare(`SELECT COUNT(*) as count FROM bpjs_pending_responses bpr ${where}`).get(...params);
+    // claim_file_id (bukan cuma claim_record_id) diikutkan supaya FE bisa link
+    // langsung ke halaman detail klaim (/results/:fileId) begitu diklik — tanpa
+    // ini FE cuma tahu record-nya ada, tapi tidak tahu file mana yang harus dibuka.
     const rows = await db.prepare(`
-      SELECT * FROM bpjs_pending_responses ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?
+      SELECT bpr.*, cr.file_id as claim_file_id
+      FROM bpjs_pending_responses bpr
+      LEFT JOIN claim_records cr ON cr.id = bpr.claim_record_id
+      ${where}
+      ORDER BY bpr.created_at DESC LIMIT ? OFFSET ?
     `).all(...params, parseInt(limit), offset);
     res.json({
       total: Number(totalResult?.count || 0),
