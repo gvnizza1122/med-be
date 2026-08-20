@@ -40,10 +40,16 @@ const OCR_CONFIG = {
 // batch upload — pemborosan CPU/memori besar dan penyebab utama CPU meroket
 // (>1000%) serta proses jadi sangat lambat saat testing production (lihat
 // item 10). Solusi: buat sejumlah kecil worker PERSISTEN sekali (lazy-init),
-// pakai ulang terus lewat checkout/checkin sederhana. Ukuran pool disamakan
-// dengan maxParallel default di ocrBatch() (2) — tidak menambah beban baru,
-// cuma menghilangkan re-init yang tidak perlu.
-const POOL_SIZE = 2;
+// pakai ulang terus lewat checkout/checkin sederhana.
+//
+// Ukuran pool = 5, BUKAN 2 (percobaan pertama) — dites langsung di production:
+// dengan pool 2 tapi record diproses dengan concurrency 5 (lihat
+// runWithConcurrencyLimit(records, 5, ...) di claimFiles.js), 3 dari 5 record
+// harus ANTRE dapat worker, dan waktu antre itu ikut kehitung ke batas waktu
+// 120 detik gatherEvidencePool() — hasilnya SEMUA 5 record tetap kena "OCR
+// timeout" walau CPU jauh lebih rendah dari sebelumnya. Pool 5 menyamakan
+// jumlah worker dengan concurrency record supaya tidak ada yang perlu antre.
+const POOL_SIZE = 5;
 let workerPoolPromise = null; // Promise<{worker, busy}[]>
 const waiters = [];
 
