@@ -22,6 +22,8 @@
  */
 
 // ICD-10: Letter followed by 2+ digits, optionally dot + digits
+const { matchPrbCategory } = require('./prbRules');
+
 const ICD10_PATTERN = /^[A-Z]\d{2}(\.\d{1,4})?$/i;
 // ICD-9-CM: 2-3 digits, optionally dot + digits
 const ICD9CM_PATTERN = /^\d{2,3}(\.\d{1,4})?$/;
@@ -144,16 +146,34 @@ function validateRecord(record, activeRules) {
     const birthDate = record.birth_date;
     const admDate = record.admission_date;
     const umur = record.umur_tahun;
-    if (birthDate && admDate && umur !== undefined && umur !== null) {
-      const birth = new Date(birthDate);
+    // Bayi baru lahir (neonatal) yang UMUR_TAHUN=0 itu VALID secara klinis —
+    // dikecualikan dari kedua cabang di bawah lewat kode ICD-10 P00-P99
+    // (satu-satunya sinyal objektif dari dokumen, bukan tebakan).
+    const isNeonatalDiagnosis = /(?:^|;)\s*P\d{2}/i.test(record.diagnosa_list || '');
+    const birth = birthDate ? new Date(birthDate) : null;
+    const birthValid = birth && !isNaN(birth);
+
+    if (admDate && (umur === 0 || umur === '0') && !birthValid && !isNeonatalDiagnosis) {
+      // Sebelumnya di-skip diam-diam kalau BIRTH_DATE kosong/tidak valid —
+      // UMUR=0 tanpa BIRTH_DATE untuk lolos tanpa verifikasi. Sekarang wajib
+      // ditandai supaya verifikator mengisi BIRTH_DATE secara manual.
+      errors.push({
+        rule_id: 'RV-04',
+        field_name: 'umur_tahun',
+        severity: 'major',
+        error_message: 'UMUR_TAHUN 0 tapi TGL_LAHIR kosong/tidak valid sehingga tidak bisa dicek silang — kemungkinan data umur belum benar diisi.',
+        expected_value: 'TGL_LAHIR valid untuk verifikasi umur, atau kode diagnosis neonatal (P00-P99) kalau memang bayi baru lahir',
+        actual_value: `umur_tahun=0, birth_date=${birthDate || '(kosong)'}`
+      });
+    } else if (birthValid && admDate && umur !== undefined && umur !== null) {
       const admission = new Date(admDate);
-      if (!isNaN(birth) && !isNaN(admission)) {
+      if (!isNaN(admission)) {
         let calcAge = admission.getFullYear() - birth.getFullYear();
         const monthDiff = admission.getMonth() - birth.getMonth();
         if (monthDiff < 0 || (monthDiff === 0 && admission.getDate() < birth.getDate())) {
           calcAge--;
         }
-        if (Math.abs(umur - calcAge) > 1) {
+        if (Math.abs(umur - calcAge) > 1 && !(isNeonatalDiagnosis && Number(umur) === 0)) {
           errors.push({
             rule_id: 'RV-04',
             field_name: 'umur_tahun',
@@ -412,29 +432,34 @@ function validateRecord(record, activeRules) {
   }
 
   // RV-15: Flagging Otomatisasi Program Rujuk Balik (PRB)
+  // Syarat status_pasien === 'STABIL' SENGAJA dihapus — field itu tidak pernah
+  // bisa diverifikasi dari dokumen (tidak ada "status stabil/tidak" tercetak
+  // eksplisit), jadi kalau dipertahankan rule ini tidak akan pernah menyala.
+  // histori_obat_kronis_bulan_berturut sekarang diisi nyata oleh
+  // detectAndFlagPRB() di claimFiles.js (hitung bulan berturut-turut diagnosis
+  // kategori PRB yang sama, lintas record yang sudah terupload di sistem ini).
   if (ruleMap['RV-15']?.is_active) {
-    const diagStr = record.diagnosa_list || '';
-    if (diagStr && diagStr !== '-') {
-      const diags = diagStr.split(';').map(d => d.trim().toUpperCase());
-      const DIAGNOSA_PRB_PREFIXES = ['E11', 'I10', 'I25', 'J45', 'J44', 'G40', 'F20', 'I63', 'M32'];
-      const hasPRBDiagnosis = diags.some(diag => DIAGNOSA_PRB_PREFIXES.some(prefix => diag.startsWith(prefix)));
-
-      if (hasPRBDiagnosis && record.histori_obat_kronis_bulan_berturut >= 3 && record.status_pasien === 'STABIL') {
-        if (!record.flag_rujuk_balik_prb) {
-          errors.push({
-            rule_id: 'RV-15',
-            field_name: 'diagnosa_list',
-            severity: 'major',
-            error_message: ruleMap['RV-15'].error_message || 'Pasien penyakit kronis dengan kondisi stabil telah mendapatkan terapi 3 bulan berturut-turut. Wajib dialihkan masuk Program Rujuk Balik (PRB) ke FKTP.',
-            expected_value: 'Flagging PRB Aktif / Rujuk Balik ke FKTP',
-            actual_value: `Stabil, Diagnosa Kronis, Pengobatan bulan ke-${record.histori_obat_kronis_bulan_berturut}`
-          });
-        }
+    const prbCategory = matchPrbCategory(record.diagnosa_list);
+    if (prbCategory && record.histori_obat_kronis_bulan_berturut >= 3 && !record.prb_exempt_reason) {
+      if (!record.flag_rujuk_balik_prb) {
+        errors.push({
+          rule_id: 'RV-15',
+          field_name: 'diagnosa_list',
+          severity: 'major',
+          error_message: ruleMap['RV-15'].error_message || 'Pasien penyakit kronis dengan kondisi stabil telah mendapatkan terapi 3 bulan berturut-turut. Wajib dialihkan masuk Program Rujuk Balik (PRB) ke FKTP.',
+          expected_value: 'Flagging PRB Aktif / Rujuk Balik ke FKTP, atau tambahkan ke daftar Exempt PRB',
+          actual_value: `Diagnosa kronis ${prbCategory}, terekam ${record.histori_obat_kronis_bulan_berturut} bulan berturut-turut`
+        });
       }
     }
   }
 
   // RV-16: Batasan Maksimal Iterasi Obat Kronis
+  // urutan_iterasi diisi ESTIMASI oleh detectAndFlagPRB() di claimFiles.js —
+  // dokumen PDF tidak pernah mencantumkan nomor iterasi resep secara eksplisit,
+  // jadi dihitung dari JUMLAH kunjungan diagnosis kategori PRB yang sama dalam
+  // bulan yang sama (proxy, bukan nomor iterasi resep asli — pesan di bawah
+  // menyebut ini eksplisit supaya verifikator tidak salah anggap ini pasti).
   if (ruleMap['RV-16']?.is_active) {
     if (record.urutan_iterasi > 2) {
       errors.push({
@@ -443,7 +468,7 @@ function validateRecord(record, activeRules) {
         severity: 'major',
         error_message: ruleMap['RV-16'].error_message || 'Sesuai regulasi BA 1247/2024, pelayanan iterasi (perulangan resep) obat kronis di FKRTL dibatasi maksimal hanya boleh dilakukan sebanyak 2 kali.',
         expected_value: '<= 2 Kali Iterasi',
-        actual_value: `${record.urutan_iterasi} Kali Iterasi`
+        actual_value: `Estimasi ${record.urutan_iterasi}x kunjungan diagnosis kronis sama bulan ini (dihitung dari riwayat, bukan nomor iterasi resep asli — mohon cek manual)`
       });
     }
   }
@@ -462,6 +487,39 @@ function validateRecord(record, activeRules) {
           actual_value: `Diajukan sebagai Klaim ${record.jenis_klaim || 'RAWAT_INAP'}`
         });
       }
+    }
+  }
+
+  // RV-20: Kriteria Kegawatan IGD — deterministik (cek kode ICD eksplisit),
+  // pelengkap pola AI "kegawatan_lemah" (aiReviewService.js) yang baca
+  // konteks kalimat S/O. Dua sudut pandang berbeda dipertahankan berdampingan
+  // (bukan duplikat): ini menyala pasti kalau kodenya cocok, AI menyala kalau
+  // narasinya lemah walau kodenya belum tentu "nyeri generik". WARNING —
+  // pakai severity 'minor' (severity CHECK di DB cuma terima
+  // critical/major/minor; determineStatus() memetakan minor -> status
+  // "pending", TIDAK memblokir submit, konsisten dengan RV-10).
+  if (ruleMap['RV-20']?.is_active && record.jenis_klaim === 'GAWAT_DARURAT') {
+    const NYERI_CODES = [/^R10/i, /^R51/i, /^R52/i, /^R07/i, /^M54/i, /^G43/i, /^M79/i];
+    const KEGAWATAN_CODES = [/^I21/i, /^I22/i, /^I46/i, /^J96/i, /^J18/i, /^N17/i, /^K35/i, /^R57/i, /^A41/i, /^R41/i];
+    const codes = (record.diagnosa_list || '').split(';').map(c => c.trim()).filter(Boolean);
+    const hasNyeriOnly = codes.some(c => NYERI_CODES.some(re => re.test(c)));
+    const hasKegawatan = codes.some(c => KEGAWATAN_CODES.some(re => re.test(c)));
+
+    if (hasNyeriOnly && !hasKegawatan) {
+      let msg = ruleMap['RV-20'].error_message ||
+        'Diagnosis IGD ini hanya kode nyeri generik tanpa bukti kegawatan objektif. Pastikan TTV abnormal/pemeriksaan penunjang terdokumentasi sebelum submit.';
+      const umur = Number(record.umur_tahun);
+      if (!isNaN(umur) && umur > 0 && umur < 7) {
+        msg += ' Untuk pasien anak, gunakan skala nyeri FLACC, bukan VAS.';
+      }
+      errors.push({
+        rule_id: 'RV-20',
+        field_name: 'diagnosa_list',
+        severity: 'minor',
+        error_message: msg,
+        expected_value: 'TTV abnormal / pemeriksaan penunjang / kode kegawatan pendamping terdokumentasi',
+        actual_value: `Diagnosa: ${codes.join(';')}`
+      });
     }
   }
 

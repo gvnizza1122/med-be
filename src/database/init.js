@@ -315,6 +315,38 @@ async function initializeSchema() {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
 
+      -- Daftar pasien kronis yang SENGAJA tidak dialihkan ke Program Rujuk
+      -- Balik (PRB) walau sudah stabil ≥3 bulan berturut (mis. komplikasi
+      -- berat, komorbid) — dikelola manual oleh admin di halaman Exempt PRB.
+      -- Dicek oleh detectAndFlagPRB() di claimFiles.js sebelum RV-15 menyala.
+      CREATE TABLE IF NOT EXISTS prb_exemption_list (
+        id TEXT PRIMARY KEY,
+        hospital_code TEXT NOT NULL,
+        mrn TEXT NOT NULL,
+        nokartu TEXT,
+        nama_pasien TEXT,
+        alasan_exempt TEXT NOT NULL,
+        dpjp TEXT,
+        tanggal_exempt DATE,
+        berlaku_sampai DATE,
+        diinput_oleh TEXT REFERENCES users(id),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      -- Audit trail konfirmasi manual RV-20 (kriteria kegawatan IGD) —
+      -- verifikator wajib centang checklist sebelum lanjut kalau RV-20
+      -- (WARNING, tidak blocking) terdeteksi. Disimpan permanen untuk bukti
+      -- kalau BPJS mempertanyakan klaim ini nanti.
+      CREATE TABLE IF NOT EXISTS rv20_confirmations (
+        id TEXT PRIMARY KEY,
+        record_id TEXT NOT NULL REFERENCES claim_records(id) ON DELETE CASCADE,
+        sep TEXT,
+        mrn TEXT,
+        checklist_items TEXT,
+        confirmed_by TEXT REFERENCES users(id),
+        confirmed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
       -- Mirror dari migrations/003-error-knowledge-base.sql (auto-init untuk deployment tanpa migration runner)
       CREATE TABLE IF NOT EXISTS error_knowledge_base (
         id TEXT PRIMARY KEY,
@@ -344,6 +376,9 @@ async function initializeSchema() {
     await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_ocr_results_page ON ocr_results(record_id, page_number)`);
     await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_error_kb_rule ON error_knowledge_base(rule_id)`);
     await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_error_kb_rule_hits ON error_knowledge_base(rule_id, hit_count DESC, created_at DESC)`);
+    await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_prb_exemption_mrn ON prb_exemption_list(hospital_code, mrn)`);
+    await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_claim_records_nokartu ON claim_records(nokartu)`);
+    await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_rv20_confirmations_record ON rv20_confirmations(record_id)`);
 
     await migrateSchema(dbHelper);
   } catch (err) {
@@ -400,7 +435,8 @@ async function migrateSchema(db) {
       // dengan klinik BEDA, itu indikasi kunjungan lintas-poli hari yang
       // sama yang seharusnya digabung 1 episode klaim. Lihat
       // detectInternalEpisodes() di claimFiles.js.
-      'klinik_poli': 'TEXT'
+      'klinik_poli': 'TEXT',
+      'prb_exempt_reason': 'TEXT'
     };
 
     for (const [col, type] of Object.entries(newCols)) {

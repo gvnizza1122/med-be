@@ -100,6 +100,55 @@ const AUDITABLE_FIELDS = new Set([
 ]);
 
 /**
+ * POST /api/v1/records/:recordId/rv20-confirm
+ * Body: { checklist_items: { tvv_abnormal: bool, tampak_sakit_berat: bool, ... } }
+ * Audit trail konfirmasi manual RV-20 (kriteria kegawatan IGD) — verifikator
+ * sudah cek checklist sebelum lanjut walau RV-20 (non-blocking) terdeteksi.
+ */
+recordsRouter.post('/:recordId/rv20-confirm', authenticate, async (req, res) => {
+  try {
+    const db = getDb();
+    const record = await db.prepare('SELECT id, sep, mrn FROM claim_records WHERE id = ?').get(req.params.recordId);
+    if (!record) return res.status(404).json({ error: 'Record tidak ditemukan.' });
+
+    const checklistItems = req.body?.checklist_items;
+    if (!checklistItems || typeof checklistItems !== 'object') {
+      return res.status(400).json({ error: 'checklist_items wajib diisi.' });
+    }
+
+    const id = uuidv4();
+    await db.prepare(`
+      INSERT INTO rv20_confirmations (id, record_id, sep, mrn, checklist_items, confirmed_by)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(id, record.id, record.sep, record.mrn, JSON.stringify(checklistItems), req.user.id);
+
+    res.status(201).json({ id, message: 'Konfirmasi kegawatan IGD tersimpan.' });
+  } catch (err) {
+    console.error('[rv20-confirm] error:', err);
+    res.status(500).json({ error: 'Terjadi gangguan pada sistem. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' });
+  }
+});
+
+/**
+ * GET /api/v1/records/:recordId/rv20-confirm
+ * Cek apakah record ini sudah pernah dikonfirmasi (supaya modal tidak
+ * berulang tiap kali halaman detail dibuka).
+ */
+recordsRouter.get('/:recordId/rv20-confirm', authenticate, async (req, res) => {
+  try {
+    const db = getDb();
+    const confirmation = await db.prepare(`
+      SELECT id, checklist_items, confirmed_by, confirmed_at FROM rv20_confirmations
+      WHERE record_id = ? ORDER BY confirmed_at DESC LIMIT 1
+    `).get(req.params.recordId);
+    res.json({ confirmed: !!confirmation, confirmation: confirmation || null });
+  } catch (err) {
+    console.error('[rv20-confirm] error:', err);
+    res.status(500).json({ error: 'Terjadi gangguan pada sistem. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' });
+  }
+});
+
+/**
  * POST /api/v1/records/:recordId/audit
  * Body: { fields: ['SEP', 'NOKARTU'], style: 'ponytail' }
  * AI audit per-field, hanya untuk record yang gagal validasi rules (cost optimization).

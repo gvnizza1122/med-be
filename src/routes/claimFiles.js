@@ -12,6 +12,7 @@ const { logAudit } = require('../services/auditService');
 const { estimatePromptTokens, estimateCompletionTokens } = require('../services/aiValidationService');
 const { generateAiReview } = require('../services/aiReviewService');
 const { getRelevantKnowledge, recordKnowledge } = require('../services/errorKnowledgeService');
+const { matchPrbCategory } = require('../services/prbRules');
 
 const router = express.Router();
 
@@ -1163,6 +1164,192 @@ async function detectAndFlagInternalEpisodes(db, { hospitalCode, nokartu, admiss
   }
 }
 
+/** "YYYY-MM-DD" (format DB) -> "DD/MM/YYYY" (format vClaim). Null kalau tidak sesuai. */
+function isoDateToVclaim(iso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || '').trim());
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : null;
+}
+
+/**
+ * Solusi sementara saat integrasi SIMRS bermasalah (data SIMRS sengaja
+ * ditunda — lihat catatan sebelumnya di sesi ini): kalau field administratif
+ * (NOKARTU/NAMA_PASIEN/BIRTH_DATE/SEX/KELAS_RAWAT-khusus-inap) kosong dari
+ * AI ekstraksi, isi dari kunjungan TERAKHIR pasien yang sama (MRN sama) yang
+ * SUDAH pernah diupload ke sistem ini — query LANGSUNG ke claim_records
+ * (bukan tabel patient_episodes terpisah, pola sama dengan detectAndFlagPRB).
+ * Tidak pernah menimpa field yang sudah terisi AI. Setiap field yang kena
+ * autofill ditandai `_autofill_<FIELDNAME> = 'mrn_history'` di extractedData
+ * (ikut tersimpan ke raw_data, dipakai UI untuk badge "dari riwayat").
+ */
+async function autofillFromMrn(db, { hospitalCode, extractedData, jenisKlaim }) {
+  if (!extractedData.MRN) return; // tidak ada kunci untuk cari riwayat
+  try {
+    const prev = await db.prepare(`
+      SELECT cr.nokartu, cr.nama_pasien, cr.kelas_rawat, cr.birth_date, cr.gender
+      FROM claim_records cr
+      JOIN claim_files cf ON cf.id = cr.file_id
+      WHERE cr.mrn = ? AND cf.hospital_code = ?
+      ORDER BY cr.admission_date DESC
+      LIMIT 1
+    `).get(extractedData.MRN, hospitalCode || '3371084');
+    if (!prev) return;
+
+    const candidates = [
+      ['NOKARTU', prev.nokartu],
+      ['NAMA_PASIEN', prev.nama_pasien],
+      ['BIRTH_DATE', isoDateToVclaim(prev.birth_date)],
+      ['SEX', prev.gender],
+      // KELAS_RAWAT cuma untuk RAWAT_INAP — rawat jalan/IGD punya aturan
+      // sendiri (Kelas Hak, bukan Kelas Rawat, lihat jenisKlaimFieldRules.js).
+      ...(jenisKlaim === 'RAWAT_INAP' ? [['KELAS_RAWAT', prev.kelas_rawat != null ? String(prev.kelas_rawat) : null]] : []),
+    ];
+
+    for (const [field, value] of candidates) {
+      if (!extractedData[field] && value) {
+        extractedData[field] = value;
+        extractedData[`_autofill_${field}`] = 'mrn_history';
+        console.log(`[autofillFromMrn] Mengisi ${field} dari riwayat MRN=${extractedData.MRN}.`);
+      }
+    }
+  } catch (err) {
+    console.warn(`[autofillFromMrn] gagal untuk mrn=${extractedData.MRN}: ${err.message}`);
+  }
+}
+
+/** claim_records.admission_date tersimpan "YYYY-MM-DD" (lihat vclaimDateToISO) -> "MM/YYYY". */
+function periodeBulanFromAdmissionDate(admissionDate) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(admissionDate || '').trim());
+  if (!m) return null;
+  return `${m[2]}/${m[1]}`;
+}
+
+/** Jumlah bulan-kalender antara 2 "MM/YYYY" (selalu >= 0). */
+function monthsBetweenPeriode(a, b) {
+  const [am, ay] = a.split('/').map(Number);
+  const [bm, by] = b.split('/').map(Number);
+  return Math.abs((ay * 12 + am) - (by * 12 + bm));
+}
+
+/**
+ * RV-15 & RV-16 (BA 1247/2024) — deteksi lintas-record diagnosis kronis PRB
+ * untuk 1 pasien (nokartu) di RS yang sama. Query LANGSUNG ke claim_records
+ * (bukan tabel duplikat terpisah) supaya tidak ada 2 sumber data yang bisa
+ * tidak sinkron — pola sama seperti detectAndFlagInternalEpisodes() di atas.
+ *
+ * RV-15: histori_obat_kronis_bulan_berturut = jumlah bulan KALENDER BERTURUT
+ * (bukan cuma distinct count) kategori diagnosis PRB yang sama muncul, sampai
+ * & termasuk periode record ini. Kalau >=3 dan pasien tidak ada di
+ * prb_exemption_list -> RV-15 menyala di ruleEngine.js.
+ *
+ * RV-16 (PROXY, bukan data pasti): urutan_iterasi = jumlah kunjungan kategori
+ * PRB yang sama dalam periode_bulan yang SAMA (bulan berjalan) — dokumen PDF
+ * tidak pernah mencantumkan nomor iterasi resep eksplisit, jadi dihitung dari
+ * frekuensi kunjungan tercatat. Pesan error RV-16 di ruleEngine.js sudah
+ * menjelaskan ini estimasi, bukan kepastian.
+ *
+ * Sama seperti detectAndFlagInternalEpisodes: cuma mendeteksi pola dari
+ * record yang SUDAH pernah diupload ke sistem ini (bukan riwayat SIMRS
+ * lengkap) — best-effort, tidak boleh menggagalkan upload utama.
+ */
+async function detectAndFlagPRB(db, { hospitalCode, mrn, nokartu, admissionDate, diagnosaList }) {
+  const category = matchPrbCategory(diagnosaList);
+  const periodeIni = periodeBulanFromAdmissionDate(admissionDate);
+  if (!category || !nokartu || !periodeIni) return; // bukan diagnosis kronis PRB / data tanggal tidak lengkap
+
+  try {
+    const rows = await db.prepare(`
+      SELECT cr.id, cr.admission_date, cr.diagnosa_list, cr.flag_rujuk_balik_prb
+      FROM claim_records cr
+      JOIN claim_files cf ON cf.id = cr.file_id
+      WHERE cr.nokartu = ? AND cf.hospital_code = ?
+    `).all(nokartu, hospitalCode || '3371084');
+
+    // Cuma record dengan kategori PRB yang SAMA, dikelompokkan per periode_bulan.
+    const byPeriode = new Map(); // periode -> [record ids]
+    for (const r of rows) {
+      if (matchPrbCategory(r.diagnosa_list) !== category) continue;
+      const p = periodeBulanFromAdmissionDate(r.admission_date);
+      if (!p) continue;
+      if (!byPeriode.has(p)) byPeriode.set(p, []);
+      byPeriode.get(p).push(r.id);
+    }
+    if (byPeriode.size === 0) return;
+
+    // RV-15: hitung mundur dari periode terbaru yang ADA datanya, berapa
+    // bulan kalender BERTURUT-TURUT (gap 1 bulan = putus, bukan cuma "3 bulan
+    // manapun" seperti draf awal brief) kategori ini muncul.
+    const periodesSorted = [...byPeriode.keys()].sort((a, b) => {
+      const [am, ay] = a.split('/').map(Number);
+      const [bm, by] = b.split('/').map(Number);
+      return (by * 12 + bm) - (ay * 12 + am);
+    });
+    let consecutiveMonths = 1;
+    for (let i = 0; i < periodesSorted.length - 1; i++) {
+      if (monthsBetweenPeriode(periodesSorted[i], periodesSorted[i + 1]) === 1) consecutiveMonths++;
+      else break;
+    }
+
+    // RV-16 (proxy): jumlah kunjungan kategori sama di periode BERJALAN ini saja.
+    const urutanIterasi = (byPeriode.get(periodeIni) || []).length;
+
+    // Cek daftar exempt (aktif = berlaku_sampai kosong ATAU >= hari ini).
+    let exemptReason = null;
+    if (mrn) {
+      const exempt = await db.prepare(`
+        SELECT alasan_exempt FROM prb_exemption_list
+        WHERE hospital_code = ? AND mrn = ?
+          AND (berlaku_sampai IS NULL OR berlaku_sampai >= CURRENT_DATE)
+        ORDER BY created_at DESC LIMIT 1
+      `).get(hospitalCode || '3371084', mrn);
+      if (exempt) exemptReason = exempt.alasan_exempt;
+    }
+
+    // Update SEMUA record kategori-sama pasien ini (semua periode yang
+    // terkumpul di byPeriode), re-validate, ganti validation_errors-nya.
+    const activeRules = await db.prepare('SELECT * FROM validation_rules WHERE is_active = 1').all();
+    const allIds = [...byPeriode.values()].flat();
+    const fullRows = await db.prepare(`
+      SELECT * FROM claim_records WHERE id IN (${allIds.map(() => '?').join(',')})
+    `).all(...allIds);
+
+    for (const rec of fullRows) {
+      const dbRecord = {
+        ...rec,
+        histori_obat_kronis_bulan_berturut: consecutiveMonths,
+        urutan_iterasi: urutanIterasi,
+        prb_exempt_reason: exemptReason,
+      };
+      const validationErrors = validateRecord(dbRecord, activeRules);
+      const validationStatus = determineStatus(validationErrors);
+
+      await db.transaction(async (tx) => {
+        await tx.prepare(`
+          UPDATE claim_records
+          SET histori_obat_kronis_bulan_berturut = ?, urutan_iterasi = ?, prb_exempt_reason = ?,
+              validation_status = ?, error_count = ?
+          WHERE id = ?
+        `).run(consecutiveMonths, urutanIterasi, exemptReason, validationStatus, validationErrors.length, rec.id);
+
+        await tx.prepare('DELETE FROM validation_errors WHERE record_id = ?').run(rec.id);
+        if (validationErrors.length > 0) {
+          const txInsertError = tx.prepare(`
+            INSERT INTO validation_errors (id, record_id, rule_id, field_name, error_message, expected_value, actual_value, severity)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          `);
+          for (const err of validationErrors) {
+            await txInsertError.run(
+              uuidv4(), rec.id, err.rule_id, err.field_name,
+              err.error_message, err.expected_value || '', err.actual_value || '', err.severity
+            );
+          }
+        }
+      });
+    }
+  } catch (err) {
+    console.warn(`[detectAndFlagPRB] gagal untuk nokartu=${nokartu}: ${err.message}`);
+  }
+}
+
 // Kategori pelayanan yang bisa dipilih user di halaman Extract PDF. Dulu
 // jenis_klaim SELALU di-hardcode 'RAWAT_INAP' untuk upload PDF, tak peduli
 // isi dokumennya rawat jalan/IGD - akibatnya rule RV-17 (odontektomi) salah
@@ -1183,7 +1370,7 @@ const JENIS_KLAIM_OPTIONS = ['RAWAT_JALAN', 'RAWAT_INAP', 'GAWAT_DARURAT'];
 async function processSinglePdfUpload(db, { filePath, originalName, jenisKlaim: fixedJenisKlaim, allowedJenisKlaim, userId, hospitalCode }) {
   try {
     const { extractFromPDF } = require('../services/pdfExtractionPipeline');
-    const result = await extractFromPDF(filePath, { jenisKlaim: fixedJenisKlaim, allowedJenisKlaim });
+    const result = await extractFromPDF(filePath, { jenisKlaim: fixedJenisKlaim, allowedJenisKlaim, originalName });
 
     if (!result.success) {
       // Detail teknis hanya untuk log server, tidak dikirim ke pengguna.
@@ -1222,6 +1409,10 @@ async function processSinglePdfUpload(db, { filePath, originalName, jenisKlaim: 
       const hospitalSettings = await db.prepare('SELECT kelas_rs FROM hospital_settings WHERE hospital_code = ?').get(hospitalCode || '3371084');
       if (hospitalSettings?.kelas_rs) extractedData.KELAS_RS = hospitalSettings.kelas_rs;
     }
+
+    // Isi field administratif yang kosong dari riwayat kunjungan MRN yang sama
+    // (solusi sementara saat integrasi SIMRS bermasalah — lihat autofillFromMrn).
+    await autofillFromMrn(db, { hospitalCode, extractedData, jenisKlaim });
 
     // Convert vClaim format to database format for validation
     const dbRecord = vclaimToDbFormat(extractedData);
@@ -1287,6 +1478,16 @@ async function processSinglePdfUpload(db, { filePath, originalName, jenisKlaim: 
       hospitalCode,
       nokartu: extractedData.NOKARTU,
       admissionDate: vclaimDateToISO(extractedData.ADMISSION_DATE),
+    });
+
+    // RV-15 (PRB) & RV-16 (iterasi obat kronis) — lihat dokumentasi lengkap
+    // di detectAndFlagPRB(). Best-effort, tidak menggagalkan upload.
+    await detectAndFlagPRB(db, {
+      hospitalCode,
+      mrn: extractedData.MRN,
+      nokartu: extractedData.NOKARTU,
+      admissionDate: vclaimDateToISO(extractedData.ADMISSION_DATE),
+      diagnosaList: extractedData.DIAGLIST,
     });
 
     // Alur AI ekstraksi -> rule engine -> AI review: setelah record tersimpan
@@ -1407,7 +1608,12 @@ router.post('/upload-pdf-batch', authenticate, pdfUploadBatch.array('files', MAX
 
     if (io) io.emit('pdf-batch:status', { batchId, status: 'processing', total, completed: 0 });
 
-    const results = await runWithConcurrencyLimit(req.files, 3, async (file) => {
+    // Tiap file = 2 AI call berurutan (ekstraksi + review), masing-masing sudah
+    // ada retry otomatis (3x percobaan + jeda) kalau provider AI rate-limit —
+    // lihat pdfExtractionService.js & aiReviewService.js. Concurrency 5 (naik
+    // dari 3) mempercepat throughput batch besar; kalau kena rate-limit, file
+    // itu retry sendiri (bukan gagal total batch).
+    const results = await runWithConcurrencyLimit(req.files, 5, async (file) => {
       const result = await processSinglePdfUpload(db, {
         filePath: file.path,
         originalName: file.originalname,
@@ -1882,6 +2088,49 @@ router.post('/validate-pdf', authenticate, async (req, res) => {
     });
   } catch (err) {
     console.error('PDF validate error:', err);
+    res.status(500).json({ error: 'Terjadi gangguan pada sistem. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' });
+  }
+});
+
+/**
+ * POST /api/v1/claim-files/scan-episodes
+ * Scan ulang manual RV-13/RV-15/RV-16 untuk semua nokartu unik pada 1
+ * periode_bulan ("MM/YYYY"). Perlu karena deteksi lintas-record cuma
+ * otomatis nyala saat file BARU diupload — kalau pola baru muncul dari
+ * kombinasi file-file LAMA yang sudah lebih dulu ada (mis. backlog yang
+ * baru selesai diupload semua), tidak ada yang men-trigger ulang
+ * deteksinya kecuali di-scan manual di sini.
+ */
+router.post('/scan-episodes', authenticate, async (req, res) => {
+  try {
+    const { periode_bulan } = req.body; // "MM/YYYY"
+    const m = /^(\d{2})\/(\d{4})$/.exec(String(periode_bulan || '').trim());
+    if (!m) return res.status(400).json({ error: 'Format periode_bulan harus MM/YYYY, contoh: 06/2026.' });
+    const isoPrefix = `${m[2]}-${m[1]}`; // "YYYY-MM"
+
+    const db = getDb();
+    const patients = await db.prepare(`
+      SELECT DISTINCT cr.nokartu, cr.mrn, cr.admission_date, cr.diagnosa_list
+      FROM claim_records cr
+      JOIN claim_files cf ON cf.id = cr.file_id
+      WHERE cf.hospital_code = ? AND cr.admission_date LIKE ? AND cr.nokartu IS NOT NULL
+    `).all(req.user.hospital_code, `${isoPrefix}%`);
+
+    let scanned = 0;
+    for (const p of patients) {
+      await detectAndFlagInternalEpisodes(db, {
+        hospitalCode: req.user.hospital_code, nokartu: p.nokartu, admissionDate: p.admission_date,
+      });
+      await detectAndFlagPRB(db, {
+        hospitalCode: req.user.hospital_code, mrn: p.mrn, nokartu: p.nokartu,
+        admissionDate: p.admission_date, diagnosaList: p.diagnosa_list,
+      });
+      scanned++;
+    }
+
+    res.json({ message: `Scan selesai untuk periode ${periode_bulan}.`, pasien_discan: scanned });
+  } catch (err) {
+    console.error('[scan-episodes] error:', err);
     res.status(500).json({ error: 'Terjadi gangguan pada sistem. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' });
   }
 });

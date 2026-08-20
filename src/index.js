@@ -19,6 +19,7 @@ const dashboardRoutes = require('./routes/dashboard');
 const userRoutes = require('./routes/users');
 const bridgingRoutes = require('./routes/bridging');
 const hospitalSettingsRoutes = require('./routes/hospitalSettings');
+const prbExemptRoutes = require('./routes/prbExempt');
 
 const app = express();
 app.set('trust proxy', 1);
@@ -127,6 +128,7 @@ app.use('/api/v1/dashboard', dashboardRoutes);
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/bridging', bridgingRoutes);
 app.use('/api/v1/hospital-settings', hospitalSettingsRoutes);
+app.use('/api/v1/prb-exempt', prbExemptRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

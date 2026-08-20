@@ -18,12 +18,25 @@ const { extractClaimData } = require('./pdfExtractionService');
  * tetap bekerja walau kata kunci klasifikasi halaman meleset atau AI lalai
  * mengikuti instruksi prompt — dua kegagalan yang pernah terjadi sebelumnya.
  */
-function applyDeterministicFallback(record, allPagesText, jenisKlaim) {
+function applyDeterministicFallback(record, allPagesText, jenisKlaim, originalName) {
   if (!record.SEP) {
-    const m = /no\.?\s*sep\s*:?\s*([0-9A-Za-z]{10,30})\b/i.exec(allPagesText);
-    if (m) {
-      record.SEP = m[1].toUpperCase();
-      console.log('[Pipeline] Fallback regex mengisi SEP (AI mengembalikan kosong).');
+    // Nama file di dataset RS ini SECARA HARFIAH adalah nomor SEP-nya sendiri
+    // (contoh: "0170R0110626V000012.pdf") — bukan tebakan, itu identifier asli
+    // yang dipakai SIMRS untuk menamai hasil export. Dicoba duluan karena lebih
+    // pasti (tidak tergantung kualitas OCR/scan) daripada regex ke teks dokumen.
+    const SEP_PATTERN = /(0\d{3}[A-Z]\d{3}\d{4}[A-Z]\d{6})/i;
+    const fromFilename = originalName ? SEP_PATTERN.exec(originalName) : null;
+    if (fromFilename) {
+      record.SEP = fromFilename[1].toUpperCase();
+      record._sep_source = 'filename';
+      console.log('[Pipeline] Fallback mengisi SEP dari nama file (AI mengembalikan kosong).');
+    } else {
+      const m = /no\.?\s*sep\s*:?\s*([0-9A-Za-z]{10,30})\b/i.exec(allPagesText);
+      if (m) {
+        record.SEP = m[1].toUpperCase();
+        record._sep_source = 'pdf_scan';
+        console.log('[Pipeline] Fallback regex mengisi SEP dari teks dokumen (AI mengembalikan kosong).');
+      }
     }
   }
   if (!record.NOKARTU) {
@@ -74,11 +87,16 @@ function applyDeterministicFallback(record, allPagesText, jenisKlaim) {
   // dicek manual verifikator (bukan ditebak jadi kode acak).
   if (record.DISCHARGE_STATUS && !/^[1-5]$/.test(String(record.DISCHARGE_STATUS).trim())) {
     const raw = String(record.DISCHARGE_STATUS).trim().toLowerCase();
+    // Kode resmi vClaim (RV-08, cuma 1-5): 1=pulang atas persetujuan dokter,
+    // 2=dirujuk, 3=APS, 4=meninggal, 5=lainnya. "Lari"/kabur dari RS TIDAK
+    // punya kode sendiri di vClaim — masuk kategori 5 (lainnya), BUKAN kode 6
+    // yang tidak dikenal RV-08.
     const DISCHARGE_STATUS_MAP = [
-      { code: '4', re: /meninggal/ },
+      { code: '4', re: /meninggal|mati/ },
       { code: '3', re: /\baps\b|pulang paksa|menolak/ },
-      { code: '2', re: /rujuk/ },
-      { code: '1', re: /pulang|rawat jalan|kontrol|sembuh|membaik/ },
+      { code: '5', re: /\blari\b|kabur/ },
+      { code: '2', re: /rujuk|pindah/ },
+      { code: '1', re: /pulang|rawat jalan|kontrol|sembuh|membaik|selesai/ },
     ];
     const match = DISCHARGE_STATUS_MAP.find(({ re }) => re.test(raw));
     if (match) {
@@ -128,7 +146,7 @@ const PESAN = {
 
 /**
  * @param {string|Buffer} filePath - path PDF atau Buffer
- * @param {{skipAI?: boolean, jenisKlaim?: string, allowedJenisKlaim?: string[]}} options
+ * @param {{skipAI?: boolean, jenisKlaim?: string, allowedJenisKlaim?: string[], originalName?: string}} options
  *   - jenisKlaim: kategori SUDAH PASTI (dipilih manual, mis. upload 1 file) —
  *     dipakai apa adanya, TIDAK ada deteksi otomatis.
  *   - allowedJenisKlaim: dipakai kalau kategori BELUM PASTI dan perlu
@@ -137,6 +155,9 @@ const PESAN = {
  *     batch ini". Hasil deteksi divalidasi terhadap daftar ini (lihat
  *     result.jenisKlaimDetection di bawah); kalau jenisKlaim juga diisi,
  *     jenisKlaim menang (allowedJenisKlaim diabaikan).
+ *   - originalName: nama file asli sebelum multer rename — dipakai fallback
+ *     SEP (lihat applyDeterministicFallback) karena di dataset RS ini nama
+ *     file adalah SEP-nya sendiri.
  * @returns {Promise<{success, record, classification, pesan, tokens, attempts, metadata, errors, jenisKlaimDetection}>}
  *          `pesan` = teks siap tampil ke pengguna (kosong bila sukses).
  *          `errors` = detail teknis untuk log, JANGAN ditampilkan ke pengguna.
@@ -144,7 +165,7 @@ const PESAN = {
  *          kalau `allowedJenisKlaim` dipakai (lihat detectAndResolveJenisKlaim).
  */
 async function extractFromPDF(filePath, options = {}) {
-  const { skipAI = false, jenisKlaim: fixedJenisKlaim, allowedJenisKlaim } = options;
+  const { skipAI = false, jenisKlaim: fixedJenisKlaim, allowedJenisKlaim, originalName } = options;
   const mulai = Date.now();
 
   const result = {
@@ -263,7 +284,7 @@ async function extractFromPDF(filePath, options = {}) {
     }
 
     const allPagesText = classification.pages.map(p => p.text_full).join('\n\n');
-    result.record = applyDeterministicFallback(extraction.record, allPagesText, jenisKlaim);
+    result.record = applyDeterministicFallback(extraction.record, allPagesText, jenisKlaim, originalName);
     result.success = true;
   } catch (error) {
     result.errors.push(error.message);

@@ -122,11 +122,33 @@ const FIELD_BEHAVIOR_BY_JENIS_KLAIM = [
     caveat: 'TIDAK diimplementasikan dengan sengaja — memaksa pakai sinyal yang tidak ada (mis. menebak arah dari urutan waktu kunjungan) melanggar prinsip "jangan menebak" yang dipakai di seluruh aplikasi ini, dan berisiko salah-flag klaim yang sebenarnya benar. Kalau mau RV-14 benar-benar jalan, butuh data eksternal (SIMRS mencatat rujukan internal secara eksplisit) — bukan sesuatu yang bisa digali dari dokumen PDF/SEP yang ada sekarang.',
   },
   {
-    field: 'RV-15 (PRB) / RV-16 (iterasi obat kronis) — bagian yang masih kurang',
-    note: 'POTENSI_PRB_SEP (di atas) kasih SEBAGIAN sinyal (flag BPJS), tapi rule RV-15 penuh & RV-16 masih butuh histori_obat_kronis_bulan_berturut (berapa bulan berturut-turut pasien ini kontrol untuk diagnosis kronis yang sama) dan urutan_iterasi (kunjungan iterasi ke berapa) — keduanya butuh riwayat MULTI-KUNJUNGAN lintas waktu, bukan cuma 1 dokumen.',
-    handledIn: ['ruleEngine.js (RV-15/16, di-skip aman kalau field kosong)'],
-    status: 'known-gap-needs-new-data-source',
-    caveat: 'Ini penyebab pending TERBESAR (~46% dari data pending RJ Juni 2026 gabungan RV-13/15/16). Solusi jangka panjang: SIMRS punya database kunjungan pasien per hari — bisa di-query riwayatnya. Jalur ingest dari SIMRS (bukan PDF) sudah ada (SimrsIngestionModal.tsx, api.ingestSimrsJson), tapi belum mengisi field episode ini. Di luar cakupan sesi ini (butuh lihat skema data SIMRS asli dulu).',
+    field: 'RV-15 (PRB) / RV-16 (iterasi obat kronis)',
+    note: 'Sekarang diisi otomatis oleh detectAndFlagPRB() di claimFiles.js — query lintas-record LANGSUNG ke claim_records (nokartu + hospital_code + kategori diagnosis PRB yang sama dari prbRules.js), BUKAN tabel replikasi terpisah (dipertimbangkan lalu ditolak — risiko data 2 tempat tidak sinkron). histori_obat_kronis_bulan_berturut = jumlah bulan KALENDER BERTURUT (dihitung mundur, putus kalau ada gap 1 bulan). urutan_iterasi (RV-16) = PROXY jumlah kunjungan kategori sama dalam bulan yang sama (dokumen tidak pernah mencantumkan nomor iterasi resep eksplisit) — pesan error RV-16 menyebut ini eksplisit sebagai estimasi.',
+    handledIn: ['prbRules.js (kategori ICD-10 PRB, sumber tunggal)', 'claimFiles.js (detectAndFlagPRB, POST /scan-episodes untuk backlog file lama)', 'ruleEngine.js (RV-15 syarat status_pasien dihapus — tidak pernah bisa diverifikasi dari dokumen)', 'database/init.js (tabel prb_exemption_list + kolom prb_exempt_reason)', 'routes/prbExempt.js (CRUD admin)', 'prb-exempt/page.tsx, results/[fileId]/page.tsx (badge EXEMPT), history/page.tsx (tombol Scan Ulang)'],
+    status: 'implemented',
+    caveat: 'Sama seperti RV-13: cuma mendeteksi pola dari record yang SUDAH pernah diupload ke sistem ini (bukan rekam medis SIMRS lengkap) — kalau kunjungan sebelumnya belum pernah diupload, tidak akan terdeteksi otomatis, perlu tombol "Scan Ulang Episode" di Riwayat Upload setelah backlog file lama selesai diupload. BELUM DIUJI ke database sungguhan (Postgres tidak jalan di mesin dev) — cuma lolos node --check + tinjauan logika manual & simulasi perhitungan bulan-berturut/proxy-iterasi.',
+    verifiedAgainstRealData: '2026-08-20 — dibangun dari feature brief user (BA Kesepakatan BPJS 1247/2024), direkonsiliasi dengan temuan verifikasi RV-13/RV-14 sebelumnya. Brief mengusulkan 4 tabel DB baru yang menduplikasi kolom yang sudah ada di claim_records — user setuju query langsung saja (1 tabel baru: prb_exemption_list, karena itu data manual admin tanpa padanan).',
+  },
+  {
+    field: 'SEP kosong dari AI ekstraksi',
+    note: 'Nama file di dataset RS ini SECARA HARFIAH adalah nomor SEP-nya sendiri (contoh: "0170R0110626V000012.pdf") — bukan tebakan, itu konvensi penamaan SIMRS saat export. Kalau AI mengembalikan SEP kosong, dicoba regex ke nama file DULU (lebih pasti, tidak tergantung kualitas scan), baru ke teks dokumen (fallback lama). Sumbernya disimpan di raw_data._sep_source ("filename"/"pdf_scan") dan ditandai badge kuning di UI supaya verifikator tetap cek ulang, bukan dipercaya buta.',
+    handledIn: ['pdfExtractionPipeline.js (applyDeterministicFallback, SEP_PATTERN)', 'claimFiles.js (originalName diteruskan ke extractFromPDF)', 'results/[fileId]/page.tsx (badge "SEP dari nama file/scan dokumen — harap verifikasi")'],
+    status: 'implemented',
+    verifiedAgainstRealData: '2026-08-20 — pola nama file dikonfirmasi dari seluruh dataset upload sesi-sesi sebelumnya (semua nama file folder data-claim-bulan-juni-dan-juli mengikuti pola SEP persis).',
+  },
+  {
+    field: 'RV-04 UMUR_TAHUN=0 lolos tidak konsisten',
+    note: 'Bukan soal exception diagnosis tertentu (dicek, tidak ada di kode) — akar masalahnya RV-04 di-skip TOTAL kalau BIRTH_DATE kosong/tidak valid, jadi UMUR_TAHUN=0 tanpa BIRTH_DATE lolos diam-diam sementara UMUR_TAHUN=0 DENGAN BIRTH_DATE valid (tapi beda dari calcAge) tetap error — makanya kelihatan tidak konsisten. Diperbaiki: BIRTH_DATE kosong + UMUR=0 sekarang WAJIB error (minta verifikator isi manual), KECUALI DIAGLIST mengandung kode neonatal P00-P99 (bayi baru lahir, umur 0 tahun valid secara klinis — satu-satunya sinyal objektif yang boleh jadi pengecualian, bukan tebakan).',
+    handledIn: ['ruleEngine.js (RV-04, isNeonatalDiagnosis)'],
+    status: 'implemented',
+    verifiedAgainstRealData: '2026-08-20 — disimulasikan manual: N18.5+umur=0 -> ERROR, P07.1+umur=0 -> VALID (sesuai 2 test case yang diminta user).',
+  },
+  {
+    field: 'AI note DISCHARGE_STATUS "kosong" padahal valid',
+    note: 'Dicek kode field_notes filter di aiReviewService.js (~baris 344-352): SUDAH benar, cuma menyimpan catatan untuk field yang benar-benar ada di validationErrors saat itu. Untuk upload BARU setelah fix DISCHARGE_STATUS_MAP (lihat entri lain), RV-08 tidak lagi error untuk nilai yang sudah ternormalisasi, jadi catatan "kosong" otomatis tidak muncul lagi. Gejala yang dilaporkan kemungkinan dari ai_review yang SUDAH TERSIMPAN di record lama (di-generate SEBELUM fix DISCHARGE_STATUS_MAP ada) — ai_review tidak di-regenerate otomatis oleh proses lain (Scan Ulang Episode cuma re-run rule engine, bukan AI review, supaya tidak boros biaya API tiap scan).',
+    handledIn: ['aiReviewService.js (tidak diubah — sudah benar)'],
+    status: 'by-design-not-a-bug',
+    caveat: 'Kalau masih terlihat di record LAMA setelah fix ini di-deploy, itu data stale (ai_review dari sebelum fix), bukan bug baru — solusinya upload ulang file itu atau (di luar cakupan sesi ini) bangun tombol "Re-generate AI Review" terpisah kalau memang dibutuhkan rutin.',
   },
 ];
 
