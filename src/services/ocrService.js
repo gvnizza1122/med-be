@@ -33,10 +33,73 @@ const OCR_CONFIG = {
   log_performance: true
 };
 
+// Worker pool tesseract.js — SEBELUMNYA setiap ocrSingleFile() memanggil
+// Tesseract.recognize() (API one-shot) yang bikin worker WASM baru dari nol
+// TIAP KALI dipanggil (spin-up engine + load bahasa eng+ind), padahal ini
+// dipanggil per HALAMAN scan, dikalikan sampai beberapa dokumen paralel saat
+// batch upload — pemborosan CPU/memori besar dan penyebab utama CPU meroket
+// (>1000%) serta proses jadi sangat lambat saat testing production (lihat
+// item 10). Solusi: buat sejumlah kecil worker PERSISTEN sekali (lazy-init),
+// pakai ulang terus lewat checkout/checkin sederhana. Ukuran pool disamakan
+// dengan maxParallel default di ocrBatch() (2) — tidak menambah beban baru,
+// cuma menghilangkan re-init yang tidak perlu.
+const POOL_SIZE = 2;
+let workerPoolPromise = null; // Promise<{worker, busy}[]>
+const waiters = [];
+
+async function getWorkerPool() {
+  if (!workerPoolPromise) {
+    workerPoolPromise = (async () => {
+      const { createWorker } = Tesseract;
+      const workers = [];
+      for (let i = 0; i < POOL_SIZE; i++) {
+        const worker = await createWorker(OCR_CONFIG.language);
+        workers.push({ worker, busy: false });
+      }
+      return workers;
+    })();
+  }
+  return workerPoolPromise;
+}
+
+async function checkoutWorker() {
+  const pool = await getWorkerPool();
+  const free = pool.find(w => !w.busy);
+  if (free) {
+    free.busy = true;
+    return free;
+  }
+  // Semua worker sedang dipakai — antre sampai salah satu dilepas (checkin).
+  return new Promise((resolve) => waiters.push(resolve));
+}
+
+function checkinWorker(entry) {
+  const nextWaiter = waiters.shift();
+  if (nextWaiter) {
+    // Langsung dioper ke yang antre, tetap busy (tidak perlu toggle false lalu true).
+    nextWaiter(entry);
+  } else {
+    entry.busy = false;
+  }
+}
+
+/** Terminate semua worker — dipanggil saat proses backend shutdown. */
+async function shutdownOcrPool() {
+  if (!workerPoolPromise) return;
+  const pool = await workerPoolPromise;
+  workerPoolPromise = null;
+  await Promise.all(pool.map(w => w.worker.terminate().catch(() => {})));
+}
+process.on('SIGTERM', () => { shutdownOcrPool(); });
+process.on('SIGINT', () => { shutdownOcrPool(); });
+
 /**
  * OCR a single PDF or image file
  * @param {string|Buffer} input - File path or Buffer
- * @param {string} language - Language code ('ind', 'eng+ind', etc.)
+ * @param {string} language - Language code ('ind', 'eng+ind', etc.) — diabaikan
+ *   kalau beda dari OCR_CONFIG.language karena worker pool sudah di-load
+ *   dengan bahasa tetap saat startup; parameter dipertahankan demi kompatibilitas
+ *   signature lama.
  * @returns {Promise<OCRResult>}
  */
 async function ocrSingleFile(input, language = OCR_CONFIG.language) {
@@ -45,9 +108,10 @@ async function ocrSingleFile(input, language = OCR_CONFIG.language) {
   }
 
   const startTime = Date.now();
+  const entry = await checkoutWorker();
 
   try {
-    const result = await Tesseract.recognize(input, language);
+    const result = await entry.worker.recognize(input);
 
     const duration = Date.now() - startTime;
 
@@ -70,6 +134,8 @@ async function ocrSingleFile(input, language = OCR_CONFIG.language) {
       error: err.message,
       duration_ms: duration
     };
+  } finally {
+    checkinWorker(entry);
   }
 }
 
@@ -278,5 +344,6 @@ module.exports = {
   ocrWithRetry,
   ocrBatch,
   isAvailable,
+  shutdownOcrPool,
   OCR_CONFIG
 };

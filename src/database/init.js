@@ -435,6 +435,14 @@ async function initializeSchema() {
     await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_claim_records_nokartu ON claim_records(nokartu)`);
     await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_rv20_confirmations_record ON rv20_confirmations(record_id)`);
 
+    // Item 10 (optimasi performa) — kolom-kolom berikut dipakai search/filter
+    // di fitur search Riwayat Upload (item 8) dan Pending BPJS (item 9), belum
+    // punya index sebelumnya, jadi jadi full-scan begitu datanya banyak.
+    await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_claim_records_nama_pasien ON claim_records(nama_pasien)`);
+    await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_bpjs_pending_file_status ON bpjs_pending_responses(pending_file_id, status)`);
+    await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_bpjs_pending_sep ON bpjs_pending_responses(sep)`);
+    await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_bpjs_pending_nama_peserta ON bpjs_pending_responses(nama_peserta)`);
+
     await migrateSchema(dbHelper);
   } catch (err) {
     console.error('Failed to initialize database schema:', err);
