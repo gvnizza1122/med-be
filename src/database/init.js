@@ -639,6 +639,25 @@ async function migrateSchema(db) {
     } catch (e) {
       console.error('[migration] Gagal memastikan rule RV-20 ada:', e.message);
     }
+
+    // One-time backfill: baris Pending BPJS yang tadinya "belum ditemukan"
+    // (diimpor sebelum klaim PDF yang cocok sempat diupload) tapi klaimnya
+    // SEKARANG sudah ada di claim_records — link sekarang juga, jangan
+    // tunggu sampai file itu diupload ulang. Sinkronisasi rutin untuk upload
+    // baru ke depannya ada di services/bpjsPendingLink.js.
+    try {
+      const linked = await db.query(`
+        UPDATE bpjs_pending_responses bpr
+        SET claim_record_id = cr.id
+        FROM claim_records cr
+        WHERE bpr.claim_record_id IS NULL AND bpr.sep = cr.sep
+      `);
+      if (linked.rowCount > 0) {
+        console.log(`[migration] Menautkan ${linked.rowCount} baris pending BPJS ke klaim yang sudah ada.`);
+      }
+    } catch (e) {
+      console.error('[migration] Gagal backfill claim_record_id pending BPJS:', e.message);
+    }
   } catch (err) {
     console.error('Failed to run schema migration:', err);
   }

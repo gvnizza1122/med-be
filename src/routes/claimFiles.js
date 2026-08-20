@@ -13,6 +13,7 @@ const { estimatePromptTokens, estimateCompletionTokens } = require('../services/
 const { generateAiReview } = require('../services/aiReviewService');
 const { getRelevantKnowledge, recordKnowledge, getRelevantBpjsExamples } = require('../services/errorKnowledgeService');
 const { matchPrbCategory } = require('../services/prbRules');
+const { linkPendingBpjsForSep } = require('../services/bpjsPendingLink');
 
 const router = express.Router();
 
@@ -1540,6 +1541,11 @@ async function processSinglePdfUpload(db, { filePath, originalName, jenisKlaim: 
       admissionDate: vclaimDateToISO(extractedData.ADMISSION_DATE),
       diagnosaList: extractedData.DIAGLIST,
     });
+
+    // Sinkronkan ke Pending BPJS — kalau ada baris pending yang SEP-nya sama
+    // tapi tadinya "belum ditemukan" (diimpor sebelum klaim ini diupload),
+    // otomatis ke-link sekarang. Lihat bpjsPendingLink.js.
+    await linkPendingBpjsForSep(db, extractedData.SEP, recordId);
 
     // Alur AI ekstraksi -> rule engine -> AI review: setelah record tersimpan
     // (dibutuhkan supaya ocr_results punya record_id valid untuk FK), kumpulkan
