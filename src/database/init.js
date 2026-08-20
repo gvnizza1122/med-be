@@ -616,6 +616,29 @@ async function migrateSchema(db) {
         console.error('[migration] Gagal backfill pending_file_id:', e.message);
       }
     }
+
+    // RV-20 (Kriteria Kegawatan IGD) ditambahkan ke seed.js belakangan, TAPI
+    // seed.js cuma jalan sekali saat database masih kosong — deployment yang
+    // sudah lama jalan (validation_rules sudah terisi RV-01..RV-17 dari seed
+    // lama) tidak pernah dapat baris RV-20 ini, jadi ruleEngine.js selalu skip
+    // RV-20 (`ruleMap['RV-20']?.is_active` selalu undefined/false) walau kode
+    // rule-nya sendiri sudah lengkap — checklist konfirmasi, Surat Klarifikasi,
+    // dst semuanya sudah dibangun tapi rule intinya tidak pernah benar-benar
+    // aktif. INSERT idempoten ini menutup celah itu untuk deployment lama.
+    try {
+      await db.query(`
+        INSERT INTO validation_rules (id, rule_code, rule_name, description, field_name, priority, error_message)
+        VALUES (
+          'RV-20', 'kegawatan_igd_kode', 'Kriteria Kegawatan IGD',
+          'Diagnosis IGD hanya kode nyeri generik tanpa kode kegawatan pendamping — BPJS sering menolak dengan alasan "tidak memenuhi kriteria gawat darurat".',
+          'diagnosa_list', 3,
+          'Diagnosis IGD ini hanya kode nyeri generik tanpa bukti kegawatan objektif. Pastikan TTV abnormal/pemeriksaan penunjang terdokumentasi sebelum submit.'
+        )
+        ON CONFLICT (id) DO NOTHING
+      `);
+    } catch (e) {
+      console.error('[migration] Gagal memastikan rule RV-20 ada:', e.message);
+    }
   } catch (err) {
     console.error('Failed to run schema migration:', err);
   }
