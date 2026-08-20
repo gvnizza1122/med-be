@@ -1642,6 +1642,12 @@ router.post('/upload-pdf-batch', authenticate, pdfUploadBatch.array('files', MAX
     // dari 3) mempercepat throughput batch besar; kalau kena rate-limit, file
     // itu retry sendiri (bukan gagal total batch).
     const results = await runWithConcurrencyLimit(req.files, 5, async (file) => {
+      // Sinyal "mulai diproses" per file — SEBELUMNYA tidak ada, jadi FE cuma
+      // bisa tahu status 'waiting' lalu langsung 'done'/'failed' (file-done),
+      // baris di UI tidak pernah sempat tampil "Memproses..." walau backend
+      // benar-benar sedang mengerjakannya (antrean concurrency 5 sudah ada,
+      // cuma progresnya tidak kelihatan). Lihat UploadJobContext.tsx di FE.
+      if (io) io.emit('pdf-batch:file-start', { batchId, fileName: file.originalname });
       const result = await processSinglePdfUpload(db, {
         filePath: file.path,
         originalName: file.originalname,
