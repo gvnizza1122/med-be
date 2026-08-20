@@ -150,4 +150,20 @@ function detectJenisKlaim(fullText) {
   return null;
 }
 
-module.exports = { classifyPdfPages, isClaimDataPage, detectJenisKlaim };
+// Penanda dokumen ini benar-benar punya halaman SEP/BPJS asli (bukan cuma
+// dokumen klinis internal RS yang tidak ada kaitan BPJS sama sekali) — dipakai
+// RV-01/RV-02 di ruleEngine.js buat bedakan "AI gagal ekstrak NOKARTU dari
+// dokumen BPJS asli" (tetap critical) vs "dokumen ini memang bukan klaim
+// BPJS" (bukan error). SENGAJA sempit (bukan pakai CLAIM_DATA_KEYWORDS/
+// EXTRA_KEYWORDS yang luas di atas) — keyword generik seperti "Diagnosa"/
+// "DPJP" bisa muncul di dokumen klinis non-BPJS juga, jadi tidak boleh jadi
+// bukti "ada halaman BPJS".
+const BPJS_PAGE_MARKERS = ['surat eligibilitas peserta', 'nomor sep', 'no. sep', 'bpjs kesehatan'];
+
+function hasBpjsPageSignal(fullText) {
+  if (!fullText) return false;
+  const lower = fullText.toLowerCase();
+  return BPJS_PAGE_MARKERS.some(kw => lower.includes(kw));
+}
+
+module.exports = { classifyPdfPages, isClaimDataPage, detectJenisKlaim, hasBpjsPageSignal };

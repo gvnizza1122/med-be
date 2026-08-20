@@ -408,7 +408,7 @@ router.post('/upload', authenticate, upload.single('file'), async (req, res) => 
 router.get('/', authenticate, async (req, res) => {
   try {
     const db = getDb();
-    const { page = 1, limit = 20, status, jenis_klaim, from_date, to_date } = req.query;
+    const { page = 1, limit = 20, status, jenis_klaim, from_date, to_date, search } = req.query;
     const offset = (parseInt(page) - 1) * parseInt(limit);
 
     let where = 'WHERE 1=1';
@@ -436,11 +436,24 @@ router.get('/', authenticate, async (req, res) => {
       params.push(to_date + 'T23:59:59');
     }
 
+    // search: cocokkan nama pasien atau SEP dari record pertama file ini
+    // (1 file PDF = 1 record, lihat subquery sep/nama_pasien di bawah).
+    if (search) {
+      where += ` AND cf.id IN (
+        SELECT file_id FROM claim_records
+        WHERE nama_pasien LIKE ? OR sep LIKE ?
+      )`;
+      const like = `%${search}%`;
+      params.push(like, like);
+    }
+
     const totalResult = await db.prepare(`SELECT COUNT(*) as count FROM claim_files cf ${where}`).get(...params);
     const total = Number(totalResult ? totalResult.count : 0);
 
     const filesRaw = await db.prepare(`
-      SELECT cf.*, u.full_name as uploaded_by_name
+      SELECT cf.*, u.full_name as uploaded_by_name,
+        (SELECT sep FROM claim_records WHERE file_id = cf.id ORDER BY row_number LIMIT 1) as sep,
+        (SELECT nama_pasien FROM claim_records WHERE file_id = cf.id ORDER BY row_number LIMIT 1) as nama_pasien
       FROM claim_files cf
       LEFT JOIN users u ON cf.uploaded_by = u.id
       ${where}
@@ -1417,6 +1430,11 @@ async function processSinglePdfUpload(db, { filePath, originalName, jenisKlaim: 
     // Convert vClaim format to database format for validation
     const dbRecord = vclaimToDbFormat(extractedData);
     dbRecord.jenis_klaim = jenisKlaim;
+    // has_bpjs_page bukan field vClaim resmi (tidak lewat MAPPING di
+    // vclaimToDbFormat) — dihitung terpisah di pdfExtractionPipeline.js dari
+    // teks mentah dokumen. Default true kalau tidak diset (dokumen lama/jalur
+    // non-PDF) supaya tidak melonggarkan validasi RV-01/RV-02 tanpa sengaja.
+    dbRecord.has_bpjs_page = result.record.has_bpjs_page !== false;
 
     // Run validation on extracted record
     const activeRules = await db.prepare('SELECT * FROM validation_rules WHERE is_active = 1').all();
@@ -1436,8 +1454,8 @@ async function processSinglePdfUpload(db, { filePath, originalName, jenisKlaim: 
           id, file_id, row_number, kode_rs, sep, nokartu, nama_pasien, mrn,
           birth_date, gender, kelas_rawat, admission_date, discharge_date,
           discharge_status, diagnosa_list, prosedur_list, dpjp_name,
-          tarif_rs, jenis_klaim, validation_status, error_count, raw_data, klinik_poli
-        ) VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          tarif_rs, jenis_klaim, validation_status, error_count, raw_data, klinik_poli, has_bpjs_page
+        ) VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
 
       await txInsertRecord.run(
@@ -1450,7 +1468,8 @@ async function processSinglePdfUpload(db, { filePath, originalName, jenisKlaim: 
         extractedData.DIAGLIST, extractedData.PROCLIST,
         extractedData.DPJP,
         /^\d+$/.test(extractedData.TARIF_RS) ? parseInt(extractedData.TARIF_RS) : null, jenisKlaim,
-        validationStatus, validationErrors.length, JSON.stringify(extractedData), extractedData.KLINIK_SEP || null
+        validationStatus, validationErrors.length, JSON.stringify(extractedData), extractedData.KLINIK_SEP || null,
+        dbRecord.has_bpjs_page
       );
 
       // Save validation errors if any
@@ -1875,7 +1894,7 @@ router.post('/:record_id/update-values', authenticate, async (req, res) => {
     const existing = await db.prepare(`
       SELECT id, file_id, raw_data, kode_rs, sep, nokartu, nama_pasien, mrn,
         birth_date, gender, kelas_rawat, admission_date, discharge_date,
-        discharge_status, diagnosa_list, prosedur_list, dpjp_name, tarif_rs
+        discharge_status, diagnosa_list, prosedur_list, dpjp_name, tarif_rs, has_bpjs_page
       FROM claim_records WHERE id = ?
     `).get(req.params.record_id);
 
@@ -1911,6 +1930,9 @@ router.post('/:record_id/update-values', authenticate, async (req, res) => {
 
     // Convert ke format database, lalu validasi ulang dengan rule engine
     const dbRecord = vclaimToDbFormat(mergedData);
+    // has_bpjs_page bukan field vClaim (tidak lewat MAPPING) — bawa nilai
+    // yang sudah tersimpan dari upload awal, edit form tidak mengubahnya.
+    dbRecord.has_bpjs_page = existing.has_bpjs_page !== false;
     const activeRules = await db.prepare('SELECT * FROM validation_rules WHERE is_active = 1').all();
     const validationErrors = validateRecord(dbRecord, activeRules);
     const validationStatus = determineStatus(validationErrors);

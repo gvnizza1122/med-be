@@ -63,7 +63,11 @@ function validateRecord(record, activeRules) {
           actual_value: sep
         });
       }
-    } else {
+    } else if (record.has_bpjs_page !== false) {
+      // has_bpjs_page === false: dokumen ini memang tidak punya halaman
+      // SEP/BPJS (terdeteksi dari isi PDF, lihat pdfPageClassifier.js) —
+      // SEP kosong di sini bukan berarti AI gagal ekstrak, tapi memang
+      // bukan klaim BPJS. Tidak dianggap error.
       errors.push({
         rule_id: 'RV-01',
         field_name: 'sep',
@@ -89,7 +93,9 @@ function validateRecord(record, activeRules) {
           actual_value: `${nokartu} (${nokartu.length} karakter)`
         });
       }
-    } else {
+    } else if (record.has_bpjs_page !== false) {
+      // Lihat catatan RV-01 di atas — sama, dokumen tanpa halaman BPJS
+      // tidak dianggap error kalau NOKARTU kosong.
       errors.push({
         rule_id: 'RV-02',
         field_name: 'nokartu',

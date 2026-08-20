@@ -20,6 +20,7 @@ const userRoutes = require('./routes/users');
 const bridgingRoutes = require('./routes/bridging');
 const hospitalSettingsRoutes = require('./routes/hospitalSettings');
 const prbExemptRoutes = require('./routes/prbExempt');
+const bpjsPendingRoutes = require('./routes/bpjsPending');
 
 const app = express();
 app.set('trust proxy', 1);
@@ -129,6 +130,14 @@ app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/bridging', bridgingRoutes);
 app.use('/api/v1/hospital-settings', hospitalSettingsRoutes);
 app.use('/api/v1/prb-exempt', prbExemptRoutes);
+// BUG LAMA yang ditemukan & diperbaiki di sesi ini: recordsRouter
+// (rv20-confirm, audit, batch-audit) diexport tapi TIDAK PERNAH di-mount di
+// entry point produksi (src/index.js) — cuma ada di src/server.js yang tidak
+// dipakai (package.json "start"/"dev" keduanya jalankan src/index.js).
+// Endpoint /api/v1/records/* jadi 404 di production. Ditambahkan di sini,
+// plus router baru untuk fitur Jawaban Pending BPJS (item 9).
+app.use('/api/v1/records', validationRuleRoutes.recordsRouter);
+app.use('/api/v1/records', bpjsPendingRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
@@ -185,6 +194,12 @@ server.listen(PORT, () => {
   console.log(`   Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`   CORS: ${process.env.CORS_ORIGIN || 'http://localhost:3000'}\n`);
 });
+// Default Node requestTimeout (~5 menit) lebih pendek dari waktu proses batch
+// besar (upload-pdf-batch: AI+OCR per file, 20 file bisa >5 menit total) —
+// naikkan supaya request tidak diputus server sebelum FE-nya sendiri timeout
+// (lib/api.ts uploadPdfBatch pakai timeout 15 menit).
+server.requestTimeout = 20 * 60 * 1000;
+server.headersTimeout = 20 * 60 * 1000 + 5000; // harus > requestTimeout (syarat Node)
 }).catch(err => {
   console.error('Failed to start server:', err);
   process.exit(1);

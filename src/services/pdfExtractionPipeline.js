@@ -7,7 +7,7 @@
  * Env: AI_PROVIDER_API_KEY (wajib), AI_PROVIDER_BASE_URL, AI_MODEL, AI_MAX_ATTEMPTS, AI_TIMEOUT_MS.
  */
 
-const { classifyPdfPages, detectJenisKlaim } = require('./pdfPageClassifier');
+const { classifyPdfPages, detectJenisKlaim, hasBpjsPageSignal } = require('./pdfPageClassifier');
 const { extractClaimData } = require('./pdfExtractionService');
 
 /**
@@ -285,6 +285,9 @@ async function extractFromPDF(filePath, options = {}) {
 
     const allPagesText = classification.pages.map(p => p.text_full).join('\n\n');
     result.record = applyDeterministicFallback(extraction.record, allPagesText, jenisKlaim, originalName);
+    // Dipakai RV-01/RV-02 (ruleEngine.js) buat bedakan "AI gagal ekstrak
+    // NOKARTU dari dokumen BPJS asli" vs "dokumen ini memang bukan klaim BPJS".
+    result.record.has_bpjs_page = hasBpjsPageSignal(allPagesText);
     result.success = true;
   } catch (error) {
     result.errors.push(error.message);

@@ -232,6 +232,35 @@ async function initializeSchema() {
         ai_suggestions TEXT,
         ai_review TEXT,
         raw_data TEXT,
+        has_bpjs_page BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      -- Jawaban Pending BPJS + draft klarifikasi AI (lihat routes/bpjsPending.js).
+      CREATE TABLE IF NOT EXISTS bpjs_pending_responses (
+        id TEXT PRIMARY KEY,
+        claim_record_id TEXT,
+        sep TEXT,
+        mrn TEXT,
+        tanggal_pending TEXT,
+        alasan_raw TEXT,
+        alasan_parsed TEXT,
+        draft_klarifikasi TEXT,
+        status TEXT DEFAULT 'draft',
+        outcome TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      -- "Memori" AI (RAG, bukan fine-tuning) — pasangan alasan pending + draft
+      -- yang berhasil diterima BPJS, diambil sebagai few-shot example saat
+      -- generate draft baru untuk kategori serupa.
+      CREATE TABLE IF NOT EXISTS ai_training_examples (
+        id TEXT PRIMARY KEY,
+        kategori_pending TEXT,
+        alasan_bpjs TEXT,
+        draft_berhasil TEXT,
+        poin_kunci TEXT,
+        outcome TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
 
@@ -436,7 +465,13 @@ async function migrateSchema(db) {
       // sama yang seharusnya digabung 1 episode klaim. Lihat
       // detectInternalEpisodes() di claimFiles.js.
       'klinik_poli': 'TEXT',
-      'prb_exempt_reason': 'TEXT'
+      'prb_exempt_reason': 'TEXT',
+      // Penanda dokumen ini punya halaman SEP/BPJS asli (bukan cuma dokumen
+      // klinis non-BPJS) — dipakai RV-01/RV-02 buat bedakan "AI gagal ekstrak
+      // NOKARTU dari dokumen BPJS asli" (tetap critical) vs "dokumennya
+      // memang bukan klaim BPJS" (bukan error). Default TRUE supaya record
+      // lama (sebelum kolom ini ada) tetap divalidasi ketat seperti biasa.
+      'has_bpjs_page': 'BOOLEAN DEFAULT TRUE'
     };
 
     for (const [col, type] of Object.entries(newCols)) {
