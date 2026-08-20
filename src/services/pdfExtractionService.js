@@ -74,6 +74,16 @@ ATURAN KETAT:
    halaman itu labelnya sering disingkat "No. SEP" (bukan "Nomor SEP") dan "No. Kartu"
    (bukan "Nomor Kartu"). Tetap SAMA PERSIS field SEP dan NOKARTU, cuma beda halaman sumber.
 ${kelasRawatRule}${tanggalRawatJalanRule}
+8c. DISCHARGE_STATUS wajib kode angka 1-5 (BUKAN kalimat), tapi dokumen aslinya sering cuma menulis
+    kata singkat di bagian "Kelanjutan"/"Rencana"/"Cara Keluar" (bukan kode). Petakan kata BAKU yang
+    JELAS artinya ke kodenya (ini MEMETAKAN istilah baku, BUKAN menebak dari narasi panjang):
+    "Pulang", "Rawat Jalan", "Kontrol", "Sembuh", "Membaik" -> "1" (pulang atas persetujuan dokter).
+    "Rujuk", "Dirujuk" -> "2". "APS", "Pulang Paksa", "Menolak" -> "3". "Meninggal" -> "4".
+    Kalau kata/frasanya TIDAK cocok jelas ke salah satu di atas (narasi panjang/ambigu), ikuti
+    aturan 6 (kosongkan), JANGAN menebak.
+8d. UMUR_TAHUN: kalau dokumen mencantumkan field "Umur" eksplisit (contoh: "Umur : 33 tahun"), salin
+    angkanya persis. Kalau field "Umur" tidak ada di teks, kosongkan saja (JANGAN menghitung sendiri
+    dari tanggal lahir — itu tugas sistem, bukan kamu).
 9. Isi HANYA field vClaim berikut: ${PDF_FIELDS.join(', ')}.
 10. DUA FIELD TAMBAHAN (bukan kolom vClaim resmi, dipakai internal RS buat cek pola pending
     BPJS — tetap WAJIB diisi kalau ada, ikuti aturan 6 kalau tidak ada di teks):

@@ -262,7 +262,7 @@ function validateRecord(record, activeRules) {
         field_name: 'discharge_status',
         severity: 'major',
         error_message: ruleMap['RV-08'].error_message || 'Status keluar wajib diisi.',
-        expected_value: '1, 2, 3, 4, atau 5',
+        expected_value: '1 (Pulang atas persetujuan dokter), 2 (Dirujuk), 3 (APS/pulang paksa), 4 (Meninggal), atau 5 (Lainnya)',
         actual_value: '(kosong)'
       });
     } else {
@@ -273,7 +273,7 @@ function validateRecord(record, activeRules) {
           field_name: 'discharge_status',
           severity: 'major',
           error_message: ruleMap['RV-08'].error_message || 'Status keluar hanya boleh 1 (Atas persetujuan dokter), 2 (Dirujuk), 3 (APS), 4 (Meninggal), atau 5 (Lainnya).',
-          expected_value: '1, 2, 3, 4, atau 5',
+          expected_value: '1 (Pulang atas persetujuan dokter), 2 (Dirujuk), 3 (APS/pulang paksa), 4 (Meninggal), atau 5 (Lainnya)',
           actual_value: String(status)
         });
       }

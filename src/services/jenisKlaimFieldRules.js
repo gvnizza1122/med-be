@@ -68,9 +68,17 @@ const FIELD_BEHAVIOR_BY_JENIS_KLAIM = [
   },
   {
     field: 'DISCHARGE_STATUS',
-    note: 'Sama untuk semua kategori — TAPI dokumen sering cuma tulis narasi ("Rencana rawat jalan") bukan kode 1-5 eksplisit. AI ekstraksi sengaja TIDAK menebak kode dari narasi (lihat aturan 6 "jangan menebak" di pdfExtractionService.js) — field kosong di kasus ini valid & disengaja, bukan bug.',
-    handledIn: ['ruleEngine.js (RV-08, sekadar validasi format 1-5)'],
-    status: 'by-design-not-a-bug',
+    note: 'Sama untuk semua kategori. Sebelumnya dianggap "by-design kosong" kalau dokumen cuma tulis kata baku ("Kelanjutan: Pulang") bukan kode 1-5 — ternyata itu SALAH: kata baku seperti "Pulang"/"Rujuk"/"Meninggal" itu bukan narasi ambigu yang butuh interpretasi, cuma butuh dipetakan ke kodenya (pola sama seperti KELAS_RAWAT dari "Kelas Hak"). Ditemukan lewat data produksi asli (0170R0110726V000008.pdf: dokumen tulis "Kelanjutan: Pulang", sistem malah error minta 1-5). Sekarang dipetakan di 2 lapis: AI diinstruksikan memetakan sendiri (aturan 8c), + fallback deterministik regex kalau AI tetap menyalin kata mentah. Narasi yang benar-benar ambigu/panjang tetap dikosongkan (tidak ditebak).',
+    handledIn: ['pdfExtractionService.js (aturan 8c)', 'pdfExtractionPipeline.js (applyDeterministicFallback: DISCHARGE_STATUS_MAP)', 'ruleEngine.js (RV-08, validasi format 1-5)', 'results/[fileId]/page.tsx (DISCHARGE_STATUS_LABELS, tampil "1 - Pulang atas persetujuan dokter" bukan angka polos)'],
+    status: 'implemented',
+    verifiedAgainstRealData: '2026-08-20 — ditemukan lewat upload batch data produksi asli Juni-Juli 2026.',
+  },
+  {
+    field: 'UMUR_TAHUN',
+    note: 'AI kadang mengembalikan 0 walau BIRTH_DATE terisi benar dan dokumen bahkan mencantumkan "Umur: 33 tahun" eksplisit di teks — ditemukan lewat data produksi asli (0170R0110726V000008.pdf). Sekarang ada fallback deterministik: kalau UMUR_TAHUN kosong/0 tapi BIRTH_DATE ada, dihitung dari BIRTH_DATE vs ADMISSION_DATE — rumus PERSIS SAMA dengan cross-check RV-04 di ruleEngine.js (bukan tebakan, murni aritmatika tanggal yang sistem sendiri sudah percaya sebagai kebenaran).',
+    handledIn: ['pdfExtractionService.js (aturan 8d, instruksi salin literal kalau ada)', 'pdfExtractionPipeline.js (applyDeterministicFallback: hitung dari BIRTH_DATE)', 'ruleEngine.js (RV-04, cross-check yang sama)'],
+    status: 'implemented',
+    verifiedAgainstRealData: '2026-08-20 — ditemukan lewat upload batch data produksi asli Juni-Juli 2026.',
   },
   {
     field: 'DIAGLIST tanpa kode ICD-10 (cuma teks diagnosis)',

@@ -65,7 +65,56 @@ function applyDeterministicFallback(record, allPagesText, jenisKlaim) {
       }
     }
   }
+
+  // DISCHARGE_STATUS wajib kode 1-5 (RV-08), tapi dokumen aslinya cuma menulis kata baku
+  // ("Kelanjutan: Pulang") bukan kode. AI diinstruksikan memetakan ini sendiri (aturan 8c
+  // di pdfExtractionService.js) — fallback ini jaring pengaman kalau AI tetap menyalin kata
+  // mentah. Cuma memetakan kata BAKU yang jelas artinya (bukan menebak dari narasi panjang);
+  // kalau tidak cocok satupun, dibiarkan apa adanya supaya RV-08 tetap menandainya untuk
+  // dicek manual verifikator (bukan ditebak jadi kode acak).
+  if (record.DISCHARGE_STATUS && !/^[1-5]$/.test(String(record.DISCHARGE_STATUS).trim())) {
+    const raw = String(record.DISCHARGE_STATUS).trim().toLowerCase();
+    const DISCHARGE_STATUS_MAP = [
+      { code: '4', re: /meninggal/ },
+      { code: '3', re: /\baps\b|pulang paksa|menolak/ },
+      { code: '2', re: /rujuk/ },
+      { code: '1', re: /pulang|rawat jalan|kontrol|sembuh|membaik/ },
+    ];
+    const match = DISCHARGE_STATUS_MAP.find(({ re }) => re.test(raw));
+    if (match) {
+      console.log(`[Pipeline] Fallback memetakan DISCHARGE_STATUS "${record.DISCHARGE_STATUS}" -> "${match.code}" (AI menyalin kata mentah, bukan kode).`);
+      record.DISCHARGE_STATUS = match.code;
+    }
+  }
+
+  // UMUR_TAHUN: kalau AI mengembalikan kosong/0 tapi BIRTH_DATE ada, hitung dari BIRTH_DATE
+  // vs ADMISSION_DATE (rumus SAMA PERSIS dengan cross-check RV-04 di ruleEngine.js — bukan
+  // tebakan, murni aritmatika tanggal). Tidak pernah menimpa nilai AI yang sudah masuk akal.
+  if ((!record.UMUR_TAHUN || record.UMUR_TAHUN === '0') && record.BIRTH_DATE) {
+    const refDateStr = record.ADMISSION_DATE || record.DISCHARGE_DATE;
+    const birth = parseDDMMYYYY(record.BIRTH_DATE);
+    const ref = parseDDMMYYYY(refDateStr);
+    if (birth && ref) {
+      let years = ref.getFullYear() - birth.getFullYear();
+      const monthDiff = ref.getMonth() - birth.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && ref.getDate() < birth.getDate())) years--;
+      if (years > 0) {
+        console.log(`[Pipeline] Fallback menghitung UMUR_TAHUN = ${years} dari BIRTH_DATE (AI mengembalikan kosong/0).`);
+        record.UMUR_TAHUN = String(years);
+      }
+    }
+  }
+
   return record;
+}
+
+/** Parse tanggal format DD/MM/YYYY (format wajib field tanggal vClaim) ke Date, atau null. */
+function parseDDMMYYYY(str) {
+  if (!str) return null;
+  const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(String(str).trim());
+  if (!m) return null;
+  const d = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
+  return isNaN(d) ? null : d;
 }
 
 // Pesan untuk pengguna akhir (perawat/verifikator) — tanpa istilah teknis.
