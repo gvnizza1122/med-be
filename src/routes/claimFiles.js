@@ -83,13 +83,19 @@ async function gatherEvidencePool(db, recordId, filePath) {
 
   // Kalau belum pernah di-OCR, coba jalankan sekarang (dibatasi waktu — kalau
   // lama, lanjut tanpa bukti OCR daripada bikin upload menggantung).
+  // 180 detik (naik dari 120 — item 10): worker pool OCR sudah di-reuse (lihat
+  // ocrService.js), jadi timeout di sini sekarang murni soal dokumen yang
+  // BENAR-BENAR berat (banyak halaman/gambar padat), bukan lagi soal cold-start
+  // worker. Kalau timeout tetap terlampaui, upload tetap lanjut tanpa bukti OCR
+  // (evidence pool kosong) — tidak fatal, cuma saran kode/verifikasi bukti dari
+  // OCR yang tidak muncul untuk record itu; data klaim inti tetap tersimpan benar.
   if (ocrResults.length === 0) {
     try {
       const { isAvailable, ocrPdfPages } = require('../services/ocrService');
       if (isAvailable()) {
         const ocrResult = await Promise.race([
           runDedupedOcr(db, recordId, filePath, 'auto-scan', ocrPdfPages),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('OCR timeout')), 120000)),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('OCR timeout')), 180000)),
         ]);
         if (ocrResult.success && ocrResult.pages?.length > 0) {
           ocrResults = await db.prepare(`
