@@ -248,6 +248,16 @@ async function initializeSchema() {
         draft_klarifikasi TEXT,
         status TEXT DEFAULT 'draft',
         outcome TEXT,
+        -- Kolom tambahan untuk rekap pending BPJS berformat XLSX (bukan
+        -- surat PDF per-klaim) — lihat routes/bpjsPending.js parsePendingSheet().
+        source TEXT DEFAULT 'pdf_upload',   -- 'pdf_upload' | 'xlsx_import'
+        jenis_klaim TEXT,                    -- 'RJ' | 'RI', dari nama sheet
+        nama_peserta TEXT,
+        nokartu TEXT,
+        kdinacbg TEXT,
+        by_pengajuan NUMERIC,
+        tgl_pulang TEXT,
+        jawaban_rs_manual TEXT,              -- kolom "JAWABAN RS" apa adanya dari file RS, kalau sudah diisi
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
 
@@ -521,6 +531,33 @@ async function migrateSchema(db) {
         try {
           await db.query(`ALTER TABLE claim_files ADD COLUMN jenis_klaim TEXT`);
         } catch (e) {}
+      }
+    }
+
+    // Migrate bpjs_pending_responses table (kolom tambahan untuk import XLSX)
+    const pendingRes = await db.query(`
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_name = 'bpjs_pending_responses'
+    `);
+    if (pendingRes.rows.length > 0) {
+      const pendingCols = pendingRes.rows.map(c => c.column_name.toLowerCase());
+      const pendingNewCols = {
+        source: `TEXT DEFAULT 'pdf_upload'`,
+        jenis_klaim: 'TEXT',
+        nama_peserta: 'TEXT',
+        nokartu: 'TEXT',
+        kdinacbg: 'TEXT',
+        by_pengajuan: 'NUMERIC',
+        tgl_pulang: 'TEXT',
+        jawaban_rs_manual: 'TEXT',
+      };
+      for (const [col, type] of Object.entries(pendingNewCols)) {
+        if (!pendingCols.includes(col)) {
+          try {
+            await db.query(`ALTER TABLE bpjs_pending_responses ADD COLUMN ${col} ${type}`);
+          } catch (e) {}
+        }
       }
     }
   } catch (err) {

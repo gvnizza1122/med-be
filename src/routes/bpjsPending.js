@@ -12,6 +12,7 @@
  */
 const express = require('express');
 const multer = require('multer');
+const XLSX = require('xlsx');
 const { v4: uuidv4 } = require('uuid');
 const { getDb } = require('../database/init');
 const { authenticate } = require('../middleware/auth');
@@ -26,6 +27,77 @@ const upload = multer({
     else cb(new Error('Hanya file PDF yang diperbolehkan.'));
   }
 });
+
+// Rekap pending BPJS dari RS ternyata berformat XLSX tabular (bukan surat PDF
+// per-klaim) — 2 sheet ("Pending RJ"/"Pending RI"), header baris ke-4 berisi
+// NOSEP/TGLSEP/TGLPLG/NOKARTU/MR/NAMAPESERTA/KDINACBG/BYPENGAJUAN/
+// ALASANPENDING/JAWABAN RS. Satu baris = satu klaim pending. Jauh lebih andal
+// diparse langsung (kolom eksplisit) daripada lewat AI ekstraksi teks PDF.
+const xlsxUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 15 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const ok = /\.(xlsx|xls)$/i.test(file.originalname) ||
+      /spreadsheetml|ms-excel/.test(file.mimetype);
+    if (ok) cb(null, true);
+    else cb(new Error('Hanya file Excel (.xlsx/.xls) yang diperbolehkan.'));
+  }
+});
+
+const REQUIRED_HEADER = 'NOSEP';
+
+function excelDateToISO(v) {
+  if (v === '' || v === null || v === undefined) return null;
+  if (typeof v === 'number') {
+    // Serial date Excel (basis 1899-12-30)
+    const ms = Math.round((v - 25569) * 86400 * 1000);
+    const d = new Date(ms);
+    if (isNaN(d.getTime())) return null;
+    return d.toISOString().slice(0, 10);
+  }
+  const s = String(v).trim();
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+  return s || null;
+}
+
+/**
+ * Cari baris header (mengandung "NOSEP") lalu map baris-baris di bawahnya
+ * jadi objek by kolom. Baris tanpa NOSEP (baris judul/kosong) dilewati.
+ */
+function parsePendingSheet(sheet, sheetLabel) {
+  const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+  const headerIdx = rows.findIndex(r => r.some(c => String(c).trim().toUpperCase() === REQUIRED_HEADER));
+  if (headerIdx === -1) return [];
+  const headers = rows[headerIdx].map(h => String(h).trim().toUpperCase());
+  const colIdx = (name) => headers.indexOf(name);
+
+  const iSep = colIdx('NOSEP'), iTglSep = colIdx('TGLSEP'), iTglPlg = colIdx('TGLPLG'),
+    iNokartu = colIdx('NOKARTU'), iMr = colIdx('MR'), iNama = colIdx('NAMAPESERTA'),
+    iInacbg = colIdx('KDINACBG'), iBiaya = colIdx('BYPENGAJUAN'), iAlasan = colIdx('ALASANPENDING'),
+    iJawaban = colIdx('JAWABAN RS');
+
+  const out = [];
+  for (let i = headerIdx + 1; i < rows.length; i++) {
+    const row = rows[i];
+    const sep = String(row[iSep] ?? '').trim();
+    if (!sep) continue;
+    out.push({
+      sheet: sheetLabel,
+      sep,
+      tgl_sep: excelDateToISO(row[iTglSep]),
+      tgl_pulang: excelDateToISO(row[iTglPlg]),
+      nokartu: iNokartu >= 0 ? String(row[iNokartu] ?? '').trim() : '',
+      mr: iMr >= 0 ? String(row[iMr] ?? '').trim() : '',
+      nama_peserta: iNama >= 0 ? String(row[iNama] ?? '').trim() : '',
+      kdinacbg: iInacbg >= 0 ? String(row[iInacbg] ?? '').trim() : '',
+      by_pengajuan: iBiaya >= 0 ? row[iBiaya] : null,
+      alasan_pending: iAlasan >= 0 ? String(row[iAlasan] ?? '').trim() : '',
+      jawaban_rs: iJawaban >= 0 ? String(row[iJawaban] ?? '').trim() : '',
+    });
+  }
+  return out;
+}
 
 const SYSTEM_PROMPT = `Kamu asisten koder klaim BPJS rumah sakit. Kamu diberi teks surat jawaban
 pending dari BPJS untuk satu klaim, data klaim asli (hasil ekstraksi sistem), dan (kalau ada)
@@ -248,6 +320,177 @@ router.patch('/pending/:id/status', authenticate, async (req, res) => {
     res.json({ ...updated, alasan_parsed: updated.alasan_parsed ? JSON.parse(updated.alasan_parsed) : null });
   } catch (err) {
     console.error('[bpjsPending] status update error:', err);
+    res.status(500).json({ error: 'Terjadi gangguan pada sistem. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' });
+  }
+});
+
+/**
+ * POST /api/v1/records/pending-import-xlsx
+ * Import massal rekap pending BPJS dari file Excel RS (sheet "Pending RJ" /
+ * "Pending RI", format lihat parsePendingSheet()). Tidak butuh AI untuk
+ * ekstraksi — datanya sudah tabular. AI draft dibuat belakangan per-baris
+ * lewat POST /pending/:id/generate-draft (biar tidak menembak AI utk
+ * puluhan baris sekaligus tanpa kontrol koder).
+ * Cocokkan NOSEP ke claim_records; baris yang SEP-nya sudah pernah diimpor
+ * (sep+alasan_pending sama) dilewati supaya re-upload file yang sama aman.
+ */
+router.post('/pending-import-xlsx', authenticate, xlsxUpload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'File Excel wajib diunggah.' });
+    const db = getDb();
+
+    let wb;
+    try {
+      wb = XLSX.read(req.file.buffer, { type: 'buffer', cellDates: false });
+    } catch (e) {
+      return res.status(400).json({ error: 'File Excel tidak bisa dibaca. Pastikan format .xlsx/.xls valid.' });
+    }
+
+    const sheetLabelOf = (name) => /rawat\s*inap|^ri$|pending\s*ri/i.test(name) ? 'RI'
+      : /rawat\s*jalan|^rj$|pending\s*rj/i.test(name) ? 'RJ' : name;
+
+    let parsedRows = [];
+    for (const sheetName of wb.SheetNames) {
+      const rows = parsePendingSheet(wb.Sheets[sheetName], sheetLabelOf(sheetName));
+      parsedRows = parsedRows.concat(rows);
+    }
+    if (!parsedRows.length) {
+      return res.status(400).json({ error: 'Tidak ada baris data ditemukan (kolom NOSEP tidak terdeteksi di sheet manapun).' });
+    }
+
+    let imported = 0, skippedDuplicate = 0, matchedClaim = 0;
+    for (const row of parsedRows) {
+      const dup = await db.prepare(`
+        SELECT id FROM bpjs_pending_responses WHERE sep = ? AND alasan_raw = ? AND source = 'xlsx_import'
+      `).get(row.sep, row.alasan_pending);
+      if (dup) { skippedDuplicate++; continue; }
+
+      const claimRecord = await db.prepare(`
+        SELECT id FROM claim_records WHERE sep = ? ORDER BY row_number LIMIT 1
+      `).get(row.sep);
+      if (claimRecord) matchedClaim++;
+
+      await db.prepare(`
+        INSERT INTO bpjs_pending_responses
+          (id, claim_record_id, sep, mrn, nokartu, nama_peserta, kdinacbg, by_pengajuan,
+           tanggal_pending, tgl_pulang, alasan_raw, jawaban_rs_manual, status, source, jenis_klaim)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', 'xlsx_import', ?)
+      `).run(
+        uuidv4(), claimRecord?.id || null, row.sep, row.mr || null, row.nokartu || null,
+        row.nama_peserta || null, row.kdinacbg || null, row.by_pengajuan,
+        row.tgl_sep, row.tgl_pulang, row.alasan_pending, row.jawaban_rs || null, row.sheet
+      );
+      imported++;
+    }
+
+    res.json({ total_rows: parsedRows.length, imported, skipped_duplicate: skippedDuplicate, matched_claim: matchedClaim });
+  } catch (err) {
+    console.error('[bpjsPending] xlsx import error:', err);
+    res.status(500).json({ error: 'Terjadi gangguan pada sistem. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' });
+  }
+});
+
+/**
+ * GET /api/v1/records/pending
+ * List semua entri pending BPJS (dari upload PDF maupun import XLSX), lintas
+ * klaim — dipakai halaman rekap pending, bukan cuma modal per-record.
+ * Query: status, outcome, jenis_klaim, search (cocok sep/nama_peserta)
+ */
+router.get('/pending', authenticate, async (req, res) => {
+  try {
+    const db = getDb();
+    const { status, outcome, jenis_klaim, search, page = 1, limit = 50 } = req.query;
+    const offset = (parseInt(page) - 1) * parseInt(limit);
+    let where = 'WHERE 1=1';
+    const params = [];
+    if (status) { where += ' AND status = ?'; params.push(status); }
+    if (outcome) { where += ' AND outcome = ?'; params.push(outcome); }
+    if (jenis_klaim) { where += ' AND jenis_klaim = ?'; params.push(jenis_klaim); }
+    if (search) {
+      where += ' AND (sep LIKE ? OR nama_peserta LIKE ?)';
+      const like = `%${search}%`;
+      params.push(like, like);
+    }
+    const totalResult = await db.prepare(`SELECT COUNT(*) as count FROM bpjs_pending_responses ${where}`).get(...params);
+    const rows = await db.prepare(`
+      SELECT * FROM bpjs_pending_responses ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?
+    `).all(...params, parseInt(limit), offset);
+    res.json({
+      total: Number(totalResult?.count || 0),
+      items: rows.map(r => ({ ...r, alasan_parsed: r.alasan_parsed ? JSON.parse(r.alasan_parsed) : null })),
+    });
+  } catch (err) {
+    console.error('[bpjsPending] list-all error:', err);
+    res.status(500).json({ error: 'Terjadi gangguan pada sistem. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' });
+  }
+});
+
+/**
+ * POST /api/v1/records/pending/:id/generate-draft
+ * Generate/regenerate draft klarifikasi AI untuk 1 entri pending yang sudah
+ * ada (dari import XLSX ataupun upload PDF) — dipanggil manual per-baris
+ * oleh koder, bukan otomatis saat import massal.
+ */
+router.post('/pending/:id/generate-draft', authenticate, async (req, res) => {
+  try {
+    const db = getDb();
+    const existing = await db.prepare('SELECT * FROM bpjs_pending_responses WHERE id = ?').get(req.params.id);
+    if (!existing) return res.status(404).json({ error: 'Data pending tidak ditemukan.' });
+    if (!existing.alasan_raw) return res.status(400).json({ error: 'Tidak ada teks alasan pending untuk entri ini.' });
+
+    let claimRecord = null;
+    if (existing.claim_record_id) {
+      claimRecord = await db.prepare(`
+        SELECT id, sep, nama_pasien, mrn, admission_date, diagnosa_list, prosedur_list, dpjp_name
+        FROM claim_records WHERE id = ?
+      `).get(existing.claim_record_id);
+    }
+    if (!claimRecord) {
+      // Belum ada klaim yang cocok di sistem (mis. NOSEP belum pernah diupload
+      // via Extract PDF) — tetap generate draft, hanya field admin dari data
+      // rekap Excel (nama_peserta/nokartu/mrn/kdinacbg), bukan dikarang.
+      claimRecord = {
+        sep: existing.sep, nama_pasien: existing.nama_peserta, mrn: existing.mrn || existing.nokartu,
+        admission_date: existing.tanggal_pending, diagnosa_list: existing.kdinacbg ? `(INA-CBG: ${existing.kdinacbg})` : '',
+        prosedur_list: '', dpjp_name: '',
+      };
+    }
+
+    const priorExamples = await db.prepare(`
+      SELECT kategori_pending, alasan_bpjs, draft_berhasil, poin_kunci
+      FROM ai_training_examples WHERE outcome = 'approved'
+      ORDER BY created_at DESC LIMIT 3
+    `).all();
+
+    const prompt = buildPrompt({ alasanRaw: existing.alasan_raw, claimRecord, examples: priorExamples });
+    let aiResult = null, aiError = null;
+    try {
+      aiResult = await callAi(prompt);
+    } catch (err) {
+      aiError = err.message;
+      console.error('[bpjsPending] generate-draft AI error:', err.message);
+    }
+    if (!aiResult) {
+      return res.status(aiError ? 502 : 400).json({
+        error: aiError || 'AI_PROVIDER_API_KEY belum disetel di server — draft harus diisi manual.',
+      });
+    }
+
+    const alasanParsed = {
+      kategori: aiResult.kategori_pending || null,
+      field: aiResult.field_dipermasalahkan || [],
+      detail: aiResult.alasan_ringkas || null,
+      checklist_dokumen_pendukung: aiResult.checklist_dokumen_pendukung || [],
+    };
+
+    await db.prepare(`
+      UPDATE bpjs_pending_responses SET alasan_parsed = ?, draft_klarifikasi = ? WHERE id = ?
+    `).run(JSON.stringify(alasanParsed), aiResult.draft_klarifikasi || null, req.params.id);
+
+    const updated = await db.prepare('SELECT * FROM bpjs_pending_responses WHERE id = ?').get(req.params.id);
+    res.json({ ...updated, alasan_parsed: updated.alasan_parsed ? JSON.parse(updated.alasan_parsed) : null });
+  } catch (err) {
+    console.error('[bpjsPending] generate-draft error:', err);
     res.status(500).json({ error: 'Terjadi gangguan pada sistem. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' });
   }
 });
