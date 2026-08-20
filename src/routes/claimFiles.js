@@ -11,7 +11,7 @@ const { generateExcel } = require('../services/exportService');
 const { logAudit } = require('../services/auditService');
 const { estimatePromptTokens, estimateCompletionTokens } = require('../services/aiValidationService');
 const { generateAiReview } = require('../services/aiReviewService');
-const { getRelevantKnowledge, recordKnowledge } = require('../services/errorKnowledgeService');
+const { getRelevantKnowledge, recordKnowledge, getRelevantBpjsExamples } = require('../services/errorKnowledgeService');
 const { matchPrbCategory } = require('../services/prbRules');
 
 const router = express.Router();
@@ -318,7 +318,8 @@ router.post('/upload', authenticate, upload.single('file'), async (req, res) => 
         try {
           const recordErrors = errorsByRecordId[record.id] || [];
           const knowledgeEntries = await getRelevantKnowledge(db, recordErrors.map(e => e.rule_id));
-          const aiReview = await generateAiReview(record, recordErrors, [], knowledgeEntries);
+          const bpjsExamples = await getRelevantBpjsExamples(db);
+          const aiReview = await generateAiReview(record, recordErrors, [], knowledgeEntries, bpjsExamples);
           if (aiReview) {
             totalAiTokens += aiReview.tokens_used || 0;
             await db.prepare('UPDATE claim_records SET ai_review = ? WHERE id = ?')
@@ -834,7 +835,8 @@ router.post('/:id/ai-audit', authenticate, async (req, res) => {
         }
         const recordErrors = errorsByRecordId[record.id] || [];
         const knowledgeEntries = await getRelevantKnowledge(db, recordErrors.map(e => e.rule_id));
-        const aiReview = await generateAiReview(record, recordErrors, evidencePool, knowledgeEntries);
+        const bpjsExamples = await getRelevantBpjsExamples(db);
+        const aiReview = await generateAiReview(record, recordErrors, evidencePool, knowledgeEntries, bpjsExamples);
         if (aiReview) {
           await db.prepare('UPDATE claim_records SET ai_review = ? WHERE id = ?')
             .run(JSON.stringify(aiReview), record.id);
@@ -1517,7 +1519,8 @@ async function processSinglePdfUpload(db, { filePath, originalName, jenisKlaim: 
     try {
       const evidencePool = await gatherEvidencePool(db, recordId, resolvedFilePath);
       const knowledgeEntries = await getRelevantKnowledge(db, validationErrors.map(e => e.rule_id));
-      aiReview = await generateAiReview(extractedData, validationErrors, evidencePool, knowledgeEntries);
+      const bpjsExamples = await getRelevantBpjsExamples(db);
+      aiReview = await generateAiReview(extractedData, validationErrors, evidencePool, knowledgeEntries, bpjsExamples);
       if (aiReview) {
         await db.prepare('UPDATE claim_records SET ai_review = ? WHERE id = ?')
           .run(JSON.stringify(aiReview), recordId);

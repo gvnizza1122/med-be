@@ -99,31 +99,26 @@ function parsePendingSheet(sheet, sheetLabel) {
   return out;
 }
 
-const SYSTEM_PROMPT = `Kamu asisten koder klaim BPJS rumah sakit. Kamu diberi teks surat jawaban
-pending dari BPJS untuk satu klaim, data klaim asli (hasil ekstraksi sistem), dan (kalau ada)
-contoh klarifikasi yang PERNAH berhasil diterima BPJS untuk kasus sejenis.
+const SYSTEM_PROMPT = `Kamu asisten koder klaim BPJS rumah sakit. Kamu diberi ALASAN_PENDING (kenapa
+klaim ditahan BPJS), data klaim asli (hasil ekstraksi sistem), dan (kalau ada) contoh jawaban yang
+PERNAH berhasil diterima BPJS untuk kasus sejenis.
 
 TUGAS — kembalikan JSON dengan struktur persis:
 {
-  "sep": "nomor SEP yang disebut di surat pending, atau null kalau tidak ada",
-  "tanggal_pending": "tanggal surat dalam format YYYY-MM-DD, atau null",
   "kategori_pending": "kategori singkat (mis. kode_tindakan, kegawatan, prb, koding_diagnosis, kelengkapan_dokumen, lainnya)",
-  "alasan_ringkas": "ringkasan 1-2 kalimat alasan pending, dalam Bahasa Indonesia",
-  "field_dipermasalahkan": ["daftar field/aspek klaim yang dipermasalahkan BPJS, mis. DIAGLIST, PROCLIST, kelengkapan resume medis"],
-  "draft_klarifikasi": "draft surat klarifikasi lengkap siap edit, dalam Bahasa Indonesia formal",
-  "checklist_dokumen_pendukung": ["daftar dokumen pendukung yang sebaiknya dilampirkan"]
+  "alasan_ringkas": "ringkasan 1 kalimat alasan pending, dalam Bahasa Indonesia",
+  "jawaban": "jawaban/klarifikasi LANGSUNG ke pertanyaan BPJS, 2-5 kalimat, Bahasa Indonesia, TANPA format surat resmi (tanpa kop surat/salam pembuka/tanda tangan) — cukup jawaban intinya saja seperti akan diketik langsung ke kolom jawaban BPJS"
 }
 
 ATURAN KERAS:
-- draft_klarifikasi HANYA boleh memakai data yang benar-benar ada di ALASAN_PENDING atau DATA_KLAIM_ASLI
-  yang diberikan. JANGAN mengarang kondisi klinis, hasil pemeriksaan, atau argumen medis yang tidak ada
+- jawaban HANYA boleh memakai data yang benar-benar ada di ALASAN_PENDING atau DATA_KLAIM_ASLI yang
+  diberikan. JANGAN mengarang kondisi klinis, hasil pemeriksaan, atau argumen medis yang tidak ada
   dasarnya di data yang diberikan.
 - Kalau argumen klinis dibutuhkan tapi datanya tidak tersedia di DATA_KLAIM_ASLI, tulis placeholder
-  "[isi ... — jelaskan kondisi klinis pasien terkait <topik>]" di bagian itu, JANGAN ditebak.
-- Kalau ada CONTOH_BERHASIL, pelajari POLA argumentasi/strukturnya (bukan disalin mentah) untuk kasus
+  singkat "[isi: <topik yang perlu dikonfirmasi>]" di bagian itu, JANGAN ditebak.
+- Kalau ada CONTOH_BERHASIL, pelajari POLA argumen yang berhasil (bukan disalin mentah) untuk kasus
   yang benar-benar sejenis — tetap sesuaikan isi dengan data klaim ini.
-- Field administratif (SEP, nama pasien, MRN, tanggal, diagnosis, DPJP) di draft WAJIB diisi otomatis
-  dari DATA_KLAIM_ASLI kalau tersedia, jangan pakai placeholder untuk field yang datanya sudah ada.`;
+- Langsung ke inti jawaban, jangan bertele-tele atau mengulang pertanyaan BPJS.`;
 
 function buildPrompt({ alasanRaw, claimRecord, examples }) {
   const claimSummary = claimRecord ? `
@@ -232,9 +227,7 @@ router.post('/:recordId/pending-upload', authenticate, upload.single('file'), as
     const id = uuidv4();
     const alasanParsed = aiResult ? {
       kategori: aiResult.kategori_pending || null,
-      field: aiResult.field_dipermasalahkan || [],
       detail: aiResult.alasan_ringkas || null,
-      checklist_dokumen_pendukung: aiResult.checklist_dokumen_pendukung || [],
     } : null;
 
     await db.prepare(`
@@ -243,12 +236,12 @@ router.post('/:recordId/pending-upload', authenticate, upload.single('file'), as
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'draft')
     `).run(
       id, req.params.recordId,
-      aiResult?.sep || claimRecord.sep || null,
+      claimRecord.sep || null,
       claimRecord.mrn || null,
-      aiResult?.tanggal_pending || null,
+      null,
       alasanRaw,
       alasanParsed ? JSON.stringify(alasanParsed) : null,
-      aiResult?.draft_klarifikasi || null
+      aiResult?.jawaban || null
     );
 
     const saved = await db.prepare('SELECT * FROM bpjs_pending_responses WHERE id = ?').get(id);
@@ -384,12 +377,20 @@ router.post('/pending-import-xlsx', authenticate, xlsxUpload.single('file'), asy
       imported++;
     }
 
-    await db.prepare(`
-      INSERT INTO bpjs_pending_files (id, file_name, total_rows, imported_rows, skipped_duplicate, matched_claim, uploaded_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(fileId, req.file.originalname, parsedRows.length, imported, skippedDuplicate, matchedClaim, req.user?.id || null);
+    // Kalau semua baris ternyata duplikat (file yang sama diupload ulang),
+    // jangan buat entri "file" baru yang isinya kosong — cuma bikin bingung
+    // di daftar file. Tetap kabari user lewat respons (imported: 0).
+    if (imported > 0) {
+      await db.prepare(`
+        INSERT INTO bpjs_pending_files (id, file_name, total_rows, imported_rows, skipped_duplicate, matched_claim, uploaded_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(fileId, req.file.originalname, parsedRows.length, imported, skippedDuplicate, matchedClaim, req.user?.id || null);
+    }
 
-    res.json({ file_id: fileId, total_rows: parsedRows.length, imported, skipped_duplicate: skippedDuplicate, matched_claim: matchedClaim });
+    res.json({
+      file_id: imported > 0 ? fileId : null,
+      total_rows: parsedRows.length, imported, skipped_duplicate: skippedDuplicate, matched_claim: matchedClaim,
+    });
   } catch (err) {
     console.error('[bpjsPending] xlsx import error:', err);
     res.status(500).json({ error: 'Terjadi gangguan pada sistem. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' });
@@ -515,14 +516,12 @@ router.post('/pending/:id/generate-draft', authenticate, async (req, res) => {
 
     const alasanParsed = {
       kategori: aiResult.kategori_pending || null,
-      field: aiResult.field_dipermasalahkan || [],
       detail: aiResult.alasan_ringkas || null,
-      checklist_dokumen_pendukung: aiResult.checklist_dokumen_pendukung || [],
     };
 
     await db.prepare(`
       UPDATE bpjs_pending_responses SET alasan_parsed = ?, draft_klarifikasi = ? WHERE id = ?
-    `).run(JSON.stringify(alasanParsed), aiResult.draft_klarifikasi || null, req.params.id);
+    `).run(JSON.stringify(alasanParsed), aiResult.jawaban || null, req.params.id);
 
     const updated = await db.prepare('SELECT * FROM bpjs_pending_responses WHERE id = ?').get(req.params.id);
     res.json({ ...updated, alasan_parsed: updated.alasan_parsed ? JSON.parse(updated.alasan_parsed) : null });

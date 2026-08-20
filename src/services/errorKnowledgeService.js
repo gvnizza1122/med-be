@@ -79,4 +79,28 @@ async function recordKnowledge(db, entries) {
   }
 }
 
-module.exports = { getRelevantKnowledge, recordKnowledge, MAX_ENTRIES_PER_RULE };
+const BPJS_EXAMPLES_IN_PROMPT = 5;
+
+/**
+ * Ambil klarifikasi pending BPJS yang PERNAH terbukti diterima (RAG, lihat
+ * routes/bpjsPending.js) untuk diselipkan ke prompt AI review klaim BARU —
+ * supaya AI review proaktif mengenali pola yang sebelumnya bikin BPJS
+ * mempending klaim (mis. kode tindakan tertentu, kriteria kegawatan) SEBELUM
+ * klaim itu diajukan, bukan cuma reaktif setelah dipending.
+ * @param {Object} db
+ * @returns {Promise<Array<{kategori_pending, alasan_bpjs, draft_berhasil}>>}
+ */
+async function getRelevantBpjsExamples(db) {
+  try {
+    return await db.prepare(`
+      SELECT kategori_pending, alasan_bpjs, draft_berhasil
+      FROM ai_training_examples WHERE outcome = 'approved'
+      ORDER BY created_at DESC LIMIT ?
+    `).all(BPJS_EXAMPLES_IN_PROMPT);
+  } catch (e) {
+    // Tabel belum ada di deployment lama / query gagal — jangan gagalkan AI review utama karena ini.
+    return [];
+  }
+}
+
+module.exports = { getRelevantKnowledge, recordKnowledge, getRelevantBpjsExamples, MAX_ENTRIES_PER_RULE };

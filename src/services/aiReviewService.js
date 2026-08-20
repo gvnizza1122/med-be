@@ -147,7 +147,7 @@ function pickCodes(record) {
   };
 }
 
-function buildPrompt(record, validationErrors, evidencePool, codes, knowledgeEntries = []) {
+function buildPrompt(record, validationErrors, evidencePool, codes, knowledgeEntries = [], bpjsExamples = []) {
   const jenisKlaim = record.JENIS_KLAIM || record.jenis_klaim || '(tidak diketahui)';
   let prompt = `JENIS_KLAIM: ${jenisKlaim} — WAJIB dipatuhi, lihat instruksi di atas.\n\n`;
   prompt += `DATA REKAM KLAIM (hasil ekstraksi, jadikan konteks — "memory"):\n`;
@@ -166,6 +166,14 @@ function buildPrompt(record, validationErrors, evidencePool, codes, knowledgeEnt
     prompt += `PENGETAHUAN_TERDAHULU (pola error serupa & solusi yang pernah tercatat — referensi saja, sesuaikan ke data record ini):\n`;
     prompt += knowledgeEntries.map(k =>
       `- [rule ${k.rule_id}${k.field_name ? ` / ${k.field_name}` : ''}] Pola: ${k.pattern_summary} → Solusi: ${k.solution}`
+    ).join('\n') + '\n\n';
+  }
+
+  if (bpjsExamples.length > 0) {
+    prompt += `PELAJARAN DARI PENDING BPJS SEBELUMNYA (kasus lain yang PERNAH dipending BPJS lalu klarifikasinya\n`;
+    prompt += `terbukti DITERIMA — referensi pola, bukan berarti record ini bermasalah sama, cuma waspada dini):\n`;
+    prompt += bpjsExamples.map(ex =>
+      `- [${ex.kategori_pending || 'lainnya'}] BPJS mempermasalahkan: "${ex.alasan_bpjs?.slice(0, 200)}" → klarifikasi yang berhasil: "${ex.draft_berhasil?.slice(0, 200)}"`
     ).join('\n') + '\n\n';
   }
 
@@ -277,7 +285,7 @@ function hasFinancialTerms(text) {
  * @returns {Promise<{field_notes: object, code_evidence: Array, suggested_codes: Array, knowledge_updates: Array, tokens_used: number}|null>}
  *   null kalau tidak ada apapun untuk direview, atau AI tidak dikonfigurasi/gagal total.
  */
-async function generateAiReview(record, validationErrors = [], evidencePool = [], knowledgeEntries = []) {
+async function generateAiReview(record, validationErrors = [], evidencePool = [], knowledgeEntries = [], bpjsExamples = []) {
   const codes = pickCodes(record);
   const hasCodesToCheck = evidencePool.length > 0 && (codes.diagnosis.length > 0 || codes.procedure.length > 0);
 
@@ -293,7 +301,7 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
   const maxAttempts = Number(process.env.AI_MAX_ATTEMPTS || 3);
   const timeoutMs = Number(process.env.AI_TIMEOUT_MS || 60000);
 
-  const userPrompt = buildPrompt(record, validationErrors, evidencePool, codes, knowledgeEntries);
+  const userPrompt = buildPrompt(record, validationErrors, evidencePool, codes, knowledgeEntries, bpjsExamples);
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {

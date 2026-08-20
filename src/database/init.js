@@ -576,6 +576,37 @@ async function migrateSchema(db) {
           } catch (e) {}
         }
       }
+
+      // Backfill: baris hasil import XLSX yang dibuat SEBELUM tabel
+      // bpjs_pending_files ada (pending_file_id masih NULL) jadi tidak
+      // kelihatan sama sekali di UI per-file yang baru — kelompokkan jadi
+      // satu "file" sintetis supaya tidak hilang dari tampilan.
+      try {
+        const orphans = await db.query(`
+          SELECT COUNT(*) as count FROM bpjs_pending_responses
+          WHERE source = 'xlsx_import' AND pending_file_id IS NULL
+        `);
+        const orphanCount = Number(orphans.rows?.[0]?.count || 0);
+        if (orphanCount > 0) {
+          const { v4: uuidv4 } = require('uuid');
+          const backfillId = uuidv4();
+          const matched = await db.query(`
+            SELECT COUNT(*) as count FROM bpjs_pending_responses
+            WHERE source = 'xlsx_import' AND pending_file_id IS NULL AND claim_record_id IS NOT NULL
+          `);
+          await db.query(`
+            INSERT INTO bpjs_pending_files (id, file_name, total_rows, imported_rows, skipped_duplicate, matched_claim, created_at)
+            VALUES (?, ?, ?, ?, 0, ?, CURRENT_TIMESTAMP)
+          `, [backfillId, 'Rekap Pending BPJS (data sebelum fitur daftar per-file)', orphanCount, orphanCount, Number(matched.rows?.[0]?.count || 0)]);
+          await db.query(`
+            UPDATE bpjs_pending_responses SET pending_file_id = ?
+            WHERE source = 'xlsx_import' AND pending_file_id IS NULL
+          `, [backfillId]);
+          console.log(`[migration] Backfilled ${orphanCount} baris pending BPJS lama ke file "${backfillId}"`);
+        }
+      } catch (e) {
+        console.error('[migration] Gagal backfill pending_file_id:', e.message);
+      }
     }
   } catch (err) {
     console.error('Failed to run schema migration:', err);
