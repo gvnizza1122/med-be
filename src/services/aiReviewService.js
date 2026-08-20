@@ -89,6 +89,17 @@ TUGAS:
       normal semua. Kombinasi ini sering ditolak BPJS dengan alasan "tidak memenuhi kriteria gawat
       darurat". Jangan laporkan kalau ada tanda objektif abnormal (mis. TTV di luar normal, temuan
       pemeriksaan fisik abnormal) yang mendukung kegawatan — itu justru bukti kuat, bukan pola risiko.
+      Konteks tambahan (SAMA PERSIS dengan RV-20 di rule engine, supaya catatanmu tidak beda pendapat
+      dengan hasil validasi otomatis): kode "nyeri saja" yang jadi pemicu pola ini —
+      R10.x, R51, R52, R07.x, M54.x, G43.x, M79.x. Kode kegawatan pendamping yang membatalkan pola ini
+      kalau ADA — I21.x/I22.x/I46.x, J96.x/J18.x, N17.x/K35.x, R57.x/A41.x, R41.x.
+      Kalau pola ini terdeteksi DAN UMUR_TAHUN pasien di bawah 7 tahun: note WAJIB menambahkan kalimat
+      bahwa skala nyeri VAS tidak valid untuk usia ini, sarankan FLACC (Face Legs Activity Cry
+      Consolability) atau Wong-Baker FACES, dan pastikan skala yang dipakai tercantum jelas di berkas
+      — tapi HANYA sebagai saran umum, JANGAN mengklaim dokumen sudah/belum pakai skala tertentu
+      kecuali kamu benar-benar melihat itu tertulis (kutip kalau ada, kalau tidak ada jangan menuduh).
+      JANGAN usulkan penggantian kode diagnosis (mis. "ganti R10.9 jadi R10.0") — itu keputusan koder
+      berdasarkan bukti klinis di dokumen yang cuma manusia yang boleh putuskan, bukan tabel umum ICD.
    b. [manifestasi_ikut_du] — Diagnosis sekunder (DS) di DIAGLIST (kode kedua dst.) yang secara medis
       cuma manifestasi/gejala langsung dari diagnosis utama (DU/kode pertama), bukan kondisi berdiri
       sendiri. BPJS sering minta kode manifestasi begini dihapus/tidak dikode terpisah dari DU-nya.
