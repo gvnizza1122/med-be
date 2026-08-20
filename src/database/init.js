@@ -236,9 +236,25 @@ async function initializeSchema() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
 
+      -- Satu baris = satu file Excel rekap pending BPJS yang diimpor (mis.
+      -- "PENDING PELKES JUNI 2026.xlsx") — dipakai supaya halaman Pending BPJS
+      -- bisa tampil per-file dulu (seperti Riwayat Upload), baru masuk ke isi
+      -- filenya setelah diklik. Lihat routes/bpjsPending.js.
+      CREATE TABLE IF NOT EXISTS bpjs_pending_files (
+        id TEXT PRIMARY KEY,
+        file_name TEXT,
+        total_rows INTEGER DEFAULT 0,
+        imported_rows INTEGER DEFAULT 0,
+        skipped_duplicate INTEGER DEFAULT 0,
+        matched_claim INTEGER DEFAULT 0,
+        uploaded_by TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
       -- Jawaban Pending BPJS + draft klarifikasi AI (lihat routes/bpjsPending.js).
       CREATE TABLE IF NOT EXISTS bpjs_pending_responses (
         id TEXT PRIMARY KEY,
+        pending_file_id TEXT,
         claim_record_id TEXT,
         sep TEXT,
         mrn TEXT,
@@ -551,6 +567,7 @@ async function migrateSchema(db) {
         by_pengajuan: 'NUMERIC',
         tgl_pulang: 'TEXT',
         jawaban_rs_manual: 'TEXT',
+        pending_file_id: 'TEXT',
       };
       for (const [col, type] of Object.entries(pendingNewCols)) {
         if (!pendingCols.includes(col)) {

@@ -358,6 +358,7 @@ router.post('/pending-import-xlsx', authenticate, xlsxUpload.single('file'), asy
       return res.status(400).json({ error: 'Tidak ada baris data ditemukan (kolom NOSEP tidak terdeteksi di sheet manapun).' });
     }
 
+    const fileId = uuidv4();
     let imported = 0, skippedDuplicate = 0, matchedClaim = 0;
     for (const row of parsedRows) {
       const dup = await db.prepare(`
@@ -372,20 +373,55 @@ router.post('/pending-import-xlsx', authenticate, xlsxUpload.single('file'), asy
 
       await db.prepare(`
         INSERT INTO bpjs_pending_responses
-          (id, claim_record_id, sep, mrn, nokartu, nama_peserta, kdinacbg, by_pengajuan,
+          (id, pending_file_id, claim_record_id, sep, mrn, nokartu, nama_peserta, kdinacbg, by_pengajuan,
            tanggal_pending, tgl_pulang, alasan_raw, jawaban_rs_manual, status, source, jenis_klaim)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', 'xlsx_import', ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', 'xlsx_import', ?)
       `).run(
-        uuidv4(), claimRecord?.id || null, row.sep, row.mr || null, row.nokartu || null,
+        uuidv4(), fileId, claimRecord?.id || null, row.sep, row.mr || null, row.nokartu || null,
         row.nama_peserta || null, row.kdinacbg || null, row.by_pengajuan,
         row.tgl_sep, row.tgl_pulang, row.alasan_pending, row.jawaban_rs || null, row.sheet
       );
       imported++;
     }
 
-    res.json({ total_rows: parsedRows.length, imported, skipped_duplicate: skippedDuplicate, matched_claim: matchedClaim });
+    await db.prepare(`
+      INSERT INTO bpjs_pending_files (id, file_name, total_rows, imported_rows, skipped_duplicate, matched_claim, uploaded_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(fileId, req.file.originalname, parsedRows.length, imported, skippedDuplicate, matchedClaim, req.user?.id || null);
+
+    res.json({ file_id: fileId, total_rows: parsedRows.length, imported, skipped_duplicate: skippedDuplicate, matched_claim: matchedClaim });
   } catch (err) {
     console.error('[bpjsPending] xlsx import error:', err);
+    res.status(500).json({ error: 'Terjadi gangguan pada sistem. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' });
+  }
+});
+
+/**
+ * GET /api/v1/records/pending-files
+ * List file Excel rekap pending yang sudah diimpor — tampilan per-file
+ * (seperti Riwayat Upload), dengan ringkasan status baris di dalamnya.
+ */
+router.get('/pending-files', authenticate, async (req, res) => {
+  try {
+    const db = getDb();
+    const { page = 1, limit = 20 } = req.query;
+    const offset = (parseInt(page) - 1) * parseInt(limit);
+
+    const totalResult = await db.prepare('SELECT COUNT(*) as count FROM bpjs_pending_files').get();
+    const files = await db.prepare(`
+      SELECT f.*,
+        (SELECT COUNT(*) FROM bpjs_pending_responses WHERE pending_file_id = f.id AND status = 'draft') as draft_count,
+        (SELECT COUNT(*) FROM bpjs_pending_responses WHERE pending_file_id = f.id AND status = 'dikirim') as dikirim_count,
+        (SELECT COUNT(*) FROM bpjs_pending_responses WHERE pending_file_id = f.id AND status = 'diterima') as diterima_count,
+        (SELECT COUNT(*) FROM bpjs_pending_responses WHERE pending_file_id = f.id AND status = 'ditolak') as ditolak_count
+      FROM bpjs_pending_files f
+      ORDER BY f.created_at DESC
+      LIMIT ? OFFSET ?
+    `).all(parseInt(limit), offset);
+
+    res.json({ total: Number(totalResult?.count || 0), files });
+  } catch (err) {
+    console.error('[bpjsPending] list files error:', err);
     res.status(500).json({ error: 'Terjadi gangguan pada sistem. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' });
   }
 });
@@ -394,18 +430,19 @@ router.post('/pending-import-xlsx', authenticate, xlsxUpload.single('file'), asy
  * GET /api/v1/records/pending
  * List semua entri pending BPJS (dari upload PDF maupun import XLSX), lintas
  * klaim — dipakai halaman rekap pending, bukan cuma modal per-record.
- * Query: status, outcome, jenis_klaim, search (cocok sep/nama_peserta)
+ * Query: status, outcome, jenis_klaim, search (cocok sep/nama_peserta), pending_file_id
  */
 router.get('/pending', authenticate, async (req, res) => {
   try {
     const db = getDb();
-    const { status, outcome, jenis_klaim, search, page = 1, limit = 50 } = req.query;
+    const { status, outcome, jenis_klaim, search, pending_file_id, page = 1, limit = 50 } = req.query;
     const offset = (parseInt(page) - 1) * parseInt(limit);
     let where = 'WHERE 1=1';
     const params = [];
     if (status) { where += ' AND status = ?'; params.push(status); }
     if (outcome) { where += ' AND outcome = ?'; params.push(outcome); }
     if (jenis_klaim) { where += ' AND jenis_klaim = ?'; params.push(jenis_klaim); }
+    if (pending_file_id) { where += ' AND pending_file_id = ?'; params.push(pending_file_id); }
     if (search) {
       where += ' AND (sep LIKE ? OR nama_peserta LIKE ?)';
       const like = `%${search}%`;
