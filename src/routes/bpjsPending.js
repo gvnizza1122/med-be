@@ -113,7 +113,10 @@ const VALID_VCLAIM_COLUMNS = [
   'DESKRIPSI_SP', 'TARIF_SP', 'DESKRIPSI_SR', 'TARIF_SR', 'DESKRIPSI_SI', 'TARIF_SI', 'DESKRIPSI_SD', 'TARIF_SD', 'TOTAL_TARIF',
   'ICU_INDIKATOR', 'ICU_LOS', 'VENT_HOUR',
   'SEP', 'NOKARTU', 'PAYOR_ID', 'DPJP', 'KODE_TARIF', 'PTD', 'IN_SP', 'IN_SR', 'IN_SI', 'IN_SD', 'SUBACUTE', 'CHRONIC', 'TARIF_POLI_EKS',
-  'TARIF_RS', 'CODER_ID', 'VERSI_INACBG', 'VERSI_GROUPER', 'C1', 'C2', 'C3', 'C4',
+  // TARIF_RS/CODER_ID/VERSI_INACBG/VERSI_GROUPER/C1-C4 sengaja TIDAK diikutkan
+  // — kolom-kolom "isi otomatis vClaim" ini sudah dihapus dari tampilan tabel
+  // frontend (staf tidak paham C1-C4), jadi AI tidak boleh menyarankan
+  // highlight ke kolom yang sudah tidak dirender.
 ];
 
 const SYSTEM_PROMPT = `Kamu asisten koder klaim BPJS rumah sakit. Kamu diberi ALASAN_PENDING (kenapa
