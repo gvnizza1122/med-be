@@ -16,6 +16,7 @@ const XLSX = require('xlsx');
 const { v4: uuidv4 } = require('uuid');
 const { getDb } = require('../database/init');
 const { authenticate } = require('../middleware/auth');
+const { callKimi } = require('../services/kimiClient');
 
 const router = express.Router();
 
@@ -182,6 +183,34 @@ async function callAi(prompt) {
 }
 
 /**
+ * Ringkas 1 kasus pending+jawaban lewat Kimi K3 dan simpan sebagai contoh
+ * training (ai_training_examples) — dipanggil best-effort setiap kali draft
+ * berhasil dibuat (lihat POST pending/:id/generate-draft), TANPA menunggu
+ * staf menandai status approved. generated_by='kimi-k3-auto' membedakannya
+ * dari hasil backfill arsip lama (scripts/importTrainingData.js, generated_by
+ * 'kimi-k3-backfill'). Silent no-op kalau KIMI_API_KEY belum disetel.
+ */
+async function recordKimiTrainingExample(db, alasanRaw, draftJawaban, kategoriFallback) {
+  if (!alasanRaw || !draftJawaban) return;
+  const prompt = `ALASAN_PENDING:\n${alasanRaw}\n\nJAWABAN_KLARIFIKASI_RS:\n${draftJawaban}\n\n(outcome belum diketahui saat ini — isi "tidak_diketahui")`;
+  const result = await callKimi(prompt);
+  if (!result) return; // KIMI_API_KEY belum disetel di server
+  await db.prepare(`
+    INSERT INTO ai_training_examples
+      (id, kategori_pending, alasan_bpjs, draft_berhasil, poin_kunci, outcome, generated_by, confidence_score)
+    VALUES (?, ?, ?, ?, ?, ?, 'kimi-k3-auto', ?)
+  `).run(
+    uuidv4(),
+    result.kategori_pending || kategoriFallback || 'lainnya',
+    alasanRaw,
+    draftJawaban,
+    Array.isArray(result.poin_kunci) ? result.poin_kunci.join('; ') : null,
+    result.outcome || 'tidak_diketahui',
+    Number.isFinite(result.confidence) ? result.confidence : null,
+  );
+}
+
+/**
  * POST /api/v1/records/:recordId/pending-upload
  * Upload PDF jawaban pending BPJS -> ekstrak teks -> AI analisis + draft.
  */
@@ -213,8 +242,8 @@ router.post('/:recordId/pending-upload', authenticate, upload.single('file'), as
       // di iterasi kedua kalau perlu — MVP ambil top-3 contoh approved apa saja).
       const priorExamples = await db.prepare(`
         SELECT kategori_pending, alasan_bpjs, draft_berhasil, poin_kunci
-        FROM ai_training_examples WHERE outcome = 'approved'
-        ORDER BY created_at DESC LIMIT 3
+        FROM ai_training_examples
+        ORDER BY confidence_score DESC NULLS LAST, created_at DESC LIMIT 3
       `).all();
 
       const prompt = buildPrompt({ alasanRaw, claimRecord, examples: priorExamples });
@@ -277,13 +306,15 @@ router.get('/:recordId/pending', authenticate, async (req, res) => {
 /**
  * PATCH /api/v1/records/pending/:id/status
  * Update status (draft/dikirim) dan/atau outcome (approved/rejected) satu
- * entri pending. Saat outcome='approved', draft ini otomatis masuk ke
- * ai_training_examples supaya jadi few-shot example untuk kasus berikutnya.
+ * entri pending. TIDAK lagi jadi syarat masuk ai_training_examples — training
+ * sekarang tercatat otomatis begitu draft dibuat (lihat POST
+ * pending/:id/generate-draft), lepas dari status/outcome ini diklik atau
+ * tidak (di lapangan gerbang klik ini jarang dipakai konsisten oleh staf).
  * Body: { status?, outcome?, poin_kunci?, draft_klarifikasi? }
  */
 router.patch('/pending/:id/status', authenticate, async (req, res) => {
   try {
-    const { status, outcome, poin_kunci, draft_klarifikasi } = req.body;
+    const { status, outcome, draft_klarifikasi } = req.body;
     const allowedStatus = ['draft', 'dikirim', 'diterima', 'ditolak'];
     const allowedOutcome = ['approved', 'rejected'];
     if (status && !allowedStatus.includes(status)) return res.status(400).json({ error: 'Status tidak valid.' });
@@ -300,14 +331,6 @@ router.patch('/pending/:id/status', authenticate, async (req, res) => {
     await db.prepare(`
       UPDATE bpjs_pending_responses SET status = ?, outcome = ?, draft_klarifikasi = ? WHERE id = ?
     `).run(nextStatus, nextOutcome, nextDraft, req.params.id);
-
-    if (outcome === 'approved') {
-      const alasanParsed = existing.alasan_parsed ? JSON.parse(existing.alasan_parsed) : {};
-      await db.prepare(`
-        INSERT INTO ai_training_examples (id, kategori_pending, alasan_bpjs, draft_berhasil, poin_kunci, outcome)
-        VALUES (?, ?, ?, ?, ?, 'approved')
-      `).run(uuidv4(), alasanParsed.kategori || 'lainnya', existing.alasan_raw, nextDraft, poin_kunci || null);
-    }
 
     const updated = await db.prepare('SELECT * FROM bpjs_pending_responses WHERE id = ?').get(req.params.id);
     res.json({ ...updated, alasan_parsed: updated.alasan_parsed ? JSON.parse(updated.alasan_parsed) : null });
@@ -532,6 +555,13 @@ router.post('/pending/:id/generate-draft', authenticate, async (req, res) => {
     await db.prepare(`
       UPDATE bpjs_pending_responses SET alasan_parsed = ?, draft_klarifikasi = ? WHERE id = ?
     `).run(JSON.stringify(alasanParsed), aiResult.jawaban || null, req.params.id);
+
+    // Training (RAG) otomatis begitu draft berhasil dibuat — TIDAK menunggu
+    // staf menandai status/outcome (lihat catatan di PATCH pending/:id/status
+    // di atas). Best-effort, tidak di-await, tidak boleh gagalkan response
+    // generate-draft ke user kalau Kimi lambat/error.
+    recordKimiTrainingExample(db, existing.alasan_raw, aiResult.jawaban || '', alasanParsed.kategori)
+      .catch(err => console.error('[bpjsPending] Kimi training error:', err.message));
 
     const updated = await db.prepare('SELECT * FROM bpjs_pending_responses WHERE id = ?').get(req.params.id);
     res.json({ ...updated, alasan_parsed: updated.alasan_parsed ? JSON.parse(updated.alasan_parsed) : null });

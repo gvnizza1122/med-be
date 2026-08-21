@@ -658,6 +658,31 @@ async function migrateSchema(db) {
     } catch (e) {
       console.error('[migration] Gagal backfill claim_record_id pending BPJS:', e.message);
     }
+
+    // Kolom baru untuk pipeline training RAG (Kimi K3) — generated_by
+    // membedakan asal contoh ('kimi-k3-backfill' dari arsip lama vs
+    // 'kimi-k3-auto' dari draft yang baru dibuat, vs NULL untuk entri lama
+    // yang masih pakai alur approve manual), confidence_score dipakai
+    // getRelevantBpjsExamples() untuk memprioritaskan contoh yang paling
+    // meyakinkan sejak filter outcome='approved' dilepas.
+    try {
+      const trainingRes = await db.query(`
+        SELECT column_name FROM information_schema.columns WHERE table_name = 'ai_training_examples'
+      `);
+      if (trainingRes.rows.length > 0) {
+        const trainingCols = trainingRes.rows.map(c => c.column_name.toLowerCase());
+        const trainingNewCols = { generated_by: 'TEXT', confidence_score: 'NUMERIC' };
+        for (const [col, type] of Object.entries(trainingNewCols)) {
+          if (!trainingCols.includes(col)) {
+            try {
+              await db.query(`ALTER TABLE ai_training_examples ADD COLUMN ${col} ${type}`);
+            } catch (e) {}
+          }
+        }
+      }
+    } catch (e) {
+      console.error('[migration] Gagal tambah kolom generated_by/confidence_score:', e.message);
+    }
   } catch (err) {
     console.error('Failed to run schema migration:', err);
   }
