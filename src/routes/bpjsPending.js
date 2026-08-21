@@ -681,4 +681,35 @@ router.delete('/pending-files/:id', authenticate, authorize('admin', 'supervisor
   }
 });
 
+/**
+ * DELETE /api/v1/records/pending-files/bulk-delete-by-user/:userId
+ * Hapus SEMUA file rekap pending BPJS (+ isinya) yang diupload oleh 1 user
+ * tertentu (kolom uploaded_by) — dipakai untuk cleanup akhir sesi testing
+ * multi-bulan, di mana file diupload manual lewat web sehingga tidak ada log
+ * id untuk dihapus satu-satu. Tidak menyentuh ai_training_examples sama
+ * sekali — hasil training Kimi tetap tersimpan meski data pending dihapus.
+ */
+router.delete('/pending-files/bulk-delete-by-user/:userId', authenticate, authorize('admin', 'supervisor'), async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const db = getDb();
+    const files = await db.prepare('SELECT id FROM bpjs_pending_files WHERE uploaded_by = ?').all(userId);
+    const fileIds = files.map(f => f.id);
+
+    let deletedResponses = 0;
+    if (fileIds.length > 0) {
+      await db.transaction(async (tx) => {
+        const respResult = await tx.run('DELETE FROM bpjs_pending_responses WHERE pending_file_id = ANY(?)', [fileIds]);
+        deletedResponses = respResult.changes;
+        await tx.run('DELETE FROM bpjs_pending_files WHERE id = ANY(?)', [fileIds]);
+      });
+    }
+
+    res.json({ deletedFiles: fileIds.length, deletedResponses });
+  } catch (err) {
+    console.error('[bpjsPending] bulk-delete-by-user error:', err);
+    res.status(500).json({ error: 'Terjadi gangguan pada sistem. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' });
+  }
+});
+
 module.exports = router;

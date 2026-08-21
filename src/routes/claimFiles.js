@@ -963,6 +963,36 @@ router.post('/bulk-delete', authenticate, authorize('admin', 'supervisor'), asyn
 });
 
 /**
+ * DELETE /api/v1/claim-files/bulk-delete-by-user/:userId
+ * Hapus SEMUA claim_files yang diupload oleh 1 user tertentu (kolom
+ * uploaded_by) — dipakai untuk cleanup akhir sesi testing multi-bulan di RS,
+ * di mana file diupload manual lewat web (bukan lewat script), jadi tidak
+ * ada log file_id untuk /bulk-delete biasa. Presisi berdasarkan akun
+ * uploader, sehingga tidak pernah menyentuh data yang diupload staf lain.
+ * Tidak menyentuh ai_training_examples sama sekali (tabel itu tidak punya
+ * kolom user) — hasil training Kimi tetap tersimpan meski data claim/pending
+ * dihapus dan diulang.
+ */
+router.delete('/bulk-delete-by-user/:userId', authenticate, authorize('admin', 'supervisor'), async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const db = getDb();
+    const result = await db.run('DELETE FROM claim_files WHERE uploaded_by = ?', [userId]);
+
+    logAudit({
+      userId: req.user.id, userEmail: req.user.email,
+      action: 'bulk_delete_by_user', resourceType: 'claim_file', resourceId: userId,
+      ipAddress: req.ip
+    });
+
+    res.json({ deleted: result.changes });
+  } catch (err) {
+    console.error('[claimFiles] bulk-delete-by-user error:', err);
+    res.status(500).json({ error: 'Terjadi gangguan pada sistem. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' });
+  }
+});
+
+/**
  * GET /api/v1/claim-files/:id/ai-token-estimate
  * Estimate AI token usage for a file's error records
  */

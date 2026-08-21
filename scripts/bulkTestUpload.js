@@ -23,6 +23,11 @@ const path = require('path');
 
 const CHUNK_SIZE = 100;
 const JENIS_MAP = { rajal: 'RAWAT_JALAN', ranap: 'RAWAT_INAP', igd: 'GAWAT_DARURAT' };
+// Tanpa ini, fetch bisa menggantung selamanya kalau 1 chunk macet di server
+// (mis. OCR lambat). Default 3 jam per chunk (100 file) supaya cukup toleran,
+// tapi kalau tetap macet, chunk itu di-skip otomatis dan lanjut ke chunk
+// berikutnya (bukan berhenti total). Bisa diubah lewat env TEST_CHUNK_TIMEOUT_MS.
+const CHUNK_TIMEOUT_MS = Number(process.env.TEST_CHUNK_TIMEOUT_MS) || 3 * 60 * 60 * 1000;
 
 function parseArgs(argv) {
   const folder = argv[2];
@@ -60,14 +65,26 @@ async function uploadChunk(baseUrl, accessToken, files, jenis) {
   }
   form.append('allowed_jenis_klaim', JSON.stringify(jenis));
 
-  const res = await fetch(`${baseUrl}/api/v1/claim-files/upload-pdf-batch`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${accessToken}` },
-    body: form,
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(`Upload batch gagal: HTTP ${res.status} ${JSON.stringify(data)}`);
-  return data;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), CHUNK_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${baseUrl}/api/v1/claim-files/upload-pdf-batch`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${accessToken}` },
+      body: form,
+      signal: controller.signal,
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(`Upload batch gagal: HTTP ${res.status} ${JSON.stringify(data)}`);
+    return data;
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      throw new Error(`Timeout setelah ${Math.round(CHUNK_TIMEOUT_MS / 60000)} menit, chunk di-skip`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 async function main() {
