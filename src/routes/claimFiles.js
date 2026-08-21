@@ -929,6 +929,40 @@ router.delete('/:id', authenticate, authorize('admin', 'supervisor'), async (req
 });
 
 /**
+ * POST /api/v1/claim-files/bulk-delete
+ * Hapus banyak claim_files sekaligus dalam 1 request — dibutuhkan untuk
+ * cleanup cepat setelah testing batch besar (mis. 10.000 file), karena
+ * DELETE /:id satu-satu akan kena rate limiter global (100 req/menit,
+ * lihat index.js) kalau dipanggil ribuan kali berturut-turut.
+ * Body: { ids: string[] } (maks 500 per panggilan — sisanya di-chunk oleh
+ * pemanggil, mis. scripts/bulkTestCleanup.js).
+ */
+router.post('/bulk-delete', authenticate, authorize('admin', 'supervisor'), async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: 'ids wajib berupa array berisi minimal 1 file_id.' });
+    }
+    if (ids.length > 500) {
+      return res.status(400).json({ error: 'Maksimal 500 id per panggilan — bagi jadi beberapa batch.' });
+    }
+    const db = getDb();
+    const result = await db.run('DELETE FROM claim_files WHERE id = ANY(?)', [ids]);
+
+    logAudit({
+      userId: req.user.id, userEmail: req.user.email,
+      action: 'bulk_delete', resourceType: 'claim_file', resourceId: ids.join(','),
+      ipAddress: req.ip
+    });
+
+    res.json({ deleted: result.changes });
+  } catch (err) {
+    console.error('[claimFiles] bulk-delete error:', err);
+    res.status(500).json({ error: 'Terjadi gangguan pada sistem. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' });
+  }
+});
+
+/**
  * GET /api/v1/claim-files/:id/ai-token-estimate
  * Estimate AI token usage for a file's error records
  */

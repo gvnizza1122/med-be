@@ -15,7 +15,7 @@ const multer = require('multer');
 const XLSX = require('xlsx');
 const { v4: uuidv4 } = require('uuid');
 const { getDb } = require('../database/init');
-const { authenticate } = require('../middleware/auth');
+const { authenticate, authorize } = require('../middleware/auth');
 const { callKimi } = require('../services/kimiClient');
 
 const router = express.Router();
@@ -523,6 +523,84 @@ router.get('/pending', authenticate, async (req, res) => {
 });
 
 /**
+ * Logic inti generate/regenerate draft klarifikasi AI untuk 1 baris pending —
+ * dipakai baik oleh endpoint single (generate-draft) maupun bulk
+ * (generate-all-drafts) supaya tidak ada logika ganda. Tidak menyentuh
+ * req/res — cuma mengembalikan { success, error }.
+ */
+async function generateDraftForRow(db, existing) {
+  if (!existing.alasan_raw) return { success: false, error: 'Tidak ada teks alasan pending untuk entri ini.' };
+
+  let claimRecord = null;
+  if (existing.claim_record_id) {
+    claimRecord = await db.prepare(`
+      SELECT id, sep, nama_pasien, mrn, admission_date, diagnosa_list, prosedur_list, dpjp_name
+      FROM claim_records WHERE id = ?
+    `).get(existing.claim_record_id);
+  }
+  if (!claimRecord) {
+    // Belum ada klaim yang cocok di sistem (mis. NOSEP belum pernah diupload
+    // via Extract PDF) — tetap generate draft, hanya field admin dari data
+    // rekap Excel (nama_peserta/nokartu/mrn/kdinacbg), bukan dikarang.
+    claimRecord = {
+      sep: existing.sep, nama_pasien: existing.nama_peserta, mrn: existing.mrn || existing.nokartu,
+      admission_date: existing.tanggal_pending, diagnosa_list: existing.kdinacbg ? `(INA-CBG: ${existing.kdinacbg})` : '',
+      prosedur_list: '', dpjp_name: '',
+    };
+  }
+
+  const priorExamples = await db.prepare(`
+    SELECT kategori_pending, alasan_bpjs, draft_berhasil, poin_kunci
+    FROM ai_training_examples
+    ORDER BY confidence_score DESC NULLS LAST, created_at DESC LIMIT 3
+  `).all();
+
+  const prompt = buildPrompt({ alasanRaw: existing.alasan_raw, claimRecord, examples: priorExamples });
+  let aiResult = null, aiError = null;
+  try {
+    aiResult = await callAi(prompt);
+  } catch (err) {
+    aiError = err.message;
+    console.error('[bpjsPending] generate-draft AI error:', err.message);
+  }
+  if (!aiResult) {
+    return { success: false, error: aiError || 'AI_PROVIDER_API_KEY belum disetel di server — draft harus diisi manual.' };
+  }
+
+  const alasanParsed = {
+    kategori: aiResult.kategori_pending || null,
+    detail: aiResult.alasan_ringkas || null,
+    field: Array.isArray(aiResult.kolom_penyebab) ? aiResult.kolom_penyebab.filter(c => VALID_VCLAIM_COLUMNS.includes(c)) : [],
+  };
+
+  await db.prepare(`
+    UPDATE bpjs_pending_responses SET alasan_parsed = ?, draft_klarifikasi = ? WHERE id = ?
+  `).run(JSON.stringify(alasanParsed), aiResult.jawaban || null, existing.id);
+
+  // Training (RAG) otomatis begitu draft berhasil dibuat — TIDAK menunggu
+  // staf menandai status/outcome (lihat catatan di PATCH pending/:id/status
+  // di atas). Best-effort, tidak di-await, tidak boleh gagalkan response
+  // kalau Kimi lambat/error.
+  recordKimiTrainingExample(db, existing.alasan_raw, aiResult.jawaban || '', alasanParsed.kategori)
+    .catch(err => console.error('[bpjsPending] Kimi training error:', err.message));
+
+  return { success: true };
+}
+
+async function runWithConcurrencyLimit(items, limit, worker) {
+  const results = new Array(items.length);
+  let nextIndex = 0;
+  async function runNext() {
+    const i = nextIndex++;
+    if (i >= items.length) return;
+    results[i] = await worker(items[i], i);
+    return runNext();
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, runNext));
+  return results;
+}
+
+/**
  * POST /api/v1/records/pending/:id/generate-draft
  * Generate/regenerate draft klarifikasi AI untuk 1 entri pending yang sudah
  * ada (dari import XLSX ataupun upload PDF) — dipanggil manual per-baris
@@ -533,67 +611,72 @@ router.post('/pending/:id/generate-draft', authenticate, async (req, res) => {
     const db = getDb();
     const existing = await db.prepare('SELECT * FROM bpjs_pending_responses WHERE id = ?').get(req.params.id);
     if (!existing) return res.status(404).json({ error: 'Data pending tidak ditemukan.' });
-    if (!existing.alasan_raw) return res.status(400).json({ error: 'Tidak ada teks alasan pending untuk entri ini.' });
 
-    let claimRecord = null;
-    if (existing.claim_record_id) {
-      claimRecord = await db.prepare(`
-        SELECT id, sep, nama_pasien, mrn, admission_date, diagnosa_list, prosedur_list, dpjp_name
-        FROM claim_records WHERE id = ?
-      `).get(existing.claim_record_id);
+    const result = await generateDraftForRow(db, existing);
+    if (!result.success) {
+      return res.status(result.error?.includes('API_KEY') ? 400 : 502).json({ error: result.error });
     }
-    if (!claimRecord) {
-      // Belum ada klaim yang cocok di sistem (mis. NOSEP belum pernah diupload
-      // via Extract PDF) — tetap generate draft, hanya field admin dari data
-      // rekap Excel (nama_peserta/nokartu/mrn/kdinacbg), bukan dikarang.
-      claimRecord = {
-        sep: existing.sep, nama_pasien: existing.nama_peserta, mrn: existing.mrn || existing.nokartu,
-        admission_date: existing.tanggal_pending, diagnosa_list: existing.kdinacbg ? `(INA-CBG: ${existing.kdinacbg})` : '',
-        prosedur_list: '', dpjp_name: '',
-      };
-    }
-
-    const priorExamples = await db.prepare(`
-      SELECT kategori_pending, alasan_bpjs, draft_berhasil, poin_kunci
-      FROM ai_training_examples WHERE outcome = 'approved'
-      ORDER BY created_at DESC LIMIT 3
-    `).all();
-
-    const prompt = buildPrompt({ alasanRaw: existing.alasan_raw, claimRecord, examples: priorExamples });
-    let aiResult = null, aiError = null;
-    try {
-      aiResult = await callAi(prompt);
-    } catch (err) {
-      aiError = err.message;
-      console.error('[bpjsPending] generate-draft AI error:', err.message);
-    }
-    if (!aiResult) {
-      return res.status(aiError ? 502 : 400).json({
-        error: aiError || 'AI_PROVIDER_API_KEY belum disetel di server — draft harus diisi manual.',
-      });
-    }
-
-    const alasanParsed = {
-      kategori: aiResult.kategori_pending || null,
-      detail: aiResult.alasan_ringkas || null,
-      field: Array.isArray(aiResult.kolom_penyebab) ? aiResult.kolom_penyebab.filter(c => VALID_VCLAIM_COLUMNS.includes(c)) : [],
-    };
-
-    await db.prepare(`
-      UPDATE bpjs_pending_responses SET alasan_parsed = ?, draft_klarifikasi = ? WHERE id = ?
-    `).run(JSON.stringify(alasanParsed), aiResult.jawaban || null, req.params.id);
-
-    // Training (RAG) otomatis begitu draft berhasil dibuat — TIDAK menunggu
-    // staf menandai status/outcome (lihat catatan di PATCH pending/:id/status
-    // di atas). Best-effort, tidak di-await, tidak boleh gagalkan response
-    // generate-draft ke user kalau Kimi lambat/error.
-    recordKimiTrainingExample(db, existing.alasan_raw, aiResult.jawaban || '', alasanParsed.kategori)
-      .catch(err => console.error('[bpjsPending] Kimi training error:', err.message));
 
     const updated = await db.prepare('SELECT * FROM bpjs_pending_responses WHERE id = ?').get(req.params.id);
     res.json({ ...updated, alasan_parsed: updated.alasan_parsed ? JSON.parse(updated.alasan_parsed) : null });
   } catch (err) {
     console.error('[bpjsPending] generate-draft error:', err);
+    res.status(500).json({ error: 'Terjadi gangguan pada sistem. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' });
+  }
+});
+
+/**
+ * POST /api/v1/records/pending-files/:id/generate-all-drafts
+ * Generate draft untuk SEMUA baris pending dalam 1 file rekap yang belum
+ * punya draft — dibutuhkan untuk testing skala besar (ratusan baris per
+ * bulan) supaya tidak klik satu-satu di UI. Concurrency rendah (3, lebih
+ * kecil dari upload batch) supaya tidak membanjiri AI provider. Sinkron
+ * (1 request selama proses jalan) — sama seperti pola upload-pdf-batch.
+ */
+router.post('/pending-files/:id/generate-all-drafts', authenticate, async (req, res) => {
+  try {
+    const db = getDb();
+    const file = await db.prepare('SELECT id FROM bpjs_pending_files WHERE id = ?').get(req.params.id);
+    if (!file) return res.status(404).json({ error: 'File pending tidak ditemukan.' });
+
+    const rows = await db.prepare(`
+      SELECT * FROM bpjs_pending_responses WHERE pending_file_id = ? AND draft_klarifikasi IS NULL
+    `).all(req.params.id);
+
+    let done = 0, error = 0;
+    await runWithConcurrencyLimit(rows, 3, async (row) => {
+      const result = await generateDraftForRow(db, row);
+      if (result.success) done++; else error++;
+    });
+
+    res.json({ processed: rows.length, done, error });
+  } catch (err) {
+    console.error('[bpjsPending] generate-all-drafts error:', err);
+    res.status(500).json({ error: 'Terjadi gangguan pada sistem. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' });
+  }
+});
+
+/**
+ * DELETE /api/v1/records/pending-files/:id
+ * Hapus 1 file rekap pending BPJS beserta semua baris di dalamnya — untuk
+ * cleanup setelah testing. pending_file_id di bpjs_pending_responses TIDAK
+ * punya FK/cascade (kolom TEXT biasa), jadi harus 2 langkah eksplisit dalam
+ * 1 transaction.
+ */
+router.delete('/pending-files/:id', authenticate, authorize('admin', 'supervisor'), async (req, res) => {
+  try {
+    const db = getDb();
+    const file = await db.prepare('SELECT id FROM bpjs_pending_files WHERE id = ?').get(req.params.id);
+    if (!file) return res.status(404).json({ error: 'File pending tidak ditemukan.' });
+
+    await db.transaction(async (tx) => {
+      await tx.prepare('DELETE FROM bpjs_pending_responses WHERE pending_file_id = ?').run(req.params.id);
+      await tx.prepare('DELETE FROM bpjs_pending_files WHERE id = ?').run(req.params.id);
+    });
+
+    res.json({ message: 'File pending berhasil dihapus.' });
+  } catch (err) {
+    console.error('[bpjsPending] delete pending-file error:', err);
     res.status(500).json({ error: 'Terjadi gangguan pada sistem. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' });
   }
 });
