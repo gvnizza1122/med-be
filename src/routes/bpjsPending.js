@@ -100,6 +100,22 @@ function parsePendingSheet(sheet, sheetLabel) {
   return out;
 }
 
+// Daftar kolom vClaim yang valid untuk "kolom_penyebab" — HARUS sinkron
+// dengan FIELD_CATEGORIES di frontend (eclaim-production/src/app/(dashboard)/
+// results/[fileId]/page.tsx) supaya nama kolom yang dikembalikan AI dijamin
+// cocok dengan nama kolom yang dirender di tabel 60-kolom (dipakai untuk
+// menyorot baris penyebab pending saat staf klik SEP dari halaman Pending BPJS).
+const VALID_VCLAIM_COLUMNS = [
+  'NAMA_PASIEN', 'MRN', 'SEX', 'BIRTH_DATE', 'BIRTH_WEIGHT', 'UMUR_TAHUN', 'UMUR_HARI',
+  'KODE_RS', 'KELAS_RS', 'KELAS_RAWAT', 'ADMISSION_DATE', 'DISCHARGE_DATE', 'DISCHARGE_STATUS', 'LOS',
+  'DIAGLIST', 'PROCLIST', 'ADL1', 'ADL2',
+  'INACBG', 'DESKRIPSI_INACBG', 'TARIF_INACBG', 'SP', 'SR', 'SI', 'SD',
+  'DESKRIPSI_SP', 'TARIF_SP', 'DESKRIPSI_SR', 'TARIF_SR', 'DESKRIPSI_SI', 'TARIF_SI', 'DESKRIPSI_SD', 'TARIF_SD', 'TOTAL_TARIF',
+  'ICU_INDIKATOR', 'ICU_LOS', 'VENT_HOUR',
+  'SEP', 'NOKARTU', 'PAYOR_ID', 'DPJP', 'KODE_TARIF', 'PTD', 'IN_SP', 'IN_SR', 'IN_SI', 'IN_SD', 'SUBACUTE', 'CHRONIC', 'TARIF_POLI_EKS',
+  'TARIF_RS', 'CODER_ID', 'VERSI_INACBG', 'VERSI_GROUPER', 'C1', 'C2', 'C3', 'C4',
+];
+
 const SYSTEM_PROMPT = `Kamu asisten koder klaim BPJS rumah sakit. Kamu diberi ALASAN_PENDING (kenapa
 klaim ditahan BPJS), data klaim asli (hasil ekstraksi sistem), dan (kalau ada) contoh jawaban yang
 PERNAH berhasil diterima BPJS untuk kasus sejenis.
@@ -108,8 +124,11 @@ TUGAS — kembalikan JSON dengan struktur persis:
 {
   "kategori_pending": "kategori singkat (mis. kode_tindakan, kegawatan, prb, koding_diagnosis, kelengkapan_dokumen, lainnya)",
   "alasan_ringkas": "ringkasan 1 kalimat alasan pending, dalam Bahasa Indonesia",
-  "jawaban": "jawaban/klarifikasi LANGSUNG ke pertanyaan BPJS, 2-5 kalimat, Bahasa Indonesia, TANPA format surat resmi (tanpa kop surat/salam pembuka/tanda tangan) — cukup jawaban intinya saja seperti akan diketik langsung ke kolom jawaban BPJS"
+  "jawaban": "jawaban/klarifikasi LANGSUNG ke pertanyaan BPJS, 2-5 kalimat, Bahasa Indonesia, TANPA format surat resmi (tanpa kop surat/salam pembuka/tanda tangan) — cukup jawaban intinya saja seperti akan diketik langsung ke kolom jawaban BPJS",
+  "kolom_penyebab": ["daftar nama kolom vClaim (huruf besar) yang jadi penyebab pending, HANYA dari KOLOM_VALID di bawah — array kosong [] kalau tidak jelas kolom mana"]
 }
+
+KOLOM_VALID (pilih HANYA dari daftar ini untuk kolom_penyebab): ${VALID_VCLAIM_COLUMNS.join(', ')}
 
 ATURAN KERAS:
 - jawaban HANYA boleh memakai data yang benar-benar ada di ALASAN_PENDING atau DATA_KLAIM_ASLI yang
@@ -119,7 +138,10 @@ ATURAN KERAS:
   singkat "[isi: <topik yang perlu dikonfirmasi>]" di bagian itu, JANGAN ditebak.
 - Kalau ada CONTOH_BERHASIL, pelajari POLA argumen yang berhasil (bukan disalin mentah) untuk kasus
   yang benar-benar sejenis — tetap sesuaikan isi dengan data klaim ini.
-- Langsung ke inti jawaban, jangan bertele-tele atau mengulang pertanyaan BPJS.`;
+- Langsung ke inti jawaban, jangan bertele-tele atau mengulang pertanyaan BPJS.
+- kolom_penyebab HANYA diisi kalau ALASAN_PENDING jelas merujuk ke kolom tertentu (mis. "kode diagnosis
+  tidak sesuai" -> DIAGLIST). Kalau alasan pending bersifat umum/administratif (mis. kelengkapan dokumen
+  yang tidak berkaitan ke 1 kolom spesifik), kembalikan array kosong — JANGAN menebak.`;
 
 function buildPrompt({ alasanRaw, claimRecord, examples }) {
   const claimSummary = claimRecord ? `
@@ -257,6 +279,7 @@ router.post('/:recordId/pending-upload', authenticate, upload.single('file'), as
     const alasanParsed = aiResult ? {
       kategori: aiResult.kategori_pending || null,
       detail: aiResult.alasan_ringkas || null,
+      field: Array.isArray(aiResult.kolom_penyebab) ? aiResult.kolom_penyebab.filter(c => VALID_VCLAIM_COLUMNS.includes(c)) : [],
     } : null;
 
     await db.prepare(`
@@ -550,6 +573,7 @@ router.post('/pending/:id/generate-draft', authenticate, async (req, res) => {
     const alasanParsed = {
       kategori: aiResult.kategori_pending || null,
       detail: aiResult.alasan_ringkas || null,
+      field: Array.isArray(aiResult.kolom_penyebab) ? aiResult.kolom_penyebab.filter(c => VALID_VCLAIM_COLUMNS.includes(c)) : [],
     };
 
     await db.prepare(`
