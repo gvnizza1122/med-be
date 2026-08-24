@@ -123,6 +123,12 @@ function getDb() {
     user: process.env.DB_USER || 'postgres',
     password: process.env.DB_PASSWORD || 'postgres',
     database: process.env.DB_NAME || 'eclaim',
+    // max (naik dari default pg = 10 ke 30): upload batch memproses file secara
+    // paralel (BATCH_AI_CONCURRENCY di routes/claimFiles.js) dan tiap file
+    // membuka koneksi DB — kalau pool lebih kecil dari concurrency, file-file
+    // paralel saling antre koneksi & throughput dibatasi pool, bukan AI.
+    // Nilai aman untuk Postgres default (max_connections=100).
+    max: parseInt(process.env.DB_POOL_MAX || '30', 10),
   };
 
   if (process.env.DATABASE_URL) {

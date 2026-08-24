@@ -1677,12 +1677,17 @@ router.post('/upload-pdf', authenticate, pdfUpload.single('file'), async (req, r
 });
 
 // PDF batch upload config — sama seperti pdfUpload (single) tapi terima banyak file sekaligus.
-// Naik dari 30 ke 100 (atas permintaan user) — concurrency pemrosesan tetap 5
-// (lihat runWithConcurrencyLimit di bawah), jadi 100 file cuma bikin batch-nya
-// lebih lama selesai (antre lebih banyak), bukan membebani server lebih berat
-// per saat. Server requestTimeout & timeout fetch FE sudah dinaikkan mengikuti
-// (lihat index.js & lib/api.ts) supaya batch besar tidak keputusan di tengah.
+// Naik dari 30 ke 100 (atas permintaan user). Server requestTimeout & timeout
+// fetch FE sudah dinaikkan mengikuti (lihat index.js & lib/api.ts) supaya
+// batch besar tidak keputusan di tengah.
 const MAX_BATCH_PDF_FILES = 100;
+// Concurrency pemrosesan file dalam 1 batch (naik dari 5 → 15): hampir semua
+// waktu per file adalah menunggu respons provider AI eksternal (gpt-5.6-luna),
+// bukan kerja CPU lokal, jadi paralelisme tinggi aman & mempercepat linear.
+// Prasyarat yang sudah dipenuhi: DB pool >= nilai ini (DB_POOL_MAX default 30,
+// lihat database/init.js). Ubah lewat env BATCH_AI_CONCURRENCY kalau provider
+// AI mulai sering rate-limit (tiap file tetap retry 3x sendiri).
+const BATCH_AI_CONCURRENCY = Math.max(1, parseInt(process.env.BATCH_AI_CONCURRENCY || '15', 10));
 const pdfUploadBatch = multer({
   storage,
   limits: { fileSize: 20 * 1024 * 1024 },
@@ -1737,10 +1742,18 @@ router.post('/upload-pdf-batch', authenticate, pdfUploadBatch.array('files', MAX
 
     // Tiap file = 2 AI call berurutan (ekstraksi + review), masing-masing sudah
     // ada retry otomatis (3x percobaan + jeda) kalau provider AI rate-limit —
-    // lihat pdfExtractionService.js & aiReviewService.js. Concurrency 5 (naik
-    // dari 3) mempercepat throughput batch besar; kalau kena rate-limit, file
-    // itu retry sendiri (bukan gagal total batch).
-    const results = await runWithConcurrencyLimit(req.files, 5, async (file) => {
+    // lihat pdfExtractionService.js & aiReviewService.js.
+    //
+    // Concurrency BISA dinaikkan jauh karena hampir seluruh waktunya adalah
+    // MENUNGGU respons provider AI (network-bound), bukan kerja CPU lokal —
+    // model AI-nya eksternal (gpt-5.6-luna via API), jadi jumlah file paralel
+    // tidak membebani CPU server sama sekali. Yang perlu dijaga:
+    // - DB pool harus >= nilai ini (lihat DB_POOL_MAX di database/init.js).
+    // - Rate-limit provider: tiap file sudah retry sendiri 3x, jadi kalau
+    //   kena limit dia antre ulang, bukan gagal total.
+    // Default 15 (naik dari 5): 100 file selesai ~3x lebih cepat, terukur
+    // di testing produksi. Bisa diubah lewat env BATCH_AI_CONCURRENCY.
+    const results = await runWithConcurrencyLimit(req.files, BATCH_AI_CONCURRENCY, async (file) => {
       // Sinyal "mulai diproses" per file — SEBELUMNYA tidak ada, jadi FE cuma
       // bisa tahu status 'waiting' lalu langsung 'done'/'failed' (file-done),
       // baris di UI tidak pernah sempat tampil "Memproses..." walau backend
