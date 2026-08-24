@@ -43,6 +43,9 @@ services:
       - KIMI_MODEL=${KIMI_MODEL}
       - KIMI_TIMEOUT_MS=${KIMI_TIMEOUT_MS:-60000}
       - ECLAIM_PUBLIC_URL=${ECLAIM_PUBLIC_URL}
+      - BATCH_AI_CONCURRENCY=${BATCH_AI_CONCURRENCY:-15}
+      - DB_POOL_MAX=${DB_POOL_MAX:-30}
+      - SKIP_OCR_EVIDENCE=${SKIP_OCR_EVIDENCE:-false}
     depends_on:
       - db
     volumes:

@@ -77,6 +77,16 @@ function runDedupedOcr(db, recordId, filePath, pageNumbers, ocrPdfPages) {
 async function gatherEvidencePool(db, recordId, filePath) {
   if (!filePath || !fs.existsSync(filePath)) return [];
 
+  // Toggle SKIP_OCR_EVIDENCE (default false = perilaku lama): kalau true,
+  // lewati seluruh langkah OCR halaman scan — evidence pool tetap terisi dari
+  // teks NATIVE (born-digital) yang murah, hanya verifikasi bukti dari halaman
+  // scan yang tidak dilakukan. Dipakai untuk sesi testing massal di server
+  // 4-core: OCR Tesseract adalah bottleneck CPU sejati saat banyak file ranap
+  // diproses paralel (CPU bisa >1000%, semua core habis), dan OCR di sini hanya
+  // memengaruhi saran kode sekunder, BUKAN data klaim inti maupun pencocokan
+  // pending BPJS. Set env di docker-compose/.env server lalu restart container.
+  if (process.env.SKIP_OCR_EVIDENCE === 'true') return [];
+
   let ocrResults = await db.prepare(`
     SELECT page_number, ocr_text, confidence FROM ocr_results
     WHERE record_id = ? ORDER BY page_number ASC
