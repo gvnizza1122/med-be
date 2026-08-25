@@ -50,3 +50,6 @@ coverage/
 *.seed
 *.pid.lock
 *.traineddata
+
+# Bulk test upload logs (scripts/bulkTestUpload.js)
+bulk-upload-log-*.json

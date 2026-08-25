@@ -20,14 +20,24 @@
 
 const fs = require('fs');
 const path = require('path');
+const { fetch, Agent, FormData } = require('undici');
 
-const CHUNK_SIZE = 100;
 const JENIS_MAP = { rajal: 'RAWAT_JALAN', ranap: 'RAWAT_INAP', igd: 'GAWAT_DARURAT' };
+// Ukuran chunk (jumlah file per request HTTP). Backend mentok di 100, tapi
+// untuk koneksi WiFi yang labil lebih baik KECIL (10-20 file): tiap request
+// cuma transfer puluhan MB selama beberapa detik-menit — kalau putus di
+// tengah, cuma 1 chunk kecil yang perlu diulang, bukan 155 MB dari nol.
+// Bisa diubah lewat env TEST_CHUNK_SIZE.
+const CHUNK_SIZE = Math.max(1, parseInt(process.env.TEST_CHUNK_SIZE || '100', 10));
 // Tanpa ini, fetch bisa menggantung selamanya kalau 1 chunk macet di server
-// (mis. OCR lambat). Default 3 jam per chunk (100 file) supaya cukup toleran,
+// (mis. OCR lambat). Default 3 jam per chunk supaya cukup toleran,
 // tapi kalau tetap macet, chunk itu di-skip otomatis dan lanjut ke chunk
 // berikutnya (bukan berhenti total). Bisa diubah lewat env TEST_CHUNK_TIMEOUT_MS.
 const CHUNK_TIMEOUT_MS = Number(process.env.TEST_CHUNK_TIMEOUT_MS) || 3 * 60 * 60 * 1000;
+// undici (dipakai global fetch Node) punya headersTimeout default 300 detik —
+// OCR sinkron 100 file per batch bisa jauh lebih lama dari itu, jadi harus
+// pakai Agent kustom dengan timeout selaras CHUNK_TIMEOUT_MS, bukan fetch bawaan.
+const dispatcher = new Agent({ headersTimeout: CHUNK_TIMEOUT_MS, bodyTimeout: CHUNK_TIMEOUT_MS });
 
 function parseArgs(argv) {
   const folder = argv[2];
@@ -42,6 +52,7 @@ async function login(baseUrl, username, password) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, password }),
+    dispatcher,
   });
   if (!res.ok) throw new Error(`Login gagal: HTTP ${res.status} ${await res.text()}`);
   return res.json();
@@ -52,6 +63,7 @@ async function refreshToken(baseUrl, refresh_token) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ refresh_token }),
+    dispatcher,
   });
   if (!res.ok) throw new Error(`Refresh token gagal: HTTP ${res.status}`);
   return res.json();
@@ -73,6 +85,7 @@ async function uploadChunk(baseUrl, accessToken, files, jenis) {
       headers: { Authorization: `Bearer ${accessToken}` },
       body: form,
       signal: controller.signal,
+      dispatcher,
     });
     const data = await res.json();
     if (!res.ok) throw new Error(`Upload batch gagal: HTTP ${res.status} ${JSON.stringify(data)}`);
@@ -105,9 +118,16 @@ async function main() {
     process.exit(1);
   }
 
-  const allFiles = fs.readdirSync(folder)
-    .filter(f => /\.pdf$/i.test(f))
-    .map(f => path.join(folder, f));
+  function walkPdfs(dir) {
+    const out = [];
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) out.push(...walkPdfs(full));
+      else if (/\.pdf$/i.test(entry.name)) out.push(full);
+    }
+    return out;
+  }
+  const allFiles = walkPdfs(folder);
   if (allFiles.length === 0) {
     console.error(`Tidak ada file .pdf ditemukan di ${folder}`);
     process.exit(1);
