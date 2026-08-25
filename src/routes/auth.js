@@ -49,7 +49,10 @@ router.post('/login', async (req, res) => {
       { expiresIn: JWT_REFRESH_EXPIRES_IN }
     );
 
-    await db.prepare("UPDATE users SET last_login = datetime('now') WHERE id = ?").run(user.id);
+    // Async background: don't block login response on DB writes
+    db.prepare("UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?").run(user.id).catch(err => {
+      console.error('Failed to update last_login:', err.message);
+    });
 
     logAudit({
       userId: user.id,
@@ -58,6 +61,8 @@ router.post('/login', async (req, res) => {
       resourceType: 'auth',
       ipAddress: req.ip,
       userAgent: req.get('User-Agent')
+    }).catch(err => {
+      console.error('Failed to log audit:', err.message);
     });
 
     res.json({
