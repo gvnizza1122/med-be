@@ -40,7 +40,46 @@ function isClaimDataPage(text) {
   return extraHits.length >= 2;
 }
 
+// Pembatas jumlah panggilan classifyPdfPages() yang boleh jalan bersamaan.
+// PDFParse().getText() (pdf-parse) mem-parse SELURUH struktur PDF secara
+// CPU-berat di thread utama Node (bukan cuma tunggu I/O) — dipanggil untuk
+// SETIAP file yang diupload (malah 2x per file: sekali di
+// pdfExtractionPipeline.js buat ekstraksi utama, sekali lagi di
+// gatherEvidencePool untuk evidence pool audit). Dengan BATCH_AI_CONCURRENCY
+// tinggi (20), sebelumnya bisa sampai puluhan panggilan classifyPdfPages
+// jalan "bersamaan" — tapi karena Node satu-thread, kerja sinkron itu tetap
+// dieksekusi berurutan dan memblokir event-loop sepanjang durasinya,
+// termasuk request lain seperti login (dikonfirmasi: hang total production
+// terjadi lagi 26 Aug 2026 walau OCR fallback SAMA SEKALI TIDAK terpicu —
+// membuktikan classifyPdfPages, bukan OCR/Tesseract, penyebab sesungguhnya).
+// Batasi ke angka kecil supaya CPU tetap tersisa untuk melayani request lain.
+const CLASSIFY_JOB_LIMIT = Math.max(1, parseInt(process.env.CLASSIFY_JOB_CONCURRENCY || '3', 10));
+let classifyJobsRunning = 0;
+const classifyJobWaiters = [];
+async function acquireClassifySlot() {
+  if (classifyJobsRunning < CLASSIFY_JOB_LIMIT) {
+    classifyJobsRunning++;
+    return;
+  }
+  await new Promise((resolve) => classifyJobWaiters.push(resolve));
+  classifyJobsRunning++;
+}
+function releaseClassifySlot() {
+  classifyJobsRunning--;
+  const next = classifyJobWaiters.shift();
+  if (next) next();
+}
+
 async function classifyPdfPages(filePath) {
+  await acquireClassifySlot();
+  try {
+    return await _classifyPdfPagesImpl(filePath);
+  } finally {
+    releaseClassifySlot();
+  }
+}
+
+async function _classifyPdfPagesImpl(filePath) {
   const result = {
     success: false, pages: [], claimDataPages: [], claimDataText: '',
     totalPages: 0, summary: { nativeCount: 0, scanCount: 0 }, errors: [],
