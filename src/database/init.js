@@ -129,6 +129,12 @@ function getDb() {
     // paralel saling antre koneksi & throughput dibatasi pool, bukan AI.
     // Nilai aman untuk Postgres default (max_connections=100).
     max: parseInt(process.env.DB_POOL_MAX || '30', 10),
+    // Connection timeout: jangan tunggu connection > 10 detik (login responsive)
+    connectionTimeoutMillis: 10000,
+    // Idle timeout: release connection yang idle > 30 detik
+    idleTimeoutMillis: 30000,
+    // Statement timeout: query > 30 detik auto-cancel (jangan block login)
+    statement_timeout: 30000,
   };
 
   if (process.env.DATABASE_URL) {

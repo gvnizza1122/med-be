@@ -22,7 +22,11 @@ router.post('/login', async (req, res) => {
     }
 
     const db = getDb();
-    const user = await db.prepare('SELECT * FROM users WHERE email = ?').get(username);
+    // Select hanya kolom yang diperlukan untuk login (bukan SELECT *)
+    // Ini reduce network transfer dan potential index scan optimization
+    const user = await db.prepare(
+      'SELECT id, email, password_hash, is_active, role, hospital_code FROM users WHERE email = ?'
+    ).get(username);
 
     if (!user) {
       return res.status(401).json({ error: 'Username atau password salah.' });
@@ -32,7 +36,17 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Akun tidak aktif. Hubungi administrator.' });
     }
 
-    const validPassword = bcrypt.compareSync(password, user.password_hash);
+    // Use async comparison jika perlu kecepatan di production
+    // compareSync memblock event loop saat salt rounds tinggi
+    const validPassword = await new Promise((resolve) => {
+      // Non-blocking password check dengan timeout
+      const timeout = setTimeout(() => resolve(false), 5000);
+      bcrypt.compare(password, user.password_hash, (err, match) => {
+        clearTimeout(timeout);
+        resolve(!err && match);
+      });
+    });
+
     if (!validPassword) {
       return res.status(401).json({ error: 'Username atau password salah.' });
     }
