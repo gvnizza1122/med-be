@@ -33,6 +33,34 @@ const OCR_CONFIG = {
   log_performance: true
 };
 
+// Pembatas jumlah JOB ocrPdfPages() yang boleh jalan bersamaan (beda dari
+// POOL_SIZE di bawah, yang cuma membatasi tahap recognize() Tesseract).
+// Rendering halaman PDF->PNG via mupdf (doc.loadPage/toPixmap/asPNG di
+// ocrPdfPages, resolusi 3x/~216 DPI) itu sendiri CPU-berat dan SEBELUMNYA
+// tidak dibatasi sama sekali — kalau upload batch memproses banyak file
+// paralel (BATCH_AI_CONCURRENCY), tiap file yang butuh OCR fallback ikut
+// me-render halaman PDF-nya secara bersamaan tanpa batas, membanjiri semua
+// core CPU (server hang total, request login pun timeout — dikonfirmasi
+// langsung lewat testing 300-file production 25 Aug 2026). Default 3: cukup
+// rendah supaya render+recognize OCR tidak memonopoli CPU dari proses lain
+// (DB query, HTTP handling), bisa diubah lewat env OCR_JOB_CONCURRENCY.
+const OCR_JOB_LIMIT = Math.max(1, parseInt(process.env.OCR_JOB_CONCURRENCY || '3', 10));
+let ocrJobsRunning = 0;
+const ocrJobWaiters = [];
+async function acquireOcrJobSlot() {
+  if (ocrJobsRunning < OCR_JOB_LIMIT) {
+    ocrJobsRunning++;
+    return;
+  }
+  await new Promise((resolve) => ocrJobWaiters.push(resolve));
+  ocrJobsRunning++;
+}
+function releaseOcrJobSlot() {
+  ocrJobsRunning--;
+  const next = ocrJobWaiters.shift();
+  if (next) next();
+}
+
 // Worker pool tesseract.js — SEBELUMNYA setiap ocrSingleFile() memanggil
 // Tesseract.recognize() (API one-shot) yang bikin worker WASM baru dari nol
 // TIAP KALI dipanggil (spin-up engine + load bahasa eng+ind), padahal ini
@@ -162,6 +190,17 @@ async function ocrSingleFile(input, language = OCR_CONFIG.language) {
  * @returns {Promise<{success, pages: {page_number, text, confidence, block_count, duration_ms}[]}>}
  */
 async function ocrPdfPages(pdfPath, pageNumbers = 'auto-scan', language = OCR_CONFIG.language) {
+  // Batasi berapa banyak PANGGILAN ocrPdfPages (render mupdf + recognize)
+  // yang boleh jalan bersamaan lintas seluruh proses — lihat OCR_JOB_LIMIT.
+  await acquireOcrJobSlot();
+  try {
+    return await _ocrPdfPagesImpl(pdfPath, pageNumbers, language);
+  } finally {
+    releaseOcrJobSlot();
+  }
+}
+
+async function _ocrPdfPagesImpl(pdfPath, pageNumbers, language) {
   if (!Tesseract) {
     throw new Error('[OCR] tesseract.js not available. Install with: npm install tesseract.js');
   }
