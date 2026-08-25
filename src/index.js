@@ -195,11 +195,12 @@ server.listen(PORT, () => {
   console.log(`   CORS: ${process.env.CORS_ORIGIN || 'http://localhost:3000'}\n`);
 });
 // Default Node requestTimeout (~5 menit) lebih pendek dari waktu proses batch
-// besar (upload-pdf-batch: AI+OCR per file, konkurensi 5). Batch maks naik ke
-// 100 file — naikkan lagi ke 40 menit supaya request tidak diputus server
-// sebelum FE-nya sendiri timeout (lib/api.ts uploadPdfBatch pakai 40 menit juga).
-server.requestTimeout = 40 * 60 * 1000;
-server.headersTimeout = 40 * 60 * 1000 + 5000; // harus > requestTimeout (syarat Node)
+// besar (upload-pdf-batch: AI+OCR per file). Batch maks naik ke 300 file (26
+// Aug 2026, permintaan klien) — estimasi ~90 menit — naikkan ke 2 jam supaya
+// request tidak diputus server sebelum FE-nya sendiri timeout (lib/api.ts
+// uploadPdfBatch pakai 2 jam juga) atau nginx (proxy_*_timeout, juga 2 jam).
+server.requestTimeout = 120 * 60 * 1000;
+server.headersTimeout = 120 * 60 * 1000 + 5000; // harus > requestTimeout (syarat Node)
 }).catch(err => {
   console.error('Failed to start server:', err);
   process.exit(1);
