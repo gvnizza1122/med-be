@@ -1,6 +1,3 @@
-const { PDFParse } = require('pdf-parse');
-const fs = require('fs');
-
 // ponytail: classifier pakai pdf-parse (sudah terpasang) — pdfjs-dist v4 tak jalan di CommonJS.
 // 'DPJP' & 'Dokter Penanggung Jawab' ikut: nama dokter ada di layer teks (halaman SPRI/SEP),
 // bukan di halaman E-Klaim — tanpa ini kolom DPJP vClaim selalu kosong.
@@ -40,98 +37,44 @@ function isClaimDataPage(text) {
   return extraHits.length >= 2;
 }
 
-// Pembatas jumlah panggilan classifyPdfPages() yang boleh jalan bersamaan.
-// PDFParse().getText() (pdf-parse) mem-parse SELURUH struktur PDF secara
-// CPU-berat di thread utama Node (bukan cuma tunggu I/O) — dipanggil untuk
-// SETIAP file yang diupload (malah 2x per file: sekali di
-// pdfExtractionPipeline.js buat ekstraksi utama, sekali lagi di
-// gatherEvidencePool untuk evidence pool audit). Dengan BATCH_AI_CONCURRENCY
-// tinggi (20), sebelumnya bisa sampai puluhan panggilan classifyPdfPages
-// jalan "bersamaan" — tapi karena Node satu-thread, kerja sinkron itu tetap
-// dieksekusi berurutan dan memblokir event-loop sepanjang durasinya,
-// termasuk request lain seperti login (dikonfirmasi: hang total production
-// terjadi lagi 26 Aug 2026 walau OCR fallback SAMA SEKALI TIDAK terpicu —
-// membuktikan classifyPdfPages, bukan OCR/Tesseract, penyebab sesungguhnya).
-// Batasi ke angka kecil supaya CPU tetap tersisa untuk melayani request lain.
-const CLASSIFY_JOB_LIMIT = Math.max(1, parseInt(process.env.CLASSIFY_JOB_CONCURRENCY || '3', 10));
-let classifyJobsRunning = 0;
-const classifyJobWaiters = [];
-async function acquireClassifySlot() {
-  if (classifyJobsRunning < CLASSIFY_JOB_LIMIT) {
-    classifyJobsRunning++;
-    return;
+// classifyPdfPages() DULU jalan inline di thread utama — pdf-parse mem-parse
+// SELURUH struktur PDF secara CPU-berat & sinkron, dipanggil untuk SETIAP
+// file diupload (2x per file: pdfExtractionPipeline.js + gatherEvidencePool).
+// Sempat dicoba dibatasi pakai semaphore Promise (CLASSIFY_JOB_CONCURRENCY)
+// — TERBUKTI GAGAL di testing production 26 Aug 2026: semaphore Promise cuma
+// mengatur GILIRAN di thread yang sama, bukan memindahkan kerjanya ke thread
+// lain, jadi total waktu blocking event-loop tetap sama persis. Solusi yang
+// benar: jalankan pdf-parse di worker_threads (thread OS terpisah) lewat
+// workerThreadPool.js — lihat src/workers/pdfClassifyWorker.js untuk isi
+// kerjanya (duplikat logika di bawah, sengaja berdiri sendiri di worker).
+const path = require('path');
+const { createWorkerPool } = require('./workerThreadPool');
+const CLASSIFY_POOL_SIZE = Math.max(1, parseInt(process.env.CLASSIFY_WORKER_POOL_SIZE || '3', 10));
+let classifyPool = null;
+function getClassifyPool() {
+  if (!classifyPool) {
+    classifyPool = createWorkerPool(path.join(__dirname, '..', 'workers', 'pdfClassifyWorker.js'), CLASSIFY_POOL_SIZE);
   }
-  await new Promise((resolve) => classifyJobWaiters.push(resolve));
-  classifyJobsRunning++;
-}
-function releaseClassifySlot() {
-  classifyJobsRunning--;
-  const next = classifyJobWaiters.shift();
-  if (next) next();
+  return classifyPool;
 }
 
 async function classifyPdfPages(filePath) {
-  await acquireClassifySlot();
-  try {
-    return await _classifyPdfPagesImpl(filePath);
-  } finally {
-    releaseClassifySlot();
-  }
+  const pool = getClassifyPool();
+  const isBuffer = typeof filePath !== 'string';
+  return pool.run({
+    filePath: isBuffer ? null : filePath,
+    bufferData: isBuffer ? filePath : null,
+  });
 }
 
-async function _classifyPdfPagesImpl(filePath) {
-  const result = {
-    success: false, pages: [], claimDataPages: [], claimDataText: '',
-    totalPages: 0, summary: { nativeCount: 0, scanCount: 0 }, errors: [],
-  };
-  try {
-    const data = typeof filePath === 'string' ? fs.readFileSync(filePath) : filePath;
-    const parsed = await new PDFParse({ data }).getText();
-    const full = parsed.text || '';
-
-    // Split per halaman via marker "-- N of M --" (konsisten dgn pdfParser.js).
-    const markers = [...full.matchAll(/--\s*(\d+)\s*of\s*(\d+)\s*--/gi)];
-    let chunks;
-    if (markers.length) {
-      chunks = []; let last = 0;
-      for (const m of markers) { chunks.push(full.slice(last, m.index)); last = m.index + m[0].length; }
-      const tail = full.slice(last).trim();
-      if (tail) chunks.push(tail);
-    } else {
-      chunks = [full]; // fallback: tak ada marker, treat 1 chunk
-    }
-
-    chunks.forEach((chunk, i) => {
-      const text = chunk.trim();
-      const type = text.length < SCAN_CHAR_THRESHOLD ? 'SCAN' : 'NATIVE';
-      const hasClaimData = isClaimDataPage(text);
-      // is_primary_source: HANYA halaman "Berkas Klaim Individual" (E-Klaim
-      // summary) yang sungguhan — beda dari has_claim_data yang sengaja luas
-      // (mencakup halaman SEP/Resume Medis/SPRI supaya field SEP/NOKARTU/DPJP
-      // ikut terbaca saat ekstraksi). Dipakai KHUSUS untuk kecualikan halaman
-      // dari evidence pool (cegah audit sirkular) — kalau pakai has_claim_data
-      // yang luas di situ, halaman Resume Medis/SPRI yang punya bukti klinis
-      // ASLI (bukan sumber ekstraksi DIAGLIST/PROCLIST) ikut ter-eksklusi
-      // secara tidak sengaja, padahal itu justru bukti yang valid.
-      const isPrimarySource = text.toLowerCase().includes(PRIMARY_KEYWORD.toLowerCase());
-      const pageNum = i + 1;
-      if (hasClaimData) result.claimDataPages.push({ page_num: pageNum, text });
-      result.pages.push({ page_num: pageNum, type, text_length: text.length, has_claim_data: hasClaimData, is_primary_source: isPrimarySource, text_sample: text.slice(0, 200), text_full: text });
-      if (type === 'NATIVE') result.summary.nativeCount++; else result.summary.scanCount++;
-    });
-    result.totalPages = chunks.length;
-
-    // Gabung semua halaman claim-data, "Berkas Klaim Individual" (E-Klaim summary) di depan.
-    const primary = result.claimDataPages.filter(p => p.text.toLowerCase().includes(PRIMARY_KEYWORD.toLowerCase()));
-    const others = result.claimDataPages.filter(p => !p.text.toLowerCase().includes(PRIMARY_KEYWORD.toLowerCase()));
-    result.claimDataText = [...primary, ...others].map(p => p.text).join('\n\n---\n\n');
-
-    result.success = true;
-  } catch (error) {
-    result.errors.push({ type: 'classification_error', message: error.message });
+async function shutdownClassifyPool() {
+  if (classifyPool) {
+    await classifyPool.shutdown();
+    classifyPool = null;
   }
-  return result;
 }
+process.on('SIGTERM', () => { shutdownClassifyPool(); });
+process.on('SIGINT', () => { shutdownClassifyPool(); });
 
 /**
  * Deteksi kategori pelayanan (jenis_klaim) dari ISI dokumen — dipakai buat
