@@ -14,8 +14,12 @@ const { generateAiReview } = require('../services/aiReviewService');
 const { getRelevantKnowledge, recordKnowledge, getRelevantBpjsExamples } = require('../services/errorKnowledgeService');
 const { matchPrbCategory } = require('../services/prbRules');
 const { linkPendingBpjsForSep } = require('../services/bpjsPendingLink');
+const { queueAiReview } = require('../services/queueService');
 
 const router = express.Router();
+
+// Flag untuk enable/disable async AI review background job
+const REVIEW_ASYNC = process.env.REVIEW_ASYNC === 'true';
 
 // OCR (tesseract.js) berat di CPU dan makan waktu tak terduga. Sebelumnya tiap
 // panggilan ke /ocr-pages yang belum ada hasilnya langsung memicu proses baru
@@ -1628,14 +1632,25 @@ async function processSinglePdfUpload(db, { filePath, originalName, jenisKlaim: 
     let aiReview = null;
     try {
       const evidencePool = await gatherEvidencePool(db, recordId, resolvedFilePath);
-      const knowledgeEntries = await getRelevantKnowledge(db, validationErrors.map(e => e.rule_id));
-      const bpjsExamples = await getRelevantBpjsExamples(db);
-      aiReview = await generateAiReview(extractedData, validationErrors, evidencePool, knowledgeEntries, bpjsExamples);
-      if (aiReview) {
-        await db.prepare('UPDATE claim_records SET ai_review = ? WHERE id = ?')
-          .run(JSON.stringify(aiReview), recordId);
-        recordKnowledge(db, aiReview.knowledge_updates).catch(kbErr =>
-          console.warn(`[upload-pdf] Gagal simpan knowledge base: ${kbErr.message}`));
+
+      if (REVIEW_ASYNC) {
+        // Queue AI review untuk background processing (return langsung, jangan tunggu)
+        queueAiReview(recordId, extractedData, validationErrors, evidencePool).catch(err =>
+          console.warn(`[upload-pdf] Gagal queue AI review untuk record ${recordId}: ${err.message}`));
+        // Tandai status pending_review — akan di-update oleh worker setelah selesai
+        await db.prepare('UPDATE claim_records SET ai_status = ? WHERE id = ?')
+          .run('pending', recordId);
+      } else {
+        // Jalankan sinkron (mode lama) — tunggu AI review selesai sebelum return response
+        const knowledgeEntries = await getRelevantKnowledge(db, validationErrors.map(e => e.rule_id));
+        const bpjsExamples = await getRelevantBpjsExamples(db);
+        aiReview = await generateAiReview(extractedData, validationErrors, evidencePool, knowledgeEntries, bpjsExamples);
+        if (aiReview) {
+          await db.prepare('UPDATE claim_records SET ai_review = ? WHERE id = ?')
+            .run(JSON.stringify(aiReview), recordId);
+          recordKnowledge(db, aiReview.knowledge_updates).catch(kbErr =>
+            console.warn(`[upload-pdf] Gagal simpan knowledge base: ${kbErr.message}`));
+        }
       }
     } catch (aiErr) {
       console.warn(`[upload-pdf] AI review gagal untuk record ${recordId}: ${aiErr.message}`);

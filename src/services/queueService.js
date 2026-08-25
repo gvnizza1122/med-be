@@ -1,5 +1,5 @@
 const { v4: uuidv4 } = require('uuid');
-const { pdfProcessingQueue } = require('../config/queue');
+const { pdfProcessingQueue, aiReviewQueue } = require('../config/queue');
 const { getDb } = require('../database/init');
 
 // Create batch job and return batch_id
@@ -129,6 +129,24 @@ async function cleanupOldJobs(ageHours = 24) {
   `).run(cutoffTime);
 }
 
+// Queue AI review task untuk background processing
+async function queueAiReview(recordId, extractedData, validationErrors, evidencePool = []) {
+  const jobData = {
+    recordId,
+    extractedData,
+    validationErrors,
+    evidencePool,
+    timestamp: new Date().toISOString(),
+  };
+
+  const job = await aiReviewQueue.add(`review-${recordId}`, jobData, {
+    jobId: recordId,
+    priority: 10,
+  });
+
+  return job;
+}
+
 module.exports = {
   createBatch,
   queueFile,
@@ -140,4 +158,5 @@ module.exports = {
   getBatchStatus,
   getQueueStats,
   cleanupOldJobs,
+  queueAiReview,
 };
