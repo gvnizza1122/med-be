@@ -507,5 +507,6 @@ module.exports = {
   generateAiReview,
   validateQuotation,
   normalizeText,
+  hasFinancialTerms,
   AI_REVIEW_SYSTEM_PROMPT,
 };

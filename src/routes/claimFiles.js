@@ -1687,10 +1687,15 @@ router.post('/upload-pdf', authenticate, pdfUpload.single('file'), async (req, r
 });
 
 // PDF batch upload config — sama seperti pdfUpload (single) tapi terima banyak file sekaligus.
-// Naik dari 30 ke 100 (atas permintaan user). Server requestTimeout & timeout
-// fetch FE sudah dinaikkan mengikuti (lihat index.js & lib/api.ts) supaya
-// batch besar tidak keputusan di tengah.
-const MAX_BATCH_PDF_FILES = 100;
+// Naik dari 100 ke 300 (26 Aug 2026, permintaan klien: minimal bisa upload
+// 300 file sekaligus). Estimasi durasi ~90 menit untuk 300 file (konsisten
+// dengan hasil testing 50 file = ~15,5 menit dgn BATCH_AI_CONCURRENCY=20) —
+// server requestTimeout, timeout fetch FE, dan nginx proxy_*_timeout semua
+// sudah dinaikkan mengikuti (lihat index.js, lib/api.ts, nginx
+// sites-available/medaudit) supaya batch besar tidak keputusan di tengah.
+// Progress per-file tetap real-time lewat socket.io (pdf-batch:file-done)
+// yang independen dari request HTTP utama & timeout-nya sendiri.
+const MAX_BATCH_PDF_FILES = 300;
 // Concurrency pemrosesan file dalam 1 batch (naik dari 5 → 15): hampir semua
 // waktu per file adalah menunggu respons provider AI eksternal (gpt-5.6-luna),
 // bukan kerja CPU lokal, jadi paralelisme tinggi aman & mempercepat linear.

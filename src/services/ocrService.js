@@ -33,6 +33,32 @@ const OCR_CONFIG = {
   log_performance: true
 };
 
+// Render halaman PDF->PNG via mupdf (dulu doc.loadPage/toPixmap/asPNG inline
+// di sini, resolusi 3x/~216 DPI) itu sendiri CPU-berat & SINKRON — sempat
+// "dibatasi" pakai semaphore Promise (OCR_JOB_CONCURRENCY), TAPI TERBUKTI
+// TIDAK CUKUP di testing production 26 Aug 2026 (dibuktikan lewat
+// classifyPdfPages yang punya masalah identik — lihat catatan panjang di
+// pdfPageClassifier.js): semaphore Promise cuma mengatur giliran di thread
+// utama yang sama, TIDAK memindahkan kerja sinkronnya, jadi event-loop tetap
+// terblokir sepanjang durasi render walau "concurrency" dibatasi kecil.
+// Solusi yang benar: render di worker_threads (thread OS terpisah) lewat
+// workerThreadPool.js — lihat src/workers/pdfRenderWorker.js.
+const { createWorkerPool } = require('./workerThreadPool');
+const RENDER_POOL_SIZE = Math.max(1, parseInt(process.env.PDF_RENDER_WORKER_POOL_SIZE || '3', 10));
+let renderPool = null;
+function getRenderPool() {
+  if (!renderPool) {
+    renderPool = createWorkerPool(path.join(__dirname, '..', 'workers', 'pdfRenderWorker.js'), RENDER_POOL_SIZE);
+  }
+  return renderPool;
+}
+async function shutdownRenderPool() {
+  if (renderPool) {
+    await renderPool.shutdown();
+    renderPool = null;
+  }
+}
+
 // Worker pool tesseract.js — SEBELUMNYA setiap ocrSingleFile() memanggil
 // Tesseract.recognize() (API one-shot) yang bikin worker WASM baru dari nol
 // TIAP KALI dipanggil (spin-up engine + load bahasa eng+ind), padahal ini
@@ -96,8 +122,8 @@ async function shutdownOcrPool() {
   workerPoolPromise = null;
   await Promise.all(pool.map(w => w.worker.terminate().catch(() => {})));
 }
-process.on('SIGTERM', () => { shutdownOcrPool(); });
-process.on('SIGINT', () => { shutdownOcrPool(); });
+process.on('SIGTERM', () => { shutdownOcrPool(); shutdownRenderPool(); });
+process.on('SIGINT', () => { shutdownOcrPool(); shutdownRenderPool(); });
 
 /**
  * OCR a single PDF or image file
@@ -211,13 +237,10 @@ async function ocrPdfPages(pdfPath, pageNumbers = 'auto-scan', language = OCR_CO
 
       const pageStart = Date.now();
       try {
-        const page = doc.loadPage(pageNum - 1); // mupdf 0-indexed
-        // 3.0 (~216 DPI, naik dari 2.0/~144 DPI) — halaman padat/print kecil
-        // (mis. label parameter di sekitar strip EKG) sering gagal terbaca
-        // di resolusi lebih rendah. Trade-off: OCR sedikit lebih lambat.
-        const matrix = mupdf.Matrix.scale(3.0, 3.0);
-        const pixmap = page.toPixmap(matrix, mupdf.ColorSpace.DeviceRGB, false, true);
-        const pngBuffer = Buffer.from(pixmap.asPNG());
+        // Render (dulu inline: doc.loadPage/toPixmap/asPNG di thread utama —
+        // 3.0/~216 DPI CPU-berat) sekarang di worker_threads terpisah, lihat
+        // catatan panjang di atas RENDER_POOL_SIZE.
+        const pngBuffer = await getRenderPool().run({ bufferData: buf, pageNum });
 
         const ocrResult = await ocrSingleFile(pngBuffer, language);
 
