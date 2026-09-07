@@ -236,6 +236,14 @@ function buildPrompt(record, validationErrors, evidencePool, codes, knowledgeEnt
     prompt += `\nBUKTI_DOKUMEN: (tidak ada — jangan isi code_evidence/suggested_codes)\n`;
   }
 
+  if (codes.diagnosis.length === 0 && evidencePool.length > 0) {
+    prompt += `\n================================\nINGATKAN DIRIMU SENDIRI SEBELUM MENJAWAB: DIAGLIST kosong (lihat di atas). ` +
+      `Baca ULANG semua halaman BUKTI_DOKUMEN yang barusan kamu terima di atas, cari SATU PER SATU label ` +
+      `"Diagnosis Utama", "Diagnosa Kerja", "Diagnosa" (di SPRI), "Assessment"/"A:". Kalau ketemu SATU SAJA ` +
+      `di halaman mana pun, WAJIB isi minimal 1 entri di suggested_codes (lihat instruksi task 3) — kosongkan ` +
+      `suggested_codes HANYA kalau kamu benar-benar sudah baca semua halaman dan tidak ada satu pun label itu.\n`;
+  }
+
   return prompt;
 }
 
