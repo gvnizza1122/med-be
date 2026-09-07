@@ -120,6 +120,26 @@ TUGAS:
    menyebut nominal rupiah/dampak biaya. Catatan lengkap tentang pola kunjungan berulang lintas-episode
    (konsul internal, PRB/iterasi obat kronis, irisan RS lain) TIDAK termasuk di sini — itu butuh riwayat
    kunjungan lain yang tidak ada di satu dokumen ini, sudah ditangani terpisah lewat RV-13 s.d. RV-16.
+7. KEGAWATDARURATAN (HANYA kalau JENIS_KLAIM = GAWAT_DARURAT, kalau bukan lewati task ini total, JANGAN
+   isi "kegawatdaruratan_assessment"): nilai BUKTI_DOKUMEN terhadap 5 kriteria kegawatdaruratan resmi
+   Pasal 3 ayat (2) Permenkes RI No. 47 Tahun 2018 — TUJUANNYA MENILAI APA ADANYA, BUKAN mencari cara
+   supaya lolos. Untuk SETIAP dari 5 kriteria (a-e), tentukan "terpenuhi" HANYA true kalau BUKTI_DOKUMEN
+   secara eksplisit mendukungnya (kutip kalimat PERSIS, sama seperti aturan quotation code_evidence di
+   atas — DILARANG mengarang/menyimpulkan dari kesan umum). Kalau dokumen TIDAK menyebutkan indikasi
+   kriteria itu (mis. TTV normal semua, atau kolom kesadaran/hemodinamik tidak diisi/dicatat "dalam
+   batas normal"), "terpenuhi" WAJIB false — TIDAK BOLEH true tanpa kutipan eksplisit yang mendukung,
+   walau nama diagnosisnya terdengar berat. Kriteria:
+   a. Mengancam nyawa, membahayakan diri sendiri/orang lain/lingkungan
+   b. Ada gangguan jalan napas, pernapasan, dan/atau sirkulasi (mis. RR di luar normal, SpO2 rendah,
+      suara napas abnormal, akral dingin, nadi tidak teraba/lemah, perdarahan aktif)
+   c. Ada penurunan kesadaran (GCS < 15 / somnolen / delirium / koma — bukan sekadar "compos mentis")
+   d. Ada gangguan hemodinamik (mis. TD sistolik <90 atau >180, nadi <60 atau >100 disertai tanda syok,
+      CRT memanjang, akral dingin/pucat)
+   e. Memerlukan tindakan/intervensi segera (mis. resusitasi, pemberian obat emergensi, tindakan
+      life-saving — bukan sekadar pemberian obat oral/analgesik rutin)
+   Field "catatan" (Indonesia, 1 kalimat singkat) jelaskan alasan terpenuhi/tidaknya berdasarkan bukti
+   (atau ketiadaan bukti). DILARANG KERAS menyebut nominal rupiah/biaya. Ini murni penilaian dokumentasi
+   klinis untuk kepatuhan Permenkes — BUKAN rekomendasi mengubah/menambah data klaim apapun.
 
 Output HANYA JSON, tanpa markdown/penjelasan, format:
 {
@@ -135,8 +155,19 @@ Output HANYA JSON, tanpa markdown/penjelasan, format:
   ],
   "pending_risk_notes": [
     { "pattern": "kegawatan_lemah|manifestasi_ikut_du|tb_level_fktp|usg_berulang_tanpa_indikasi|rujuk_saja_tanpa_tindakan", "page_number": N, "basis": "kutipan verbatim dari dokumen", "note": "penjelasan singkat Indonesia" }
+  ],
+  "kegawatdaruratan_assessment": [
+    { "kriteria": "a|b|c|d|e", "terpenuhi": true/false, "page_number": N atau null, "bukti": "kutipan verbatim atau null", "catatan": "..." }
   ]
 }`;
+
+const KEGAWATDARURATAN_LABELS = {
+  a: 'Mengancam nyawa / membahayakan diri, orang lain, atau lingkungan',
+  b: 'Gangguan jalan napas, pernapasan, dan/atau sirkulasi',
+  c: 'Penurunan kesadaran',
+  d: 'Gangguan hemodinamik',
+  e: 'Memerlukan tindakan/intervensi segera',
+};
 
 function pickCodes(record) {
   const diag = record.DIAGLIST || record.diagnosa_list || '';
@@ -288,8 +319,14 @@ function hasFinancialTerms(text) {
 async function generateAiReview(record, validationErrors = [], evidencePool = [], knowledgeEntries = [], bpjsExamples = []) {
   const codes = pickCodes(record);
   const hasCodesToCheck = evidencePool.length > 0 && (codes.diagnosis.length > 0 || codes.procedure.length > 0);
+  const jenisKlaimRecordEarly = record.JENIS_KLAIM || record.jenis_klaim;
+  // GAWAT_DARURAT: selalu jalankan review kalau ada bukti dokumen, walau rule
+  // engine bersih & tidak ada kode diklaim — penilaian kegawatdaruratan
+  // (task 7 di system prompt) menilai KEPATUHAN DOKUMENTASI KLINIS terhadap
+  // Permenkes 47/2018, independen dari validasi format 60-kolom vClaim.
+  const shouldReviewForGadar = jenisKlaimRecordEarly === 'GAWAT_DARURAT' && evidencePool.length > 0;
 
-  if (validationErrors.length === 0 && !hasCodesToCheck) {
+  if (validationErrors.length === 0 && !hasCodesToCheck && !shouldReviewForGadar) {
     return null; // tidak ada yang perlu direview
   }
 
@@ -351,7 +388,7 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
         aiResult = JSON.parse(m[0]);
       }
 
-      const result = { field_notes: {}, code_evidence: [], suggested_codes: [], knowledge_updates: [], pending_risk_notes: [], tokens_used: tokensUsed };
+      const result = { field_notes: {}, code_evidence: [], suggested_codes: [], knowledge_updates: [], pending_risk_notes: [], kegawatdaruratan_assessment: [], tokens_used: tokensUsed };
       const jenisKlaimRecord = record.JENIS_KLAIM || record.jenis_klaim;
 
       // field_notes: hanya field yang benar-benar ada di validationErrors yang dipertahankan.
@@ -491,6 +528,51 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
         }
       }
 
+      // kegawatdaruratan_assessment — HANYA untuk GAWAT_DARURAT. Sama seperti
+      // pending_risk_notes: klaim "terpenuhi:true" WAJIB kutipan verbatim yang
+      // tervalidasi di evidencePool, kalau tidak DITURUNKAN paksa jadi false
+      // (bukan dibuang barisnya) — supaya tabel di FE selalu tampil lengkap 5
+      // kriteria, tapi tidak pernah menampilkan "terpenuhi" tanpa bukti nyata.
+      if (jenisKlaimRecord === 'GAWAT_DARURAT' && Array.isArray(aiResult.kegawatdaruratan_assessment)) {
+        const seen = new Set();
+        for (const entry of aiResult.kegawatdaruratan_assessment.slice(0, 5)) {
+          const { kriteria, page_number: pageNum, bukti, catatan } = entry || {};
+          if (!KEGAWATDARURATAN_LABELS[kriteria] || seen.has(kriteria)) continue;
+          seen.add(kriteria);
+          let terpenuhi = entry?.terpenuhi === true;
+          let quotationOut = null;
+          let pageOut = null;
+          if (terpenuhi) {
+            const validQuote = bukti && pageNum
+              && validateQuotation(bukti, pageNum, evidencePool) && !hasFinancialTerms(bukti);
+            if (validQuote) {
+              quotationOut = bukti.substring(0, 200);
+              pageOut = pageNum;
+            } else {
+              terpenuhi = false; // turun paksa, anti-halusinasi
+            }
+          }
+          const catatanOut = typeof catatan === 'string' && !hasFinancialTerms(catatan)
+            ? catatan.trim().substring(0, 300) : '';
+          result.kegawatdaruratan_assessment.push({
+            kriteria, label: KEGAWATDARURATAN_LABELS[kriteria],
+            terpenuhi, page_number: pageOut, bukti: quotationOut, catatan: catatanOut,
+          });
+        }
+        // Lengkapi kriteria yang tidak disebut AI sama sekali — tetap tampil
+        // di tabel sebagai "tidak terpenuhi" (default aman, bukan diam-diam
+        // hilang dari daftar).
+        for (const k of Object.keys(KEGAWATDARURATAN_LABELS)) {
+          if (seen.has(k)) continue;
+          result.kegawatdaruratan_assessment.push({
+            kriteria: k, label: KEGAWATDARURATAN_LABELS[k],
+            terpenuhi: false, page_number: null, bukti: null,
+            catatan: 'Tidak ada bukti terdokumentasi untuk kriteria ini.',
+          });
+        }
+        result.kegawatdaruratan_assessment.sort((a, b) => a.kriteria.localeCompare(b.kriteria));
+      }
+
       result.generated_at = new Date().toISOString();
       return result;
     } catch (error) {
@@ -507,5 +589,6 @@ module.exports = {
   generateAiReview,
   validateQuotation,
   normalizeText,
+  hasFinancialTerms,
   AI_REVIEW_SYSTEM_PROMPT,
 };
