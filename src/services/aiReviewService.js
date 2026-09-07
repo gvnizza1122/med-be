@@ -428,6 +428,7 @@ async function suggestDiagnosisCodesFallback(evidencePool) {
     }
 
     const raw = Array.isArray(parsed.suggested_codes) ? parsed.suggested_codes : [];
+    console.warn(`[AI-REVIEW] Fallback: AI mentah mengembalikan ${raw.length} entri suggested_codes.`);
     const out = [];
     for (const entry of raw) {
       const { page_number: pageNum, quotation } = entry || {};
@@ -733,10 +734,11 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
       // — terbukti lebih andal daripada instruksi yang sama di prompt gabungan.
       // Best-effort: gagal/timeout di sini TIDAK menggagalkan hasil utama.
       if (codes.diagnosis.length === 0 && result.suggested_codes.length === 0 && evidencePool.length > 0) {
+        console.warn(`[AI-REVIEW] Memanggil fallback saran diagnosis (evidencePool ${evidencePool.length} halaman)...`);
         try {
           const fallbackSuggestions = await suggestDiagnosisCodesFallback(evidencePool);
+          console.warn(`[AI-REVIEW] Fallback selesai, ${fallbackSuggestions.length} saran lolos filter.`);
           if (fallbackSuggestions.length > 0) {
-            console.warn(`[AI-REVIEW] Fallback call menghasilkan ${fallbackSuggestions.length} saran diagnosis tambahan.`);
             result.suggested_codes.push(...fallbackSuggestions);
           }
         } catch (fallbackErr) {
