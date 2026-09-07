@@ -57,16 +57,30 @@ TUGAS:
    - DILARANG mengarang/menyimpulkan kode dari konteks umum — hanya dari bukti eksplisit di teks.
    - Kalau ragu, tandai found:false — lebih baik tidak menyarankan daripada salah.
 3. suggested_codes HANYA diisi kalau ada bukti KUAT kode itu relevan tapi belum diklaim. Ini termasuk
-   kasus DIAGLIST kosong TOTAL (lihat FIELD_ERRORS rule RV-05): kalau DIAGLIST kosong tapi
-   BUKTI_DOKUMEN memuat istilah diagnosis eksplisit (mis. label "Diag Awal", "Diagnosa",
-   "Assessment"/"A:", "Diagnosa Kerja"),
-   WAJIB usulkan minimal 1 kode ICD-10 di suggested_codes berdasarkan istilah itu — jangan biarkan
-   suggested_codes kosong hanya karena belum ada kode yang diklaim sama sekali. quotation WAJIB kutipan
-   VERBATIM istilah diagnosis dari dokumen (bukan kode ICD-10 itu sendiri, karena kodenya memang tidak
-   tercetak di dokumen — itulah sebabnya diusulkan); reasoning jelaskan pemetaan istilah -> kode secara
-   singkat. Kalau istilah diagnosisnya ambigu/terlalu umum untuk dipetakan ke 1 kode pasti, boleh usulkan
-   lebih dari 1 kandidat kode dengan reasoning masing-masing, atau lewati kalau benar-benar tidak yakin —
-   jangan mengarang kode hanya supaya field ini terisi.
+   kasus DIAGLIST kosong TOTAL (lihat FIELD_ERRORS rule RV-05) — PALING SERING terjadi saat dokumen
+   TIDAK PUNYA halaman resmi "Berkas Klaim Individual" (E-Klaim), cuma kumpulan dokumen naratif RS
+   (Resume Medis, SPRI, Triage IGD, dst). Untuk kasus ini WAJIB HUKUMNYA: baca ULANG SELURUH halaman
+   di BUKTI_DOKUMEN satu per satu (bukan cuma halaman pertama yang ketemu) — istilah diagnosis sering
+   tersebar di halaman berbeda dengan label berbeda-beda, semua ini valid sumber:
+   "Diagnosis Utama", "Diagnosa Kerja", "Diagnosa" (di SPRI/Surat Perintah Rawat Inap), "Assessment"/"A:"
+   (format S-O-A-P), "Diag Awal". WAJIB usulkan minimal 1 kode ICD-10 di suggested_codes kalau SATU SAJA
+   dari label-label itu ditemukan di mana pun di BUKTI_DOKUMEN — jangan biarkan suggested_codes kosong
+   hanya karena tidak ada halaman "Berkas Klaim Individual", dan jangan berhenti mencari cuma karena
+   halaman pertama yang dibaca tidak mengandungnya.
+   PRIORITAS kalau ada BEBERAPA pernyataan diagnosis yang beda-beda untuk pasien yang sama (mis. "Alasan
+   Masuk Rawat Inap" di SPRI menyebut satu hal, tapi "Diagnosis Utama" di Resume Medis Rawat Inap
+   menyebut hal lain) — SEMUA WAJIB diusulkan sebagai kandidat terpisah (jangan cuma pilih satu),
+   supaya koder manusia yang memutuskan mana yang final; jangan diam-diam abaikan salah satunya. Yang
+   BUKAN diagnosis (jangan dipetakan ke ICD-10 dari sini): "Keluhan" (gejala subjektif pasien, mis.
+   "nyeri perut" — beda dari diagnosis dokter), "Diagnosis Keperawatan" (istilah asuhan keperawatan,
+   bukan diagnosis medis, mis. "nyeri akut", "ketidakefektifan bersihan jalan nafas").
+   quotation WAJIB kutipan VERBATIM istilah diagnosis dari dokumen (bukan kode ICD-10 itu sendiri, karena
+   kodenya memang tidak tercetak di dokumen — itulah sebabnya diusulkan); reasoning jelaskan pemetaan
+   istilah -> kode secara singkat, DAN sebutkan label sumbernya (mis. "dari Diagnosis Utama" vs "dari
+   Alasan Masuk Rawat Inap") supaya koder tahu mana yang lebih otoritatif. Kalau istilah diagnosisnya
+   ambigu/terlalu umum untuk dipetakan ke 1 kode pasti, boleh usulkan lebih dari 1 kandidat kode dengan
+   reasoning masing-masing, atau lewati kalau benar-benar tidak yakin — jangan mengarang kode hanya
+   supaya field ini terisi.
 4. Kalau ada PENGETAHUAN_TERDAHULU (pola error serupa yang pernah ditemukan): jadikan referensi
    supaya konsisten dengan penilaian sebelumnya, TAPI jangan disalin mentah — selalu sesuaikan
    dengan data record ini.
