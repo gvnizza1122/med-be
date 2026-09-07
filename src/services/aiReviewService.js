@@ -475,11 +475,21 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
       // difilter istilah rawat inap, itu fakta dokumen bukan opini AI); reasoning
       // adalah opini AI, difilter sama seperti field_notes untuk RAWAT_JALAN.
       if (Array.isArray(aiResult.suggested_codes)) {
+        console.warn(`[AI-REVIEW] AI mengembalikan ${aiResult.suggested_codes.length} suggested_codes mentah.`);
         for (const entry of aiResult.suggested_codes) {
           const { page_number: pageNum, quotation } = entry;
-          if (!quotation || !pageNum) continue;
-          if (!validateQuotation(quotation, pageNum, evidencePool)) continue;
-          if (hasFinancialTerms(quotation) || hasFinancialTerms(entry.reasoning)) continue;
+          if (!quotation || !pageNum) {
+            console.warn(`[AI-REVIEW] suggested_code "${entry.code}" dibuang: quotation/page_number kosong.`);
+            continue;
+          }
+          if (!validateQuotation(quotation, pageNum, evidencePool)) {
+            console.warn(`[AI-REVIEW] suggested_code "${entry.code}" dibuang: kutipan tidak cocok di halaman ${pageNum}. quotation="${quotation.slice(0,120)}"`);
+            continue;
+          }
+          if (hasFinancialTerms(quotation) || hasFinancialTerms(entry.reasoning)) {
+            console.warn(`[AI-REVIEW] suggested_code "${entry.code}" dibuang: mengandung istilah finansial.`);
+            continue;
+          }
           if (jenisKlaimRecord === 'RAWAT_JALAN' && hasInpatientOnlyTerms(entry.reasoning)) {
             console.warn(`[AI-REVIEW] Saran kode "${entry.code}" dibuang (reasoning menyinggung rawat inap untuk klaim RAWAT_JALAN).`);
             continue;
