@@ -329,6 +329,128 @@ function hasFinancialTerms(text) {
 }
 
 /**
+ * Prompt fokus TUNGGAL — dipisah dari AI_REVIEW_SYSTEM_PROMPT (yang memuat
+ * 7 tugas sekaligus) karena terbukti empiris (7 Sep 2026): saat DIAGLIST
+ * kosong TOTAL dan dokumen tidak punya halaman "Berkas Klaim Individual",
+ * instruksi "WAJIB usulkan suggested_codes" di prompt gabungan itu SERING
+ * TIDAK dipatuhi model walau sudah ditulis eksplisit 2x (di system prompt
+ * dan di akhir user prompt) — kemungkinan besar karena tenggelam di antara
+ * 6 tugas lain (field_notes, code_evidence, knowledge_updates, dst) dan
+ * ribuan token teks dokumen. Panggilan terpisah dengan SATU tugas saja
+ * terbukti jauh lebih andal untuk kepatuhan instruksi LLM secara umum.
+ */
+const DIAGNOSIS_SUGGESTION_SYSTEM_PROMPT = `Kamu asisten koding medis ICD-10 untuk klaim BPJS rumah sakit.
+Kamu diberi teks lengkap semua halaman satu berkas klaim (Resume Medis, Surat Perintah Rawat Inap/SPRI,
+Triage IGD, hasil lab, dst — dokumen ini TIDAK PUNYA halaman resmi "Berkas Klaim Individual" makanya kamu
+diminta bantu cari diagnosisnya dari teks naratif).
+
+TUGAS TUNGGAL: baca SEMUA halaman satu per satu, cari istilah diagnosis medis eksplisit di label seperti
+"Diagnosis Utama", "Diagnosa Kerja", "Diagnosa" (biasanya di SPRI), "Assessment"/"A:" (format S-O-A-P),
+"Diag Awal". Untuk SETIAP istilah diagnosis berbeda yang ditemukan (walau ada beberapa versi/label berbeda
+untuk pasien yang sama di halaman berbeda — usulkan SEMUA, jangan pilih satu saja), usulkan kode ICD-10
+yang paling sesuai.
+
+ATURAN KETAT (anti-halusinasi):
+- HANYA dari istilah yang benar-benar tertulis eksplisit SEBAGAI diagnosis dokter. BUKAN "Keluhan" (gejala
+  subjektif pasien sendiri, mis. "nyeri perut"), BUKAN "Diagnosis Keperawatan" (istilah asuhan keperawatan,
+  bukan diagnosis medis, mis. "nyeri akut", "ketidakefektifan bersihan jalan nafas").
+- quotation WAJIB kutipan VERBATIM persis dari teks yang diberikan (salin apa adanya, termasuk typo kalau
+  ada) — kutipan yang tidak match persis akan otomatis ditolak sistem.
+- page_number WAJIB sesuai nomor "Halaman N" yang tertera di awal blok teks tempat kutipan itu berada.
+- Kalau SETELAH membaca semua halaman benar-benar tidak ada satupun label diagnosis eksplisit, kembalikan
+  array kosong — jangan mengarang demi mengisi.
+- DILARANG KERAS menyebut nominal rupiah/biaya di quotation atau reasoning.
+
+Output HANYA JSON, tanpa markdown/penjelasan:
+{"suggested_codes":[{"code":"...","page_number":N,"quotation":"...","reasoning":"pemetaan istilah -> kode, sebutkan label sumbernya"}]}`;
+
+/**
+ * Panggilan AI terpisah & fokus untuk mengusulkan kode ICD-10 diagnosis saat
+ * DIAGLIST kosong total dan panggilan generateAiReview() utama tidak
+ * menghasilkan suggested_codes apapun. Lihat catatan di
+ * DIAGNOSIS_SUGGESTION_SYSTEM_PROMPT untuk alasan kenapa ini dipisah.
+ * @param {Array} evidencePool - [{page_number, ocr_text, confidence}]
+ * @returns {Promise<Array>} suggested_codes (bisa kosong)
+ */
+async function suggestDiagnosisCodesFallback(evidencePool) {
+  const apiKey = process.env.AI_PROVIDER_API_KEY;
+  if (!apiKey || evidencePool.length === 0) return [];
+
+  const baseUrl = process.env.AI_PROVIDER_BASE_URL || 'https://api.openai.com/v1';
+  const model = process.env.AI_MODEL || 'gpt-4o-mini';
+  const timeoutMs = Number(process.env.AI_TIMEOUT_MS || 60000);
+
+  let userPrompt = 'TEKS DOKUMEN (per halaman):\n================================\n';
+  const sorted = [...evidencePool].sort((a, b) => a.page_number - b.page_number);
+  for (const ev of sorted) {
+    userPrompt += `=== Halaman ${ev.page_number} ===\n${ev.ocr_text}\n\n`;
+  }
+
+  try {
+    const ac = new AbortController();
+    const timer = setTimeout(() => ac.abort(), timeoutMs);
+    let respText;
+    try {
+      const response = await fetch(`${baseUrl}/chat/completions`, {
+        method: 'POST',
+        signal: ac.signal,
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: 'system', content: DIAGNOSIS_SUGGESTION_SYSTEM_PROMPT },
+            { role: 'user', content: userPrompt },
+          ],
+          max_completion_tokens: 1500,
+          response_format: { type: 'json_object' },
+        }),
+      });
+      respText = await response.text();
+      if (!response.ok) throw new Error(`HTTP ${response.status}: ${respText.slice(0, 160)}`);
+    } finally {
+      clearTimeout(timer);
+    }
+
+    const data = JSON.parse(respText);
+    const content = data.choices?.[0]?.message?.content || '';
+    if (!content) return [];
+
+    let parsed;
+    try {
+      parsed = JSON.parse(content);
+    } catch {
+      const m = content.match(/\{[\s\S]*\}/);
+      if (!m) return [];
+      parsed = JSON.parse(m[0]);
+    }
+
+    const raw = Array.isArray(parsed.suggested_codes) ? parsed.suggested_codes : [];
+    const out = [];
+    for (const entry of raw) {
+      const { page_number: pageNum, quotation } = entry || {};
+      if (!quotation || !pageNum) continue;
+      if (!validateQuotation(quotation, pageNum, evidencePool)) {
+        console.warn(`[AI-REVIEW] Fallback saran diagnosis: kutipan tidak cocok di halaman ${pageNum}, dibuang.`);
+        continue;
+      }
+      if (hasFinancialTerms(quotation) || hasFinancialTerms(entry.reasoning)) continue;
+      out.push({
+        code: entry.code, type: 'diagnosis', page_number: pageNum,
+        quotation: quotation.substring(0, 200),
+        reasoning: (entry.reasoning || '').substring(0, 200),
+      });
+    }
+    return out;
+  } catch (error) {
+    console.warn(`[AI-REVIEW] Fallback saran diagnosis gagal: ${error.message}`);
+    return [];
+  }
+}
+
+/**
  * @param {Object} record - Field values rekam klaim saat ini (memory) — bisa
  *   format vClaim (DIAGLIST, SEP, ...) atau format DB (diagnosa_list, sep, ...).
  * @param {Array} validationErrors - Error dari rule engine (field_name, error_message, dst).
@@ -603,6 +725,23 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
           });
         }
         result.kegawatdaruratan_assessment.sort((a, b) => a.kriteria.localeCompare(b.kriteria));
+      }
+
+      // Fallback panggilan terpisah: kalau DIAGLIST kosong total DAN panggilan
+      // utama di atas tidak menghasilkan suggested_codes apapun, coba sekali
+      // lagi dengan prompt fokus tunggal (lihat suggestDiagnosisCodesFallback)
+      // — terbukti lebih andal daripada instruksi yang sama di prompt gabungan.
+      // Best-effort: gagal/timeout di sini TIDAK menggagalkan hasil utama.
+      if (codes.diagnosis.length === 0 && result.suggested_codes.length === 0 && evidencePool.length > 0) {
+        try {
+          const fallbackSuggestions = await suggestDiagnosisCodesFallback(evidencePool);
+          if (fallbackSuggestions.length > 0) {
+            console.warn(`[AI-REVIEW] Fallback call menghasilkan ${fallbackSuggestions.length} saran diagnosis tambahan.`);
+            result.suggested_codes.push(...fallbackSuggestions);
+          }
+        } catch (fallbackErr) {
+          console.warn(`[AI-REVIEW] Fallback saran diagnosis error: ${fallbackErr.message}`);
+        }
       }
 
       result.generated_at = new Date().toISOString();
