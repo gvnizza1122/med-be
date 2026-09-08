@@ -701,6 +701,57 @@ router.post('/pending-files/:id/generate-all-drafts', authenticate, async (req, 
 });
 
 /**
+ * POST /api/v1/records/pending-files/:id/backfill-training
+ * Isi ai_training_examples dari jawaban RS ASLI (jawaban_rs_manual, hasil
+ * import Excel) — BEDA dari generate-all-drafts (itu bikin draft BARU pakai
+ * AI, belum tentu sama dengan yang sungguhan dipakai RS dulu). Di sini kita
+ * pakai pasangan alasan_raw + jawaban_rs_manual APA ADANYA (real ground
+ * truth dari histori), diringkas Kimi K3 sama seperti alur draft biasa
+ * (lihat recordKimiTrainingExample) — supaya RAG belajar dari kejadian
+ * NYATA, bukan karangan AI yang belum terbukti manjur.
+ * Cuma proses baris yang: sudah ke-link ke claim_record (claim_record_id
+ * ada — perlu data klinis buat konteks), alasan_raw ada, dan jawaban_rs_manual
+ * ada (kalau kosong, tidak ada yang bisa dipelajari dari baris itu).
+ * Dedup: lewati kalau alasan_raw yang sama persis sudah pernah tercatat di
+ * ai_training_examples (mis. file yang sama diproses ulang).
+ */
+router.post('/pending-files/:id/backfill-training', authenticate, async (req, res) => {
+  try {
+    const db = getDb();
+    const file = await db.prepare('SELECT id FROM bpjs_pending_files WHERE id = ?').get(req.params.id);
+    if (!file) return res.status(404).json({ error: 'File pending tidak ditemukan.' });
+
+    const rows = await db.prepare(`
+      SELECT * FROM bpjs_pending_responses
+      WHERE pending_file_id = ? AND claim_record_id IS NOT NULL
+        AND alasan_raw IS NOT NULL AND alasan_raw != ''
+        AND jawaban_rs_manual IS NOT NULL AND jawaban_rs_manual != ''
+    `).all(req.params.id);
+
+    let done = 0, skippedDuplicate = 0, error = 0;
+    await runWithConcurrencyLimit(rows, 3, async (row) => {
+      try {
+        const dup = await db.prepare(`
+          SELECT id FROM ai_training_examples WHERE alasan_bpjs = ? LIMIT 1
+        `).get(row.alasan_raw);
+        if (dup) { skippedDuplicate++; return; }
+
+        await recordKimiTrainingExample(db, row.alasan_raw, row.jawaban_rs_manual, null);
+        done++;
+      } catch (err) {
+        console.error('[bpjsPending] backfill-training gagal untuk row', row.id, ':', err.message);
+        error++;
+      }
+    });
+
+    res.json({ processed: rows.length, done, skipped_duplicate: skippedDuplicate, error });
+  } catch (err) {
+    console.error('[bpjsPending] backfill-training error:', err);
+    res.status(500).json({ error: 'Terjadi gangguan pada sistem. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' });
+  }
+});
+
+/**
  * DELETE /api/v1/records/pending-files/:id
  * Hapus 1 file rekap pending BPJS beserta semua baris di dalamnya — untuk
  * cleanup setelah testing. pending_file_id di bpjs_pending_responses TIDAK
