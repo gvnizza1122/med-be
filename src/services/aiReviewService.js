@@ -733,10 +733,14 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
       // lagi dengan prompt fokus tunggal (lihat suggestDiagnosisCodesFallback)
       // — terbukti lebih andal daripada instruksi yang sama di prompt gabungan.
       // Best-effort: gagal/timeout di sini TIDAK menggagalkan hasil utama.
+      console.warn(`[AI-REVIEW] Cek kondisi fallback: codes.diagnosis.length=${codes.diagnosis.length}, result.suggested_codes.length=${result.suggested_codes.length}, evidencePool.length=${evidencePool.length}`);
       if (codes.diagnosis.length === 0 && result.suggested_codes.length === 0 && evidencePool.length > 0) {
         console.warn(`[AI-REVIEW] Memanggil fallback saran diagnosis (evidencePool ${evidencePool.length} halaman)...`);
         try {
-          const fallbackSuggestions = await suggestDiagnosisCodesFallback(evidencePool);
+          const fallbackSuggestions = await Promise.race([
+            suggestDiagnosisCodesFallback(evidencePool),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('fallback hard-timeout 70s')), 70000)),
+          ]);
           console.warn(`[AI-REVIEW] Fallback selesai, ${fallbackSuggestions.length} saran lolos filter.`);
           if (fallbackSuggestions.length > 0) {
             result.suggested_codes.push(...fallbackSuggestions);
