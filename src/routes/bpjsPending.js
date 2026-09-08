@@ -68,27 +68,71 @@ function excelDateToISO(v) {
  */
 function parsePendingSheet(sheet, sheetLabel) {
   const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
-  const headerIdx = rows.findIndex(r => r.some(c => String(c).trim().toUpperCase() === REQUIRED_HEADER));
-  if (headerIdx === -1) return [];
-  const headers = rows[headerIdx].map(h => String(h).trim().toUpperCase());
-  const colIdx = (name) => headers.indexOf(name);
 
-  const iSep = colIdx('NOSEP'), iTglSep = colIdx('TGLSEP'), iTglPlg = colIdx('TGLPLG'),
-    iNokartu = colIdx('NOKARTU'), iMr = colIdx('MR'), iNama = colIdx('NAMAPESERTA'),
-    iInacbg = colIdx('KDINACBG'), iBiaya = colIdx('BYPENGAJUAN'), iAlasan = colIdx('ALASANPENDING'),
-    iJawaban = colIdx('JAWABAN RS');
+  const headerIdxPrimary = rows.findIndex(r => r.some(c => String(c).trim().toUpperCase() === REQUIRED_HEADER));
+  if (headerIdxPrimary !== -1) {
+    const headers = rows[headerIdxPrimary].map(h => String(h).trim().toUpperCase());
+    const colIdx = (name) => headers.indexOf(name);
+    const iSep = colIdx('NOSEP'), iTglSep = colIdx('TGLSEP'), iTglPlg = colIdx('TGLPLG'),
+      iNokartu = colIdx('NOKARTU'), iMr = colIdx('MR'), iNama = colIdx('NAMAPESERTA'),
+      iInacbg = colIdx('KDINACBG'), iBiaya = colIdx('BYPENGAJUAN'), iAlasan = colIdx('ALASANPENDING'),
+      iJawaban = colIdx('JAWABAN RS');
+
+    const out = [];
+    for (let i = headerIdxPrimary + 1; i < rows.length; i++) {
+      const row = rows[i];
+      const sep = String(row[iSep] ?? '').trim();
+      if (!sep) continue;
+      out.push({
+        sheet: sheetLabel,
+        sep,
+        tgl_sep: excelDateToISO(row[iTglSep]),
+        tgl_pulang: excelDateToISO(row[iTglPlg]),
+        nokartu: iNokartu >= 0 ? String(row[iNokartu] ?? '').trim() : '',
+        mr: iMr >= 0 ? String(row[iMr] ?? '').trim() : '',
+        nama_peserta: iNama >= 0 ? String(row[iNama] ?? '').trim() : '',
+        kdinacbg: iInacbg >= 0 ? String(row[iInacbg] ?? '').trim() : '',
+        by_pengajuan: iBiaya >= 0 ? row[iBiaya] : null,
+        alasan_pending: iAlasan >= 0 ? String(row[iAlasan] ?? '').trim() : '',
+        jawaban_rs: iJawaban >= 0 ? String(row[iJawaban] ?? '').trim() : '',
+      });
+    }
+    return out;
+  }
+
+  // Format alternatif (ditemukan 8 Sep 2026 di rekap RI Januari 2026 RS
+  // Lestari Raharja — sheet "RI" & "RJ" dalam satu file XLSX ternyata bisa
+  // punya format kolom BERBEDA: "No. | Tgl. Masuk | Tgl. Pulang | No. RM |
+  // Nama Pasien | No. Klaim / SEP | INACBG | Top Up | Total Tarif | Tarif RS
+  // | Jenis | Konfirmasi" — kolom "Jenis" di format ini ternyata isinya
+  // ALASAN PENDING (bukan kategori jenis), "Konfirmasi" = jawaban/tindakan
+  // RS. Tanpa fallback ini, sheet berformat begini SILENT gagal total (0
+  // baris ter-import) — bukan error, cuma diam-diam kosong.
+  const normalize = (s) => String(s).trim().toUpperCase().replace(/\.\s*/g, ' ').replace(/\s+/g, ' ');
+  const headerIdxAlt = rows.findIndex(r => r.some(c => /NO\s*KLAIM\s*\/?\s*SEP/.test(normalize(c))));
+  if (headerIdxAlt === -1) return [];
+
+  const headersAlt = rows[headerIdxAlt].map(normalize);
+  const findCol = (...patterns) => headersAlt.findIndex(h => patterns.some(p => p.test(h)));
+
+  const iSep = findCol(/NO\s*KLAIM\s*\/?\s*SEP/), iTglMasuk = findCol(/^TGL\s*MASUK$/),
+    iTglPlg = findCol(/^TGL\s*PULANG$/), iMr = findCol(/^NO\s*RM$/), iNama = findCol(/^NAMA\s*PASIEN$/),
+    iInacbg = findCol(/^INACBG$/), iBiaya = findCol(/^TOTAL\s*TARIF$/), iAlasan = findCol(/^JENIS$/),
+    iJawaban = findCol(/^KONFIRMASI$/);
 
   const out = [];
-  for (let i = headerIdx + 1; i < rows.length; i++) {
+  for (let i = headerIdxAlt + 1; i < rows.length; i++) {
     const row = rows[i];
-    const sep = String(row[iSep] ?? '').trim();
+    const sep = iSep >= 0 ? String(row[iSep] ?? '').trim() : '';
     if (!sep) continue;
     out.push({
       sheet: sheetLabel,
       sep,
-      tgl_sep: excelDateToISO(row[iTglSep]),
-      tgl_pulang: excelDateToISO(row[iTglPlg]),
-      nokartu: iNokartu >= 0 ? String(row[iNokartu] ?? '').trim() : '',
+      // Format alternatif tidak punya "Tanggal SEP" terpisah — pakai
+      // Tanggal Masuk sebagai referensi tanggal terdekat yang tersedia.
+      tgl_sep: iTglMasuk >= 0 ? excelDateToISO(row[iTglMasuk]) : null,
+      tgl_pulang: iTglPlg >= 0 ? excelDateToISO(row[iTglPlg]) : null,
+      nokartu: '',
       mr: iMr >= 0 ? String(row[iMr] ?? '').trim() : '',
       nama_peserta: iNama >= 0 ? String(row[iNama] ?? '').trim() : '',
       kdinacbg: iInacbg >= 0 ? String(row[iInacbg] ?? '').trim() : '',
