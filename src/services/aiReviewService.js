@@ -428,7 +428,6 @@ async function suggestDiagnosisCodesFallback(evidencePool) {
     }
 
     const raw = Array.isArray(parsed.suggested_codes) ? parsed.suggested_codes : [];
-    console.warn(`[AI-REVIEW] Fallback: AI mentah mengembalikan ${raw.length} entri suggested_codes.`);
     const out = [];
     for (const entry of raw) {
       const { page_number: pageNum, quotation } = entry || {};
@@ -606,21 +605,14 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
       // difilter istilah rawat inap, itu fakta dokumen bukan opini AI); reasoning
       // adalah opini AI, difilter sama seperti field_notes untuk RAWAT_JALAN.
       if (Array.isArray(aiResult.suggested_codes)) {
-        console.warn(`[AI-REVIEW] AI mengembalikan ${aiResult.suggested_codes.length} suggested_codes mentah.`);
         for (const entry of aiResult.suggested_codes) {
           const { page_number: pageNum, quotation } = entry;
-          if (!quotation || !pageNum) {
-            console.warn(`[AI-REVIEW] suggested_code "${entry.code}" dibuang: quotation/page_number kosong.`);
-            continue;
-          }
+          if (!quotation || !pageNum) continue;
           if (!validateQuotation(quotation, pageNum, evidencePool)) {
-            console.warn(`[AI-REVIEW] suggested_code "${entry.code}" dibuang: kutipan tidak cocok di halaman ${pageNum}. quotation="${quotation.slice(0,120)}"`);
+            console.warn(`[AI-REVIEW] suggested_code "${entry.code}" dibuang: kutipan tidak cocok di halaman ${pageNum} (AI halusinasi?).`);
             continue;
           }
-          if (hasFinancialTerms(quotation) || hasFinancialTerms(entry.reasoning)) {
-            console.warn(`[AI-REVIEW] suggested_code "${entry.code}" dibuang: mengandung istilah finansial.`);
-            continue;
-          }
+          if (hasFinancialTerms(quotation) || hasFinancialTerms(entry.reasoning)) continue;
           if (jenisKlaimRecord === 'RAWAT_JALAN' && hasInpatientOnlyTerms(entry.reasoning)) {
             console.warn(`[AI-REVIEW] Saran kode "${entry.code}" dibuang (reasoning menyinggung rawat inap untuk klaim RAWAT_JALAN).`);
             continue;
@@ -733,16 +725,14 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
       // lagi dengan prompt fokus tunggal (lihat suggestDiagnosisCodesFallback)
       // — terbukti lebih andal daripada instruksi yang sama di prompt gabungan.
       // Best-effort: gagal/timeout di sini TIDAK menggagalkan hasil utama.
-      console.warn(`[AI-REVIEW] Cek kondisi fallback: codes.diagnosis.length=${codes.diagnosis.length}, result.suggested_codes.length=${result.suggested_codes.length}, evidencePool.length=${evidencePool.length}`);
       if (codes.diagnosis.length === 0 && result.suggested_codes.length === 0 && evidencePool.length > 0) {
-        console.warn(`[AI-REVIEW] Memanggil fallback saran diagnosis (evidencePool ${evidencePool.length} halaman)...`);
         try {
           const fallbackSuggestions = await Promise.race([
             suggestDiagnosisCodesFallback(evidencePool),
             new Promise((_, reject) => setTimeout(() => reject(new Error('fallback hard-timeout 70s')), 70000)),
           ]);
-          console.warn(`[AI-REVIEW] Fallback selesai, ${fallbackSuggestions.length} saran lolos filter.`);
           if (fallbackSuggestions.length > 0) {
+            console.warn(`[AI-REVIEW] Fallback saran diagnosis menghasilkan ${fallbackSuggestions.length} kandidat tambahan.`);
             result.suggested_codes.push(...fallbackSuggestions);
           }
         } catch (fallbackErr) {
