@@ -46,7 +46,13 @@ async function extractClaimData(claimDataText, jenisKlaim) {
   // cuma labelnya beda — persis kasus yang sama dengan KELAS_RAWAT di atas.
   const tanggalRawatJalanRule = isOutpatientLike
     ? `\n8b. ADMISSION_DATE & DISCHARGE_DATE khusus rawat jalan/IGD (tanpa rawat inap): dokumen jenis ini biasanya TIDAK punya field "Tanggal Masuk"/"Tanggal Keluar" terpisah (pasien tidak menginap). Kalau field itu tidak ada tapi ada "Tanggal Pelayanan", "Tanggal Kunjungan", "Tgl Periksa", atau tanggal pada SEP yang menunjukkan kapan pasien dilayani, isi ADMISSION_DATE dan DISCHARGE_DATE dengan tanggal yang SAMA itu (satu hari kunjungan = tanggal masuk = tanggal keluar). Kalau memang tidak ada tanggal pelayanan/kunjungan sama sekali di dokumen, baru isi keduanya dengan "".`
-    : '';
+    : `\n8b. DISCHARGE_DATE khusus rawat inap: dokumen "RESUME MEDIS RAWAT INAP" biasanya TIDAK mencetak
+    label "Tanggal Keluar" eksplisit — sumbernya adalah TANGGAL yang tercetak PERSIS DI ATAS baris
+    tanda tangan "Dokter Penanggung Jawab Pelayanan" di akhir dokumen itu (contoh format: "Magelang,
+    21 Agustus 2026" tepat sebelum nama & jabatan dokter penanggung jawab) — itu tanggal resmi
+    penandatanganan resume pulang pasien, JADIKAN itu DISCHARGE_DATE. JANGAN pakai tanggal lain (mis.
+    "Tanggal MRS"/tanggal masuk, tanggal cetak di header dokumen lain) untuk field ini kecuali tanggal
+    di atas tanda tangan itu benar-benar tidak ada di teks — baru ikuti aturan 6 (kosongkan).`;
 
   const prompt = `Kamu ekstraktor data klaim BPJS dari dokumen scan/print RS. Bentuk dokumennya BUKAN
 "Berkas Klaim Individual" (ringkasan E-Klaim terkode rapi) — itu jarang/tidak pernah ada di berkas

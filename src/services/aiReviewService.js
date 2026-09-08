@@ -134,8 +134,10 @@ TUGAS:
    menyebut nominal rupiah/dampak biaya. Catatan lengkap tentang pola kunjungan berulang lintas-episode
    (konsul internal, PRB/iterasi obat kronis, irisan RS lain) TIDAK termasuk di sini — itu butuh riwayat
    kunjungan lain yang tidak ada di satu dokumen ini, sudah ditangani terpisah lewat RV-13 s.d. RV-16.
-7. KEGAWATDARURATAN (HANYA kalau JENIS_KLAIM = GAWAT_DARURAT, kalau bukan lewati task ini total, JANGAN
-   isi "kegawatdaruratan_assessment"): nilai BUKTI_DOKUMEN terhadap 5 kriteria kegawatdaruratan resmi
+7. KEGAWATDARURATAN (HANYA kalau BUKTI_DOKUMEN memuat halaman "TRIASE IGD" atau "SKRINING AWAL PASIEN
+   IGD" — baik untuk klaim GAWAT_DARURAT maupun RAWAT_INAP yang pasiennya masuk lewat IGD dulu; kalau
+   TIDAK ADA halaman itu sama sekali di BUKTI_DOKUMEN, lewati task ini total, JANGAN isi
+   "kegawatdaruratan_assessment"): nilai BUKTI_DOKUMEN terhadap 5 kriteria kegawatdaruratan resmi
    Pasal 3 ayat (2) Permenkes RI No. 47 Tahun 2018 — TUJUANNYA MENILAI APA ADANYA, BUKAN mencari cara
    supaya lolos. Untuk SETIAP dari 5 kriteria (a-e), tentukan "terpenuhi" HANYA true kalau BUKTI_DOKUMEN
    secara eksplisit mendukungnya (kutip kalimat PERSIS, sama seperti aturan quotation code_evidence di
@@ -329,6 +331,21 @@ function hasFinancialTerms(text) {
 }
 
 /**
+ * Tabel Kegawatdaruratan (kegawatdaruratan_assessment) ditentukan dari ADA/
+ * TIDAKNYA halaman Triase IGD di bukti dokumen — BUKAN dari jenis_klaim.
+ * Alasan (8 Sep 2026): banyak klaim RAWAT_INAP pasiennya masuk lewat IGD
+ * dulu (ada halaman Triase IGD/Skrining Awal Pasien IGD di berkasnya) —
+ * kriteria Permenkes 47/2018 tetap relevan buat kasus itu, bukan cuma
+ * klaim berkategori GAWAT_DARURAT murni. Kalau tidak ada halaman Triase
+ * IGD sama sekali (mis. rawat inap terjadwal tanpa lewat IGD), tabel ini
+ * tidak relevan — tidak ditampilkan.
+ */
+function hasIgdTriagePage(evidencePool) {
+  if (!Array.isArray(evidencePool)) return false;
+  return evidencePool.some(p => /triage\s+igd|skrining\s+awal\s+pasien\s+igd/i.test(p.ocr_text || ''));
+}
+
+/**
  * Prompt fokus TUNGGAL — dipisah dari AI_REVIEW_SYSTEM_PROMPT (yang memuat
  * 7 tugas sekaligus) karena terbukti empiris (7 Sep 2026): saat DIAGLIST
  * kosong TOTAL dan dokumen tidak punya halaman "Berkas Klaim Individual",
@@ -463,12 +480,13 @@ async function suggestDiagnosisCodesFallback(evidencePool) {
 async function generateAiReview(record, validationErrors = [], evidencePool = [], knowledgeEntries = [], bpjsExamples = []) {
   const codes = pickCodes(record);
   const hasCodesToCheck = evidencePool.length > 0 && (codes.diagnosis.length > 0 || codes.procedure.length > 0);
-  const jenisKlaimRecordEarly = record.JENIS_KLAIM || record.jenis_klaim;
-  // GAWAT_DARURAT: selalu jalankan review kalau ada bukti dokumen, walau rule
-  // engine bersih & tidak ada kode diklaim — penilaian kegawatdaruratan
-  // (task 7 di system prompt) menilai KEPATUHAN DOKUMENTASI KLINIS terhadap
-  // Permenkes 47/2018, independen dari validasi format 60-kolom vClaim.
-  const shouldReviewForGadar = jenisKlaimRecordEarly === 'GAWAT_DARURAT' && evidencePool.length > 0;
+  // Ada halaman Triase IGD: selalu jalankan review kalau ada bukti dokumen,
+  // walau rule engine bersih & tidak ada kode diklaim — penilaian
+  // kegawatdaruratan (task 7 di system prompt) menilai KEPATUHAN DOKUMENTASI
+  // KLINIS terhadap Permenkes 47/2018, independen dari validasi format
+  // 60-kolom vClaim. Gating berbasis ADA/TIDAKNYA halaman Triase IGD (lihat
+  // hasIgdTriagePage), BUKAN jenis_klaim — lihat catatan di hasIgdTriagePage.
+  const shouldReviewForGadar = hasIgdTriagePage(evidencePool);
 
   if (validationErrors.length === 0 && !hasCodesToCheck && !shouldReviewForGadar) {
     return null; // tidak ada yang perlu direview
@@ -680,7 +698,7 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
       // tervalidasi di evidencePool, kalau tidak DITURUNKAN paksa jadi false
       // (bukan dibuang barisnya) — supaya tabel di FE selalu tampil lengkap 5
       // kriteria, tapi tidak pernah menampilkan "terpenuhi" tanpa bukti nyata.
-      if (jenisKlaimRecord === 'GAWAT_DARURAT' && Array.isArray(aiResult.kegawatdaruratan_assessment)) {
+      if (hasIgdTriagePage(evidencePool) && Array.isArray(aiResult.kegawatdaruratan_assessment)) {
         const seen = new Set();
         for (const entry of aiResult.kegawatdaruratan_assessment.slice(0, 5)) {
           const { kriteria, page_number: pageNum, bukti, catatan } = entry || {};

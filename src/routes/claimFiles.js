@@ -14,12 +14,8 @@ const { generateAiReview } = require('../services/aiReviewService');
 const { getRelevantKnowledge, recordKnowledge, getRelevantBpjsExamples } = require('../services/errorKnowledgeService');
 const { matchPrbCategory } = require('../services/prbRules');
 const { linkPendingBpjsForSep } = require('../services/bpjsPendingLink');
-const { queueAiReview } = require('../services/queueService');
 
 const router = express.Router();
-
-// Flag untuk enable/disable async AI review background job
-const REVIEW_ASYNC = process.env.REVIEW_ASYNC === 'true';
 
 // OCR (tesseract.js) berat di CPU dan makan waktu tak terduga. Sebelumnya tiap
 // panggilan ke /ocr-pages yang belum ada hasilnya langsung memicu proses baru
@@ -1632,25 +1628,14 @@ async function processSinglePdfUpload(db, { filePath, originalName, jenisKlaim: 
     let aiReview = null;
     try {
       const evidencePool = await gatherEvidencePool(db, recordId, resolvedFilePath);
-
-      if (REVIEW_ASYNC) {
-        // Queue AI review untuk background processing (return langsung, jangan tunggu)
-        queueAiReview(recordId, extractedData, validationErrors, evidencePool).catch(err =>
-          console.warn(`[upload-pdf] Gagal queue AI review untuk record ${recordId}: ${err.message}`));
-        // Tandai status pending_review — akan di-update oleh worker setelah selesai
-        await db.prepare('UPDATE claim_records SET ai_status = ? WHERE id = ?')
-          .run('pending', recordId);
-      } else {
-        // Jalankan sinkron (mode lama) — tunggu AI review selesai sebelum return response
-        const knowledgeEntries = await getRelevantKnowledge(db, validationErrors.map(e => e.rule_id));
-        const bpjsExamples = await getRelevantBpjsExamples(db);
-        aiReview = await generateAiReview(extractedData, validationErrors, evidencePool, knowledgeEntries, bpjsExamples);
-        if (aiReview) {
-          await db.prepare('UPDATE claim_records SET ai_review = ? WHERE id = ?')
-            .run(JSON.stringify(aiReview), recordId);
-          recordKnowledge(db, aiReview.knowledge_updates).catch(kbErr =>
-            console.warn(`[upload-pdf] Gagal simpan knowledge base: ${kbErr.message}`));
-        }
+      const knowledgeEntries = await getRelevantKnowledge(db, validationErrors.map(e => e.rule_id));
+      const bpjsExamples = await getRelevantBpjsExamples(db);
+      aiReview = await generateAiReview(extractedData, validationErrors, evidencePool, knowledgeEntries, bpjsExamples);
+      if (aiReview) {
+        await db.prepare('UPDATE claim_records SET ai_review = ? WHERE id = ?')
+          .run(JSON.stringify(aiReview), recordId);
+        recordKnowledge(db, aiReview.knowledge_updates).catch(kbErr =>
+          console.warn(`[upload-pdf] Gagal simpan knowledge base: ${kbErr.message}`));
       }
     } catch (aiErr) {
       console.warn(`[upload-pdf] AI review gagal untuk record ${recordId}: ${aiErr.message}`);
@@ -1678,6 +1663,169 @@ async function processSinglePdfUpload(db, { filePath, originalName, jenisKlaim: 
     return { success: false, original_name: originalName, error: 'Terjadi gangguan saat memproses berkas. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' };
   }
 }
+
+/**
+ * "Baca Ulang" — jalankan ulang ekstraksi -> rule engine -> AI review untuk
+ * SATU record yang SUDAH ADA (bukan upload baru), pakai file PDF yang sudah
+ * tersimpan di disk. Dipakai saat verifikator lihat ada field kosong/error
+ * (mis. DIAGLIST, DISCHARGE_DATE) yang dicurigai sebenarnya ADA di dokumen
+ * tapi terlewat oleh AI ekstraksi pertama — mis. karena prompt sudah
+ * diperbaiki, atau AI cuma "kurang beruntung" di percobaan pertama.
+ *
+ * UPDATE di tempat (bukan INSERT record baru) — file_id & record_id tetap
+ * sama, supaya link/histori yang sudah ada (pending BPJS, dst) tidak putus.
+ *
+ * @returns {Promise<{success:boolean, error?:string, vclaimFormat?, validation_status?, validation_errors?, ai_review?}>}
+ */
+async function reprocessExistingRecord(db, { fileId, recordId, filePath, jenisKlaim, hospitalCode }) {
+  try {
+    const { extractFromPDF } = require('../services/pdfExtractionPipeline');
+    const result = await extractFromPDF(filePath, { jenisKlaim, originalName: path.basename(filePath) });
+
+    if (!result.success) {
+      console.error('[reread] gagal:', recordId, JSON.stringify(result.errors));
+      return { success: false, error: result.pesan };
+    }
+
+    const extractedData = { ...result.record, JENIS_KLAIM: jenisKlaim };
+
+    if (!extractedData.KODE_RS && hospitalCode) {
+      extractedData.KODE_RS = hospitalCode;
+    }
+    if (!extractedData.KELAS_RS) {
+      const hospitalSettings = await db.prepare('SELECT kelas_rs FROM hospital_settings WHERE hospital_code = ?').get(hospitalCode || '3371084');
+      if (hospitalSettings?.kelas_rs) extractedData.KELAS_RS = hospitalSettings.kelas_rs;
+    }
+
+    await autofillFromMrn(db, { hospitalCode, extractedData, jenisKlaim });
+
+    const dbRecord = vclaimToDbFormat(extractedData);
+    dbRecord.jenis_klaim = jenisKlaim;
+    dbRecord.has_bpjs_page = result.record.has_bpjs_page !== false;
+
+    const activeRules = await db.prepare('SELECT * FROM validation_rules WHERE is_active = 1').all();
+    const validationErrors = validateRecord(dbRecord, activeRules);
+    const validationStatus = determineStatus(validationErrors);
+
+    await db.transaction(async (tx) => {
+      await tx.prepare(`
+        UPDATE claim_records SET
+          kode_rs = ?, sep = ?, nokartu = ?, nama_pasien = ?, mrn = ?,
+          birth_date = ?, gender = ?, kelas_rawat = ?, admission_date = ?, discharge_date = ?,
+          discharge_status = ?, diagnosa_list = ?, prosedur_list = ?, dpjp_name = ?,
+          tarif_rs = ?, validation_status = ?, error_count = ?, raw_data = ?, klinik_poli = ?, has_bpjs_page = ?
+        WHERE id = ?
+      `).run(
+        extractedData.KODE_RS, extractedData.SEP, extractedData.NOKARTU,
+        extractedData.NAMA_PASIEN, extractedData.MRN,
+        vclaimDateToISO(extractedData.BIRTH_DATE), extractedData.SEX,
+        /^\d+$/.test(extractedData.KELAS_RAWAT) ? parseInt(extractedData.KELAS_RAWAT) : null,
+        vclaimDateToISO(extractedData.ADMISSION_DATE), vclaimDateToISO(extractedData.DISCHARGE_DATE),
+        /^\d+$/.test(extractedData.DISCHARGE_STATUS) ? parseInt(extractedData.DISCHARGE_STATUS) : 1,
+        extractedData.DIAGLIST, extractedData.PROCLIST,
+        extractedData.DPJP,
+        /^\d+$/.test(extractedData.TARIF_RS) ? parseInt(extractedData.TARIF_RS) : null,
+        validationStatus, validationErrors.length, JSON.stringify(extractedData), extractedData.KLINIK_SEP || null,
+        dbRecord.has_bpjs_page,
+        recordId
+      );
+
+      await tx.prepare('DELETE FROM validation_errors WHERE record_id = ?').run(recordId);
+      if (validationErrors.length > 0) {
+        const txInsertError = tx.prepare(`
+          INSERT INTO validation_errors (id, record_id, rule_id, field_name, error_message, expected_value, actual_value, severity)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+        for (const err of validationErrors) {
+          await txInsertError.run(
+            uuidv4(), recordId, err.rule_id, err.field_name,
+            err.error_message, err.expected_value || '', err.actual_value || '',
+            err.severity
+          );
+        }
+      }
+    });
+
+    // Best-effort, sama seperti alur upload asli — tidak menggagalkan baca ulang.
+    await detectAndFlagInternalEpisodes(db, {
+      hospitalCode,
+      nokartu: extractedData.NOKARTU,
+      admissionDate: vclaimDateToISO(extractedData.ADMISSION_DATE),
+    }).catch(() => {});
+    await detectAndFlagPRB(db, {
+      hospitalCode,
+      mrn: extractedData.MRN,
+      nokartu: extractedData.NOKARTU,
+      admissionDate: vclaimDateToISO(extractedData.ADMISSION_DATE),
+      diagnosaList: extractedData.DIAGLIST,
+    }).catch(() => {});
+    await linkPendingBpjsForSep(db, extractedData.SEP, recordId).catch(() => {});
+
+    let aiReview = null;
+    try {
+      const evidencePool = await gatherEvidencePool(db, recordId, path.resolve(filePath));
+      const knowledgeEntries = await getRelevantKnowledge(db, validationErrors.map(e => e.rule_id));
+      const bpjsExamples = await getRelevantBpjsExamples(db);
+      aiReview = await generateAiReview(extractedData, validationErrors, evidencePool, knowledgeEntries, bpjsExamples);
+      if (aiReview) {
+        await db.prepare('UPDATE claim_records SET ai_review = ? WHERE id = ?')
+          .run(JSON.stringify(aiReview), recordId);
+        recordKnowledge(db, aiReview.knowledge_updates).catch(kbErr =>
+          console.warn(`[reread] Gagal simpan knowledge base: ${kbErr.message}`));
+      } else {
+        await db.prepare('UPDATE claim_records SET ai_review = NULL WHERE id = ?').run(recordId);
+      }
+    } catch (aiErr) {
+      console.warn(`[reread] AI review gagal untuk record ${recordId}: ${aiErr.message}`);
+    }
+
+    return {
+      success: true,
+      file_id: fileId,
+      record_id: recordId,
+      vclaimFormat: extractedData,
+      validation_status: validationStatus,
+      validation_errors: validationErrors,
+      ai_review: aiReview,
+    };
+  } catch (err) {
+    console.error('[reread] error tak terduga:', recordId, err);
+    return { success: false, error: 'Terjadi gangguan saat membaca ulang berkas. Silakan coba lagi.' };
+  }
+}
+
+/**
+ * POST /api/v1/claim-files/records/:recordId/reread
+ * "Baca Ulang" — re-ekstraksi + re-validasi + re-AI-review 1 record yang
+ * sudah ada, pakai PDF yang sudah tersimpan. Lihat reprocessExistingRecord().
+ */
+router.post('/records/:recordId/reread', authenticate, async (req, res) => {
+  try {
+    const db = getDb();
+    const record = await db.prepare('SELECT * FROM claim_records WHERE id = ?').get(req.params.recordId);
+    if (!record) return res.status(404).json({ error: 'Record tidak ditemukan.' });
+
+    const file = await db.prepare('SELECT * FROM claim_files WHERE id = ?').get(record.file_id);
+    if (!file) return res.status(404).json({ error: 'Berkas tidak ditemukan.' });
+    if (!file.file_path || !fs.existsSync(file.file_path)) {
+      return res.status(400).json({ error: 'Berkas PDF asli tidak ditemukan di server, tidak bisa dibaca ulang.' });
+    }
+
+    const result = await reprocessExistingRecord(db, {
+      fileId: file.id,
+      recordId: record.id,
+      filePath: file.file_path,
+      jenisKlaim: file.jenis_klaim || record.jenis_klaim || 'RAWAT_INAP',
+      hospitalCode: file.hospital_code,
+    });
+
+    if (!result.success) return res.status(500).json({ error: result.error });
+    res.json(result);
+  } catch (err) {
+    console.error('[reread] route error:', err);
+    res.status(500).json({ error: 'Terjadi gangguan server saat membaca ulang.' });
+  }
+});
 
 router.post('/upload-pdf', authenticate, pdfUpload.single('file'), async (req, res) => {
   if (!req.file) {
