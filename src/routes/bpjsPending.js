@@ -117,7 +117,12 @@ function parsePendingSheet(sheet, sheetLabel) {
 
   const iSep = findCol(/NO\s*KLAIM\s*\/?\s*SEP/), iTglMasuk = findCol(/^TGL\s*MASUK$/),
     iTglPlg = findCol(/^TGL\s*PULANG$/), iMr = findCol(/^NO\s*RM$/), iNama = findCol(/^NAMA\s*PASIEN$/),
-    iInacbg = findCol(/^INACBG$/), iBiaya = findCol(/^TOTAL\s*TARIF$/), iAlasan = findCol(/^JENIS$/),
+    iInacbg = findCol(/^INACBG$/), iBiaya = findCol(/^TOTAL\s*TARIF$/),
+    // Kolom alasan pending di format alternatif ternyata beda label antar
+    // bulan (ditemukan 8 Sep 2026, cross-check 6 file Excel Jan-Jun 2026):
+    // "Jenis" (Feb-Apr) vs "Keterangan Pending" (Mei) — sama-sama berisi
+    // alasan pending walau labelnya beda, JENIS bukan berarti kategori.
+    iAlasan = findCol(/^JENIS$/, /KETERANGAN\s*PENDING/),
     iJawaban = findCol(/^KONFIRMASI$/);
 
   const out = [];
