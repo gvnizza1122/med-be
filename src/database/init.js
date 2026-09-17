@@ -502,6 +502,9 @@ async function initializeSchema() {
     await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_bpjs_pending_nama_peserta ON bpjs_pending_responses(nama_peserta)`);
     await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_tarif_inacbg_jenis_layanan ON tarif_inacbg_pmk3_2023(jenis_layanan)`);
 
+    // Explicit index pada users.email untuk mempercepat login queries
+    await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)`);
+
     await migrateSchema(dbHelper);
   } catch (err) {
     console.error('Failed to initialize database schema:', err);
