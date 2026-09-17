@@ -1,5 +1,11 @@
 require('dotenv').config();
 
+// Dipasang paling awal (sebelum modul lain sempat log apa pun) supaya
+// SEMUA console.log/warn/error dan uncaught exception ikut tercatat ke file
+// persisten (lihat services/logger.js) — sebelumnya log cuma ke stdout
+// docker yang hilang total tiap `docker compose up --build`.
+require('./services/logger').installPersistentLogging();
+
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -21,6 +27,7 @@ const bridgingRoutes = require('./routes/bridging');
 const hospitalSettingsRoutes = require('./routes/hospitalSettings');
 const prbExemptRoutes = require('./routes/prbExempt');
 const bpjsPendingRoutes = require('./routes/bpjsPending');
+const auditLogRoutes = require('./routes/auditLogs');
 
 const app = express();
 app.set('trust proxy', 1);
@@ -130,6 +137,7 @@ app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/bridging', bridgingRoutes);
 app.use('/api/v1/hospital-settings', hospitalSettingsRoutes);
 app.use('/api/v1/prb-exempt', prbExemptRoutes);
+app.use('/api/v1/audit-logs', auditLogRoutes);
 // BUG LAMA yang ditemukan & diperbaiki di sesi ini: recordsRouter
 // (rv20-confirm, audit, batch-audit) diexport tapi TIDAK PERNAH di-mount di
 // entry point produksi (src/index.js) — cuma ada di src/server.js yang tidak

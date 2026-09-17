@@ -31,6 +31,13 @@ async function authenticate(req, res, next) {
   }
 }
 
+// Hierarki role — 'superadmin' otomatis punya semua izin 'admin' TANPA perlu
+// menulis authorize('admin', 'superadmin') di setiap route. Kebalikannya
+// TIDAK berlaku (admin tidak otomatis dapat izin superadmin) — dipakai
+// khusus buat Manajemen User (authorize('superadmin') saja, admin biasa
+// sengaja dikecualikan dari situ).
+const ROLE_INHERITANCE = { superadmin: ['admin'] };
+
 /**
  * Middleware factory: Check if user has required role(s)
  * @param  {...string} roles - Allowed roles
@@ -40,7 +47,8 @@ function authorize(...roles) {
     if (!req.user) {
       return res.status(401).json({ error: 'Autentikasi diperlukan.' });
     }
-    if (!roles.includes(req.user.role)) {
+    const effectiveRoles = [req.user.role, ...(ROLE_INHERITANCE[req.user.role] || [])];
+    if (!effectiveRoles.some(r => roles.includes(r))) {
       return res.status(403).json({
         error: `Akses ditolak. Role '${req.user.role}' tidak memiliki izin untuk aksi ini.`
       });

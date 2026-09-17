@@ -418,6 +418,57 @@ async function initializeSchema() {
         hit_count INTEGER DEFAULT 1,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+
+      -- Kamus ICD-10 WHO (BUKAN ICD-10-CM Amerika) -- dibangun 17 Sep 2026 supaya
+      -- suggested_codes di aiReviewService.js (saran kode diagnosis AI) bisa dicek
+      -- terhadap daftar kode resmi sebelum tombol "Terapkan" di frontend diaktifkan
+      -- lagi (saat ini SENGAJA dimatikan total, lihat komentar "DIMATIKAN sengaja"
+      -- di eclaim-production/.../results/[fileId]/page.tsx -- bug produksi lama:
+      -- AI sempat menyarankan kode ICD-10-CM, bukan ICD-10 WHO yang dipakai BPJS
+      -- Indonesia via PMK 3/2023). Diisi oleh scripts/seedIcd10WhoDictionary.js
+      -- dari src/data/icd10_who_dictionary.json -- lihat file itu utk sumber data
+      -- & catatan cakupan/keterbatasan per baris (field meta.source_caveat).
+      -- Kolom "source" WAJIB diisi saat seed (audit trail per-baris, supaya kalau
+      -- ada kode yang diragukan, asal datanya bisa dilacak).
+      CREATE TABLE IF NOT EXISTS icd10_who_codes (
+        code TEXT PRIMARY KEY,              -- format WHO, mis. "A00.0", atau kategori 3-char tanpa subdivisi mis. "I10"
+        description_en TEXT,
+        description_id TEXT,
+        chapter TEXT,                       -- nama bab (Inggris), mis. "Certain infectious and parasitic diseases"
+        chapter_number TEXT,                -- angka Romawi bab, mis. "I".."XXII"
+        source TEXT NOT NULL,               -- asal data kode ini (audit trail) -- lihat scripts/seedIcd10WhoDictionary.js
+        imported_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      -- Tabel tarif resmi INA-CBG PMK No. 3 Tahun 2023, khusus irisan
+      -- Regional 1 x Kelas D Swasta (satu-satunya kombinasi yang relevan
+      -- untuk RS Lestari Raharja, Kode Provider 0170) -- dipakai supaya
+      -- TARIF_INACBG/TOTAL_TARIF (field 'turunan' di fieldTypeRegistry.js,
+      -- seharusnya di-lookup dari tabel resmi, BUKAN dipercaya dari OCR/AI)
+      -- bisa divalidasi terhadap tarif resmi lewat rule RV-21 (lihat
+      -- ruleEngine.js). Diisi oleh scripts/seedTarifInacbg.js dari
+      -- src/data/tarif_inacbg_pmk3_2023_r1_kelasD_swasta.json -- lihat file
+      -- itu untuk metode ekstraksi, cross-check, dan catatan cakupan.
+      -- Tarif rawat jalan (jenis_layanan='RAWAT_JALAN') tidak distratifikasi
+      -- per kelas rawat (sesuai dokumen sumber) -- tersimpan di
+      -- tarif_kelas_3, sedangkan tarif_kelas_2/tarif_kelas_1 NULL untuk
+      -- baris itu. NULL pada kolom tarif manapun berarti kode itu TIDAK
+      -- berlaku/tidak dijamin untuk kombinasi Regional 1 x Kelas D Swasta
+      -- (tanda "-" di dokumen sumber) -- BEDA arti dari 0 (tarif nol).
+      CREATE TABLE IF NOT EXISTS tarif_inacbg_pmk3_2023 (
+        kode_inacbg TEXT PRIMARY KEY,
+        deskripsi TEXT,
+        tarif_kelas_3 BIGINT,
+        tarif_kelas_2 BIGINT,
+        tarif_kelas_1 BIGINT,
+        regional TEXT NOT NULL DEFAULT '1',
+        tipe_rs TEXT NOT NULL DEFAULT 'D_SWASTA',
+        jenis_layanan TEXT CHECK (jenis_layanan IN ('RAWAT_INAP','RAWAT_JALAN')),
+        sumber_halaman INTEGER,
+        perlu_verifikasi_manual BOOLEAN DEFAULT FALSE,
+        catatan_verifikasi TEXT,
+        imported_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
     `);
 
     // Create Indexes
@@ -437,6 +488,7 @@ async function initializeSchema() {
     await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_ocr_results_page ON ocr_results(record_id, page_number)`);
     await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_error_kb_rule ON error_knowledge_base(rule_id)`);
     await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_error_kb_rule_hits ON error_knowledge_base(rule_id, hit_count DESC, created_at DESC)`);
+    await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_icd10_who_chapter ON icd10_who_codes(chapter_number)`);
     await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_prb_exemption_mrn ON prb_exemption_list(hospital_code, mrn)`);
     await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_claim_records_nokartu ON claim_records(nokartu)`);
     await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_rv20_confirmations_record ON rv20_confirmations(record_id)`);
@@ -448,6 +500,7 @@ async function initializeSchema() {
     await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_bpjs_pending_file_status ON bpjs_pending_responses(pending_file_id, status)`);
     await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_bpjs_pending_sep ON bpjs_pending_responses(sep)`);
     await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_bpjs_pending_nama_peserta ON bpjs_pending_responses(nama_peserta)`);
+    await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_tarif_inacbg_jenis_layanan ON tarif_inacbg_pmk3_2023(jenis_layanan)`);
 
     await migrateSchema(dbHelper);
   } catch (err) {
@@ -644,6 +697,60 @@ async function migrateSchema(db) {
       `);
     } catch (e) {
       console.error('[migration] Gagal memastikan rule RV-20 ada:', e.message);
+    }
+
+    // RV-18 (Kode Kombinasi I10+I25.9) — insert idempoten sama seperti RV-20
+    // di atas, supaya deployment lama yang validation_rules-nya sudah terisi
+    // dari seed sebelum rule ini ditambahkan tetap dapat baris ini.
+    try {
+      await db.query(`
+        INSERT INTO validation_rules (id, rule_code, rule_name, description, field_name, priority, error_message)
+        VALUES (
+          'RV-18', 'kombinasi_i10_i259', 'Kode Kombinasi I10 + I25.9',
+          'Kode I10 (hipertensi esensial) dan I25.9 (PJK kronik) dicantumkan terpisah — dari mining data pending BPJS riil Jan-Mei 2026, BPJS/TKMKB konsisten meminta kode gabungan I11.9.',
+          'diagnosa_list', 3,
+          'Kode I10 dan I25.9 dicantumkan terpisah. BPJS/TKMKB biasanya meminta kode gabungan I11.9 (penyakit jantung hipertensif) untuk kombinasi diagnosis ini, bukan dua kode terpisah.'
+        )
+        ON CONFLICT (id) DO NOTHING
+      `);
+    } catch (e) {
+      console.error('[migration] Gagal memastikan rule RV-18 ada:', e.message);
+    }
+
+    // RV-21 (Tarif INACBG vs Tabel Resmi PMK 3/2023) — insert idempoten sama
+    // seperti RV-18/RV-20 di atas, supaya deployment lama yang
+    // validation_rules-nya sudah terisi dari seed sebelum rule ini
+    // ditambahkan tetap dapat baris ini.
+    try {
+      await db.query(`
+        INSERT INTO validation_rules (id, rule_code, rule_name, description, field_name, priority, error_message)
+        VALUES (
+          'RV-21', 'tarif_inacbg_vs_resmi', 'Tarif INACBG vs Tabel Resmi PMK 3/2023',
+          'TARIF_INACBG klaim wajib cocok dengan tarif resmi PMK No. 3 Tahun 2023 (Regional 1 x Kelas D Swasta) untuk kode & kelas rawat yang sama.',
+          'tarif_inacbg', 2,
+          'TARIF_INACBG klaim tidak cocok dengan tarif resmi PMK No. 3 Tahun 2023 untuk kode dan kelas rawat ini.'
+        )
+        ON CONFLICT (id) DO NOTHING
+      `);
+    } catch (e) {
+      console.error('[migration] Gagal memastikan rule RV-21 ada:', e.message);
+    }
+
+    // Role 'superadmin' (8 Sep 2026) — dulu users_role_check cuma izinkan
+    // admin/supervisor/verifikator. Superadmin ditambahkan sebagai role di
+    // atas admin (lihat ROLE_INHERITANCE di middleware/auth.js — superadmin
+    // otomatis dapat semua izin admin, KECUALI kebalikannya), khusus untuk
+    // membatasi akses halaman Manajemen User supaya admin biasa tidak bisa
+    // buka itu lagi. DROP + ADD CHECK constraint idempoten — aman dijalankan
+    // ulang tiap startup (Postgres tidak punya "ALTER CHECK IF NOT EXISTS").
+    try {
+      await db.query(`ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check`);
+      await db.query(`
+        ALTER TABLE users ADD CONSTRAINT users_role_check
+        CHECK (role = ANY (ARRAY['superadmin'::text, 'admin'::text, 'supervisor'::text, 'verifikator'::text]))
+      `);
+    } catch (e) {
+      console.error('[migration] Gagal memastikan constraint role superadmin ada:', e.message);
     }
 
     // One-time backfill: baris Pending BPJS yang tadinya "belum ditemukan"

@@ -495,7 +495,13 @@ router.get('/', authenticate, async (req, res) => {
     const filesRaw = await db.prepare(`
       SELECT cf.*, u.full_name as uploaded_by_name,
         ${displaySepSubquery},
-        ${displayNamaSubquery}
+        ${displayNamaSubquery},
+        (
+          SELECT string_agg(DISTINCT ve.error_message, '; ')
+          FROM validation_errors ve
+          JOIN claim_records cr ON ve.record_id = cr.id
+          WHERE cr.file_id = cf.id
+        ) as pending_reason
       FROM claim_files cf
       LEFT JOIN users u ON cf.uploaded_by = u.id
       ${where}
@@ -509,6 +515,7 @@ router.get('/', authenticate, async (req, res) => {
       valid_count: Number(f.valid_count || 0),
       error_count: Number(f.error_count || 0),
       pending_count: Number(f.pending_count || 0),
+      pending_reason: f.pending_reason || null,
       ai_prompt_tokens: Number(f.ai_prompt_tokens || 0),
       ai_completion_tokens: Number(f.ai_completion_tokens || 0),
       ai_total_tokens: Number(f.ai_total_tokens || 0)
@@ -540,6 +547,13 @@ router.get('/:id', authenticate, async (req, res) => {
     // PDF asli tersimpan & bisa disajikan ke halaman review (path valid, .pdf, ada di disk).
     const has_pdf = !!resolvePdfPath(fileRaw);
 
+    const pendingReasonRow = await db.prepare(`
+      SELECT string_agg(DISTINCT ve.error_message, '; ') as pending_reason
+      FROM validation_errors ve
+      JOIN claim_records cr ON ve.record_id = cr.id
+      WHERE cr.file_id = ?
+    `).get(fileRaw.id);
+
     const file = {
       ...fileRaw,
       has_pdf,
@@ -547,6 +561,7 @@ router.get('/:id', authenticate, async (req, res) => {
       valid_count: Number(fileRaw.valid_count || 0),
       error_count: Number(fileRaw.error_count || 0),
       pending_count: Number(fileRaw.pending_count || 0),
+      pending_reason: pendingReasonRow?.pending_reason || null,
       ai_prompt_tokens: Number(fileRaw.ai_prompt_tokens || 0),
       ai_completion_tokens: Number(fileRaw.ai_completion_tokens || 0),
       ai_total_tokens: Number(fileRaw.ai_total_tokens || 0)
@@ -1336,6 +1351,33 @@ async function autofillFromMrn(db, { hospitalCode, extractedData, jenisKlaim }) 
   }
 }
 
+/**
+ * Sinkronkan cache valid_count/error_count/pending_count di claim_files dari
+ * validation_status claim_records AKTUAL (agregasi ulang, bukan asumsi 1
+ * record/file) -- WAJIB dipanggil setiap kali validation_status SATU record
+ * di file itu berubah di luar alur upload awal (reread, update-values),
+ * supaya panel ringkasan atas ("VALID X% / PENDING Y%") tidak jadi cache basi
+ * yang bertentangan dgn badge status per-record di bawahnya (temuan K-2,
+ * evaluasi 14 Sep 2026 -- sebelum ini reread MENIMPA count SELURUH file
+ * dengan pola 1/0 dari status SATU record yang baru dibaca ulang, salah utk
+ * file multi-record; update-values malah TIDAK menyentuh count sama sekali).
+ * Terima db ATAU tx (sama-sama punya .prepare(), dipanggil di dalam
+ * transaction kalau pemanggilnya sudah dalam satu).
+ */
+async function recomputeFileCounts(db, fileId) {
+  const counts = await db.prepare(`
+    SELECT
+      SUM(CASE WHEN validation_status = 'valid' THEN 1 ELSE 0 END) AS valid_count,
+      SUM(CASE WHEN validation_status = 'error' THEN 1 ELSE 0 END) AS error_count,
+      SUM(CASE WHEN validation_status = 'pending' THEN 1 ELSE 0 END) AS pending_count
+    FROM claim_records WHERE file_id = ?
+  `).get(fileId);
+  await db.prepare(`
+    UPDATE claim_files SET valid_count = ?, error_count = ?, pending_count = ?
+    WHERE id = ?
+  `).run(Number(counts?.valid_count || 0), Number(counts?.error_count || 0), Number(counts?.pending_count || 0), fileId);
+}
+
 /** claim_records.admission_date tersimpan "YYYY-MM-DD" (lihat vclaimDateToISO) -> "MM/YYYY". */
 function periodeBulanFromAdmissionDate(admissionDate) {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(admissionDate || '').trim());
@@ -1487,6 +1529,29 @@ const JENIS_KLAIM_OPTIONS = ['RAWAT_JALAN', 'RAWAT_INAP', 'GAWAT_DARURAT'];
  *   Selalu resolve (tidak throw) — kegagalan 1 file ditandai success:false supaya
  *   tidak menghentikan file lain dalam batch.
  */
+/**
+ * P1-6: cek apakah SEP yang baru diekstrak SUDAH ada di claim_records
+ * manapun (lintas file_id -- bukan cuma dalam batch/file yang sama). Dipakai
+ * untuk cegah upload duplikat: kasus nyata SEP yang sama sempat ke-upload 2x
+ * sebagai kategori berbeda (IGD & Rawat Jalan) di hari yang sama, risiko
+ * klaim ganda kalau lolos ke vClaim. Scoped per hospital_code sama seperti
+ * detectAndFlagInternalEpisodes() -- SEP BPJS pada praktiknya cuma relevan
+ * dibandingkan dalam RS yang sama.
+ * @returns {Promise<{jenis_klaim: string, created_at: string, file_name: string}|null>}
+ */
+async function findExistingRecordBySep(db, { hospitalCode, sep }) {
+  if (!sep) return null;
+  const existing = await db.prepare(`
+    SELECT cr.jenis_klaim, cr.created_at, cf.file_name
+    FROM claim_records cr
+    JOIN claim_files cf ON cf.id = cr.file_id
+    WHERE cr.sep = ? AND cf.hospital_code = ?
+    ORDER BY cr.created_at ASC
+    LIMIT 1
+  `).get(sep, hospitalCode || '3371084');
+  return existing || null;
+}
+
 async function processSinglePdfUpload(db, { filePath, originalName, jenisKlaim: fixedJenisKlaim, allowedJenisKlaim, userId, hospitalCode }) {
   try {
     const { extractFromPDF } = require('../services/pdfExtractionPipeline');
@@ -1513,6 +1578,26 @@ async function processSinglePdfUpload(db, { filePath, originalName, jenisKlaim: 
     // jenis_klaim ditambahkan dari pilihan user (AI ekstraksi tidak pernah
     // menghasilkan field ini) - jadi konteks "memory" untuk AI review nanti.
     const extractedData = { ...result.record, JENIS_KLAIM: jenisKlaim };
+
+    // P1-6: REJECT (bukan cuma warn) kalau SEP ini SUDAH ada di claim_records
+    // manapun -- beda dari pola detectAndFlagInternalEpisodes (flag-only,
+    // verifikator yang putuskan) karena SEP identik risikonya klaim ganda
+    // LANGSUNG ke BPJS, bukan sekadar pola yang perlu direview. Dicek di sini
+    // (sebelum insert claim_files/claim_records) supaya tidak ada baris
+    // setengah-tersimpan kalau ditolak.
+    if (extractedData.SEP) {
+      const duplicate = await findExistingRecordBySep(db, { hospitalCode, sep: extractedData.SEP });
+      if (duplicate) {
+        const uploadedAt = duplicate.created_at
+          ? new Date(duplicate.created_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', dateStyle: 'medium', timeStyle: 'short' })
+          : 'waktu tidak diketahui';
+        return {
+          success: false,
+          original_name: originalName,
+          error: `SEP ${extractedData.SEP} sudah pernah diupload sebelumnya sebagai kategori ${duplicate.jenis_klaim || '(tidak diketahui)'} pada ${uploadedAt} (berkas: "${duplicate.file_name || '-'}"). Upload ini ditolak untuk mencegah klaim ganda ke BPJS -- periksa apakah ini genuinely klaim berbeda atau salah upload sebelum lanjut.`,
+        };
+      }
+    }
 
     // KODE_RS & KELAS_RS TIDAK PERNAH tercetak di SEP/Resume Medis pasien —
     // keduanya atribut RS itu sendiri, bukan per-klaim, jadi AI ekstraksi wajar
@@ -1548,11 +1633,21 @@ async function processSinglePdfUpload(db, { filePath, originalName, jenisKlaim: 
     const validationErrors = validateRecord(dbRecord, activeRules);
     const validationStatus = determineStatus(validationErrors);
 
-    // Save file record with status='uploaded' (data extraction complete)
+    // Save file record with status='uploaded' (data extraction complete).
+    // valid_count/error_count/pending_count harus diisi di sini juga (bukan
+    // cuma di claim_records) — halaman Riwayat Upload bacanya dari kolom ini,
+    // dan untuk jalur PDF (1 file = 1 record) nilainya langsung turunan dari
+    // validationStatus record itu sendiri.
     await db.prepare(`
-      INSERT INTO claim_files (id, hospital_code, file_name, file_path, status, uploaded_by, total_records, description, jenis_klaim)
-      VALUES (?, ?, ?, ?, 'uploaded', ?, 1, 'Extracted from PDF', ?)
-    `).run(fileId, hospitalCode || '3371084', originalName, resolvedFilePath, userId, jenisKlaim);
+      INSERT INTO claim_files (id, hospital_code, file_name, file_path, status, uploaded_by, total_records, valid_count, error_count, pending_count, description, jenis_klaim)
+      VALUES (?, ?, ?, ?, 'uploaded', ?, 1, ?, ?, ?, 'Extracted from PDF', ?)
+    `).run(
+      fileId, hospitalCode || '3371084', originalName, resolvedFilePath, userId,
+      validationStatus === 'valid' ? 1 : 0,
+      validationStatus === 'error' ? 1 : 0,
+      validationStatus === 'pending' ? 1 : 0,
+      jenisKlaim
+    );
 
     // Save extracted record with validation results using transaction
     await db.transaction(async (tx) => {
@@ -1663,6 +1758,174 @@ async function processSinglePdfUpload(db, { filePath, originalName, jenisKlaim: 
     return { success: false, original_name: originalName, error: 'Terjadi gangguan saat memproses berkas. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' };
   }
 }
+
+/**
+ * "Baca Ulang" — jalankan ulang ekstraksi -> rule engine -> AI review untuk
+ * SATU record yang SUDAH ADA (bukan upload baru), pakai file PDF yang sudah
+ * tersimpan di disk. Dipakai saat verifikator lihat ada field kosong/error
+ * (mis. DIAGLIST, DISCHARGE_DATE) yang dicurigai sebenarnya ADA di dokumen
+ * tapi terlewat oleh AI ekstraksi pertama — mis. karena prompt sudah
+ * diperbaiki, atau AI cuma "kurang beruntung" di percobaan pertama.
+ *
+ * UPDATE di tempat (bukan INSERT record baru) — file_id & record_id tetap
+ * sama, supaya link/histori yang sudah ada (pending BPJS, dst) tidak putus.
+ *
+ * @returns {Promise<{success:boolean, error?:string, vclaimFormat?, validation_status?, validation_errors?, ai_review?}>}
+ */
+async function reprocessExistingRecord(db, { fileId, recordId, filePath, jenisKlaim, hospitalCode }) {
+  try {
+    const { extractFromPDF } = require('../services/pdfExtractionPipeline');
+    const result = await extractFromPDF(filePath, { jenisKlaim, originalName: path.basename(filePath) });
+
+    if (!result.success) {
+      console.error('[reread] gagal:', recordId, JSON.stringify(result.errors));
+      return { success: false, error: result.pesan };
+    }
+
+    const extractedData = { ...result.record, JENIS_KLAIM: jenisKlaim };
+
+    if (!extractedData.KODE_RS && hospitalCode) {
+      extractedData.KODE_RS = hospitalCode;
+    }
+    if (!extractedData.KELAS_RS) {
+      const hospitalSettings = await db.prepare('SELECT kelas_rs FROM hospital_settings WHERE hospital_code = ?').get(hospitalCode || '3371084');
+      if (hospitalSettings?.kelas_rs) extractedData.KELAS_RS = hospitalSettings.kelas_rs;
+    }
+
+    await autofillFromMrn(db, { hospitalCode, extractedData, jenisKlaim });
+
+    const dbRecord = vclaimToDbFormat(extractedData);
+    dbRecord.jenis_klaim = jenisKlaim;
+    dbRecord.has_bpjs_page = result.record.has_bpjs_page !== false;
+
+    const activeRules = await db.prepare('SELECT * FROM validation_rules WHERE is_active = 1').all();
+    const validationErrors = validateRecord(dbRecord, activeRules);
+    const validationStatus = determineStatus(validationErrors);
+
+    await db.transaction(async (tx) => {
+      await tx.prepare(`
+        UPDATE claim_records SET
+          kode_rs = ?, sep = ?, nokartu = ?, nama_pasien = ?, mrn = ?,
+          birth_date = ?, gender = ?, kelas_rawat = ?, admission_date = ?, discharge_date = ?,
+          discharge_status = ?, diagnosa_list = ?, prosedur_list = ?, dpjp_name = ?,
+          tarif_rs = ?, validation_status = ?, error_count = ?, raw_data = ?, klinik_poli = ?, has_bpjs_page = ?
+        WHERE id = ?
+      `).run(
+        extractedData.KODE_RS, extractedData.SEP, extractedData.NOKARTU,
+        extractedData.NAMA_PASIEN, extractedData.MRN,
+        vclaimDateToISO(extractedData.BIRTH_DATE), extractedData.SEX,
+        /^\d+$/.test(extractedData.KELAS_RAWAT) ? parseInt(extractedData.KELAS_RAWAT) : null,
+        vclaimDateToISO(extractedData.ADMISSION_DATE), vclaimDateToISO(extractedData.DISCHARGE_DATE),
+        /^\d+$/.test(extractedData.DISCHARGE_STATUS) ? parseInt(extractedData.DISCHARGE_STATUS) : 1,
+        extractedData.DIAGLIST, extractedData.PROCLIST,
+        extractedData.DPJP,
+        /^\d+$/.test(extractedData.TARIF_RS) ? parseInt(extractedData.TARIF_RS) : null,
+        validationStatus, validationErrors.length, JSON.stringify(extractedData), extractedData.KLINIK_SEP || null,
+        dbRecord.has_bpjs_page,
+        recordId
+      );
+
+      await tx.prepare('DELETE FROM validation_errors WHERE record_id = ?').run(recordId);
+      if (validationErrors.length > 0) {
+        const txInsertError = tx.prepare(`
+          INSERT INTO validation_errors (id, record_id, rule_id, field_name, error_message, expected_value, actual_value, severity)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+        for (const err of validationErrors) {
+          await txInsertError.run(
+            uuidv4(), recordId, err.rule_id, err.field_name,
+            err.error_message, err.expected_value || '', err.actual_value || '',
+            err.severity
+          );
+        }
+      }
+
+      // Sinkronkan cache di claim_files (dibaca panel ringkasan atas & Riwayat
+      // Upload) dari HASIL AGREGASI ULANG seluruh record file ini, bukan cuma
+      // status record yang baru dibaca ulang -- lihat recomputeFileCounts().
+      await recomputeFileCounts(tx, fileId);
+    });
+
+    // Best-effort, sama seperti alur upload asli — tidak menggagalkan baca ulang.
+    await detectAndFlagInternalEpisodes(db, {
+      hospitalCode,
+      nokartu: extractedData.NOKARTU,
+      admissionDate: vclaimDateToISO(extractedData.ADMISSION_DATE),
+    }).catch(() => {});
+    await detectAndFlagPRB(db, {
+      hospitalCode,
+      mrn: extractedData.MRN,
+      nokartu: extractedData.NOKARTU,
+      admissionDate: vclaimDateToISO(extractedData.ADMISSION_DATE),
+      diagnosaList: extractedData.DIAGLIST,
+    }).catch(() => {});
+    await linkPendingBpjsForSep(db, extractedData.SEP, recordId).catch(() => {});
+
+    let aiReview = null;
+    try {
+      const evidencePool = await gatherEvidencePool(db, recordId, path.resolve(filePath));
+      const knowledgeEntries = await getRelevantKnowledge(db, validationErrors.map(e => e.rule_id));
+      const bpjsExamples = await getRelevantBpjsExamples(db);
+      aiReview = await generateAiReview(extractedData, validationErrors, evidencePool, knowledgeEntries, bpjsExamples);
+      if (aiReview) {
+        await db.prepare('UPDATE claim_records SET ai_review = ? WHERE id = ?')
+          .run(JSON.stringify(aiReview), recordId);
+        recordKnowledge(db, aiReview.knowledge_updates).catch(kbErr =>
+          console.warn(`[reread] Gagal simpan knowledge base: ${kbErr.message}`));
+      } else {
+        await db.prepare('UPDATE claim_records SET ai_review = NULL WHERE id = ?').run(recordId);
+      }
+    } catch (aiErr) {
+      console.warn(`[reread] AI review gagal untuk record ${recordId}: ${aiErr.message}`);
+    }
+
+    return {
+      success: true,
+      file_id: fileId,
+      record_id: recordId,
+      vclaimFormat: extractedData,
+      validation_status: validationStatus,
+      validation_errors: validationErrors,
+      ai_review: aiReview,
+    };
+  } catch (err) {
+    console.error('[reread] error tak terduga:', recordId, err);
+    return { success: false, error: 'Terjadi gangguan saat membaca ulang berkas. Silakan coba lagi.' };
+  }
+}
+
+/**
+ * POST /api/v1/claim-files/records/:recordId/reread
+ * "Baca Ulang" — re-ekstraksi + re-validasi + re-AI-review 1 record yang
+ * sudah ada, pakai PDF yang sudah tersimpan. Lihat reprocessExistingRecord().
+ */
+router.post('/records/:recordId/reread', authenticate, async (req, res) => {
+  try {
+    const db = getDb();
+    const record = await db.prepare('SELECT * FROM claim_records WHERE id = ?').get(req.params.recordId);
+    if (!record) return res.status(404).json({ error: 'Record tidak ditemukan.' });
+
+    const file = await db.prepare('SELECT * FROM claim_files WHERE id = ?').get(record.file_id);
+    if (!file) return res.status(404).json({ error: 'Berkas tidak ditemukan.' });
+    if (!file.file_path || !fs.existsSync(file.file_path)) {
+      return res.status(400).json({ error: 'Berkas PDF asli tidak ditemukan di server, tidak bisa dibaca ulang.' });
+    }
+
+    const result = await reprocessExistingRecord(db, {
+      fileId: file.id,
+      recordId: record.id,
+      filePath: file.file_path,
+      jenisKlaim: file.jenis_klaim || record.jenis_klaim || 'RAWAT_INAP',
+      hospitalCode: file.hospital_code,
+    });
+
+    if (!result.success) return res.status(500).json({ error: result.error });
+    res.json(result);
+  } catch (err) {
+    console.error('[reread] route error:', err);
+    res.status(500).json({ error: 'Terjadi gangguan server saat membaca ulang.' });
+  }
+});
 
 router.post('/upload-pdf', authenticate, pdfUpload.single('file'), async (req, res) => {
   if (!req.file) {
@@ -2119,6 +2382,14 @@ router.post('/:record_id/update-values', authenticate, async (req, res) => {
           );
         }
       }
+
+      // Panel ringkasan file (VALID X% / PENDING Y%) baca count ini -- tanpa
+      // sinkron di sini, count-nya basi begitu koder edit field lewat endpoint
+      // ini (mis. klik Terapkan pada saran kode lalu Simpan), sementara badge
+      // status per-record di header/daftar sudah baca validation_status yang
+      // baru -- itu persis temuan K-2 (evaluasi 14 Sep 2026): tiga tempat beda
+      // status utk klaim yang sama. Lihat juga recomputeFileCounts() di reread.
+      await recomputeFileCounts(tx, existing.file_id);
     });
 
     res.json({

@@ -13,6 +13,19 @@ const router = express.Router();
  * Admin-only, sama seperti users.js.
  */
 
+// Fitur dinonaktifkan sementara (8 Sep 2026, permintaan user) — data di tabel
+// prb_exemption_list TIDAK dihapus dan TETAP dipakai oleh detectAndFlagPRB()
+// (logika itu ada di claimFiles.js, bukan router ini), cuma endpoint CRUD
+// untuk mengelola daftar exempt-nya yang ditutup. Hapus blok ini untuk
+// mengaktifkan lagi fitur manajemen-nya.
+const FEATURE_ENABLED = false;
+router.use((req, res, next) => {
+  if (!FEATURE_ENABLED) {
+    return res.status(403).json({ error: 'Fitur Exempt PRB saat ini dinonaktifkan.' });
+  }
+  next();
+});
+
 // GET /api/v1/prb-exempt
 router.get('/', authenticate, authorize('admin'), async (req, res) => {
   try {

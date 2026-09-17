@@ -46,7 +46,13 @@ async function extractClaimData(claimDataText, jenisKlaim) {
   // cuma labelnya beda — persis kasus yang sama dengan KELAS_RAWAT di atas.
   const tanggalRawatJalanRule = isOutpatientLike
     ? `\n8b. ADMISSION_DATE & DISCHARGE_DATE khusus rawat jalan/IGD (tanpa rawat inap): dokumen jenis ini biasanya TIDAK punya field "Tanggal Masuk"/"Tanggal Keluar" terpisah (pasien tidak menginap). Kalau field itu tidak ada tapi ada "Tanggal Pelayanan", "Tanggal Kunjungan", "Tgl Periksa", atau tanggal pada SEP yang menunjukkan kapan pasien dilayani, isi ADMISSION_DATE dan DISCHARGE_DATE dengan tanggal yang SAMA itu (satu hari kunjungan = tanggal masuk = tanggal keluar). Kalau memang tidak ada tanggal pelayanan/kunjungan sama sekali di dokumen, baru isi keduanya dengan "".`
-    : '';
+    : `\n8b. DISCHARGE_DATE khusus rawat inap: dokumen "RESUME MEDIS RAWAT INAP" biasanya TIDAK mencetak
+    label "Tanggal Keluar" eksplisit — sumbernya adalah TANGGAL yang tercetak PERSIS DI ATAS baris
+    tanda tangan "Dokter Penanggung Jawab Pelayanan" di akhir dokumen itu (contoh format: "Magelang,
+    21 Agustus 2026" tepat sebelum nama & jabatan dokter penanggung jawab) — itu tanggal resmi
+    penandatanganan resume pulang pasien, JADIKAN itu DISCHARGE_DATE. JANGAN pakai tanggal lain (mis.
+    "Tanggal MRS"/tanggal masuk, tanggal cetak di header dokumen lain) untuk field ini kecuali tanggal
+    di atas tanda tangan itu benar-benar tidak ada di teks — baru ikuti aturan 6 (kosongkan).`;
 
   const prompt = `Kamu ekstraktor data klaim BPJS dari dokumen scan/print RS. Bentuk dokumennya BUKAN
 "Berkas Klaim Individual" (ringkasan E-Klaim terkode rapi) — itu jarang/tidak pernah ada di berkas
@@ -99,6 +105,11 @@ ${kelasRawatRule}${tanggalRawatJalanRule}
        (contoh nilai: "INSTALASI GAWAT DARURAT", "UGD", "HEMODIALISA", nama poli spesialis).
        Salin APA ADANYA, jangan disingkat/diseragamkan. Dipakai untuk mendeteksi kunjungan
        lintas-poli hari yang sama (bukan kamu yang memutuskan itu, cuma salin nama kliniknya).
+    d. BERAT_BADAN: berat badan pasien SAAT INI dalam kg (BEDA dari BIRTH_WEIGHT, yang khusus
+       berat LAHIR bayi/neonatus) — biasanya tercatat di bagian "VITAL SIGN"/tanda vital Triase
+       IGD atau di header Resume Medis, berlabel "BB" atau "Berat Badan" (contoh: "BB: 10 kg" ->
+       isi "10"). Angka SAJA, tanpa satuan "kg". Field ini TIDAK WAJIB ada di semua dokumen — kalau
+       tidak tercatat sama sekali, ikuti aturan 6 (kosongkan), JANGAN mengarang angka.
 
 TEKS KLAIM:
 ${claimDataText}
@@ -170,6 +181,10 @@ JSON:`;
       if (extracted.POTENSI_PRB_SEP) result.record.POTENSI_PRB_SEP = String(extracted.POTENSI_PRB_SEP).trim();
       if (extracted.JENIS_KUNJUNGAN_SEP) result.record.JENIS_KUNJUNGAN_SEP = String(extracted.JENIS_KUNJUNGAN_SEP).trim();
       if (extracted.KLINIK_SEP) result.record.KLINIK_SEP = String(extracted.KLINIK_SEP).trim();
+      // BERAT_BADAN: field baru (bukan kolom vClaim resmi, sama pola dengan 3 field di atas)
+      // — kontrak dgn frontend: kunci HARUS persis "BERAT_BADAN", null/tidak ada kalau dokumen
+      // tidak mencatatnya (JANGAN isi default 0, beda arti dari "memang 0 kg").
+      if (extracted.BERAT_BADAN) result.record.BERAT_BADAN = String(extracted.BERAT_BADAN).trim();
       result.success = true;
       result.errors = [];
       return result;

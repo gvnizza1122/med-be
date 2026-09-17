@@ -35,6 +35,26 @@ describe('validateRecord', () => {
       const errors = validateRecord(record, activeRules);
       expect(errors.some(e => e.rule_id === 'RV-11')).toBe(false);
     });
+
+    test('does not trigger for 93.94 (nebulizer/respiratory therapy, not Rehab Medik)', () => {
+      const record = {
+        prosedur_list: '90.59;87.44;93.94',
+        los: 2,
+        diagnosa_list: 'J18.0'
+      };
+      const errors = validateRecord(record, activeRules);
+      expect(errors.some(e => e.rule_id === 'RV-11')).toBe(false);
+    });
+
+    test('still triggers when a genuine rehab code (93.x, x<9) is mixed with 93.9x', () => {
+      const record = {
+        prosedur_list: '93.94;93.01',
+        los: 5,
+        diagnosa_list: 'M545'
+      };
+      const errors = validateRecord(record, activeRules);
+      expect(errors.some(e => e.rule_id === 'RV-11')).toBe(true);
+    });
   });
 
   describe('RV-12: Tumor Neoplasma', () => {

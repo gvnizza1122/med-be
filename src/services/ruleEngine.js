@@ -19,10 +19,14 @@
  * RV-15: Flagging Otomatisasi Program Rujuk Balik / PRB (BA 1247/2024) - MAJOR
  * RV-16: Batasan Maksimal Iterasi Obat Kronis (BA 1247/2024) - MAJOR
  * RV-17: Validasi Tarif Top-Up Odontektomi Khusus Rawat Jalan (PMK 3/2023 & BA 1247/2024) - MAJOR
+ * RV-18: Kode Kombinasi I10 + I25.9 -> I11.9 (mining data pending BPJS riil) - MINOR
+ * RV-20: Kriteria Kegawatan IGD (kode nyeri generik tanpa bukti kegawatan) - MINOR
+ * RV-21: Validasi TARIF_INACBG vs Tabel Resmi PMK 3/2023 (Regional 1 x Kelas D Swasta) - MAJOR
  */
 
 // ICD-10: Letter followed by 2+ digits, optionally dot + digits
 const { matchPrbCategory } = require('./prbRules');
+const { getTarifResmi } = require('./tarifInacbgLookup');
 
 const ICD10_PATTERN = /^[A-Z]\d{2}(\.\d{1,4})?$/i;
 // ICD-9-CM: 2-3 digits, optionally dot + digits
@@ -340,12 +344,22 @@ function validateRecord(record, activeRules) {
     }
   }
 
-  // RV-11: Rehabilitasi Medik Check (ICD-9-CM 93...)
+  // RV-11: Rehabilitasi Medik Check (ICD-9-CM 93.0-93.8) -- KECUALI 93.9x
+  // (93.90-93.99, "Respiratory therapy": nebulizer/oksigen/ventilasi dst,
+  // BUKAN Rehabilitasi Medik/KFR sama sekali, tidak pernah butuh Lembar
+  // Program/Uji Fungsi/Bukti Pendampingan). Sebelumnya proc.startsWith('93')
+  // menyapu SELURUH bab 93.x termasuk 93.94 (nebulizer IGD rutin) sebagai
+  // "butuh dokumen Rehab Medik lengkap" -- bug nyata, 30 dari 32 record
+  // riil dengan kode 93.x di DB ini HANYA punya kode 93.9x (murni terapi
+  // respirasi IGD, mis. 90.59;87.44;93.94 -- workup IGD standar), bukan
+  // rehab sama sekali. Dilaporkan Afri (10 Sep 2026), root cause diverifikasi
+  // via query DB riil, bukan asumsi.
   if (ruleMap['RV-11']?.is_active) {
     const procStr = record.prosedur_list || '';
     if (procStr && procStr !== '-') {
       const procs = procStr.split(';').map(p => p.trim());
-      const hasRehab = procs.some(proc => proc.startsWith('93'));
+      const isRehabCode = proc => proc.startsWith('93') && !proc.startsWith('93.9');
+      const hasRehab = procs.some(isRehabCode);
       if (hasRehab) {
         // Validation check for prolonged therapy without re-assessment
         if (record.los > 14 && !record.has_re_assessment_sp_kfr) {
@@ -364,7 +378,7 @@ function validateRecord(record, activeRules) {
             severity: 'major',
             error_message: ruleMap['RV-11'].error_message || 'Tindakan Rehabilitasi Medik (93...) terdeteksi. Sesuai BA 1247/2024, wajib melampirkan Lembar Program, Lembar Uji Fungsi, dan Bukti Pendampingan.',
             expected_value: 'Dokumen Rehabilitasi Medik Lengkap',
-            actual_value: procs.filter(p => p.startsWith('93')).join(', ')
+            actual_value: procs.filter(isRehabCode).join(', ')
           });
         }
       }
@@ -526,6 +540,78 @@ function validateRecord(record, activeRules) {
         expected_value: 'TTV abnormal / pemeriksaan penunjang / kode kegawatan pendamping terdokumentasi',
         actual_value: `Diagnosa: ${codes.join(';')}`
       });
+    }
+  }
+
+  // RV-18: Kode Kombinasi I10 + I25.9 — dari mining data pending BPJS
+  // riil Jan-Mei 2026 (RS Lestari Raharja): BPJS/TKMKB konsisten menolak
+  // kode I10 (hipertensi esensial) dan I25.9 (PJK kronik) yang dicantumkan
+  // TERPISAH, dan meminta kode gabungan I11.9 (penyakit jantung hipertensif)
+  // — pola coding-combination standar, jadi aman dideteksi otomatis (bukan
+  // penilaian klinis kasus-per-kasus seperti mayoritas alasan pending
+  // lainnya yang ditemukan saat mining).
+  if (ruleMap['RV-18']?.is_active) {
+    const diagStr = record.diagnosa_list || '';
+    if (diagStr && diagStr !== '-') {
+      const codes = diagStr.split(';').map(c => c.trim().toUpperCase());
+      const hasI10 = codes.some(c => c === 'I10');
+      const hasI259 = codes.some(c => c === 'I25.9');
+      if (hasI10 && hasI259) {
+        errors.push({
+          rule_id: 'RV-18',
+          field_name: 'diagnosa_list',
+          severity: 'minor',
+          error_message: ruleMap['RV-18'].error_message ||
+            'Kode I10 dan I25.9 dicantumkan terpisah. BPJS/TKMKB biasanya meminta kode gabungan I11.9 (penyakit jantung hipertensif) untuk kombinasi diagnosis ini, bukan dua kode terpisah.',
+          expected_value: 'I11.9 (kode gabungan)',
+          actual_value: `Diagnosa: ${codes.join(';')}`
+        });
+      }
+    }
+  }
+
+  // RV-21: Validasi TARIF_INACBG klaim vs tabel resmi INA-CBG PMK No. 3
+  // Tahun 2023 (Regional 1 x Kelas D Swasta -- satu-satunya kombinasi yang
+  // relevan untuk RS Lestari Raharja). Kalau INACBG terisi dan kodenya ada
+  // di tabel resmi, TARIF_INACBG klaim wajib cocok dengan tarif resmi untuk
+  // kelas rawat klaim ini (kelas rawat diabaikan untuk RAWAT_JALAN karena
+  // tarif RJTL tidak distratifikasi per kelas di dokumen sumber). Lihat
+  // src/services/tarifInacbgLookup.js dan src/data/tarif_inacbg_pmk3_2023_r1_kelasD_swasta.json
+  // (field "meta") untuk metode ekstraksi & cross-check.
+  if (ruleMap['RV-21']?.is_active) {
+    const kode = (record.inacbg_code || '').trim().toUpperCase();
+    if (kode) {
+      const resmi = getTarifResmi(kode, record.kelas_rawat);
+      if (resmi === undefined) {
+        // Kode tidak ditemukan di tabel Regional 1 x Kelas D Swasta ini --
+        // bisa jadi kode salah ketik, atau memang bukan kombinasi yang
+        // dicakup (mis. kelas_rawat belum valid, lihat RV-07). Tidak cukup
+        // yakin untuk menandai error/mismatch tarif, cukup dilewati diam-diam
+        // supaya tidak dobel-flag dengan RV-05/07 untuk akar masalah yang sama.
+      } else if (resmi.tarif === null) {
+        errors.push({
+          rule_id: 'RV-21',
+          field_name: 'inacbg_code',
+          severity: 'minor',
+          error_message: ruleMap['RV-21'].error_message ||
+            `Kode INACBG ${kode} ditemukan di tabel resmi PMK 3/2023, tapi TIDAK memiliki tarif yang dijamin (tanda "-") untuk Regional 1 x Kelas D Swasta pada kelas rawat klaim ini. Periksa ulang ketepatan kode/kelas rawat.`,
+          expected_value: 'Kode dengan tarif resmi berlaku untuk kelas rawat ini',
+          actual_value: `${kode} (kelas_rawat=${record.kelas_rawat ?? '(kosong)'})`
+        });
+      } else {
+        const tarifKlaim = Number(record.tarif_inacbg);
+        if (!isNaN(tarifKlaim) && tarifKlaim > 0 && Math.round(tarifKlaim) !== Math.round(resmi.tarif)) {
+          errors.push({
+            rule_id: 'RV-21',
+            field_name: 'tarif_inacbg',
+            severity: 'major',
+            error_message: ruleMap['RV-21'].error_message ||
+              `TARIF_INACBG klaim tidak cocok dengan tarif resmi PMK No. 3 Tahun 2023 untuk kode ${kode} (Regional 1, Kelas D Swasta, kelas rawat ${record.kelas_rawat ?? '(kosong)'}).`,
+            expected_value: `Rp ${Number(resmi.tarif).toLocaleString('id-ID')}`,
+            actual_value: `Rp ${tarifKlaim.toLocaleString('id-ID')}`
+          });
+        }
+      }
     }
   }
 

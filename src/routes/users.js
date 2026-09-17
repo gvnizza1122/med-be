@@ -10,7 +10,7 @@ const router = express.Router();
 /**
  * GET /api/v1/users
  */
-router.get('/', authenticate, authorize('admin'), async (req, res) => {
+router.get('/', authenticate, authorize('superadmin'), async (req, res) => {
   try {
     const db = getDb();
     const users = await db.prepare(`
@@ -27,7 +27,7 @@ router.get('/', authenticate, authorize('admin'), async (req, res) => {
 /**
  * POST /api/v1/users
  */
-router.post('/', authenticate, authorize('admin'), async (req, res) => {
+router.post('/', authenticate, authorize('superadmin'), async (req, res) => {
   try {
     const { email, password, full_name, nik, role } = req.body;
 
@@ -35,7 +35,7 @@ router.post('/', authenticate, authorize('admin'), async (req, res) => {
       return res.status(400).json({ error: 'Email, password, nama lengkap, dan role wajib diisi.' });
     }
 
-    if (!['admin', 'supervisor', 'verifikator'].includes(role)) {
+    if (!['superadmin', 'admin', 'supervisor', 'verifikator'].includes(role)) {
       return res.status(400).json({ error: 'Role tidak valid.' });
     }
 
@@ -78,7 +78,7 @@ router.post('/', authenticate, authorize('admin'), async (req, res) => {
 /**
  * PUT /api/v1/users/:id
  */
-router.put('/:id', authenticate, authorize('admin'), async (req, res) => {
+router.put('/:id', authenticate, authorize('superadmin'), async (req, res) => {
   try {
     const db = getDb();
     const user = await db.prepare('SELECT * FROM users WHERE id = ?').get(req.params.id);
@@ -116,7 +116,7 @@ router.put('/:id', authenticate, authorize('admin'), async (req, res) => {
 /**
  * DELETE /api/v1/users/:id (soft delete)
  */
-router.delete('/:id', authenticate, authorize('admin'), async (req, res) => {
+router.delete('/:id', authenticate, authorize('superadmin'), async (req, res) => {
   try {
     const db = getDb();
     if (req.params.id === req.user.id) {

@@ -68,27 +68,76 @@ function excelDateToISO(v) {
  */
 function parsePendingSheet(sheet, sheetLabel) {
   const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
-  const headerIdx = rows.findIndex(r => r.some(c => String(c).trim().toUpperCase() === REQUIRED_HEADER));
-  if (headerIdx === -1) return [];
-  const headers = rows[headerIdx].map(h => String(h).trim().toUpperCase());
-  const colIdx = (name) => headers.indexOf(name);
 
-  const iSep = colIdx('NOSEP'), iTglSep = colIdx('TGLSEP'), iTglPlg = colIdx('TGLPLG'),
-    iNokartu = colIdx('NOKARTU'), iMr = colIdx('MR'), iNama = colIdx('NAMAPESERTA'),
-    iInacbg = colIdx('KDINACBG'), iBiaya = colIdx('BYPENGAJUAN'), iAlasan = colIdx('ALASANPENDING'),
-    iJawaban = colIdx('JAWABAN RS');
+  const headerIdxPrimary = rows.findIndex(r => r.some(c => String(c).trim().toUpperCase() === REQUIRED_HEADER));
+  if (headerIdxPrimary !== -1) {
+    const headers = rows[headerIdxPrimary].map(h => String(h).trim().toUpperCase());
+    const colIdx = (name) => headers.indexOf(name);
+    const iSep = colIdx('NOSEP'), iTglSep = colIdx('TGLSEP'), iTglPlg = colIdx('TGLPLG'),
+      iNokartu = colIdx('NOKARTU'), iMr = colIdx('MR'), iNama = colIdx('NAMAPESERTA'),
+      iInacbg = colIdx('KDINACBG'), iBiaya = colIdx('BYPENGAJUAN'), iAlasan = colIdx('ALASANPENDING'),
+      iJawaban = colIdx('JAWABAN RS');
+
+    const out = [];
+    for (let i = headerIdxPrimary + 1; i < rows.length; i++) {
+      const row = rows[i];
+      const sep = String(row[iSep] ?? '').trim();
+      if (!sep) continue;
+      out.push({
+        sheet: sheetLabel,
+        sep,
+        tgl_sep: excelDateToISO(row[iTglSep]),
+        tgl_pulang: excelDateToISO(row[iTglPlg]),
+        nokartu: iNokartu >= 0 ? String(row[iNokartu] ?? '').trim() : '',
+        mr: iMr >= 0 ? String(row[iMr] ?? '').trim() : '',
+        nama_peserta: iNama >= 0 ? String(row[iNama] ?? '').trim() : '',
+        kdinacbg: iInacbg >= 0 ? String(row[iInacbg] ?? '').trim() : '',
+        by_pengajuan: iBiaya >= 0 ? row[iBiaya] : null,
+        alasan_pending: iAlasan >= 0 ? String(row[iAlasan] ?? '').trim() : '',
+        jawaban_rs: iJawaban >= 0 ? String(row[iJawaban] ?? '').trim() : '',
+      });
+    }
+    return out;
+  }
+
+  // Format alternatif (ditemukan 8 Sep 2026 di rekap RI Januari 2026 RS
+  // Lestari Raharja — sheet "RI" & "RJ" dalam satu file XLSX ternyata bisa
+  // punya format kolom BERBEDA: "No. | Tgl. Masuk | Tgl. Pulang | No. RM |
+  // Nama Pasien | No. Klaim / SEP | INACBG | Top Up | Total Tarif | Tarif RS
+  // | Jenis | Konfirmasi" — kolom "Jenis" di format ini ternyata isinya
+  // ALASAN PENDING (bukan kategori jenis), "Konfirmasi" = jawaban/tindakan
+  // RS. Tanpa fallback ini, sheet berformat begini SILENT gagal total (0
+  // baris ter-import) — bukan error, cuma diam-diam kosong.
+  const normalize = (s) => String(s).trim().toUpperCase().replace(/\.\s*/g, ' ').replace(/\s+/g, ' ');
+  const headerIdxAlt = rows.findIndex(r => r.some(c => /NO\s*KLAIM\s*\/?\s*SEP/.test(normalize(c))));
+  if (headerIdxAlt === -1) return [];
+
+  const headersAlt = rows[headerIdxAlt].map(normalize);
+  const findCol = (...patterns) => headersAlt.findIndex(h => patterns.some(p => p.test(h)));
+
+  const iSep = findCol(/NO\s*KLAIM\s*\/?\s*SEP/), iTglMasuk = findCol(/^TGL\s*MASUK$/),
+    iTglPlg = findCol(/^TGL\s*PULANG$/), iMr = findCol(/^NO\s*RM$/), iNama = findCol(/^NAMA\s*PASIEN$/),
+    iInacbg = findCol(/^INACBG$/), iBiaya = findCol(/^TOTAL\s*TARIF$/),
+    // Kolom alasan pending di format alternatif ternyata beda label antar
+    // bulan (ditemukan 8 Sep 2026, cross-check 6 file Excel Jan-Jun 2026):
+    // "Jenis" (Feb-Apr) vs "Keterangan Pending" (Mei) — sama-sama berisi
+    // alasan pending walau labelnya beda, JENIS bukan berarti kategori.
+    iAlasan = findCol(/^JENIS$/, /KETERANGAN\s*PENDING/),
+    iJawaban = findCol(/^KONFIRMASI$/);
 
   const out = [];
-  for (let i = headerIdx + 1; i < rows.length; i++) {
+  for (let i = headerIdxAlt + 1; i < rows.length; i++) {
     const row = rows[i];
-    const sep = String(row[iSep] ?? '').trim();
+    const sep = iSep >= 0 ? String(row[iSep] ?? '').trim() : '';
     if (!sep) continue;
     out.push({
       sheet: sheetLabel,
       sep,
-      tgl_sep: excelDateToISO(row[iTglSep]),
-      tgl_pulang: excelDateToISO(row[iTglPlg]),
-      nokartu: iNokartu >= 0 ? String(row[iNokartu] ?? '').trim() : '',
+      // Format alternatif tidak punya "Tanggal SEP" terpisah — pakai
+      // Tanggal Masuk sebagai referensi tanggal terdekat yang tersedia.
+      tgl_sep: iTglMasuk >= 0 ? excelDateToISO(row[iTglMasuk]) : null,
+      tgl_pulang: iTglPlg >= 0 ? excelDateToISO(row[iTglPlg]) : null,
+      nokartu: '',
       mr: iMr >= 0 ? String(row[iMr] ?? '').trim() : '',
       nama_peserta: iNama >= 0 ? String(row[iNama] ?? '').trim() : '',
       kdinacbg: iInacbg >= 0 ? String(row[iInacbg] ?? '').trim() : '',
@@ -652,6 +701,57 @@ router.post('/pending-files/:id/generate-all-drafts', authenticate, async (req, 
     res.json({ processed: rows.length, done, error });
   } catch (err) {
     console.error('[bpjsPending] generate-all-drafts error:', err);
+    res.status(500).json({ error: 'Terjadi gangguan pada sistem. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' });
+  }
+});
+
+/**
+ * POST /api/v1/records/pending-files/:id/backfill-training
+ * Isi ai_training_examples dari jawaban RS ASLI (jawaban_rs_manual, hasil
+ * import Excel) — BEDA dari generate-all-drafts (itu bikin draft BARU pakai
+ * AI, belum tentu sama dengan yang sungguhan dipakai RS dulu). Di sini kita
+ * pakai pasangan alasan_raw + jawaban_rs_manual APA ADANYA (real ground
+ * truth dari histori), diringkas Kimi K3 sama seperti alur draft biasa
+ * (lihat recordKimiTrainingExample) — supaya RAG belajar dari kejadian
+ * NYATA, bukan karangan AI yang belum terbukti manjur.
+ * Cuma proses baris yang: sudah ke-link ke claim_record (claim_record_id
+ * ada — perlu data klinis buat konteks), alasan_raw ada, dan jawaban_rs_manual
+ * ada (kalau kosong, tidak ada yang bisa dipelajari dari baris itu).
+ * Dedup: lewati kalau alasan_raw yang sama persis sudah pernah tercatat di
+ * ai_training_examples (mis. file yang sama diproses ulang).
+ */
+router.post('/pending-files/:id/backfill-training', authenticate, async (req, res) => {
+  try {
+    const db = getDb();
+    const file = await db.prepare('SELECT id FROM bpjs_pending_files WHERE id = ?').get(req.params.id);
+    if (!file) return res.status(404).json({ error: 'File pending tidak ditemukan.' });
+
+    const rows = await db.prepare(`
+      SELECT * FROM bpjs_pending_responses
+      WHERE pending_file_id = ? AND claim_record_id IS NOT NULL
+        AND alasan_raw IS NOT NULL AND alasan_raw != ''
+        AND jawaban_rs_manual IS NOT NULL AND jawaban_rs_manual != ''
+    `).all(req.params.id);
+
+    let done = 0, skippedDuplicate = 0, error = 0;
+    await runWithConcurrencyLimit(rows, 3, async (row) => {
+      try {
+        const dup = await db.prepare(`
+          SELECT id FROM ai_training_examples WHERE alasan_bpjs = ? LIMIT 1
+        `).get(row.alasan_raw);
+        if (dup) { skippedDuplicate++; return; }
+
+        await recordKimiTrainingExample(db, row.alasan_raw, row.jawaban_rs_manual, null);
+        done++;
+      } catch (err) {
+        console.error('[bpjsPending] backfill-training gagal untuk row', row.id, ':', err.message);
+        error++;
+      }
+    });
+
+    res.json({ processed: rows.length, done, skipped_duplicate: skippedDuplicate, error });
+  } catch (err) {
+    console.error('[bpjsPending] backfill-training error:', err);
     res.status(500).json({ error: 'Terjadi gangguan pada sistem. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' });
   }
 });

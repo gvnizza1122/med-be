@@ -70,6 +70,7 @@ async function seed() {
     { id: 'RV-16', rule_code: 'batas_max_iterasi_obat', rule_name: 'Batasan Maksimal Iterasi Obat', description: 'Iterasi obat kronis maksimal 2 kali.', field_name: 'urutan_iterasi', priority: 2, error_message: 'Iterasi obat melebihi batas maksimal 2 kali.' },
     { id: 'RV-17', rule_code: 'odontektomi_rawat_jalan', rule_name: 'Odontektomi Khusus Rawat Jalan', description: 'Odontektomi hanya untuk rawat jalan.', field_name: 'prosedur_list', priority: 2, error_message: 'Odontektomi hanya berlaku untuk rawat jalan.' },
     { id: 'RV-20', rule_code: 'kegawatan_igd_kode', rule_name: 'Kriteria Kegawatan IGD', description: 'Diagnosis IGD hanya kode nyeri generik tanpa kode kegawatan pendamping — BPJS sering menolak dengan alasan "tidak memenuhi kriteria gawat darurat".', field_name: 'diagnosa_list', priority: 3, error_message: 'Diagnosis IGD ini hanya kode nyeri generik tanpa bukti kegawatan objektif. Pastikan TTV abnormal/pemeriksaan penunjang terdokumentasi sebelum submit.' },
+    { id: 'RV-21', rule_code: 'tarif_inacbg_vs_resmi', rule_name: 'Tarif INACBG vs Tabel Resmi PMK 3/2023', description: 'TARIF_INACBG klaim wajib cocok dengan tarif resmi PMK No. 3 Tahun 2023 (Regional 1 x Kelas D Swasta) untuk kode & kelas rawat yang sama.', field_name: 'tarif_inacbg', priority: 2, error_message: 'TARIF_INACBG klaim tidak cocok dengan tarif resmi PMK No. 3 Tahun 2023 untuk kode dan kelas rawat ini.' },
   ];
 
   for (const rule of rules) {
@@ -79,7 +80,7 @@ async function seed() {
       ON CONFLICT (id) DO UPDATE SET rule_name = excluded.rule_name, description = excluded.description, error_message = excluded.error_message
     `).run(rule.id, rule.rule_code, rule.rule_name, rule.description, rule.field_name, rule.priority, rule.error_message);
   }
-  console.log('  18 validation rules seeded');
+  console.log('  19 validation rules seeded');
 
   closeDb();
   console.log('Seeding complete!');

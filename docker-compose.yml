@@ -50,6 +50,7 @@ services:
       - db
     volumes:
       - ./uploads:/usr/src/app/uploads
+      - ./logs:/usr/src/app/logs
     restart: unless-stopped
 
 volumes:
