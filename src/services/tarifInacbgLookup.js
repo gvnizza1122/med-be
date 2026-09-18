@@ -57,4 +57,39 @@ function getTarifResmi(kodeInacbg, kelasRawat) {
   return undefined; // kelas_rawat tidak valid (1/2/3) -- biarkan RV-07 yang menangani
 }
 
-module.exports = { lookupTarifInacbg, getTarifResmi, TARIF_MAP };
+/**
+ * Memvalidasi tarif klaim vs tarif resmi PMK 3/2023 (Regional 1 Kelas D Swasta).
+ * Jika selisih > 0, hasilkan detail selisih & error deterministik.
+ * @param {string} kodeInacbg
+ * @param {number|string} kelasRawat
+ * @param {number|string} tarifKlaim
+ * @returns {{ valid: boolean, status: string, selisih: number, tarifResmi: number|null, tarifKlaim: number|null, detail?: object }}
+ */
+function validateTarifDiscrepancy(kodeInacbg, kelasRawat, tarifKlaim) {
+  const resmi = getTarifResmi(kodeInacbg, kelasRawat);
+  if (!resmi) {
+    return { valid: true, status: 'KODE_TIDAK_DITEMUKAN', selisih: 0, tarifResmi: null, tarifKlaim: Number(tarifKlaim) || null };
+  }
+  if (resmi.tarif === null) {
+    return { valid: false, status: 'TARIF_TIDAK_BERLAKU', selisih: 0, tarifResmi: null, tarifKlaim: Number(tarifKlaim) || null };
+  }
+  const claimValue = Number(tarifKlaim);
+  if (isNaN(claimValue) || claimValue <= 0) {
+    return { valid: true, status: 'TARIF_KLAIM_KOSONG', selisih: 0, tarifResmi: Number(resmi.tarif), tarifKlaim: null };
+  }
+
+  const selisih = Math.abs(Math.round(claimValue) - Math.round(Number(resmi.tarif)));
+  const valid = selisih === 0;
+
+  return {
+    valid,
+    status: valid ? 'MATCH' : 'DISCREPANCY',
+    selisih,
+    tarifResmi: Number(resmi.tarif),
+    tarifKlaim: claimValue,
+    detail: resmi.sumber
+  };
+}
+
+module.exports = { lookupTarifInacbg, getTarifResmi, validateTarifDiscrepancy, TARIF_MAP };
+

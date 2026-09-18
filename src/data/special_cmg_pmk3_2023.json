@@ -1,0 +1,122 @@
+{
+  "meta": {
+    "title": "Kamus Referensi Special CMG PMK No. 3 Tahun 2023",
+    "hospital_profile": {
+      "regional": "1",
+      "kelas": "D",
+      "kepemilikan": "Swasta"
+    },
+    "source_pages": "PMK No. 3 Tahun 2023 Hal 31-59"
+  },
+  "special_cmgs": [
+    {
+      "code": "YY-01-III",
+      "category": "procedure",
+      "name": "Special CMG Top-Up Odontektomi",
+      "required_procedure_codes": ["23.19"],
+      "allowed_service_type": "RAWAT_JALAN",
+      "description": "Tindakan odontektomi (ekstraksi gigi impaksi) khusus rawat jalan",
+      "tarif_topup": 250000
+    },
+    {
+      "code": "YY-02-III",
+      "category": "procedure",
+      "name": "Special CMG Top-Up Kemoterapi",
+      "required_procedure_codes": ["99.25"],
+      "allowed_service_type": "ALL",
+      "description": "Prosedur penyuntikan / infus agen kemoterapi",
+      "tarif_topup": 400000
+    },
+    {
+      "code": "YY-03-III",
+      "category": "procedure",
+      "name": "Special CMG Top-Up Radioterapi",
+      "required_procedure_codes": ["92.21", "92.22", "92.23", "92.24", "92.25", "92.26", "92.27", "92.28", "92.29"],
+      "allowed_service_type": "ALL",
+      "description": "Prosedur radioterapi / terapi radiasi",
+      "tarif_topup": 500000
+    },
+    {
+      "code": "YY-04-III",
+      "category": "procedure",
+      "name": "Special CMG Top-Up Hemodialisis",
+      "required_procedure_codes": ["39.95"],
+      "allowed_service_type": "ALL",
+      "description": "Prosedur pencucian darah (Hemodialisis)",
+      "tarif_topup": 350000
+    },
+    {
+      "code": "YY-05-III",
+      "category": "procedure",
+      "name": "Special CMG Top-Up Kateterisasi Jantung / PTCA",
+      "required_procedure_codes": ["36.06", "36.07", "37.22", "37.23"],
+      "allowed_service_type": "ALL",
+      "description": "Tindakan intervensi jantung perkutan / kateterisasi",
+      "tarif_topup": 2500000
+    },
+    {
+      "code": "DD-01-III",
+      "category": "drug",
+      "name": "Special CMG Top-Up Obat Kemoterapi Spesialistik",
+      "required_diagnosis_codes": ["C00", "C97", "D00", "D48"],
+      "required_procedure_codes": ["99.25"],
+      "allowed_service_type": "ALL",
+      "description": "Obat kemoterapi sitostatika khusus",
+      "tarif_topup": 1200000
+    },
+    {
+      "code": "DD-02-III",
+      "category": "drug",
+      "name": "Special CMG Top-Up Factor VIII / IX (Hemofilia)",
+      "required_diagnosis_codes": ["D66", "D67"],
+      "allowed_service_type": "ALL",
+      "description": "Faktor pembekuan darah VIII / IX untuk hemofilia",
+      "tarif_topup": 3000000
+    },
+    {
+      "code": "DD-03-III",
+      "category": "drug",
+      "name": "Special CMG Top-Up Obat Kelasi Besi (Thalassemia)",
+      "required_diagnosis_codes": ["D56.1", "D56.9"],
+      "allowed_service_type": "ALL",
+      "description": "Obat Deferiprone / Deferasirox kelasi besi Thalassemia",
+      "tarif_topup": 850000
+    },
+    {
+      "code": "DD-04-III",
+      "category": "drug",
+      "name": "Special CMG Top-Up Human Albumin",
+      "required_diagnosis_codes": ["K74", "E43", "N04"],
+      "allowed_service_type": "RAWAT_INAP",
+      "description": "Pemberian Human Albumin pada hipoalbuminemia berat / sirosis",
+      "tarif_topup": 950000
+    },
+    {
+      "code": "RR-01-III",
+      "category": "prosthesis",
+      "name": "Special CMG Top-Up Lensa Intraokuler (IOL)",
+      "required_procedure_codes": ["13.71", "13.41"],
+      "allowed_service_type": "ALL",
+      "description": "Implantasi lensa intraokuler Phaco / Ekstraksi Katarak",
+      "tarif_topup": 600000
+    },
+    {
+      "code": "RR-02-III",
+      "category": "prosthesis",
+      "name": "Special CMG Top-Up Stent Pembuluh Darah Jantung",
+      "required_procedure_codes": ["36.06", "36.07"],
+      "allowed_service_type": "ALL",
+      "description": "Prostesa Stent pembuluh darah (Coronary Stent)",
+      "tarif_topup": 4500000
+    },
+    {
+      "code": "RR-03-III",
+      "category": "prosthesis",
+      "name": "Special CMG Top-Up Implan Ortopedi / Pen",
+      "required_procedure_codes": ["78.50", "78.51", "78.52", "78.53", "78.54", "78.55", "78.56", "78.57", "78.58", "78.59", "79.30", "79.31", "79.32", "79.33", "79.34", "79.35", "79.36", "79.37", "79.38", "79.39"],
+      "allowed_service_type": "ALL",
+      "description": "Internal fiksasi / implan ortopedi (Pen / Plate / Screw)",
+      "tarif_topup": 1500000
+    }
+  ]
+}

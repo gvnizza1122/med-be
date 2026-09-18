@@ -26,7 +26,7 @@
 
 // ICD-10: Letter followed by 2+ digits, optionally dot + digits
 const { matchPrbCategory } = require('./prbRules');
-const { getTarifResmi } = require('./tarifInacbgLookup');
+const { getTarifResmi, validateTarifDiscrepancy } = require('./tarifInacbgLookup');
 
 const ICD10_PATTERN = /^[A-Z]\d{2}(\.\d{1,4})?$/i;
 // ICD-9-CM: 2-3 digits, optionally dot + digits
@@ -592,14 +592,8 @@ function validateRecord(record, activeRules) {
   if (ruleMap['RV-21']?.is_active) {
     const kode = (record.inacbg_code || '').trim().toUpperCase();
     if (kode) {
-      const resmi = getTarifResmi(kode, record.kelas_rawat);
-      if (resmi === undefined) {
-        // Kode tidak ditemukan di tabel Regional 1 x Kelas D Swasta ini --
-        // bisa jadi kode salah ketik, atau memang bukan kombinasi yang
-        // dicakup (mis. kelas_rawat belum valid, lihat RV-07). Tidak cukup
-        // yakin untuk menandai error/mismatch tarif, cukup dilewati diam-diam
-        // supaya tidak dobel-flag dengan RV-05/07 untuk akar masalah yang sama.
-      } else if (resmi.tarif === null) {
+      const resVal = validateTarifDiscrepancy(kode, record.kelas_rawat, record.tarif_inacbg);
+      if (resVal.status === 'TARIF_TIDAK_BERLAKU') {
         errors.push({
           rule_id: 'RV-21',
           field_name: 'inacbg_code',
@@ -609,19 +603,16 @@ function validateRecord(record, activeRules) {
           expected_value: 'Kode dengan tarif resmi berlaku untuk kelas rawat ini',
           actual_value: `${kode} (kelas_rawat=${record.kelas_rawat ?? '(kosong)'})`
         });
-      } else {
-        const tarifKlaim = Number(record.tarif_inacbg);
-        if (!isNaN(tarifKlaim) && tarifKlaim > 0 && Math.round(tarifKlaim) !== Math.round(resmi.tarif)) {
-          errors.push({
-            rule_id: 'RV-21',
-            field_name: 'tarif_inacbg',
-            severity: 'major',
-            error_message: ruleMap['RV-21'].error_message ||
-              `TARIF_INACBG klaim tidak cocok dengan tarif resmi PMK No. 3 Tahun 2023 untuk kode ${kode} (Regional 1, Kelas D Swasta, kelas rawat ${record.kelas_rawat ?? '(kosong)'}).`,
-            expected_value: `Rp ${Number(resmi.tarif).toLocaleString('id-ID')}`,
-            actual_value: `Rp ${tarifKlaim.toLocaleString('id-ID')}`
-          });
-        }
+      } else if (resVal.status === 'DISCREPANCY' && resVal.selisih > 0) {
+        errors.push({
+          rule_id: 'RV-21',
+          field_name: 'tarif_inacbg',
+          severity: 'major',
+          error_message: ruleMap['RV-21'].error_message ||
+            `TARIF_INACBG klaim (Rp ${resVal.tarifKlaim.toLocaleString('id-ID')}) memiliki selisih Rp ${resVal.selisih.toLocaleString('id-ID')} dibanding tarif resmi PMK No. 3 Tahun 2023 (Rp ${resVal.tarifResmi.toLocaleString('id-ID')}) untuk kode ${kode} (Regional 1, Kelas D Swasta, kelas rawat ${record.kelas_rawat ?? '(kosong)'}).`,
+          expected_value: `Rp ${resVal.tarifResmi.toLocaleString('id-ID')}`,
+          actual_value: `Rp ${resVal.tarifKlaim.toLocaleString('id-ID')} (selisih Rp ${resVal.selisih.toLocaleString('id-ID')})`
+        });
       }
     }
   }

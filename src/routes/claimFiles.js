@@ -2583,6 +2583,23 @@ router.post('/scan-episodes', authenticate, async (req, res) => {
   }
 });
 
+/**
+ * POST /api/v1/claim-files/:record_id/audit-suggestions
+ * Menghasilkan rekomendasi audit koding medis ("Bukti Dulu, Tarif Menyusul")
+ * berbasis kutipan verbatim dan kamus validasi ICD-10 WHO / ICD-9-CM.
+ */
+router.post('/:record_id/audit-suggestions', authenticate, async (req, res) => {
+  try {
+    const { record_id } = req.params;
+    const { generateAuditSuggestions } = require('../services/auditSuggestionsService');
+    const result = await generateAuditSuggestions(record_id);
+    res.json(result);
+  } catch (err) {
+    console.error('[audit-suggestions] error:', err);
+    res.status(500).json({ error: err.message || 'Gagal menghasilkan rekomendasi saran koding.' });
+  }
+});
+
 module.exports = router;
 module.exports.vclaimToDbFormat = vclaimToDbFormat;
 module.exports.vclaimDateToISO = vclaimDateToISO;
