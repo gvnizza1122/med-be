@@ -36,6 +36,8 @@ const { resolveFieldFormStatus } = require('./documentFieldTemplate');
 const { matchTindakanSegera, checkProcedureCodability } = require('./procedureRulesService');
 const { evaluateDiagnosisConsistency } = require('./diagnosisConsistencyService');
 const { classifyPageDocumentType } = require('./pdfPageClassifier');
+const { groupCodesToInaCBG } = require('./inacbgGroupingService');
+const { getTarifResmi, lookupTarifInacbg } = require('./tarifInacbgLookup');
 
 const AI_REVIEW_SYSTEM_PROMPT = `Kamu asisten audit klaim BPJS E-Claim untuk perawat/verifikator rumah sakit.
 Kamu diberi data lengkap satu rekam klaim (hasil ekstraksi), daftar field yang gagal validasi otomatis,
@@ -1581,7 +1583,9 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
         diagnosis_consistency_flags: [],
         tokens_used: tokensUsed,
         suggested_inacbg: null,
-        suggested_tarif: null
+        suggested_tarif: null,
+        inacbg_result: null,
+        tariff_result: null
       };
       const jenisKlaimRecord = record.JENIS_KLAIM || record.jenis_klaim;
 
@@ -1831,7 +1835,84 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
         console.warn(`[AI-REVIEW] annotateKamusValid gagal total: ${kamusErr.message}`);
       }
 
-      // Proses Estimasi INA-CBG dari AI ke dictionary
+      // --- INA-CBG Grouping & Tariff Lookup Integration (19 Sep 2026) ---
+      // Langkah 1: Dapatkan INA-CBG code dari grouping service
+      const inacbgGrouping = groupCodesToInaCBG(codes.diagnosis, codes.procedure, jenisKlaimRecord);
+      let inacbgCodeForLookup = null;
+      let inacbgResult = null;
+
+      // Prioritas: gunakan AI-suggested INA-CBG, fallback ke grouping service
+      if (aiResult.suggested_inacbg && typeof aiResult.suggested_inacbg === 'string') {
+        inacbgCodeForLookup = aiResult.suggested_inacbg.trim().toUpperCase();
+      } else if (inacbgGrouping) {
+        inacbgCodeForLookup = inacbgGrouping.code;
+      }
+
+      // Langkah 2: Lookup tarif menggunakan tariff table (PMK 3/2023)
+      let tarifResult = null;
+      if (inacbgCodeForLookup) {
+        try {
+          const tarifData = lookupTarifInacbg(inacbgCodeForLookup);
+          if (tarifData) {
+            // Tentukan kelas rawat untuk lookup
+            const kelasRawat = record.KELAS_RAWAT || record.kelas_rawat || '3';
+            const tarifInfo = getTarifResmi(inacbgCodeForLookup, kelasRawat);
+
+            if (tarifInfo && tarifInfo.tarif !== null) {
+              tarifResult = {
+                amount: Number(tarifInfo.tarif),
+                region: tarifData.regional || '1',
+                class: tarifData.tipe_rs || 'D_SWASTA',
+                jenis_layanan: tarifData.jenis_layanan || jenisKlaimRecord,
+                source: 'PMK_3_2023',
+                kelas_rawat: kelasRawat,
+              };
+            } else if (tarifInfo) {
+              // Tarif data ada tapi tarif null (tidak berlaku untuk kelas ini)
+              tarifResult = {
+                amount: null,
+                region: tarifData.regional || '1',
+                class: tarifData.tipe_rs || 'D_SWASTA',
+                jenis_layanan: tarifData.jenis_layanan || jenisKlaimRecord,
+                source: 'PMK_3_2023',
+                kelas_rawat: kelasRawat,
+              };
+            }
+
+            // Buat inacbg_result dengan informasi dari tariff data
+            inacbgResult = {
+              code: inacbgCodeForLookup,
+              description: tarifData.deskripsi || null,
+              confidence: inacbgGrouping ? inacbgGrouping.confidence : 0.8, // AI suggestion biasanya lebih confident
+              reasoning: inacbgGrouping ? inacbgGrouping.reasoning : `Dari diagnosis utama ${codes.diagnosis[0] || 'unknown'}.`,
+              severity_level: inacbgCodeForLookup.split('-').pop() || null, // Ambil severity dari kode (I/II/III)
+            };
+          } else if (inacbgGrouping) {
+            // Code tidak ditemukan di tariff table, tapi ada dari grouping service
+            inacbgResult = {
+              code: inacbgGrouping.code,
+              description: null,
+              confidence: inacbgGrouping.confidence,
+              reasoning: inacbgGrouping.reasoning,
+              severity_level: inacbgGrouping.code.split('-').pop() || null,
+            };
+          }
+        } catch (tarifErr) {
+          console.warn(`[AI-REVIEW] Gagal lookup tarif untuk ${inacbgCodeForLookup}: ${tarifErr.message}`);
+          // Fallback: jika lookup gagal tapi ada grouping result, tetap return grouping result
+          if (inacbgGrouping) {
+            inacbgResult = {
+              code: inacbgGrouping.code,
+              description: null,
+              confidence: inacbgGrouping.confidence,
+              reasoning: inacbgGrouping.reasoning,
+              severity_level: inacbgGrouping.code.split('-').pop() || null,
+            };
+          }
+        }
+      }
+
+      // Langkah 3: Tetap update legacy fields untuk backward compatibility
       if (aiResult.suggested_inacbg && typeof aiResult.suggested_inacbg === 'string') {
         const estimasi = getInacbgEstimasi(aiResult.suggested_inacbg);
         if (estimasi) {
@@ -1839,6 +1920,10 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
           result.suggested_tarif = estimasi.tarif;
         }
       }
+
+      // Langkah 4: Set result fields
+      result.inacbg_result = inacbgResult;
+      result.tariff_result = tarifResult;
 
       result.generated_at = new Date().toISOString();
       return result;

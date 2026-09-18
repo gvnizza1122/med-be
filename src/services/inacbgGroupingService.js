@@ -7,6 +7,128 @@ const { getTarifResmi, validateTarifDiscrepancy } = require('./tarifInacbgLookup
 const { detectSpecialCmg, calculateTotalTopup } = require('./specialCmgService');
 
 /**
+ * Memetakan kode diagnosis dan prosedur ke INA-CBG berdasarkan diagnosis utama.
+ * Fungsi ini menggunakan diagnosis utama (primary diagnosis) untuk menentukan
+ * kategori INA-CBG yang paling sesuai.
+ *
+ * @param {Array<string>} diagnosisCodes - Array kode diagnosis ICD-10 (prioritas: urutan pertama adalah primary)
+ * @param {Array<string>} procedureCodes - Array kode prosedur ICD-9-CM (opsional, untuk konteks)
+ * @param {string} jenisKlaim - Jenis klaim: 'RAWAT_INAP', 'RAWAT_JALAN', 'GAWAT_DARURAT'
+ * @returns {Object|null} {code, confidence, reasoning} atau null jika tidak bisa memetakan
+ */
+function groupCodesToInaCBG(diagnosisCodes, procedureCodes = [], jenisKlaim = 'RAWAT_INAP') {
+  if (!Array.isArray(diagnosisCodes) || diagnosisCodes.length === 0) {
+    return null;
+  }
+
+  // Ambil diagnosis utama (kode pertama dari DIAGLIST)
+  const primaryDiagnosis = diagnosisCodes[0]?.trim().toUpperCase();
+  if (!primaryDiagnosis) return null;
+
+  // Mapping sederhana dari prefiks ICD-10 ke kategori INA-CBG
+  // Ini adalah heuristik dasar -- implementasi produksi bisa lebih sophisticated
+  let suggestedCategory = null;
+  let confidence = 0.5; // confidence default untuk mapping
+
+  // Pemetaan berdasarkan prefiks dan struktur kode ICD-10
+  const prefix = primaryDiagnosis.substring(0, 1);
+  const codeNum = primaryDiagnosis.substring(1, 2);
+
+  // Mapping kategori INA-CBG berdasarkan diagnosis
+  // Format: [Letter]-[Block]-[Category]-[Severity]
+  // Contoh: J (Respiratory) -> J-4-15 (Lower Respiratory Infection), I/II/III (severity)
+
+  switch (prefix) {
+    case 'J': // Respiratory diseases
+      if (primaryDiagnosis.includes('18') || primaryDiagnosis.includes('15')) {
+        // Pneumonia / Lower respiratory infection
+        suggestedCategory = 'J-4-15'; // akan ditambah severity di bawah
+        confidence = 0.7;
+      } else if (primaryDiagnosis.includes('45') || primaryDiagnosis.includes('46')) {
+        // Asthma
+        suggestedCategory = 'J-4-16';
+        confidence = 0.7;
+      }
+      break;
+
+    case 'I': // Cardiovascular diseases
+      if (primaryDiagnosis.includes('10') || primaryDiagnosis.includes('11')) {
+        // Hypertension
+        suggestedCategory = 'I-4-10';
+        confidence = 0.7;
+      } else if (primaryDiagnosis.includes('21') || primaryDiagnosis.includes('20')) {
+        // Heart failure
+        suggestedCategory = 'I-4-11';
+        confidence = 0.65;
+      }
+      break;
+
+    case 'K': // Digestive diseases
+      if (primaryDiagnosis.includes('59')) {
+        // Gastroenteritis
+        suggestedCategory = 'K-4-17';
+        confidence = 0.7;
+      }
+      break;
+
+    case 'A': // Certain infectious and parasitic diseases
+      if (primaryDiagnosis.includes('01') || primaryDiagnosis.includes('15')) {
+        // Bacterial/viral infections
+        suggestedCategory = 'A-4-14';
+        confidence = 0.6;
+      }
+      break;
+
+    case 'E': // Endocrine diseases
+      if (primaryDiagnosis.includes('10') || primaryDiagnosis.includes('11')) {
+        // Diabetes mellitus
+        suggestedCategory = 'E-4-10';
+        confidence = 0.7;
+      }
+      break;
+  }
+
+  if (!suggestedCategory) {
+    // Fallback: tidak bisa pemetakan, tapi jangan gagal total
+    return null;
+  }
+
+  // Tentukan severity berdasarkan ada/tidaknya komplikasi atau prosedur
+  let severity = 'I'; // default: ringan/mild
+
+  if (procedureCodes.length > 0) {
+    // Jika ada prosedur kompleks, asumsikan kasus lebih berat
+    const complexProcedures = procedureCodes.filter(p => {
+      const code = p?.trim().toUpperCase();
+      // Prosedur kompleks biasanya > 1 tindakan atau tindakan invasif
+      return code && (code.includes('87') || code.includes('89') || code.includes('93') || code.includes('96'));
+    });
+    if (complexProcedures.length > 0) {
+      severity = 'II'; // sedang
+      confidence += 0.1;
+    }
+  }
+
+  // Jika diagnosis lebih dari 1 (ada komorbiditas), tingkatkan severity
+  if (diagnosisCodes.length > 1) {
+    if (severity === 'I') {
+      severity = 'II';
+    } else if (severity === 'II') {
+      severity = 'III';
+    }
+    confidence += 0.05;
+  }
+
+  const finalCode = `${suggestedCategory}-${severity}`;
+
+  return {
+    code: finalCode,
+    confidence: Math.min(confidence, 1.0),
+    reasoning: `Pemetaan dari diagnosis utama ${primaryDiagnosis} dengan ${diagnosisCodes.length} diagnosis total, ${procedureCodes.length} prosedur. Severity: ${severity}.`,
+  };
+}
+
+/**
  * Membandingkan tarif klaim eksisting vs hasil kalkulasi grouping internal
  * (Base INA-CBG + Special CMG Top-Ups) tanpa mengubah record klaim asli.
  *
@@ -73,5 +195,6 @@ function simulateGroupingComparison(claimRecord) {
 }
 
 module.exports = {
-  simulateGroupingComparison
+  simulateGroupingComparison,
+  groupCodesToInaCBG
 };

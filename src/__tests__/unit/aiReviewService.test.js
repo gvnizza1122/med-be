@@ -129,4 +129,91 @@ describe('generateAiReview — dengan AI dikonfigurasi (fetch dimock)', () => {
     const userMessage = sentBody.messages.find(m => m.role === 'user').content;
     expect(userMessage).toContain('JENIS_KLAIM: RAWAT_JALAN');
   });
+
+  test('inacbg_result dan tariff_result diisi dari grouping service + tariff lookup', async () => {
+    mockFetchOk({
+      field_notes: {},
+      code_evidence: [],
+      suggested_codes: [],
+      suggested_inacbg: 'J-4-15-I',
+    });
+
+    const evidencePool = [{ page_number: 1, ocr_text: 'Diagnosa: pneumonia', confidence: 100 }];
+
+    const result = await generateAiReview(
+      {
+        sep: 'ABC',
+        DIAGLIST: 'J18.9',
+        PROCLIST: '87.44',
+        KELAS_RAWAT: '3',
+        JENIS_KLAIM: 'RAWAT_INAP'
+      },
+      [],
+      evidencePool
+    );
+
+    expect(result).not.toBeNull();
+    expect(result.inacbg_result).not.toBeNull();
+    expect(result.inacbg_result.code).toBeTruthy();
+    expect(typeof result.inacbg_result.confidence).toBe('number');
+    expect(result.inacbg_result.confidence).toBeGreaterThanOrEqual(0);
+    expect(result.inacbg_result.confidence).toBeLessThanOrEqual(1);
+    expect(result.inacbg_result.reasoning).toBeTruthy();
+  });
+
+  test('tariff_result berisi amount, region, class, source', async () => {
+    mockFetchOk({
+      field_notes: {},
+      code_evidence: [],
+      suggested_codes: [],
+      suggested_inacbg: 'J-4-15-I',
+    });
+
+    const evidencePool = [{ page_number: 1, ocr_text: 'Diagnosa: pneumonia', confidence: 100 }];
+
+    const result = await generateAiReview(
+      {
+        sep: 'ABC',
+        DIAGLIST: 'J18.9',
+        PROCLIST: '87.44',
+        KELAS_RAWAT: '3',
+        JENIS_KLAIM: 'RAWAT_INAP'
+      },
+      [],
+      evidencePool
+    );
+
+    expect(result).not.toBeNull();
+    expect(result.tariff_result).not.toBeNull();
+    if (result.tariff_result.amount !== null) {
+      expect(typeof result.tariff_result.amount).toBe('number');
+      expect(result.tariff_result.amount).toBeGreaterThan(0);
+    }
+    expect(result.tariff_result.region).toBeTruthy();
+    expect(result.tariff_result.class).toBeTruthy();
+    expect(result.tariff_result.source).toBe('PMK_3_2023');
+  });
+
+  test('inacbg_result dan tariff_result handle missing codes gracefully', async () => {
+    mockFetchOk({
+      field_notes: {},
+      code_evidence: [],
+      suggested_codes: [],
+    });
+
+    const result = await generateAiReview(
+      {
+        sep: 'ABC',
+        DIAGLIST: '',
+        PROCLIST: '',
+        JENIS_KLAIM: 'RAWAT_JALAN'
+      },
+      [{ field_name: 'sep', error_message: 'must be set', actual_value: '', expected_value: 'required' }],
+      []
+    );
+
+    expect(result).not.toBeNull();
+    expect(result.inacbg_result).toBeNull();
+    expect(result.tariff_result).toBeNull();
+  });
 });
