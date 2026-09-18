@@ -427,15 +427,18 @@ async function initializeSchema() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
 
-      -- Kamus ICD-10 WHO (BUKAN ICD-10-CM Amerika) -- dibangun 17 Sep 2026 supaya
+      -- Kamus ICD-10 WHO (BUKAN ICD-10-CM Amerika) -- dibangun 17 Sep 2026, DIREVISI
+      -- 18 Sep 2026 (sumber diganti ke Kemenkes SATUSEHAT Platform, label versi
+      -- eksplisit "ICD10_2010" -- cocok PMK 3/2023 lampiran "ICD-10 Versi Tahun
+      -- 2010", menggantikan sumber pihak ketiga generik revisi pertama) -- supaya
       -- suggested_codes di aiReviewService.js (saran kode diagnosis AI) bisa dicek
       -- terhadap daftar kode resmi sebelum tombol "Terapkan" di frontend diaktifkan
       -- lagi (saat ini SENGAJA dimatikan total, lihat komentar "DIMATIKAN sengaja"
       -- di eclaim-production/.../results/[fileId]/page.tsx -- bug produksi lama:
       -- AI sempat menyarankan kode ICD-10-CM, bukan ICD-10 WHO yang dipakai BPJS
-      -- Indonesia via PMK 3/2023). Diisi oleh scripts/seedIcd10WhoDictionary.js
-      -- dari src/data/icd10_who_dictionary.json -- lihat file itu utk sumber data
-      -- & catatan cakupan/keterbatasan per baris (field meta.source_caveat).
+      -- Indonesia). Diisi oleh scripts/seedIcd10WhoDictionary.js dari
+      -- src/data/icd10_who_dictionary.json -- lihat file itu (blok "meta") utk
+      -- sumber data & catatan cakupan/keterbatasan/caveat versi 2010 secara jujur.
       -- Kolom "source" WAJIB diisi saat seed (audit trail per-baris, supaya kalau
       -- ada kode yang diragukan, asal datanya bisa dilacak).
       CREATE TABLE IF NOT EXISTS icd10_who_codes (
@@ -445,6 +448,23 @@ async function initializeSchema() {
         chapter TEXT,                       -- nama bab (Inggris), mis. "Certain infectious and parasitic diseases"
         chapter_number TEXT,                -- angka Romawi bab, mis. "I".."XXII"
         source TEXT NOT NULL,               -- asal data kode ini (audit trail) -- lihat scripts/seedIcd10WhoDictionary.js
+        imported_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      -- Kamus ICD-9-CM Volume 3 (kode PROSEDUR/tindakan, format numerik mis.
+      -- "38.93", "96.04") -- BARU 18 Sep 2026, pasangan icd10_who_codes di atas
+      -- tapi untuk suggested_codes bertipe "procedure" (PROCLIST), yang sebelumnya
+      -- SELALU dapat kamus_valid:null karena belum ada kamus untuk dicek. Sumber
+      -- SAMA seperti icd10_who_codes: Kemenkes SATUSEHAT Platform, label versi
+      -- eksplisit "ICD9CM_2010" (cocok PMK 3/2023 "ICD-9-CM Versi Tahun 2010").
+      -- Diisi oleh scripts/seedIcd9CmProcedures.js dari
+      -- src/data/icd9cm_procedures.json -- lihat file itu (blok "meta") utk detail
+      -- sumber & caveat. BUKAN ICD-10-PCS, BUKAN CPT.
+      CREATE TABLE IF NOT EXISTS icd9_cm_procedures (
+        code TEXT PRIMARY KEY,              -- format numerik ICD-9-CM Vol.3, mis. "38.93", atau kategori 2-digit mis. "00"
+        description_en TEXT,
+        block TEXT,                         -- kelompok blok deskriptif (BUKAN bagian resmi kode), mis. "Operations on the Cardiovascular System" -- boleh NULL kalau tidak masuk blok baku manapun
+        source TEXT NOT NULL,               -- asal data kode ini (audit trail) -- lihat scripts/seedIcd9CmProcedures.js
         imported_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
 
@@ -497,6 +517,9 @@ async function initializeSchema() {
     await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_error_kb_rule ON error_knowledge_base(rule_id)`);
     await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_error_kb_rule_hits ON error_knowledge_base(rule_id, hit_count DESC, created_at DESC)`);
     await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_icd10_who_chapter ON icd10_who_codes(chapter_number)`);
+    await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_icd10_who_code_upper ON icd10_who_codes(UPPER(code))`);
+    await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_icd9_cm_block ON icd9_cm_procedures(block)`);
+    await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_icd9_cm_code_upper ON icd9_cm_procedures(UPPER(code))`);
     await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_prb_exemption_mrn ON prb_exemption_list(hospital_code, mrn)`);
     await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_claim_records_nokartu ON claim_records(nokartu)`);
     await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_rv20_confirmations_record ON rv20_confirmations(record_id)`);

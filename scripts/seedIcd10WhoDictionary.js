@@ -13,20 +13,25 @@
  * berdasarkan keberadaan kode di tabel ini -- TIDAK membuang kode yang
  * tidak ditemukan (kamus mungkin belum lengkap), cuma menandai.
  *
- * SUMBER DATA (lihat src/data/icd10_who_dictionary.json -> meta untuk detail
- * lengkap termasuk caveat): repo GitHub pihak ketiga fendis0709/icd-10,
- * yang menyatakan datanya "diperoleh dari ICD-X WHO
- * (https://www.who.int/classifications/icd/icdonlineversions/en)". BUKAN
- * unduhan langsung dari WHO ICD-API/ClaML resmi atau Kemenkes/BPJS/INA-CBG
- * (pencarian untuk sumber itu tidak menemukan file bulk yang bisa diunduh
- * publik tanpa menjalankan installer Windows e-Klaim). 10.469 kode, 21 dari
- * 22 bab WHO ICD-10 terisi (bab XXII "Codes for special purposes", U00-U99,
- * KOSONG di sumber ini -- lihat meta.chapters_with_zero_codes). Sudah lolos
- * sanity-check dasar (format kode WHO murni, tanpa ekstensi 7-karakter ala
- * ICD-10-CM, tidak ada duplikat) tapi BELUM diverifikasi baris-per-baris
- * terhadap WHO resmi -- rekomendasi: spot-check oleh koder medis
- * bersertifikat sebelum dipakai sebagai dasar mengaktifkan kembali tombol
- * "Terapkan".
+ * SUMBER DATA (REVISI 18 Sep 2026 -- lihat src/data/icd10_who_dictionary.json
+ * -> meta untuk detail lengkap termasuk caveat): Kemenkes SATUSEHAT Platform
+ * (https://satusehat.kemkes.go.id/platform/docs/id/terminology/icd/icd-10/),
+ * yang menyatakan eksplisit "SATUSEHAT Platform (SSP) menggunakan ICD-10
+ * versi 2010" -- SESUAI PMK 3/2023 lampiran ("ICD-10 Versi Tahun 2010").
+ * Diunduh dari spreadsheet resmi yang ditautkan di halaman itu. Revisi ini
+ * MENGGANTIKAN sumber pihak ketiga generik (fendis0709/GitHub) dari revisi
+ * pertama -- deskripsi Indonesia (description_id) tetap dipertahankan dari
+ * sumber lama sebagai enrichment sekunder untuk kode yang cocok saja (lihat
+ * meta.description_id_enrichment_note), TAPI keberadaan/validitas kode
+ * sekarang sepenuhnya berdasar SATUSEHAT. 18.542 kode, SEMUA 22 bab WHO
+ * ICD-10 terisi (termasuk bab XXII "Codes for special purposes" yang KOSONG
+ * di revisi pertama -- sekarang 17 kode). PENTING: label versi "ICD10_2010"
+ * BELUM TENTU snapshot beku 2010 persis -- ditemukan kode COVID-19 (U07.1
+ * dkk, penyakit yang baru ada 2020) di dalamnya, jadi ini kemungkinan besar
+ * "basis 2010 yang terus dipatch Kemenkes", bukan cetakan 2010 murni (lihat
+ * meta.source_version_caveat). Tetap rekomendasi: spot-check oleh koder
+ * medis bersertifikat sebelum dipakai sebagai dasar mengaktifkan kembali
+ * tombol "Terapkan".
  *
  * PENTING: script ini hanya DISIAPKAN, belum pernah dijalankan ke database
  * manapun. Jalankan manual setelah kamus ini direview:
@@ -59,13 +64,13 @@ async function main() {
     process.exit(1);
   }
 
-  const sourceLabel = [meta.source_name, meta.source_repo_url].filter(Boolean).join(' - ')
+  const sourceLabel = [meta.source_name, meta.source_page_url].filter(Boolean).join(' - ')
     || 'src/data/icd10_who_dictionary.json (sumber tidak tercatat di meta)';
 
   console.log(`Memuat ${codes.length} kode dari ${DATA_PATH}`);
   console.log(`Sumber (kolom "source" per baris): ${sourceLabel}`);
-  if (meta.source_caveat) {
-    console.log(`Catatan sumber: ${meta.source_caveat}`);
+  if (meta.source_version_caveat) {
+    console.log(`Catatan versi: ${meta.source_version_caveat}`);
   }
   if (Array.isArray(meta.chapters_with_zero_codes) && meta.chapters_with_zero_codes.length > 0) {
     console.log(`PERINGATAN -- bab TANPA kode sama sekali di sumber ini: ${meta.chapters_with_zero_codes.join('; ')}`);

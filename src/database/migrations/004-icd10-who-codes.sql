@@ -1,11 +1,14 @@
--- Kamus ICD-10 WHO (BUKAN ICD-10-CM Amerika) -- dibangun 17 Sep 2026 supaya
+-- Kamus ICD-10 WHO (BUKAN ICD-10-CM Amerika) -- dibangun 17 Sep 2026, DIREVISI
+-- 18 Sep 2026 (sumber diganti ke Kemenkes SATUSEHAT Platform, label versi
+-- eksplisit "ICD10_2010" -- cocok PMK 3/2023 lampiran "ICD-10 Versi Tahun 2010",
+-- menggantikan sumber pihak ketiga generik revisi pertama) -- supaya
 -- suggested_codes di aiReviewService.js (saran kode diagnosis AI) bisa dicek
 -- terhadap daftar kode resmi sebelum tombol "Terapkan" di frontend diaktifkan
 -- lagi (saat ini SENGAJA dimatikan total -- bug produksi lama: AI sempat
--- menyarankan kode ICD-10-CM, bukan ICD-10 WHO yang dipakai BPJS Indonesia
--- via PMK 3/2023). Diisi oleh scripts/seedIcd10WhoDictionary.js dari
--- src/data/icd10_who_dictionary.json -- lihat file itu utk sumber data &
--- catatan cakupan/keterbatasan (field meta.source_caveat).
+-- menyarankan kode ICD-10-CM, bukan ICD-10 WHO yang dipakai BPJS Indonesia).
+-- Diisi oleh scripts/seedIcd10WhoDictionary.js dari
+-- src/data/icd10_who_dictionary.json -- lihat file itu (blok "meta") utk
+-- sumber data & catatan cakupan/keterbatasan/caveat versi 2010 secara jujur.
 --
 -- Mirror dari src/database/init.js (auto-init untuk deployment tanpa migration
 -- runner) -- lihat komentar di sana.

@@ -263,13 +263,33 @@ function normalizeIcdCode(code) {
 }
 
 /**
- * LAPISAN VALIDASI TAMBAHAN (17 Sep 2026) -- cek apakah kode yang diusulkan AI
- * di suggested_codes benar-benar ADA di kamus ICD-10 WHO resmi (tabel
- * icd10_who_codes, diisi dari src/data/icd10_who_dictionary.json via
- * scripts/seedIcd10WhoDictionary.js). Latar belakang: fitur ini sempat
- * menghasilkan kode ICD-10-CM (Amerika) alih-alih ICD-10 WHO yang dipakai
- * BPJS Indonesia -- tombol "Terapkan" di frontend DIMATIKAN TOTAL sampai
- * kamus ini siap & direview.
+ * Query satu tabel kamus untuk sekumpulan kode, kembalikan Set kode yang
+ * ditemukan (null kalau query gagal total -- dibedakan dari "tidak
+ * ditemukan" supaya annotateKamusValid tahu harus isi null, bukan false).
+ */
+async function lookupCodesInTable(table, codes) {
+  if (codes.length === 0) return new Set();
+  try {
+    const db = getDb();
+    const placeholders = codes.map(() => '?').join(', ');
+    const rows = await db.all(`SELECT code FROM ${table} WHERE code IN (${placeholders})`, codes);
+    return new Set(rows.map(r => r.code));
+  } catch (err) {
+    console.warn(`[AI-REVIEW] Gagal cek kamus di tabel ${table}, kamus_valid diisi null: ${err.message}`);
+    return null;
+  }
+}
+
+/**
+ * LAPISAN VALIDASI TAMBAHAN (17 Sep 2026, diperluas 18 Sep 2026) -- cek apakah
+ * kode yang diusulkan AI di suggested_codes benar-benar ADA di kamus resmi:
+ * type "diagnosis" dicek ke tabel icd10_who_codes (kamus ICD-10 WHO, diisi
+ * dari src/data/icd10_who_dictionary.json via scripts/seedIcd10WhoDictionary.js),
+ * type "procedure" dicek ke tabel icd9_cm_procedures (kamus ICD-9-CM Volume 3,
+ * diisi dari src/data/icd9cm_procedures.json via scripts/seedIcd9CmProcedures.js).
+ * Latar belakang: fitur ini sempat menghasilkan kode ICD-10-CM (Amerika) alih-
+ * alih ICD-10 WHO yang dipakai BPJS Indonesia -- tombol "Terapkan" di frontend
+ * DIMATIKAN TOTAL sampai kamus ini siap & direview.
  *
  * PENTING -- ini TAMBAHAN, bukan pengganti validateQuotation: dipanggil SETELAH
  * semua entry suggested_codes lolos validasi kutipan (baik dari alur utama
@@ -279,9 +299,9 @@ function normalizeIcdCode(code) {
  * kodenya pasti salah) -- cuma ditandai kamus_valid:false, supaya frontend
  * bisa membedakan "ada di kamus resmi" vs "tidak ditemukan, ekstra hati-hati".
  * kamus_valid:null berarti tidak bisa dicek sama sekali (tabel belum ada di
- * deployment ini, query gagal, atau entry bertipe "procedure" -- kamus ini
- * HANYA ICD-10 diagnosis, bukan ICD-9-CM prosedur) -- BUKAN berarti "salah".
- * Best-effort: kegagalan di sini tidak pernah menggagalkan hasil AI review.
+ * deployment ini, query gagal, atau type-nya bukan "diagnosis"/"procedure")
+ * -- BUKAN berarti "salah". Best-effort: kegagalan di sini tidak pernah
+ * menggagalkan hasil AI review.
  */
 async function annotateKamusValid(suggestedCodes) {
   if (!Array.isArray(suggestedCodes) || suggestedCodes.length === 0) return suggestedCodes;
@@ -291,24 +311,26 @@ async function annotateKamusValid(suggestedCodes) {
       .filter(entry => entry.type === 'diagnosis' && entry.code)
       .map(entry => normalizeIcdCode(entry.code))
   )];
+  const procCodes = [...new Set(
+    suggestedCodes
+      .filter(entry => entry.type === 'procedure' && entry.code)
+      .map(entry => normalizeIcdCode(entry.code))
+  )];
 
-  let foundSet = null;
-  if (diagCodes.length > 0) {
-    try {
-      const db = getDb();
-      const placeholders = diagCodes.map(() => '?').join(', ');
-      const rows = await db.all(`SELECT code FROM icd10_who_codes WHERE code IN (${placeholders})`, diagCodes);
-      foundSet = new Set(rows.map(r => r.code));
-    } catch (err) {
-      console.warn(`[AI-REVIEW] Gagal cek kamus ICD-10 WHO, kamus_valid diisi null: ${err.message}`);
-    }
-  }
+  const [diagFoundSet, procFoundSet] = await Promise.all([
+    lookupCodesInTable('icd10_who_codes', diagCodes),
+    lookupCodesInTable('icd9_cm_procedures', procCodes),
+  ]);
 
   return suggestedCodes.map(entry => {
-    if (entry.type !== 'diagnosis' || !entry.code || !foundSet) {
-      return { ...entry, kamus_valid: null };
+    if (!entry.code) return { ...entry, kamus_valid: null };
+    if (entry.type === 'diagnosis') {
+      return { ...entry, kamus_valid: diagFoundSet ? diagFoundSet.has(normalizeIcdCode(entry.code)) : null };
     }
-    return { ...entry, kamus_valid: foundSet.has(normalizeIcdCode(entry.code)) };
+    if (entry.type === 'procedure') {
+      return { ...entry, kamus_valid: procFoundSet ? procFoundSet.has(normalizeIcdCode(entry.code)) : null };
+    }
+    return { ...entry, kamus_valid: null };
   });
 }
 
@@ -460,31 +482,38 @@ function getAnyResumeMedisPageNumbers(evidencePool) {
  * ribuan token teks dokumen. Panggilan terpisah dengan SATU tugas saja
  * terbukti jauh lebih andal untuk kepatuhan instruksi LLM secara umum.
  */
-const DIAGNOSIS_SUGGESTION_SYSTEM_PROMPT = `Kamu asisten koding medis ICD-10 untuk klaim BPJS rumah sakit.
+const DIAGNOSIS_SUGGESTION_SYSTEM_PROMPT = `Kamu asisten koding medis ICD-10 WHO & ICD-9-CM untuk klaim BPJS rumah sakit.
 Kamu diberi teks halaman Resume Medis SAJA dari satu berkas klaim (dokumen lain seperti SEP/SPRI/Triage IGD
 sengaja TIDAK disertakan di sini — permintaan eksplisit klien: kolom diagnosis HANYA boleh diambil dari
 Resume Medis, demi kecepatan & kejelasan sumber). Dokumen ini TIDAK PUNYA halaman resmi "Berkas Klaim
-Individual" makanya kamu diminta bantu cari diagnosisnya dari teks naratif Resume Medis.
+Individual" makanya kamu diminta bantu cari diagnosis & prosedur dari teks naratif Resume Medis.
 
-TUGAS TUNGGAL: baca SEMUA halaman Resume Medis yang diberikan satu per satu, cari istilah diagnosis medis
+TUGAS TUNGGAL: baca SEMUA halaman Resume Medis yang diberikan satu per satu, cari istilah diagnosis & prosedur medis
 eksplisit di label seperti "Diagnosis Utama", "Diagnosa Kerja", "Diagnosa", "Assessment"/"A:" (format
-S-O-A-P), "Diag Awal". Untuk SETIAP istilah diagnosis berbeda yang ditemukan (walau ada beberapa versi/
-label berbeda untuk pasien yang sama di halaman berbeda — usulkan SEMUA, jangan pilih satu saja), usulkan
-kode ICD-10 yang paling sesuai.
+S-O-A-P), "Diag Awal", "Tindakan/Prosedur". Untuk SETIAP istilah diagnosis/prosedur berbeda yang ditemukan, usulkan
+kode ICD-10 WHO / ICD-9-CM yang paling sesuai.
 
-ATURAN KETAT (anti-halusinasi):
-- HANYA dari istilah yang benar-benar tertulis eksplisit SEBAGAI diagnosis dokter. BUKAN "Keluhan" (gejala
+FOKUS KHUSUS KELOMPOK J (Pernapasan / Respiratory):
+- Pneumonia / Bronchopneumonia: J18.9 (unspecified), J18.0 (Bronchopneumonia), J15.9 (Bacterial)
+- Asthma / Asma Bronkial: J45.9 (unspecified), J45.901 (Eksaserbasi Akut), J46 (Status Asthmaticus)
+- PPOK / COPD: J44.9 (COPD), J44.1 (COPD dengan eksaserbasi akut)
+- TB Paru / Tuberculosis: A16.2 (TB Paru klinis), A15.0 (TB Paru terkonfirmasi)
+- Prosedur Terkait: Nebulisasi/Inhalasi (96.04 / 93.94), Oksigenasi (93.96), Foto Thorax (87.44 / 87.49)
+
+ATURAN KETAT (anti-upcoding & bukti verbatim):
+- PRINCIPLE: "Bukti Dulu, Tarif Menyusul" — Usulkan kandidat kode murni berdasarkan bukti medis verbatim, BUTA terhadap tarif/biaya.
+- HANYA dari istilah yang benar-benar tertulis eksplisit SEBAGAI diagnosis/prosedur dokter. BUKAN "Keluhan" (gejala
   subjektif pasien sendiri, mis. "nyeri perut"), BUKAN "Diagnosis Keperawatan" (istilah asuhan keperawatan,
   bukan diagnosis medis, mis. "nyeri akut", "ketidakefektifan bersihan jalan nafas").
 - quotation WAJIB kutipan VERBATIM persis dari teks yang diberikan (salin apa adanya, termasuk typo kalau
   ada) — kutipan yang tidak match persis akan otomatis ditolak sistem.
 - page_number WAJIB sesuai nomor "Halaman N" yang tertera di awal blok teks tempat kutipan itu berada.
-- Kalau SETELAH membaca semua halaman benar-benar tidak ada satupun label diagnosis eksplisit, kembalikan
+- Kalau SETELAH membaca semua halaman benar-benar tidak ada satupun label diagnosis/prosedur eksplisit, kembalikan
   array kosong — jangan mengarang demi mengisi.
-- DILARANG KERAS menyebut nominal rupiah/biaya di quotation atau reasoning.
+- DILARANG KERAS menyebut nominal rupiah, biaya, tarif, atau dampak finansial di quotation atau reasoning.
 
 Output HANYA JSON, tanpa markdown/penjelasan:
-{"suggested_codes":[{"code":"...","page_number":N,"quotation":"...","reasoning":"pemetaan istilah -> kode, sebutkan label sumbernya"}]}`;
+{"suggested_codes":[{"code":"...","type":"diagnosis|procedure","page_number":N,"quotation":"...","reasoning":"pemetaan istilah -> kode, sebutkan label sumbernya"}]}`;
 
 /**
  * Panggilan AI terpisah & fokus untuk mengusulkan kode ICD-10 diagnosis saat
