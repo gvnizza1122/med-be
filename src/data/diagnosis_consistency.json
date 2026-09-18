@@ -1,0 +1,48 @@
+{
+  "_comment": "Aturan konsistensi diagnosis per keluarga ICD-10 -- dipakai diagnosisConsistencyService.js. TIDAK PERNAH mengubah/menghapus kode DIAGLIST otomatis -- hanya menghasilkan flag 'perlu_review' + kode alternatif (arah-netral, bisa naik ATAU turun derajat) + evidence + aksi 'klarifikasi DPJP'. Mulai dari keluarga O21.x (hyperemesis gravidarum) sesuai kasus regresi -- tambah keluarga lain di sini kalau ada kasus baru, JANGAN hardcode di kode.",
+  "families": {
+    "O21": {
+      "label": "Hyperemesis gravidarum (O21.x)",
+      "variant_severity_rank": {
+        "O21.0": 1,
+        "O21.1": 2
+      },
+      "variant_label": {
+        "O21.0": "Mild hyperemesis gravidarum",
+        "O21.1": "Hyperemesis gravidarum with metabolic disturbance"
+      },
+      "severity_indicators": [
+        {
+          "id": "dehidrasi_sedang_berat",
+          "pattern": "dehidrasi\\s*(sedang|berat)",
+          "label": "Dehidrasi sedang/berat tercatat"
+        },
+        {
+          "id": "mukosa_kering",
+          "pattern": "mukosa\\s*kering",
+          "label": "Mukosa kering (tanda dehidrasi)"
+        },
+        {
+          "id": "elektrolit_abnormal",
+          "pattern": "\\b(cl|na|k|kalium|natrium|klorida)\\b[^\\n.]{0,20}\\d+[^\\n.]{0,10}\\((h|l)\\)",
+          "label": "Elektrolit abnormal di hasil laboratorium"
+        },
+        {
+          "id": "kebutuhan_cairan_iv",
+          "pattern": "\\bivfd\\b|infus[^.\\n]{0,30}(cairan|nacl|rl|ringer|asering)",
+          "label": "Kebutuhan terapi cairan IV"
+        }
+      ],
+      "undocumented_indicators_to_mention": [
+        {
+          "id": "keton_urin",
+          "pattern": "keton\\s*urin",
+          "label": "Keton urin"
+        }
+      ],
+      "min_indicators_for_flag": 2,
+      "action": "Klarifikasi DPJP",
+      "rule_description": "Kalau diagnosis final memakai varian derajat RINGAN (O21.0) TANPA derajat eksplisit disebut di Resume Medis, TAPI >= min_indicators_for_flag indikator severity (dehidrasi/mukosa kering/elektrolit abnormal/kebutuhan cairan IV) ditemukan di dokumen lain (SPRI/Resume Medis/Lab/Triase) -- tandai 'perlu_review', alternatif = varian derajat lebih berat dalam keluarga sama (O21.1), evidence = SEMUA indikator yang ditemukan (dengan sumber & halaman), sebut juga indikator dari undocumented_indicators_to_mention yang TIDAK ditemukan sama sekali. Arah saran SELALU netral (dokumen bisa juga menunjukkan derajat SAMA/RINGAN -- service ini hanya menandai butuh klarifikasi manusia, bukan menyimpulkan kode yang benar)."
+    }
+  }
+}

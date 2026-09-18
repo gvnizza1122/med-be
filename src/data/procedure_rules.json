@@ -1,0 +1,56 @@
+{
+  "_comment": "Rules terpisah dari kode (bisa diedit tanpa deploy ulang -- restart proses masih perlu karena di-require sekali saat start, tapi TIDAK perlu ubah kode/rebuild). Dua bagian: (1) k5_tindakan_segera_patterns dipakai kegawatdaruratanAggregation.js untuk mendeteksi 'tindakan segera' dari TEKS BEBAS (Triase IGD/CPPT), TAMBAHAN dari K5_WHITELIST_CODES (PROCLIST kode resmi) yang sudah ada di kegawatdaruratanReference.js -- TIDAK menggantikannya. (2) non_codable_or_review_procedures dipakai procedureRulesService.js untuk menandai kode PROCLIST yang valid EVIDENCE-nya (ada di dokumen) tapi meragukan CODABILITY-nya (lab rutin dsb, umumnya tidak dikoding sebagai prosedur INA-CBG terpisah) -- perlu_review, BUKAN otomatis dihapus/diganti.",
+
+  "k5_tindakan_segera_patterns": [
+    {
+      "id": "resusitasi_cairan_iv",
+      "pattern": "(ivfd|infus)[^.\\n]{0,40}(loading|bolus|guyur)|(loading|bolus|guyur)[^.\\n]{0,40}(ivfd|infus|cairan)",
+      "label": "Resusitasi cairan IV (loading/bolus/guyur)"
+    },
+    {
+      "id": "oksigenasi_segera",
+      "pattern": "oksigen(asi)?\\s*(nasal|masker|kanul|nrm|non.?rebreathing)?|o2\\s*(nasal|masker|kanul|nrm)",
+      "label": "Pemberian oksigen segera"
+    },
+    {
+      "id": "rjp",
+      "pattern": "\\brjp\\b|resusitasi\\s*jantung\\s*paru|kompresi\\s*dada",
+      "label": "RJP (resusitasi jantung paru)"
+    },
+    {
+      "id": "intubasi",
+      "pattern": "intubasi|pasang\\s*ett\\b",
+      "label": "Intubasi jalan napas"
+    },
+    {
+      "id": "dc_shock",
+      "pattern": "dc\\s*shock|defibrilasi|kardioversi",
+      "label": "DC shock/defibrilasi/kardioversi"
+    },
+    {
+      "id": "nebulisasi_segera",
+      "pattern": "nebul(isasi)?\\s*(segera|emergency|stat)",
+      "label": "Nebulisasi segera"
+    }
+  ],
+  "_k5_freetext_promotes_to_ya": false,
+  "_k5_freetext_promotes_to_ya_comment": "Default FALSE -- kecocokan pola tindakan_segera dari teks bebas (bukan kode PROCLIST resmi di whitelist K5_WHITELIST_CODES) menghasilkan status BORDERLINE, bukan langsung YA. Alasan: teks bebas lebih rawan salah-tangkap dibanding kode resmi yang sudah diverifikasi ke referensi ICD-9-CM. RS/verifikator BOLEH ubah ke true di sini kalau setelah pemakaian dinilai teks bebas cukup andal jadi YA otomatis -- REVIEW MANUSIA DIPERLUKAN sebelum ubah (lihat catatan finalisasi tugas ini).",
+  "esi_signal_threshold": 3,
+  "_esi_signal_threshold_comment": "Skor ESI (Emergency Severity Index, skala 1-5, makin KECIL makin gawat) <= angka ini ditampilkan sebagai SINYAL PENDUKUNG K5 di UI/catatan -- TIDAK mengubah status K5 secara otomatis (murni informasi tambahan buat verifikator, keputusan tetap dari PROCLIST/tindakan_segera).",
+
+  "non_codable_or_review_procedures": [
+    {
+      "id": "lab_rutin_darah",
+      "code_prefix": "90.5",
+      "match_type": "prefix",
+      "reason": "Kode 90.5x (microscopic examination of blood) mencakup pemeriksaan laboratorium darah rutin -- pemeriksaan penunjang rutin umumnya TIDAK dikoding sebagai prosedur INA-CBG tersendiri (sudah termasuk komponen tarif lain). Evidence dokumen valid (ditemukan di teks), tapi mapping ke tarif prosedur terpisah perlu dicek ulang koder."
+    },
+    {
+      "id": "lab_kimia_klinik",
+      "code_prefix": "90.",
+      "match_type": "prefix",
+      "reason": "Kode grup 90.x (pemeriksaan mikroskopik/laboratorium klinik: darah, urin, kimia, elektrolit, dsb) umumnya pemeriksaan penunjang rutin -- perlu review apakah layak dikode sebagai prosedur INA-CBG terpisah atau sudah termasuk komponen tarif lain."
+    }
+  ],
+  "_non_codable_matching_note": "Aturan lebih spesifik (code_prefix lebih panjang, mis. '90.5') dicek DULU sebelum yang lebih umum ('90.') -- lihat urutan evaluasi di procedureRulesService.js. Kode yang TIDAK match rule manapun di sini tetap 'valid' seperti biasa (rules ini TIDAK mengubah/menghapus kode, cuma menambah flag review)."
+}

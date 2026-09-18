@@ -32,6 +32,10 @@ const { aggregateKriteria, KRITERIA_LABELS } = require('./kegawatdaruratanAggreg
 const { getDb } = require('../database/init');
 const { assessPneumoniaSeverityMismatch } = require('./pneumoniaSeverityAssessment');
 const { getInacbgEstimasi } = require('./inacbgTarifDictionary');
+const { resolveFieldFormStatus } = require('./documentFieldTemplate');
+const { matchTindakanSegera, checkProcedureCodability } = require('./procedureRulesService');
+const { evaluateDiagnosisConsistency } = require('./diagnosisConsistencyService');
+const { classifyPageDocumentType } = require('./pdfPageClassifier');
 
 const AI_REVIEW_SYSTEM_PROMPT = `Kamu asisten audit klaim BPJS E-Claim untuk perawat/verifikator rumah sakit.
 Kamu diberi data lengkap satu rekam klaim (hasil ekstraksi), daftar field yang gagal validasi otomatis,
@@ -645,7 +649,7 @@ yang tercetak, tapi tata letak bisa sedikit beda antar dokumen):
   tambahan) — cari di semua bagian, jangan cuma satu section.
 Kalau dokumen tidak memakai label section persis seperti di atas, tetap cari data setara secara maknanya.
 
-=== BAGIAN 1: EKSTRAK 11 PARAMETER PEMERIKSAAN FISIK ===
+=== BAGIAN 1: EKSTRAK 16 PARAMETER PEMERIKSAAN FISIK ===
 CATATAN NOTASI & SINGKATAN (baca ini dulu sebelum ekstraksi Bagian 1 -- dokumen RS ini sering pakai notasi
 singkat, bukan kalimat lengkap):
 - Notasi tanda: "+" = ada/positif, "-" atau "−" = tidak ada/negatif. Untuk pasangan sisi kanan/kiri: "+/+" =
@@ -667,7 +671,7 @@ singkat, bukan kalimat lengkap):
   karena itu bukti objektif dokter bukan laporan subjektif orang tua/pasien. Baca SELURUH bagian Pemeriksaan
   Fisik dulu sebelum menyerah dan memakai kutipan dari Keluhan untuk parameter yang sama.
 - Field "CA" (conjunctiva anemis) dan "SI" (sklera ikterik) bisa muncul di teks pemeriksaan mata -- keduanya
-  BUKAN salah satu dari 11 parameter di bawah, JANGAN dipetakan ke parameter manapun. Khusus "SI": dalam
+  BUKAN salah satu dari 16 parameter di bawah, JANGAN dipetakan ke parameter manapun. Khusus "SI": dalam
   konteks pemeriksaan fisik/mata ini artinya sklera ikterik, BUKAN field "SI" INA-CBG/tarif -- jangan tertukar.
 
 Untuk TIAP parameter di bawah: cari DULU di teks TRIASE IGD. Kalau TIDAK disebutkan di Triase IGD SAMA
@@ -694,6 +698,24 @@ disebutkan sama sekali di KEDUA sumber, JANGAN mengarang — laporkan "ditemukan
 - bunyi_jantung (bunyi jantung tambahan): normal="reguler, tanpa murmur", abnormal="gallop/murmur"
 - kesadaran_kualitatif: normal="compos mentis", abnormal="somnolen/sopor/koma/delirium"
 - deformitas_luka: normal="tidak ada", abnormal="ada, deskripsi luka/cedera"
+- kepala (kepala/wajah, TERMASUK mukosa mulut/bibir/konjungtiva -- dipakai kalau dokumen menyebut kondisi
+  mukosa, mis. "mukosa kering"/"mukosa lembab", tanpa section "kepala" eksplisit): normal="normocephal, mukosa
+  lembab", abnormal="mukosa kering/pucat/ikterik, atau deformitas kepala/wajah"
+- leher: normal="tidak ada pembesaran KGB/tiroid, kaku kuduk (-)", abnormal="ada pembesaran KGB/tiroid, atau
+  kaku kuduk (+)"
+- thorak (dari baris "KEADAAN"/pemeriksaan fisik region toraks -- BEDA dari ronkhi/wheezing/sdv/retraksi di
+  atas yang lebih spesifik; thorak di sini rangkuman umum bentuk/simetri dada, BOLEH tumpang tindih narasi):
+  normal="simetris, tidak ada jejas/retraksi", abnormal="asimetris/jejas/retraksi/nyeri tekan dada"
+- abdomen (mis. "abd supel bu+" = abdomen supel, bising usus positif = NORMAL): normal="supel, bising usus
+  (BU) normal", abnormal="distensi/nyeri tekan/BU abnormal (meningkat/menurun/tidak ada)"
+- ekstremitas (KEADAAN umum ekstremitas -- BEDA dari parameter "edema" & "akral" & "crt" di atas yang lebih
+  spesifik; ekstremitas di sini rangkuman umum bentuk/gerak, BOLEH tumpang tindih narasi): normal="tidak ada
+  kelainan bentuk/gerak", abnormal="ada kelainan bentuk/gerak/kelemahan"
+Untuk 5 parameter baru ini (kepala/leher/thorak/abdomen/ekstremitas), cari juga di baris "PRIMARY SURVEY"
+(Airway/Breathing/Circulation/Disability/Exposure) kalau tabel "KEADAAN" tidak ada -- mis. "Exposure: Clear"
+tanpa rincian lebih lanjut TETAP boleh dipetakan sebagai status normal untuk parameter yang relevan HANYA
+kalau redaksinya eksplisit menyebut region itu baik-baik saja, JANGAN menebak dari "Clear" umum saja tanpa
+konteks region yang jelas.
 
 === BAGIAN 2: EKSTRAK 7 NILAI VITAL/SKOR MENTAH (HANYA dari TRIASE IGD) ===
 WAJIB HANYA cari di teks TRIASE IGD untuk bagian ini -- JANGAN pakai Resume Medis Rawat Inap sama sekali
@@ -732,14 +754,30 @@ diri, ancaman kekerasan, overdosis sengaja, dsb). "status":"ya" HANYA kalau ADA 
 mendukung — JANGAN simpulkan dari nama diagnosis semata (mis. "sesak napas" TIDAK otomatis K1). Field
 "kutipan" WAJIB diisi kalau status "ya". Field "catatan" (1 kalimat Indonesia) jelaskan singkat alasannya.
 
-ATURAN ANTI-HALUSINASI (WAJIB untuk SEMUA field kutipan di ketiga bagian):
-- SEMUA "kutipan" WAJIB kutipan PERSIS dari teks yang diberikan — DILARANG mengarang/parafrase.
+=== BAGIAN 4: TINDAKAN KEPERAWATAN SEGERA & SKOR ESI (HANYA dari TRIASE IGD) === (ditambah 19 Sep 2026, fix
+item 5 -- PROCLIST cuma berisi kode ICD-9-CM final e-Klaim, TIDAK PERNAH mencatat tindakan keperawatan yang
+dilakukan SAAT TRIASE sebagai teks naratif, mis. "IVFD asering loading 250cc lanjut 20tpm". Sistem butuh
+teks tindakan itu APA ADANYA -- JANGAN menilai sendiri apakah itu "tindakan segera" atau bukan, itu
+keputusan kode deterministik di luar prompt ini berdasarkan rules terpisah.)
+WAJIB HANYA cari di teks TRIASE IGD (sama seperti Bagian 2 & 3). Ekstrak:
+- "tindakan_keperawatan": array tindakan/intervensi yang tercatat DILAKUKAN (bukan direncanakan/instruksi
+  dokter yang belum dikerjakan) di Triase IGD -- mis. pemasangan infus/IVFD (sertakan detail cairan/rate
+  kalau ada), pemberian oksigen, injeksi obat, pemasangan NGT, dst. Untuk TIAP tindakan: quotation WAJIB
+  kutipan verbatim baris tempat tindakan itu tercatat, page_number nomor halamannya. Kalau tidak ada tindakan
+  tercatat sama sekali, array kosong [] -- JANGAN mengarang.
+- "esi": skor ESI (Emergency Severity Index, skala 1-5, kalau formulir mencantumkannya -- kadang berlabel
+  "ESI", "Triage Level", atau "Level"). Kalau ADA, isi {"skor":N,"page_number":N,"kutipan":"..."}. Kalau
+  TIDAK dicantumkan sama sekali di formulir, isi {"skor":null,"page_number":null,"kutipan":null} -- JANGAN
+  menebak/menghitung skor ESI sendiri dari kondisi klinis, HANYA laporkan angka yang benar-benar tercetak.
+
+ATURAN ANTI-HALUSINASI (WAJIB untuk SEMUA field kutipan di KEEMPAT bagian):
+- SEMUA "kutipan"/"quotation" WAJIB kutipan PERSIS dari teks yang diberikan — DILARANG mengarang/parafrase.
 - "page_number" WAJIB sesuai halaman tempat kutipan itu benar-benar ada di teks yang diberikan.
 - DILARANG KERAS menyebut nominal rupiah/biaya di kutipan/catatan manapun.
 - Kalau parameter/nilai TIDAK ditemukan sama sekali, laporkan "ditemukan":false (Bagian 1) atau "nilai":null
   (Bagian 2) — JANGAN diam-diam hilangkan field itu dari output, dan JANGAN mengarang supaya "lengkap".
 
-Output HANYA JSON, tanpa markdown/penjelasan, PERSIS struktur ini (parameter_findings WAJIB 11 entri, key
+Output HANYA JSON, tanpa markdown/penjelasan, PERSIS struktur ini (parameter_findings WAJIB 16 entri, key
 harus persis seperti di atas; vital_findings WAJIB 8 key seperti di atas):
 {
   "parameter_findings": [
@@ -756,7 +794,9 @@ harus persis seperti di atas; vital_findings WAJIB 8 key seperti di atas):
     "GCS": {"nilai":N,"page_number":N,"kutipan":"..."},
     "Nyeri": {"nilai":N,"page_number":N,"kutipan":"..."}
   },
-  "k1": {"status":"ya"|"tidak","page_number":N,"kutipan":"...","catatan":"..."}
+  "k1": {"status":"ya"|"tidak","page_number":N,"kutipan":"...","catatan":"..."},
+  "tindakan_keperawatan": [{"quotation":"...","page_number":N}],
+  "esi": {"skor":N,"page_number":N,"kutipan":"..."}
 }`;
 
 /**
@@ -784,8 +824,19 @@ async function assessKegawatdaruratan(evidencePool, triagePageNumbers, umurTahun
     ringkasan: catatan,
     parameter_findings: PARAMETER_TABLE.map(p => ({ key: p.key, label: p.label, ditemukan: false, status: null, nilai: null, page_number: null, kutipan: null, sumber_dokumen: null, ...(p.key === 'retraksi' ? { retraksi_grade: null } : {}) })),
     vital_findings: Object.fromEntries(['RR', 'SpO2', 'HR', 'TD_sistolik', 'TD_diastolik', 'Suhu', 'GCS', 'Nyeri'].map(k =>
-      [k, { nilai: null, band: null, page_number: null, kutipan: null, ...(k === 'Nyeri' ? { instrumen_diharapkan: painInstrument } : {}) }])),
-    kriteria: aggregateKriteria([], {}, null, procedureCodes),
+      [k, {
+        nilai: null, band: null, page_number: null, kutipan: null,
+        // Tri-state (fix item 4, 19 Sep 2026): tanpa halaman Triase IGD sama
+        // sekali TIDAK BISA menentukan not_in_form vs empty_on_form secara
+        // andal (tidak ada teks buat dicek) -- fallback 'empty_on_form'
+        // (perilaku lama, tetap tampilkan sebagai perlu dicek) daripada diam-
+        // diam menyembunyikannya sebagai not_in_form tanpa dasar.
+        form_status: 'empty_on_form',
+        ...(k === 'Nyeri' ? { instrumen_diharapkan: painInstrument } : {}),
+      }])),
+    kriteria: aggregateKriteria([], {}, null, procedureCodes, [], null),
+    tindakan_keperawatan: [],
+    esi: { skor: null, page_number: null, kutipan: null },
     age_group: ageGroup,
   });
 
@@ -841,7 +892,10 @@ async function assessKegawatdaruratan(evidencePool, triagePageNumbers, umurTahun
           // persis di completion=2000, JSON tidak valid, hasil jatuh ke
           // emptyResult diam-diam (tidak ada log jelas karena gagal di parse,
           // bukan di HTTP/exception level). Naikkan ke 3500 dengan margin.
-          max_completion_tokens: 3500,
+          // Naikkan LAGI ke 4200 (19 Sep 2026, fix item 5/6): Bagian 1 nambah 5
+          // parameter (11->16) + Bagian 4 baru (tindakan_keperawatan + esi) --
+          // output makin panjang, risiko kepotong sama seperti kasus di atas.
+          max_completion_tokens: 4200,
           response_format: { type: 'json_object' },
         }),
       });
@@ -916,13 +970,20 @@ async function assessKegawatdaruratan(evidencePool, triagePageNumbers, umurTahun
         && triagePageNumbers.includes(v.page_number)
         && validateQuotation(v.kutipan, v.page_number, evidencePool) && !hasFinancialTerms(v.kutipan);
       const nyeriExtra = key === 'Nyeri' ? { instrumen_diharapkan: painInstrument } : {};
+      // Tri-state (fix item 4, 19 Sep 2026): bedakan "kolomnya ada di form tapi
+      // kosong" (empty_on_form, perlu ditindak) dari "form ini memang tidak
+      // punya kolom itu" (not_in_form, BUKAN masalah -- mis. SpO2 tidak
+      // dicetak di form Triase IGD RS ybs). Deterministik (regex ke teks
+      // mentah halaman Triase), lihat documentFieldTemplate.js.
+      const formStatus = resolveFieldFormStatus(key, 'triase_igd', triagePages, validQuote);
       if (!validQuote) {
-        vitalFindings[key] = { nilai: null, band: null, page_number: null, kutipan: null, ...nyeriExtra };
+        vitalFindings[key] = { nilai: null, band: null, page_number: null, kutipan: null, form_status: formStatus, ...nyeriExtra };
         continue;
       }
       vitalFindings[key] = {
         nilai, band: ageGroup ? lookupBand(key, nilai, ageGroup) : null,
         page_number: v.page_number, kutipan: v.kutipan.substring(0, 200),
+        form_status: formStatus,
         ...nyeriExtra,
       };
     }
@@ -942,16 +1003,50 @@ async function assessKegawatdaruratan(evidencePool, triagePageNumbers, umurTahun
       }
     }
 
+    // --- Validasi tindakan_keperawatan & esi (Bagian 4, fix item 5) ---
+    // Sama seperti Bagian 2/3: WAJIB dari Triase IGD saja, quote-validated
+    // sama seperti field lain (anti-halusinasi, TIDAK ada pengecualian).
+    const rawTindakan = Array.isArray(parsed.tindakan_keperawatan) ? parsed.tindakan_keperawatan : [];
+    const tindakanKeperawatan = [];
+    for (const t of rawTindakan) {
+      const validQuote = t && t.quotation && t.page_number
+        && triagePageNumbers.includes(t.page_number)
+        && validateQuotation(t.quotation, t.page_number, evidencePool) && !hasFinancialTerms(t.quotation);
+      if (validQuote) {
+        tindakanKeperawatan.push({ quotation: String(t.quotation).substring(0, 200), page_number: t.page_number });
+      }
+    }
+    // matchTindakanSegera (procedure_rules.json) dijalankan terhadap TEKS ASLI
+    // halaman Triase (bukan terhadap tindakanKeperawatan hasil ekstraksi AI di
+    // atas) -- deterministik murni, tidak tergantung AI menangkap semua
+    // tindakan dengan benar. tindakanKeperawatan (ekstraksi AI, quote-
+    // validated) tetap dikembalikan terpisah sebagai data mentah utk display.
+    const tindakanSegeraMatches = matchTindakanSegera(triagePages);
+
+    const rawEsi = parsed.esi || {};
+    let esiResult = { skor: null, page_number: null, kutipan: null };
+    if (Number.isFinite(Number(rawEsi.skor))) {
+      const validQuote = rawEsi.kutipan && rawEsi.page_number
+        && triagePageNumbers.includes(rawEsi.page_number)
+        && validateQuotation(rawEsi.kutipan, rawEsi.page_number, evidencePool) && !hasFinancialTerms(rawEsi.kutipan);
+      if (validQuote) {
+        esiResult = { skor: Number(rawEsi.skor), page_number: rawEsi.page_number, kutipan: rawEsi.kutipan.substring(0, 200) };
+      }
+    }
+
     // --- Agregasi K1-K5 (murni kode, lihat kegawatdaruratanAggregation.js) ---
     // WAJIB pakai HANYA temuan bersumber Triase IGD -- temuan dari Resume
     // Medis Rawat Inap TETAP ditampilkan di parameter_findings (Tabel 1,
     // untuk konteks) tapi TIDAK BOLEH ikut menentukan verdict K1-K5 (Opsi A,
     // lihat catatan di getIgdTriagePageNumbers/getResumeMedisPageNumbers).
     const triageOnlyFindings = parameterFindings.filter(p => p.sumber_dokumen === 'triase_igd' || p.sumber_dokumen === null);
-    const kriteria = aggregateKriteria(triageOnlyFindings, vitalFindings, k1Result, procedureCodes);
+    const kriteria = aggregateKriteria(triageOnlyFindings, vitalFindings, k1Result, procedureCodes, tindakanSegeraMatches, esiResult.skor !== null ? esiResult : null);
 
     const ringkasan = buildRingkasan(kriteria, ageGroup);
-    return { ringkasan, parameter_findings: parameterFindings, vital_findings: vitalFindings, kriteria, age_group: ageGroup };
+    return {
+      ringkasan, parameter_findings: parameterFindings, vital_findings: vitalFindings, kriteria,
+      tindakan_keperawatan: tindakanKeperawatan, esi: esiResult, age_group: ageGroup,
+    };
   } catch (error) {
     console.warn(`[AI-REVIEW] assessKegawatdaruratan gagal: ${error.message}`);
     return emptyResult('Penilaian Kegawatdaruratan gagal dibuat — coba Baca Ulang.');
@@ -1476,13 +1571,14 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
         aiResult = JSON.parse(m[0]);
       }
 
-      const result = { 
-        field_notes: {}, 
-        code_evidence: [], 
-        suggested_codes: [], 
-        knowledge_updates: [], 
-        pending_risk_notes: [], 
-        kegawatdaruratan_assessment: null, 
+      const result = {
+        field_notes: {},
+        code_evidence: [],
+        suggested_codes: [],
+        knowledge_updates: [],
+        pending_risk_notes: [],
+        kegawatdaruratan_assessment: null,
+        diagnosis_consistency_flags: [],
         tokens_used: tokensUsed,
         suggested_inacbg: null,
         suggested_tarif: null
@@ -1553,6 +1649,58 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
         };
         codes.diagnosis.forEach(code => pushWithFallback(code, 'diagnosis'));
         codes.procedure.forEach(code => pushWithFallback(code, 'procedure'));
+      }
+
+      // --- Provenance & status review per code_evidence (fix item 7/8/9, 19 Sep 2026) ---
+      // (a) document_type: dihitung DARI METADATA HALAMAN (page_number ->
+      //     classifyPageDocumentType, deterministik/regex), BUKAN dari teks
+      //     bebas LLM -- sebelumnya frontend HARDCODE label "Dari Resume
+      //     Medis" untuk semua evidence apapun sumber aslinya (bug provenance
+      //     salah, mis. kutipan Rincian Biaya dilabeli Resume Medis).
+      // (b) review_status ('valid'|'perlu_review'|'evidence_tidak_terverifikasi'):
+      //     found:false -> evidence_tidak_terverifikasi (tidak ada bukti
+      //     terverifikasi sama sekali, termasuk kutipan palsu yang gagal
+      //     validateQuotation); found:true PROCEDURE yang match
+      //     procedure_rules.json (mis. lab rutin) -> perlu_review; sisanya valid.
+      //     Diagnosis TIDAK dicek codability (rules ini utk PROCLIST saja) --
+      //     diagnosis diperiksa terpisah oleh diagnosisConsistencyService
+      //     (severity-consistency, bukan codability) di bawah.
+      for (const entry of result.code_evidence) {
+        const page = entry.found && entry.page_number ? evidencePool.find(p => p.page_number === entry.page_number) : null;
+        entry.document_type = page ? classifyPageDocumentType(page.ocr_text) : null;
+        if (!entry.found) {
+          entry.review_status = 'evidence_tidak_terverifikasi';
+          entry.review_flags = [{ reason: 'Tidak ditemukan kutipan yang terverifikasi (cocok persis) di halaman dokumen manapun untuk kode ini.' }];
+          continue;
+        }
+        if (entry.type === 'procedure') {
+          const codability = checkProcedureCodability(entry.code);
+          if (codability.review) {
+            entry.review_status = 'perlu_review';
+            entry.review_flags = [{ reason: codability.reason }];
+            continue;
+          }
+        }
+        entry.review_status = 'valid';
+        entry.review_flags = [];
+      }
+
+      // Konsistensi klinis diagnosis (item 9) -- MURNI deterministik (regex ke
+      // evidencePool), TIDAK PERNAH mengubah DIAGLIST. Hasilnya ditempel juga
+      // ke code_evidence entry yang cocok (review_status -> perlu_review) supaya
+      // badge per-kode di frontend konsisten dengan flag detailnya di
+      // diagnosis_consistency_flags.
+      try {
+        result.diagnosis_consistency_flags = evaluateDiagnosisConsistency(codes.diagnosis, evidencePool);
+        for (const flag of result.diagnosis_consistency_flags) {
+          const evEntry = result.code_evidence.find(e => e.code === flag.code && e.type === 'diagnosis');
+          if (evEntry && evEntry.review_status !== 'evidence_tidak_terverifikasi') {
+            evEntry.review_status = 'perlu_review';
+            evEntry.review_flags = [...(evEntry.review_flags || []), { reason: flag.reason, alternative_code: flag.alternative_code, action: flag.action }];
+          }
+        }
+      } catch (consistencyErr) {
+        console.warn(`[AI-REVIEW] evaluateDiagnosisConsistency gagal: ${consistencyErr.message}`);
       }
 
       // suggested_codes — quotation adalah kutipan VERBATIM dari dokumen (tidak
@@ -1710,4 +1858,11 @@ module.exports = {
   normalizeText,
   hasFinancialTerms,
   AI_REVIEW_SYSTEM_PROMPT,
+  // Diekspor tambahan 19 Sep 2026 untuk testability langsung (fix item 4-9) --
+  // supaya test regresi bisa memanggil assessKegawatdaruratan tanpa harus
+  // mock seluruh alur generateAiReview (yang juga memanggil pending-risk &
+  // suggested_codes secara paralel).
+  assessKegawatdaruratan,
+  getIgdTriagePageNumbers,
+  getResumeMedisPageNumbers,
 };

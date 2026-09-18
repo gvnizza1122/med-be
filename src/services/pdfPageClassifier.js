@@ -173,4 +173,32 @@ function hasHasilPaSignal(fullText) {
   return PA_RESULT_MARKERS.some(kw => lower.includes(kw));
 }
 
-module.exports = { classifyPdfPages, isClaimDataPage, detectJenisKlaim, hasBpjsPageSignal, hasLaporanOperasiSignal, hasHasilPaSignal };
+/**
+ * Klasifikasi TIPE DOKUMEN satu halaman -- ditambah 19 Sep 2026 (fix item 7:
+ * provenance evidence code_evidence/suggested_codes SEBELUMNYA selalu
+ * dilabeli "Dari Resume Medis" di frontend TANPA CEK tipe dokumen
+ * sebenarnya -- lihat generateCodingExplanation.ts). Deterministik murni
+ * (regex keyword terhadap teks halaman), TIDAK memakai AI -- provenance
+ * WAJIB dari metadata halaman, bukan teks bebas LLM (lihat catatan tugas).
+ *
+ * Urutan pengecekan SENGAJA dari paling spesifik/pasti ke paling umum --
+ * satu halaman bisa memuat >1 keyword (mis. halaman Rincian Biaya juga
+ * menyebut "Diagnosa"), jadi urutan menentukan tipe mana yang menang.
+ * @param {string} text - teks OCR/native satu halaman
+ * @returns {'rincian_biaya'|'spri'|'sep'|'resume_medis'|'triase_igd'|'lab'|'berkas_eklaim'|'lainnya'}
+ */
+function classifyPageDocumentType(text) {
+  if (!text) return 'lainnya';
+  const t = text.toLowerCase();
+
+  if (/rincian\s*biaya/i.test(t)) return 'rincian_biaya';
+  if (/triage\s+igd|skrining\s+awal\s+pasien\s+igd/i.test(t)) return 'triase_igd';
+  if (/surat\s*perintah\s*rawat\s*inap/i.test(t)) return 'spri';
+  if (/berkas\s*klaim\s*individual/i.test(t)) return 'berkas_eklaim';
+  if (/surat\s*eligibilitas\s*peserta|no\.?\s*sep\b|nomor\s*sep\b/i.test(t)) return 'sep';
+  if (/resume\s*medis/i.test(t)) return 'resume_medis';
+  if (/hasil\s*laboratorium|pemeriksaan\s*laboratorium|patologi\s*klinik/i.test(t)) return 'lab';
+  return 'lainnya';
+}
+
+module.exports = { classifyPdfPages, isClaimDataPage, detectJenisKlaim, hasBpjsPageSignal, hasLaporanOperasiSignal, hasHasilPaSignal, classifyPageDocumentType };

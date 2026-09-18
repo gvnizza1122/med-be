@@ -1,0 +1,15 @@
+{
+  "_comment": "Template field per tipe dokumen -- dipakai untuk model tri-state (recorded/empty_on_form/not_in_form) di documentFieldTemplate.js. TUJUAN: bedakan 'nilai kosong karena form ini memang tidak punya kolom itu' (not_in_form, BUKAN masalah) dari 'kolomnya ada tapi tidak diisi' (empty_on_form, PERLU ditindak). Ditambah 18 Sep 2026 (fix item 4: false positive 'Lengkapi/cek SpO2' saat form Triase IGD RS ybs memang tidak mencetak kolom SpO2).",
+  "_cara_kerja": "Untuk tiap key di bawah, 'label_patterns' berisi variasi teks label (regex, case-insensitive) yang dicari di TEKS MENTAH halaman dokumen tipe ini (bukan cuma nilai yang berhasil diekstrak AI). Kalau SALAH SATU pattern ketemu di teks halaman -- field dianggap ADA di form (lanjut ke recorded/empty_on_form tergantung nilainya). Kalau TIDAK SATUPUN ketemu di SEMUA halaman dokumen tipe ini -- field dianggap not_in_form.",
+  "_maintenance": "File ini per-RS/per-template dokumen -- kalau RS lain punya format form Triase IGD berbeda (mis. SpO2 memang tercetak), TAMBAH varian pattern di sini, JANGAN ubah kode di documentFieldTemplate.js.",
+  "triase_igd": {
+    "RR": { "label_patterns": ["\\bRR\\b", "respirasi", "laju\\s*napas", "frekuensi\\s*napas"] },
+    "SpO2": { "label_patterns": ["spo2", "sp0?2", "saturasi\\s*o2", "saturasi\\s*oksigen"] },
+    "HR": { "label_patterns": ["\\bHR\\b", "heart\\s*rate", "nadi"] },
+    "TD_sistolik": { "label_patterns": ["\\bTD\\b", "tekanan\\s*darah"] },
+    "TD_diastolik": { "label_patterns": ["\\bTD\\b", "tekanan\\s*darah"] },
+    "Suhu": { "label_patterns": ["suhu", "\\btemp\\b", "temperatur"] },
+    "GCS": { "label_patterns": ["\\bGCS\\b", "kesadaran", "glasgow"] },
+    "Nyeri": { "label_patterns": ["skala\\s*nyeri", "\\bVAS\\b", "\\bNRS\\b", "\\bFLACC\\b", "wong.?baker"] }
+  }
+}

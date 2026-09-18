@@ -13,6 +13,7 @@
  * hasilnya 100% konsisten untuk nilai yang sama (tidak tergantung mood model).
  */
 const { lookupBand, K5_WHITELIST_CODES } = require('./kegawatdaruratanReference');
+const { freetextPromotesToYa, getEsiSignalThreshold } = require('./procedureRulesService');
 
 const KRITERIA_LABELS = {
   K1: 'Mengancam nyawa / membahayakan diri, orang lain, atau lingkungan',
@@ -42,9 +43,18 @@ function vitalEvidence(key, vf) {
  *   {nilai, band, page_number, kutipan} (band sudah dihitung lookupBand)
  * @param {Object} k1Result - hasil AI untuk K1: {status:'ya'|'tidak', kutipan, page_number, catatan}
  * @param {Array<string>} procedureCodes - PROCLIST record ini, sudah di-split/trim
+ * @param {Array} [tindakanSegera] - tindakan keperawatan segera dari TEKS BEBAS
+ *   (bukan kode PROCLIST resmi), hasil procedureRulesService.matchTindakanSegera()
+ *   -- {id, label, page_number, kutipan}[]. Ditambah 19 Sep 2026 (fix item 5):
+ *   PROCLIST cuma berisi kode ICD-9-CM final e-Klaim, TIDAK PERNAH mencatat
+ *   tindakan keperawatan segera (mis. "IVFD asering loading") yang dicatat di
+ *   Triase IGD/CPPT sebagai teks naratif, bukan kode.
+ * @param {Object} [esi] - skor ESI (Emergency Severity Index) dari Triase IGD,
+ *   {skor, page_number, kutipan} -- SINYAL PENDUKUNG saja, TIDAK menentukan
+ *   status K5 otomatis (lihat esi_signal_threshold di procedure_rules.json).
  * @returns {Array} 5 entri kriteria K1-K5, format seragam
  */
-function aggregateKriteria(parameterFindings, vitalFindings, k1Result, procedureCodes) {
+function aggregateKriteria(parameterFindings, vitalFindings, k1Result, procedureCodes, tindakanSegera = [], esi = null) {
   const out = [];
 
   // K1 -- dibawa dari hasil AI apa adanya (bahasa, bukan lookup).
@@ -118,15 +128,52 @@ function aggregateKriteria(parameterFindings, vitalFindings, k1Result, procedure
     out.push({ kriteria: 'K4', label: KRITERIA_LABELS.K4, status, evidence, catatan: buildCatatanK2K4(['akral', 'edema'], ['HR', 'TD_sistolik', 'TD_diastolik'], parameterFindings, vitalFindings, evidence, status) });
   }
 
-  // K5 -- murni cek PROCLIST vs whitelist kode, TIDAK ADA komponen AI sama sekali.
+  // K5 -- diperluas 19 Sep 2026 (fix item 5): SEBELUMNYA murni cek PROCLIST
+  // vs whitelist kode (TIDAK ADA komponen AI). Sekarang TETAP deterministik
+  // (tidak ada AI judgment di sini), tapi ditambah 2 sumber: (a) tindakan
+  // segera dari TEKS BEBAS Triase IGD/CPPT (procedureRulesService,
+  // matchTindakanSegera -- dipanggil oleh pemanggil, hasilnya dioper lewat
+  // parameter tindakanSegera), (b) skor ESI sebagai SINYAL (tidak menentukan
+  // status). 3 hasil: YA (kode PROCLIST resmi ditemukan -- SAMA seperti
+  // perilaku lama, tidak berubah), BORDERLINE (HANYA tindakan teks bebas yang
+  // ditemukan, kode PROCLIST kosong -- default rules, bisa diubah ke YA lewat
+  // procedure_rules.json), TIDAK (keduanya kosong).
   {
-    const matched = (procedureCodes || []).filter(code => K5_WHITELIST_CODES[code]);
-    const status = matched.length > 0 ? 'ya' : 'tidak';
-    const evidence = matched.map(code => ({ sumber: 'proclist', kode: code, deskripsi: K5_WHITELIST_CODES[code] }));
-    const catatan = matched.length > 0
-      ? `Kode tindakan darurat terdeteksi di PROCLIST: ${matched.map(c => `${c} (${K5_WHITELIST_CODES[c]})`).join(', ')}.`
-      : 'Tidak ada kode tindakan darurat (RJP/DC shock/intubasi/infus/oksigenasi) di PROCLIST.';
-    out.push({ kriteria: 'K5', label: KRITERIA_LABELS.K5, status, evidence, catatan });
+    const matchedCodes = (procedureCodes || []).filter(code => K5_WHITELIST_CODES[code]);
+    const freetextMatches = Array.isArray(tindakanSegera) ? tindakanSegera : [];
+    let status;
+    if (matchedCodes.length > 0) status = 'ya';
+    else if (freetextMatches.length > 0) status = freetextPromotesToYa() ? 'ya' : 'borderline';
+    else status = 'tidak';
+
+    const evidence = [
+      ...matchedCodes.map(code => ({ sumber: 'proclist', kode: code, deskripsi: K5_WHITELIST_CODES[code] })),
+      ...freetextMatches.map(t => ({ sumber: 'tindakan_segera', id: t.id, label: t.label, kutipan: t.kutipan, page_number: t.page_number })),
+    ];
+    let esiSignal = false;
+    if (esi && Number.isFinite(Number(esi.skor))) {
+      esiSignal = Number(esi.skor) <= getEsiSignalThreshold();
+      evidence.push({ sumber: 'esi', skor: esi.skor, kutipan: esi.kutipan, page_number: esi.page_number, signal: esiSignal });
+    }
+
+    const catatanParts = [];
+    if (matchedCodes.length > 0) {
+      catatanParts.push(`Kode tindakan darurat terdeteksi di PROCLIST: ${matchedCodes.map(c => `${c} (${K5_WHITELIST_CODES[c]})`).join(', ')}.`);
+    }
+    if (freetextMatches.length > 0) {
+      catatanParts.push(`Tindakan segera tercatat di dokumentasi (teks bebas, bukan kode PROCLIST resmi): ${freetextMatches.map(f => `${f.label} ("${f.kutipan}")`).join('; ')}.`);
+    }
+    if (matchedCodes.length === 0 && freetextMatches.length === 0) {
+      catatanParts.push('Tidak ada kode tindakan darurat (RJP/DC shock/intubasi/infus/oksigenasi) di PROCLIST, maupun pola tindakan segera di dokumentasi.');
+    }
+    if (status === 'borderline') {
+      catatanParts.push('Status BORDERLINE: tindakan segera hanya ditemukan dari teks bebas (bukan kode resmi PROCLIST) -- verifikator wajib cek manual; aturan default bisa diubah jadi YA otomatis lewat procedure_rules.json kalau dinilai cukup andal.');
+    }
+    if (esi && Number.isFinite(Number(esi.skor))) {
+      catatanParts.push(`Skor ESI tercatat: ${esi.skor} (sinyal pendukung${esiSignal ? ', konsisten dengan kegawatan' : ''} -- tidak menentukan status K5 secara otomatis).`);
+    }
+
+    out.push({ kriteria: 'K5', label: KRITERIA_LABELS.K5, status, evidence, catatan: catatanParts.join(' ') });
   }
 
   return out;

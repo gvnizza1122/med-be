@@ -18,6 +18,23 @@
  */
 
 // ===== TABEL 1: Parameter checklist (per-record, dari dokumen Triase IGD) =====
+// Diperluas 19 Sep 2026 (fix item 6) dari 11 jadi 16 parameter -- 5 parameter
+// baru (kepala, leher, thorak, abdomen, ekstremitas) menangkap temuan tabel
+// "KEADAAN" & primary survey yang SEBELUMNYA sama sekali tidak punya field
+// sendiri (kasus regresi: "1/11 tercatat" padahal triase juga mencatat
+// KEADAAN kepala/leher/thorak/abdomen/ekstremitas normal & primary survey
+// ABCDE Clear -- tidak ada tempat menyimpannya). SENGAJA berdiri sendiri dari
+// 11 parameter lama (ronkhi..deformitas_luka, sistem organ spesifik) --
+// parameter baru ini pemeriksaan region-based (KEADAAN UMUM), boleh tumpang
+// tindih narasi dengan yang lama (mis. "thorak" bisa memuat info yang sama
+// dengan ronkhi/retraksi) tapi TETAP dicatat terpisah karena sumber
+// dokumennya (baris "KEADAAN"/primary survey) beda dari baris pemeriksaan
+// fisik spesifik. TIDAK ditambahkan ke kriteria_terkait manapun -- agregasi
+// K2-K4 (kegawatdaruratanAggregation.js) TETAP pakai array key literal yang
+// SUDAH ADA (tidak dibaca dari kriteria_terkait di sini), jadi menambah
+// parameter ini TIDAK mengubah hasil K1-K5 sama sekali, murni menambah
+// cakupan dokumentasi Tabel 1 (keputusan eksplisit pengguna 19 Sep 2026,
+// Opsi A: extend PARAMETER_TABLE, bukan struktur terpisah).
 const PARAMETER_TABLE = [
   { key: 'ronkhi', label: 'Ronkhi (Rh)', sistem_tubuh: 'Respirasi', contoh_normal: '(-/-)', contoh_abnormal: '(+/+) -- cairan/sekret paru', kriteria_terkait: ['K2'] },
   { key: 'wheezing', label: 'Wheezing (Wh)', sistem_tubuh: 'Respirasi', contoh_normal: '(-/-)', contoh_abnormal: '(+/+) -- obstruksi jalan napas', kriteria_terkait: ['K2'] },
@@ -30,6 +47,12 @@ const PARAMETER_TABLE = [
   { key: 'bunyi_jantung', label: 'Bunyi jantung tambahan', sistem_tubuh: 'Kardiovaskular', contoh_normal: 'reguler, tanpa murmur', contoh_abnormal: 'gallop/murmur', kriteria_terkait: ['K4'] },
   { key: 'kesadaran_kualitatif', label: 'Kesadaran kualitatif', sistem_tubuh: 'Neurologis', contoh_normal: 'compos mentis', contoh_abnormal: 'somnolen/sopor/koma', kriteria_terkait: ['K3'] },
   { key: 'deformitas_luka', label: 'Deformitas/luka', sistem_tubuh: 'Trauma', contoh_normal: 'tidak ada', contoh_abnormal: 'ada, deskripsi', kriteria_terkait: ['K1'] },
+  // --- 5 parameter baru (KEADAAN/primary survey), 19 Sep 2026 ---
+  { key: 'kepala', label: 'Kepala/wajah (termasuk mukosa)', sistem_tubuh: 'KEADAAN', contoh_normal: 'normocephal, mukosa lembab', contoh_abnormal: 'mukosa kering/pucat/ikterik, deformitas', kriteria_terkait: [] },
+  { key: 'leher', label: 'Leher', sistem_tubuh: 'KEADAAN', contoh_normal: 'tidak ada pembesaran KGB/tiroid, kaku kuduk (-)', contoh_abnormal: 'ada pembesaran/kaku kuduk (+)', kriteria_terkait: [] },
+  { key: 'thorak', label: 'Thorak', sistem_tubuh: 'KEADAAN', contoh_normal: 'simetris, tidak ada jejas/retraksi', contoh_abnormal: 'asimetris/jejas/retraksi/nyeri tekan', kriteria_terkait: [] },
+  { key: 'abdomen', label: 'Abdomen', sistem_tubuh: 'KEADAAN', contoh_normal: 'supel, bising usus (BU) normal', contoh_abnormal: 'distensi/nyeri tekan/BU abnormal (meningkat/menurun/tidak ada)', kriteria_terkait: [] },
+  { key: 'ekstremitas', label: 'Ekstremitas (KEADAAN umum)', sistem_tubuh: 'KEADAAN', contoh_normal: 'tidak ada kelainan bentuk/gerak', contoh_abnormal: 'ada kelainan bentuk/gerak/kelemahan', kriteria_terkait: [] },
 ];
 
 // ===== Kelompok usia =====
