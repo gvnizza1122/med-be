@@ -53,3 +53,4 @@ coverage/
 
 # Bulk test upload logs (scripts/bulkTestUpload.js)
 bulk-upload-log-*.json
+nul

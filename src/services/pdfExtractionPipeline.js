@@ -2,14 +2,17 @@
  * Pipeline ekstraksi PDF klaim → 1 record vClaim (60 kolom).
  *
  * Alur: klasifikasi halaman (pdf-parse) → ambil teks halaman claim-data →
+ *       [ENHANCEMENT] multi-pass OCR (vital signs, clinical findings) →
  *       ekstraksi AI → record vClaim sesuai skema resmi.
  *
  * Env: AI_PROVIDER_API_KEY (wajib), AI_PROVIDER_BASE_URL, AI_MODEL, AI_MAX_ATTEMPTS, AI_TIMEOUT_MS.
+ * Env: OCR_ENHANCEMENT_ENABLED (default true) — enable multi-pass OCR enhancement
  */
 
 const { classifyPdfPages, detectJenisKlaim, hasBpjsPageSignal, hasLaporanOperasiSignal, hasHasilPaSignal } = require('./pdfPageClassifier');
 const { extractClaimData } = require('./pdfExtractionService');
 const { parsePhysicalExam, translateClinicalText } = require('./notasiMedisParser');
+const { applyOcrEnhancements, mergeEnhancementsIntoRecord } = require('./ocrIntegration');
 
 /**
  * Jaring pengaman deterministik (regex, BUKAN AI) untuk SEP/NOKARTU/KELAS_RAWAT
@@ -202,24 +205,44 @@ async function extractFromPDF(filePath, options = {}) {
         const totalText = classification.pages.reduce((sum, p) => sum + p.text_length, 0);
         if (totalText < 200 && classification.totalPages > 0) {
           console.log(`[Pipeline] Teks pdf-parse terlalu sedikit (${totalText} chars), mencoba OCR...`);
-          const ocrResult = await ocrPdfPages(filePath, 'all');
-          if (ocrResult.success && ocrResult.pages.length > 0) {
-            const ocrTexts = ocrResult.pages
-              .filter(p => p.text && p.text.trim().length > 30)
-              .map(p => p.text);
-            if (ocrTexts.length > 0) {
-              const { isClaimDataPage } = require('./pdfPageClassifier');
-              const combinedText = ocrTexts.join('\n\n---\n\n');
-              if (isClaimDataPage(combinedText)) {
-                classification.claimDataText = combinedText;
-                classification.claimDataPages = ocrResult.pages.map((p, i) => ({
-                  page_num: p.page_number, text: p.text
-                }));
-                result.metadata.claimDataPagesFound = classification.claimDataPages.length;
-                result.metadata.ocrFallback = true;
-                ocrFallbackWorked = true;
-                console.log(`[Pipeline] OCR fallback berhasil, ${ocrTexts.length} halaman terbaca.`);
+
+          // ENHANCEMENT: Apply multi-pass OCR untuk extract vital signs dan clinical findings
+          const ocrEnhancementEnabled = process.env.OCR_ENHANCEMENT_ENABLED !== 'false';
+          if (ocrEnhancementEnabled) {
+            console.log('[Pipeline] Applying enhanced OCR (multi-pass dengan vital signs extraction)...');
+            classification = await applyOcrEnhancements(classification, filePath, {
+              performEnhancedOcr: true,
+              pageNumbers: null
+            });
+          } else {
+            const ocrResult = await ocrPdfPages(filePath, 'all');
+            if (ocrResult.success && ocrResult.pages.length > 0) {
+              const ocrTexts = ocrResult.pages
+                .filter(p => p.text && p.text.trim().length > 30)
+                .map(p => p.text);
+              if (ocrTexts.length > 0) {
+                const { isClaimDataPage } = require('./pdfPageClassifier');
+                const combinedText = ocrTexts.join('\n\n---\n\n');
+                if (isClaimDataPage(combinedText)) {
+                  classification.claimDataText = combinedText;
+                  classification.claimDataPages = ocrResult.pages.map((p, i) => ({
+                    page_num: p.page_number, text: p.text
+                  }));
+                  result.metadata.claimDataPagesFound = classification.claimDataPages.length;
+                  result.metadata.ocrFallback = true;
+                }
               }
+            }
+          }
+
+          // Check hasil OCR (enhanced atau standard)
+          if (classification.claimDataText && classification.claimDataText.trim().length > 50) {
+            const { isClaimDataPage } = require('./pdfPageClassifier');
+            if (isClaimDataPage(classification.claimDataText)) {
+              result.metadata.ocrFallback = true;
+              result.metadata.ocrEnhancementApplied = classification.enhancement_applied || false;
+              ocrFallbackWorked = true;
+              console.log(`[Pipeline] OCR fallback berhasil, enhancement: ${classification.enhancement_applied ? 'yes' : 'no'}`);
             }
           }
         }
@@ -230,6 +253,25 @@ async function extractFromPDF(filePath, options = {}) {
       if (!ocrFallbackWorked) {
         result.pesan = PESAN.bukanBerkasKlaim;
         return result;
+      }
+    } else {
+      // ENHANCEMENT: Kalau pdf-parse SUDAH dapat teks, apply enhancement untuk extract vital signs
+      const ocrEnhancementEnabled = process.env.OCR_ENHANCEMENT_ENABLED !== 'false';
+      if (ocrEnhancementEnabled && filePath) {
+        try {
+          console.log('[Pipeline] Applying OCR enhancement (already have text, enriching with vital signs)...');
+          const enhanced = await applyOcrEnhancements(classification, filePath, {
+            performEnhancedOcr: true,
+            pageNumbers: null
+          });
+          if (enhanced.enhancement_applied) {
+            classification = enhanced;
+            result.metadata.ocrEnhancementApplied = true;
+          }
+        } catch (enhanceErr) {
+          console.warn('[Pipeline] Enhancement non-blocking gagal:', enhanceErr.message);
+          // Lanjut tanpa enhancement — bukan blocking operation
+        }
       }
     }
 
@@ -294,6 +336,12 @@ async function extractFromPDF(filePath, options = {}) {
     // menyertakan lampiran wajibnya atau belum (lihat 18 Sep 2026).
     result.record.has_laporan_operasi = hasLaporanOperasiSignal(allPagesText);
     result.record.has_hasil_pa = hasHasilPaSignal(allPagesText);
+
+    // ENHANCEMENT: Merge OCR enhancements (vital signs, clinical findings) ke record
+    if (classification.ocr_enhancement && classification.enhancement_applied) {
+      result.record = mergeEnhancementsIntoRecord(result.record, classification);
+      console.log('[Pipeline] Enhancement merged ke record');
+    }
 
     // Parse notasi medis dan singkatan klinis dari teks klain
     try {

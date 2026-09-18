@@ -247,7 +247,18 @@ async function initializeSchema() {
         has_bpjs_page BOOLEAN DEFAULT TRUE,
         has_laporan_operasi BOOLEAN DEFAULT FALSE,
         has_hasil_pa BOOLEAN DEFAULT FALSE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+
+        -- 6 Field Types System (migration 006)
+        jenis_field VARCHAR(50) CHECK (jenis_field IN ('Salin', 'Turunan', 'Konfigurasi', 'Koding', 'Fakta_nol', 'Wajar_kosong')),
+        dokumen_sumber VARCHAR(100) CHECK (dokumen_sumber IN ('resume_medis', 'sep', 'grouper', 'triage', 'resep')),
+        halaman_sumber INTEGER,
+        kutipan TEXT,
+        status_usulan VARCHAR(50) CHECK (status_usulan IN ('usulan', 'disetujui', 'ditolak')),
+        disetujui_oleh TEXT REFERENCES users(id) ON DELETE SET NULL,
+        disetujui_pada TIMESTAMP,
+
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT ck_koding_requires_kutipan CHECK (NOT (jenis_field = 'Koding' AND kutipan IS NULL))
       );
 
       -- Satu baris = satu file Excel rekap pending BPJS yang diimpor (mis.
@@ -497,6 +508,63 @@ async function initializeSchema() {
         catatan_verifikasi TEXT,
         imported_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+
+      -- Kriteria Top-Up Special CMG (Special Casemix Main Groups) PMK No. 3
+      -- Tahun 2023, Lampiran I.A (Pasal 27 ayat 2 huruf a-d: special
+      -- procedure/drugs/investigation/prosthesis -- TIDAK termasuk subacute/
+      -- chronic cases huruf e/f, yang tidak punya tabel kriteria kode-per-
+      -- kode di dokumen ini). SATU BARIS PER (kode_special_cmg, kode_diagnosis)
+      -- -- kolom asal PDF punya PULUHAN kode diagnosis dalam 1 sel (mis.
+      -- "Human Albumin for Septicaemia" = 26 kode ICD-10 berbeda), dipecah
+      -- di sini supaya bisa dicari via index, BUKAN disimpan sbg teks
+      -- dipisah-koma. Baris dgn kode_diagnosis NULL berarti kode Special CMG
+      -- itu MEMANG tidak punya syarat diagnosis spesifik (kriteria murni dari
+      -- kode_group_inacbg + kode_prosedur) -- BEDA dari kode yg tidak ada di
+      -- tabel ini sama sekali. kode_group_inacbg/kode_prosedur tetap TEXT
+      -- gabungan koma per baris (jumlahnya kecil per kode, tidak dieksplode).
+      -- Diisi oleh scripts/seedSpecialCmg.js dari src/data/special_cmg_kriteria.json
+      -- -- lihat file itu (field "meta") utk metode ekstraksi & verifikasi.
+      CREATE TABLE IF NOT EXISTS special_cmg_kriteria (
+        id TEXT PRIMARY KEY,
+        no_asal INTEGER,
+        kode_special_cmg TEXT NOT NULL,
+        deskripsi TEXT,
+        jenis TEXT CHECK (jenis IN ('special_procedure','special_drugs','special_investigation','special_prosthesis')),
+        kode_group_inacbg TEXT,
+        kode_diagnosis TEXT,
+        kode_prosedur TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      -- Ketentuan Penjaminan Bagian II PMK No. 3 Tahun 2023 ("KRITERIA
+      -- PELAYANAN DAN KOMPETENSI UNTUK PELAYANAN KESEHATAN TERTENTU DI
+      -- FKRTL", Pasal 34) -- memuat pembatasan top-up berdasarkan KELAS RS.
+      -- WAJIB dipakai BERSAMAAN dengan special_cmg_kriteria (lihat
+      -- src/services/specialCmgDetector.js) -- kriteria kode yang cocok di
+      -- special_cmg_kriteria BUKAN berarti top-up itu boleh diklaim RS ini,
+      -- kalau kode_special_cmg-nya ada di tabel ini DAN kelas RS (D utk RS
+      -- Lestari Raharja) TIDAK termasuk yang diizinkan. Baris dgn
+      -- kode_special_cmg NULL (mis. Kemoterapi, Hemodialisis) adalah kriteria
+      -- kompetensi FKRTL umum di luar skema Special CMG (Pasal 34, bukan
+      -- Pasal 27) -- disimpan utk kelengkapan referensi, tidak dipakai
+      -- specialCmgDetector.js. Diisi oleh scripts/seedSpecialCmg.js dari
+      -- src/data/special_cmg_penjaminan_kelas_rs.json.
+      CREATE TABLE IF NOT EXISTS special_cmg_penjaminan (
+        id TEXT PRIMARY KEY,
+        no_asal INTEGER,
+        kode_special_cmg TEXT,
+        jenis_layanan TEXT,
+        kode_group_inacbg TEXT,
+        kode_diagnosis TEXT,
+        kode_prosedur TEXT,
+        allowed_kelas_rs TEXT,
+        excluded_kelas_rs TEXT,
+        boleh_kelas_d BOOLEAN,
+        catatan_kelas_rs TEXT,
+        catatan_lengkap TEXT,
+        sumber_halaman TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
     `);
 
     // Create Indexes
@@ -524,6 +592,13 @@ async function initializeSchema() {
     await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_claim_records_nokartu ON claim_records(nokartu)`);
     await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_rv20_confirmations_record ON rv20_confirmations(record_id)`);
 
+    // Indexes for 6 Field Types System (migration 006)
+    await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_claim_records_jenis_field ON claim_records(jenis_field)`);
+    await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_claim_records_dokumen_sumber ON claim_records(dokumen_sumber)`);
+    await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_claim_records_status_usulan ON claim_records(status_usulan)`);
+    await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_claim_records_disetujui_oleh ON claim_records(disetujui_oleh)`);
+    await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_claim_records_jenis_field_status ON claim_records(jenis_field, status_usulan)`);
+
     // Item 10 (optimasi performa) — kolom-kolom berikut dipakai search/filter
     // di fitur search Riwayat Upload (item 8) dan Pending BPJS (item 9), belum
     // punya index sebelumnya, jadi jadi full-scan begitu datanya banyak.
@@ -532,6 +607,9 @@ async function initializeSchema() {
     await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_bpjs_pending_sep ON bpjs_pending_responses(sep)`);
     await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_bpjs_pending_nama_peserta ON bpjs_pending_responses(nama_peserta)`);
     await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_tarif_inacbg_jenis_layanan ON tarif_inacbg_pmk3_2023(jenis_layanan)`);
+    await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_special_cmg_kriteria_kode ON special_cmg_kriteria(kode_special_cmg)`);
+    await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_special_cmg_kriteria_diagnosis ON special_cmg_kriteria(kode_diagnosis)`);
+    await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_special_cmg_penjaminan_kode ON special_cmg_penjaminan(kode_special_cmg)`);
 
     // Explicit index pada users.email untuk mempercepat login queries
     await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)`);
@@ -605,7 +683,17 @@ async function migrateSchema(db) {
       // (konservatif) -- record lama (sebelum kolom ini ada) tetap divalidasi
       // ketat, cuma record yang deteksinya EKSPLISIT nemu marker yang lolos.
       'has_laporan_operasi': 'BOOLEAN DEFAULT FALSE',
-      'has_hasil_pa': 'BOOLEAN DEFAULT FALSE'
+      'has_hasil_pa': 'BOOLEAN DEFAULT FALSE',
+      // 6 Field Types System (migration 006) — sistem tracking untuk categorize field types
+      // (Salin/Turunan/Konfigurasi/Koding/Fakta_nol/Wajar_kosong), field source, quote,
+      // approval workflow.
+      'jenis_field': `VARCHAR(50) CHECK (jenis_field IN ('Salin', 'Turunan', 'Konfigurasi', 'Koding', 'Fakta_nol', 'Wajar_kosong'))`,
+      'dokumen_sumber': `VARCHAR(100) CHECK (dokumen_sumber IN ('resume_medis', 'sep', 'grouper', 'triage', 'resep'))`,
+      'halaman_sumber': 'INTEGER',
+      'kutipan': 'TEXT',
+      'status_usulan': `VARCHAR(50) CHECK (status_usulan IN ('usulan', 'disetujui', 'ditolak'))`,
+      'disetujui_oleh': 'TEXT REFERENCES users(id) ON DELETE SET NULL',
+      'disetujui_pada': 'TIMESTAMP'
     };
 
     for (const [col, type] of Object.entries(newCols)) {
@@ -615,6 +703,34 @@ async function migrateSchema(db) {
         } catch (e) {
           // Column may already exist
         }
+      }
+    }
+
+    // Add constraint: If jenis_field='Koding', kutipan must NOT be NULL
+    // PostgreSQL CHECK constraint validation
+    try {
+      await db.query(`
+        ALTER TABLE claim_records ADD CONSTRAINT ck_koding_requires_kutipan
+        CHECK (NOT (jenis_field = 'Koding' AND kutipan IS NULL))
+      `);
+    } catch (e) {
+      // Constraint may already exist
+    }
+
+    // Add indexes for field types system
+    const indexQueries = [
+      `CREATE INDEX IF NOT EXISTS idx_claim_records_jenis_field ON claim_records(jenis_field)`,
+      `CREATE INDEX IF NOT EXISTS idx_claim_records_dokumen_sumber ON claim_records(dokumen_sumber)`,
+      `CREATE INDEX IF NOT EXISTS idx_claim_records_status_usulan ON claim_records(status_usulan)`,
+      `CREATE INDEX IF NOT EXISTS idx_claim_records_disetujui_oleh ON claim_records(disetujui_oleh)`,
+      `CREATE INDEX IF NOT EXISTS idx_claim_records_jenis_field_status ON claim_records(jenis_field, status_usulan)`
+    ];
+
+    for (const indexQuery of indexQueries) {
+      try {
+        await db.query(indexQuery);
+      } catch (e) {
+        // Index may already exist
       }
     }
 

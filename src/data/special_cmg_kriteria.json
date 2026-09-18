@@ -1,0 +1,1552 @@
+{
+  "meta": {
+    "generated_at": "2026-09-18T10:00:12.803592Z",
+    "total_rows_sumber_pdf": 36,
+    "total_rows_exploded": 96,
+    "jenis_counts": {
+      "special_drugs": 11,
+      "special_prosthesis": 5,
+      "special_procedure": 17,
+      "special_investigation": 3
+    },
+    "description": "Kriteria Top-Up Special CMG (Special Casemix Main Groups) PMK No. 3 Tahun 2023, Lampiran I bagian A (Kriteria Pembayaran Tambahan pada Special Casemix Main Groups) -- Pasal 27 ayat (2) huruf a-d: special procedure, special drugs, special investigation, special prosthesis.",
+    "source_name": "Peraturan Menteri Kesehatan (PMK) Nomor 3 Tahun 2023, Lampiran I.A",
+    "source_file_local": "D:/mod-gta/Permenkes Nomor 3 Tahun 2023.pdf (referensi lokal, tidak disertakan di repo)",
+    "source_pages": "31-39 (halaman 31 gambar/raster -- lihat catatan; halaman 40 dst adalah tabel BESARAN/tarif top-up per kelas RS, bukan tabel kriteria ini, sengaja TIDAK diekstrak di sini)",
+    "jenis_mapping_note": "Kolom \"jenis\" TIDAK ada secara eksplisit di tabel PDF -- diturunkan dari prefix 2-huruf KODE_SPECIAL_CMG (DD/II/RR/YY), dicocokkan dengan definisi resmi di Pasal 27 ayat (2) PMK 3/2023 (\"special procedure; special drugs; special investigation; special prosthesis; subacute cases; dan chronic cases\") DAN divalidasi silang terhadap isi deskripsi tiap baris (semua kode DD adalah nama obat -> special_drugs, semua II adalah pencitraan/pemeriksaan penunjang -> special_investigation, semua RR adalah alat/implan/prostesis -> special_prosthesis, semua YY adalah tindakan/prosedur operatif -> special_procedure). Subacute cases dan chronic cases (Pasal 27 ayat 2 huruf e & f) TIDAK punya tabel kriteria kode-per-kode terpisah di dokumen ini (dicari di halaman 31-99, tidak ditemukan) -- kemungkinan ditentukan dari LOS/durasi rawat, bukan pencocokan kode, sehingga di luar cakupan modul lookup kode ini.",
+    "extraction_method": "Halaman 31 adalah GAMBAR RASTER (bukan teks PDF asli -- get_text() hanya mengembalikan 1 kata \"jdih.kemkes.go.id\" untuk seluruh halaman), jadi baris 1-5 (DD-01-I s.d. DD-05-II) ditranskripsi manual dari render halaman resolusi tinggi (4x zoom) dan diverifikasi ulang dgn crop kedua yang menyertakan kolom prosedur penuh. Halaman 32-39 adalah teks vektor asli -- diekstrak dengan PyMuPDF page.find_tables() (deteksi grid tabel asli dari garis PDF, BUKAN heuristik gabung-baris berbasis koordinat kata) karena tabel ini py sel multi-baris dengan tinggi berbeda per kolom (mis. kolom KODE_GROUP_INACBG 3 baris, kolom KODE_DIAGNOSIS puluhan baris untuk 1 baris logis yang sama) yang membuat pendekatan \"kelompokkan kata per koordinat Y\" (dipakai sukses utk tabel tarif) SALAH mengaitkan kolom pada baris ini -- dicoba dulu dan terbukti salah (lihat riwayat kerja), baru pindah ke find_tables(). Baris logis yang melimpah ke halaman berikutnya (sel NO/KODE_SPECIAL_CMG/DESKRIPSI kosong pada baris lanjutan) digabung ke baris logis sebelumnya berdasarkan urutan halaman.",
+    "verification_notes": [
+      "Verifikasi visual (render halaman ke gambar, dibandingkan manual baris-per-baris) pada SEMUA 9 halaman (31-39, mencakup 36/36 baris) -- 100% cocok setelah 2 perbaikan bug ditemukan & diperbaiki selama proses: (1) batas kolom PROSEDUR/DIAGNOSIS yang terlalu ketat sempat memotong beberapa kode di tepi kolom -- diperbaiki dgn menggeser batas kolom; (2) fungsi pemisah kode sempat mengasumsikan SELALU dipisah koma, padahal baris YY-15-III (Percutaneous Endoscopy Gastrostomy) memisah 3 kode diagnosis (E43/E44.0/E44.1) TANPA koma sama sekali (cuma newline antar baris tabel) -- diperbaiki dgn split pakai koma ATAU whitespace.",
+      "Baris 7 (DD-11-II, \"Human Albumin for Burn\") secara SAH memiliki 2 KODE_GROUP_INACBG sub-varian (L-1-20-* untuk rawat inap non-operatif, S-4-16-* -- keduanya dgn daftar diagnosis T20-T32 yang identik dicetak ULANG di sumber PDF utk tiap sub-varian) -- daftar diagnosis di-dedupe (bukan bug ekstraksi, tapi pengulangan asli di sumber, dikonfirmasi visual). KETERBATASAN YANG DISADARI: krn kode_group_inacbg & kode_prosedur disimpan gabungan per BARIS (bukan per sub-varian group), baris ini py kode_prosedur (85.82-86.93) yang SECARA KETAT cuma berlaku utk sub-varian L-1-20-* (sub-varian S-4-16-* di sumber PDF tidak mensyaratkan prosedur spesifik apapun, selnya \"-\") -- specialCmgDetector.js TIDAK membedakan ini (memperlakukan kode_prosedur berlaku utk seluruh kode_group_inacbg baris ybs), jadi utk baris ini bisa SEDIKIT lebih longgar dari bacaan paling ketat kalau klaim pakai S-4-16-*. Baris lain semuanya 1 sub-varian per baris, tidak kena keterbatasan ini.",
+      "Baris tanpa syarat diagnosis spesifik (kode_diagnosis kosong di sumber, sel \"-\") TETAP disimpan 1 baris di tabel exploded dgn kode_diagnosis = NULL (bukan dihilangkan) -- berlaku utk sebagian besar baris RR/YY (kriterianya murni dari kode_group_inacbg + kode_prosedur, tanpa syarat diagnosis)."
+    ],
+    "caveat": "Data ini HANYA mencakup Lampiran I.A (Kriteria Special CMG: special procedure/drugs/investigation/prosthesis) -- BUKAN Lampiran I.B (Besaran/tarif top-up per kelas RS, halaman 40+, tabel terpisah jauh lebih besar & TIDAK diminta di tugas ini) dan BUKAN subacute/chronic cases (tidak py tabel kriteria kode terpisah di dokumen ini)."
+  },
+  "kriteria": [
+    {
+      "no": 1,
+      "kode_special_cmg": "DD-01-I",
+      "deskripsi": "Streptokinase",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": [
+        "I-4-10-I",
+        "I-4-10-II",
+        "I-4-10-III"
+      ],
+      "kode_diagnosis": [
+        "I21.0",
+        "I21.1",
+        "I21.2",
+        "I21.3",
+        "I21.4",
+        "I21.9",
+        "I23.3"
+      ],
+      "kode_prosedur": []
+    },
+    {
+      "no": 2,
+      "kode_special_cmg": "DD-02-II",
+      "deskripsi": "Deferiprone",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": [
+        "D-4-13-I",
+        "D-4-13-II",
+        "D-4-13-III"
+      ],
+      "kode_diagnosis": [
+        "D56.1"
+      ],
+      "kode_prosedur": []
+    },
+    {
+      "no": 3,
+      "kode_special_cmg": "DD-03-II",
+      "deskripsi": "Deferoksamin",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": [
+        "D-4-13-I",
+        "D-4-13-II",
+        "D-4-13-III"
+      ],
+      "kode_diagnosis": [
+        "D56.1"
+      ],
+      "kode_prosedur": []
+    },
+    {
+      "no": 4,
+      "kode_special_cmg": "DD-04-II",
+      "deskripsi": "Deferasirox",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": [
+        "D-4-13-I",
+        "D-4-13-II",
+        "D-4-13-III"
+      ],
+      "kode_diagnosis": [
+        "D56.1"
+      ],
+      "kode_prosedur": []
+    },
+    {
+      "no": 5,
+      "kode_special_cmg": "DD-05-II",
+      "deskripsi": "Human Albumin for Septicaemia",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": [
+        "A-4-10-I",
+        "A-4-10-II",
+        "A-4-10-III"
+      ],
+      "kode_diagnosis": [
+        "A02.1",
+        "A20.7",
+        "A22.7",
+        "A39.1",
+        "A39.2",
+        "A39.3",
+        "A39.4",
+        "A39.8",
+        "A39.9",
+        "A40.0",
+        "A40.1",
+        "A40.2",
+        "A40.3",
+        "A40.8",
+        "A40.9",
+        "A41.0",
+        "A41.1",
+        "A41.2",
+        "A41.3",
+        "A41.4",
+        "A41.5",
+        "A41.8",
+        "A41.9",
+        "A42.7",
+        "B37.7",
+        "R57.1"
+      ],
+      "kode_prosedur": []
+    },
+    {
+      "no": 6,
+      "kode_special_cmg": "DD-06-II",
+      "deskripsi": "Anti Hemofilia Factor",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": [
+        "D-4-11-I",
+        "D-4-11-II",
+        "D-4-11-III"
+      ],
+      "kode_diagnosis": [
+        "D66",
+        "D67"
+      ],
+      "kode_prosedur": []
+    },
+    {
+      "no": 7,
+      "kode_special_cmg": "DD-11-II",
+      "deskripsi": "Human Albumin for Burn",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": [
+        "L-1-20-I",
+        "L-1-20-II",
+        "L-1-20-III",
+        "S-4-16-I",
+        "S-4-16-II",
+        "S-4-16-III"
+      ],
+      "kode_diagnosis": [
+        "T20.3",
+        "T20.7",
+        "T21.3",
+        "T21.7",
+        "T22.3",
+        "T22.7",
+        "T23.3",
+        "T23.7",
+        "T24.3",
+        "T24.7",
+        "T25.3",
+        "T25.7",
+        "T29.3",
+        "T29.7",
+        "T31.4",
+        "T31.5",
+        "T31.6",
+        "T31.7",
+        "T31.8",
+        "T31.9",
+        "T32.4",
+        "T32.5",
+        "T32.6",
+        "T32.7",
+        "T32.8",
+        "T32.9"
+      ],
+      "kode_prosedur": [
+        "85.82",
+        "85.83",
+        "85.84",
+        "85.85",
+        "86.60",
+        "86.61",
+        "86.62",
+        "86.63",
+        "86.65",
+        "86.66",
+        "86.67",
+        "86.69",
+        "86.70",
+        "86.71",
+        "86.72",
+        "86.73",
+        "86.74",
+        "86.75",
+        "86.91",
+        "86.93"
+      ]
+    },
+    {
+      "no": 8,
+      "kode_special_cmg": "RR-01-II",
+      "deskripsi": "Subdural Grid Electrode",
+      "jenis": "special_prosthesis",
+      "kode_group_inacbg": [
+        "G-1-10-I",
+        "G-1-10-II",
+        "G-1-10-III"
+      ],
+      "kode_diagnosis": [],
+      "kode_prosedur": [
+        "02.93"
+      ]
+    },
+    {
+      "no": 9,
+      "kode_special_cmg": "RR-02-II",
+      "deskripsi": "Contegra",
+      "jenis": "special_prosthesis",
+      "kode_group_inacbg": [
+        "I-1-03-I",
+        "I-1-03-II",
+        "I-1-03-III"
+      ],
+      "kode_diagnosis": [],
+      "kode_prosedur": [
+        "35.92"
+      ]
+    },
+    {
+      "no": 10,
+      "kode_special_cmg": "RR-03-III",
+      "deskripsi": "Temporomandibul ar Joint (TMJ) Prothesis",
+      "jenis": "special_prosthesis",
+      "kode_group_inacbg": [
+        "M-1-60-I",
+        "M-1-60-II",
+        "M-1-60-III"
+      ],
+      "kode_diagnosis": [],
+      "kode_prosedur": [
+        "76.5"
+      ]
+    },
+    {
+      "no": 11,
+      "kode_special_cmg": "RR-04-III",
+      "deskripsi": "Hip Implant/Knee Implant",
+      "jenis": "special_prosthesis",
+      "kode_group_inacbg": [
+        "M-1-04-I",
+        "M-1-04-II",
+        "M-1-04-III"
+      ],
+      "kode_diagnosis": [],
+      "kode_prosedur": [
+        "81.51",
+        "81.52",
+        "81.53",
+        "81.54",
+        "81.55"
+      ]
+    },
+    {
+      "no": 12,
+      "kode_special_cmg": "RR-05-III",
+      "deskripsi": "Prostesis Evar/Tevar",
+      "jenis": "special_prosthesis",
+      "kode_group_inacbg": [
+        "I-1-20-I",
+        "I-1-20-II",
+        "I-1-20-III"
+      ],
+      "kode_diagnosis": [],
+      "kode_prosedur": [
+        "39.71",
+        "39.73"
+      ]
+    },
+    {
+      "no": 13,
+      "kode_special_cmg": "YY-01-II",
+      "deskripsi": "Hip Replacement/ Knee Replacement",
+      "jenis": "special_procedure",
+      "kode_group_inacbg": [
+        "M-1-04-I",
+        "M-1-04-II",
+        "M-1-04-III"
+      ],
+      "kode_diagnosis": [],
+      "kode_prosedur": [
+        "81.51",
+        "81.52",
+        "81.53",
+        "81.54",
+        "81.55"
+      ]
+    },
+    {
+      "no": 14,
+      "kode_special_cmg": "YY-02-III",
+      "deskripsi": "Percutaneous Coronary Intervention (PCI)",
+      "jenis": "special_procedure",
+      "kode_group_inacbg": [
+        "I-1-40-I",
+        "I-1-40-II",
+        "I-1-40-III"
+      ],
+      "kode_diagnosis": [],
+      "kode_prosedur": [
+        "36.06",
+        "36.07"
+      ]
+    },
+    {
+      "no": 15,
+      "kode_special_cmg": "YY-03-III",
+      "deskripsi": "Keratoplasty",
+      "jenis": "special_procedure",
+      "kode_group_inacbg": [
+        "H-1-30-I",
+        "H-1-30-II",
+        "H-1-30-III"
+      ],
+      "kode_diagnosis": [],
+      "kode_prosedur": [
+        "11.60",
+        "11.61",
+        "11.62",
+        "11.63",
+        "11.64",
+        "11.69"
+      ]
+    },
+    {
+      "no": 16,
+      "kode_special_cmg": "YY-04-III",
+      "deskripsi": "Pancreatectomy",
+      "jenis": "special_procedure",
+      "kode_group_inacbg": [
+        "B-1-10-I",
+        "B-1-10-II",
+        "B-1-10-III"
+      ],
+      "kode_diagnosis": [],
+      "kode_prosedur": [
+        "52.51",
+        "52.52",
+        "52.53",
+        "52.59",
+        "52.6"
+      ]
+    },
+    {
+      "no": 17,
+      "kode_special_cmg": "YY-05-III",
+      "deskripsi": "Repair of Septal Defect of Heart with Prosthesis",
+      "jenis": "special_procedure",
+      "kode_group_inacbg": [
+        "I-1-06-I",
+        "I-1-06-II",
+        "I-1-06-III"
+      ],
+      "kode_diagnosis": [],
+      "kode_prosedur": [
+        "35.50",
+        "35.51",
+        "35.52",
+        "35.53",
+        "35.55"
+      ]
+    },
+    {
+      "no": 18,
+      "kode_special_cmg": "YY-06-III",
+      "deskripsi": "Stereotactic Surgery & Radiotheraphy",
+      "jenis": "special_procedure",
+      "kode_group_inacbg": [
+        "C-4-12-I",
+        "C-4-12-II",
+        "C-4-12-III"
+      ],
+      "kode_diagnosis": [
+        "Z51.0"
+      ],
+      "kode_prosedur": [
+        "92.21",
+        "92.22",
+        "92.23",
+        "92.24",
+        "92.25",
+        "92.26",
+        "92.27",
+        "92.28",
+        "92.29",
+        "92.30",
+        "92.31",
+        "92.32",
+        "92.33",
+        "92.39"
+      ]
+    },
+    {
+      "no": 19,
+      "kode_special_cmg": "YY-07-III",
+      "deskripsi": "Torakotomi",
+      "jenis": "special_procedure",
+      "kode_group_inacbg": [
+        "J-1-30-I",
+        "J-1-30-II",
+        "J-1-30-III"
+      ],
+      "kode_diagnosis": [],
+      "kode_prosedur": [
+        "34.02",
+        "34.03"
+      ]
+    },
+    {
+      "no": 20,
+      "kode_special_cmg": "YY-08-III",
+      "deskripsi": "Lobektomi/Bilobekto mi/Pneumonektomi",
+      "jenis": "special_procedure",
+      "kode_group_inacbg": [
+        "J-1-10-I",
+        "J-1-10-II",
+        "J-1-10-III"
+      ],
+      "kode_diagnosis": [],
+      "kode_prosedur": [
+        "32.41",
+        "32.49",
+        "32.50",
+        "32.59"
+      ]
+    },
+    {
+      "no": 21,
+      "kode_special_cmg": "YY-09-III",
+      "deskripsi": "Vitrectomy",
+      "jenis": "special_procedure",
+      "kode_group_inacbg": [
+        "H-1-30-I",
+        "H-1-30-II",
+        "H-1-30-III"
+      ],
+      "kode_diagnosis": [],
+      "kode_prosedur": [
+        "14.71",
+        "14.72",
+        "14.73",
+        "14.74"
+      ]
+    },
+    {
+      "no": 22,
+      "kode_special_cmg": "YY-13-III",
+      "deskripsi": "Coil",
+      "jenis": "special_procedure",
+      "kode_group_inacbg": [
+        "G-1-12-I",
+        "G-1-12-II",
+        "G-1-12-III"
+      ],
+      "kode_diagnosis": [],
+      "kode_prosedur": [
+        "39.75"
+      ]
+    },
+    {
+      "no": 23,
+      "kode_special_cmg": "YY-14-III",
+      "deskripsi": "Trombektomi",
+      "jenis": "special_procedure",
+      "kode_group_inacbg": [
+        "G-1-12-I",
+        "G-1-12-II",
+        "G-1-12-III"
+      ],
+      "kode_diagnosis": [],
+      "kode_prosedur": [
+        "39.74"
+      ]
+    },
+    {
+      "no": 24,
+      "kode_special_cmg": "YY-15-III",
+      "deskripsi": "Percutaneous Endoscopy Gastrostomy",
+      "jenis": "special_procedure",
+      "kode_group_inacbg": [
+        "E-4-10-I",
+        "E-4-10-II",
+        "E-4-10-III"
+      ],
+      "kode_diagnosis": [
+        "E43",
+        "E44.0",
+        "E44.1"
+      ],
+      "kode_prosedur": [
+        "43.11"
+      ]
+    },
+    {
+      "no": 25,
+      "kode_special_cmg": "DD-07-II",
+      "deskripsi": "Deferiprone",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": [
+        "Q-5-44-0"
+      ],
+      "kode_diagnosis": [
+        "D56.1"
+      ],
+      "kode_prosedur": []
+    },
+    {
+      "no": 26,
+      "kode_special_cmg": "DD-08-II",
+      "deskripsi": "Deferoksamin",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": [
+        "Q-5-44-0"
+      ],
+      "kode_diagnosis": [
+        "D56.1"
+      ],
+      "kode_prosedur": []
+    },
+    {
+      "no": 27,
+      "kode_special_cmg": "DD-09-II",
+      "deskripsi": "Deferasirox",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": [
+        "Q-5-44-0"
+      ],
+      "kode_diagnosis": [
+        "D56.1"
+      ],
+      "kode_prosedur": []
+    },
+    {
+      "no": 28,
+      "kode_special_cmg": "DD-10-II",
+      "deskripsi": "Anti Hemofilia Factor",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": [
+        "Q-5-44-0"
+      ],
+      "kode_diagnosis": [
+        "D66",
+        "D67"
+      ],
+      "kode_prosedur": []
+    },
+    {
+      "no": 29,
+      "kode_special_cmg": "II-01-III",
+      "deskripsi": "Nuclear Medicine",
+      "jenis": "special_investigation",
+      "kode_group_inacbg": [
+        "Z-3-17-0"
+      ],
+      "kode_diagnosis": [],
+      "kode_prosedur": [
+        "92.05",
+        "92.15"
+      ]
+    },
+    {
+      "no": 30,
+      "kode_special_cmg": "II-02-III",
+      "deskripsi": "Magnetic Resonance Imaging (MRI)",
+      "jenis": "special_investigation",
+      "kode_group_inacbg": [
+        "Z-3-16-0"
+      ],
+      "kode_diagnosis": [],
+      "kode_prosedur": [
+        "88.92",
+        "88.93",
+        "88.97"
+      ]
+    },
+    {
+      "no": 31,
+      "kode_special_cmg": "II-03-III",
+      "deskripsi": "Diagnostic and Imaging Procedures of Eye",
+      "jenis": "special_investigation",
+      "kode_group_inacbg": [
+        "H-3-13-0"
+      ],
+      "kode_diagnosis": [],
+      "kode_prosedur": [
+        "95.12"
+      ]
+    },
+    {
+      "no": 32,
+      "kode_special_cmg": "YY-10-III",
+      "deskripsi": "Phacoemulsification",
+      "jenis": "special_procedure",
+      "kode_group_inacbg": [
+        "H-2-36-0"
+      ],
+      "kode_diagnosis": [],
+      "kode_prosedur": [
+        "13.41"
+      ]
+    },
+    {
+      "no": 33,
+      "kode_special_cmg": "YY-11-III",
+      "deskripsi": "Microlaringoscopy",
+      "jenis": "special_procedure",
+      "kode_group_inacbg": [
+        "J-3-15-0"
+      ],
+      "kode_diagnosis": [],
+      "kode_prosedur": [
+        "31.41",
+        "31.42",
+        "31.44"
+      ]
+    },
+    {
+      "no": 34,
+      "kode_special_cmg": "YY-12-III",
+      "deskripsi": "Cholangiograph",
+      "jenis": "special_procedure",
+      "kode_group_inacbg": [
+        "B-3-11-0"
+      ],
+      "kode_diagnosis": [],
+      "kode_prosedur": [
+        "51.10",
+        "51.11",
+        "51.14",
+        "51.15",
+        "52.13"
+      ]
+    },
+    {
+      "no": 35,
+      "kode_special_cmg": "YY-16-III",
+      "deskripsi": "Odontektomi",
+      "jenis": "special_procedure",
+      "kode_group_inacbg": [
+        "U-3-16-0"
+      ],
+      "kode_diagnosis": [],
+      "kode_prosedur": [
+        "23.19"
+      ]
+    },
+    {
+      "no": 36,
+      "kode_special_cmg": "YY-17-III",
+      "deskripsi": "Brakiterapi",
+      "jenis": "special_procedure",
+      "kode_group_inacbg": [
+        "C-3-10-0"
+      ],
+      "kode_diagnosis": [
+        "Z51.0"
+      ],
+      "kode_prosedur": [
+        "92.20",
+        "92.27"
+      ]
+    }
+  ],
+  "kriteria_exploded": [
+    {
+      "no_asal": 1,
+      "kode_special_cmg": "DD-01-I",
+      "deskripsi": "Streptokinase",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "I-4-10-I, I-4-10-II, I-4-10-III",
+      "kode_diagnosis": "I21.0",
+      "kode_prosedur": null
+    },
+    {
+      "no_asal": 1,
+      "kode_special_cmg": "DD-01-I",
+      "deskripsi": "Streptokinase",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "I-4-10-I, I-4-10-II, I-4-10-III",
+      "kode_diagnosis": "I21.1",
+      "kode_prosedur": null
+    },
+    {
+      "no_asal": 1,
+      "kode_special_cmg": "DD-01-I",
+      "deskripsi": "Streptokinase",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "I-4-10-I, I-4-10-II, I-4-10-III",
+      "kode_diagnosis": "I21.2",
+      "kode_prosedur": null
+    },
+    {
+      "no_asal": 1,
+      "kode_special_cmg": "DD-01-I",
+      "deskripsi": "Streptokinase",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "I-4-10-I, I-4-10-II, I-4-10-III",
+      "kode_diagnosis": "I21.3",
+      "kode_prosedur": null
+    },
+    {
+      "no_asal": 1,
+      "kode_special_cmg": "DD-01-I",
+      "deskripsi": "Streptokinase",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "I-4-10-I, I-4-10-II, I-4-10-III",
+      "kode_diagnosis": "I21.4",
+      "kode_prosedur": null
+    },
+    {
+      "no_asal": 1,
+      "kode_special_cmg": "DD-01-I",
+      "deskripsi": "Streptokinase",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "I-4-10-I, I-4-10-II, I-4-10-III",
+      "kode_diagnosis": "I21.9",
+      "kode_prosedur": null
+    },
+    {
+      "no_asal": 1,
+      "kode_special_cmg": "DD-01-I",
+      "deskripsi": "Streptokinase",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "I-4-10-I, I-4-10-II, I-4-10-III",
+      "kode_diagnosis": "I23.3",
+      "kode_prosedur": null
+    },
+    {
+      "no_asal": 2,
+      "kode_special_cmg": "DD-02-II",
+      "deskripsi": "Deferiprone",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "D-4-13-I, D-4-13-II, D-4-13-III",
+      "kode_diagnosis": "D56.1",
+      "kode_prosedur": null
+    },
+    {
+      "no_asal": 3,
+      "kode_special_cmg": "DD-03-II",
+      "deskripsi": "Deferoksamin",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "D-4-13-I, D-4-13-II, D-4-13-III",
+      "kode_diagnosis": "D56.1",
+      "kode_prosedur": null
+    },
+    {
+      "no_asal": 4,
+      "kode_special_cmg": "DD-04-II",
+      "deskripsi": "Deferasirox",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "D-4-13-I, D-4-13-II, D-4-13-III",
+      "kode_diagnosis": "D56.1",
+      "kode_prosedur": null
+    },
+    {
+      "no_asal": 5,
+      "kode_special_cmg": "DD-05-II",
+      "deskripsi": "Human Albumin for Septicaemia",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "A-4-10-I, A-4-10-II, A-4-10-III",
+      "kode_diagnosis": "A02.1",
+      "kode_prosedur": null
+    },
+    {
+      "no_asal": 5,
+      "kode_special_cmg": "DD-05-II",
+      "deskripsi": "Human Albumin for Septicaemia",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "A-4-10-I, A-4-10-II, A-4-10-III",
+      "kode_diagnosis": "A20.7",
+      "kode_prosedur": null
+    },
+    {
+      "no_asal": 5,
+      "kode_special_cmg": "DD-05-II",
+      "deskripsi": "Human Albumin for Septicaemia",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "A-4-10-I, A-4-10-II, A-4-10-III",
+      "kode_diagnosis": "A22.7",
+      "kode_prosedur": null
+    },
+    {
+      "no_asal": 5,
+      "kode_special_cmg": "DD-05-II",
+      "deskripsi": "Human Albumin for Septicaemia",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "A-4-10-I, A-4-10-II, A-4-10-III",
+      "kode_diagnosis": "A39.1",
+      "kode_prosedur": null
+    },
+    {
+      "no_asal": 5,
+      "kode_special_cmg": "DD-05-II",
+      "deskripsi": "Human Albumin for Septicaemia",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "A-4-10-I, A-4-10-II, A-4-10-III",
+      "kode_diagnosis": "A39.2",
+      "kode_prosedur": null
+    },
+    {
+      "no_asal": 5,
+      "kode_special_cmg": "DD-05-II",
+      "deskripsi": "Human Albumin for Septicaemia",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "A-4-10-I, A-4-10-II, A-4-10-III",
+      "kode_diagnosis": "A39.3",
+      "kode_prosedur": null
+    },
+    {
+      "no_asal": 5,
+      "kode_special_cmg": "DD-05-II",
+      "deskripsi": "Human Albumin for Septicaemia",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "A-4-10-I, A-4-10-II, A-4-10-III",
+      "kode_diagnosis": "A39.4",
+      "kode_prosedur": null
+    },
+    {
+      "no_asal": 5,
+      "kode_special_cmg": "DD-05-II",
+      "deskripsi": "Human Albumin for Septicaemia",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "A-4-10-I, A-4-10-II, A-4-10-III",
+      "kode_diagnosis": "A39.8",
+      "kode_prosedur": null
+    },
+    {
+      "no_asal": 5,
+      "kode_special_cmg": "DD-05-II",
+      "deskripsi": "Human Albumin for Septicaemia",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "A-4-10-I, A-4-10-II, A-4-10-III",
+      "kode_diagnosis": "A39.9",
+      "kode_prosedur": null
+    },
+    {
+      "no_asal": 5,
+      "kode_special_cmg": "DD-05-II",
+      "deskripsi": "Human Albumin for Septicaemia",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "A-4-10-I, A-4-10-II, A-4-10-III",
+      "kode_diagnosis": "A40.0",
+      "kode_prosedur": null
+    },
+    {
+      "no_asal": 5,
+      "kode_special_cmg": "DD-05-II",
+      "deskripsi": "Human Albumin for Septicaemia",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "A-4-10-I, A-4-10-II, A-4-10-III",
+      "kode_diagnosis": "A40.1",
+      "kode_prosedur": null
+    },
+    {
+      "no_asal": 5,
+      "kode_special_cmg": "DD-05-II",
+      "deskripsi": "Human Albumin for Septicaemia",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "A-4-10-I, A-4-10-II, A-4-10-III",
+      "kode_diagnosis": "A40.2",
+      "kode_prosedur": null
+    },
+    {
+      "no_asal": 5,
+      "kode_special_cmg": "DD-05-II",
+      "deskripsi": "Human Albumin for Septicaemia",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "A-4-10-I, A-4-10-II, A-4-10-III",
+      "kode_diagnosis": "A40.3",
+      "kode_prosedur": null
+    },
+    {
+      "no_asal": 5,
+      "kode_special_cmg": "DD-05-II",
+      "deskripsi": "Human Albumin for Septicaemia",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "A-4-10-I, A-4-10-II, A-4-10-III",
+      "kode_diagnosis": "A40.8",
+      "kode_prosedur": null
+    },
+    {
+      "no_asal": 5,
+      "kode_special_cmg": "DD-05-II",
+      "deskripsi": "Human Albumin for Septicaemia",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "A-4-10-I, A-4-10-II, A-4-10-III",
+      "kode_diagnosis": "A40.9",
+      "kode_prosedur": null
+    },
+    {
+      "no_asal": 5,
+      "kode_special_cmg": "DD-05-II",
+      "deskripsi": "Human Albumin for Septicaemia",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "A-4-10-I, A-4-10-II, A-4-10-III",
+      "kode_diagnosis": "A41.0",
+      "kode_prosedur": null
+    },
+    {
+      "no_asal": 5,
+      "kode_special_cmg": "DD-05-II",
+      "deskripsi": "Human Albumin for Septicaemia",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "A-4-10-I, A-4-10-II, A-4-10-III",
+      "kode_diagnosis": "A41.1",
+      "kode_prosedur": null
+    },
+    {
+      "no_asal": 5,
+      "kode_special_cmg": "DD-05-II",
+      "deskripsi": "Human Albumin for Septicaemia",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "A-4-10-I, A-4-10-II, A-4-10-III",
+      "kode_diagnosis": "A41.2",
+      "kode_prosedur": null
+    },
+    {
+      "no_asal": 5,
+      "kode_special_cmg": "DD-05-II",
+      "deskripsi": "Human Albumin for Septicaemia",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "A-4-10-I, A-4-10-II, A-4-10-III",
+      "kode_diagnosis": "A41.3",
+      "kode_prosedur": null
+    },
+    {
+      "no_asal": 5,
+      "kode_special_cmg": "DD-05-II",
+      "deskripsi": "Human Albumin for Septicaemia",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "A-4-10-I, A-4-10-II, A-4-10-III",
+      "kode_diagnosis": "A41.4",
+      "kode_prosedur": null
+    },
+    {
+      "no_asal": 5,
+      "kode_special_cmg": "DD-05-II",
+      "deskripsi": "Human Albumin for Septicaemia",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "A-4-10-I, A-4-10-II, A-4-10-III",
+      "kode_diagnosis": "A41.5",
+      "kode_prosedur": null
+    },
+    {
+      "no_asal": 5,
+      "kode_special_cmg": "DD-05-II",
+      "deskripsi": "Human Albumin for Septicaemia",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "A-4-10-I, A-4-10-II, A-4-10-III",
+      "kode_diagnosis": "A41.8",
+      "kode_prosedur": null
+    },
+    {
+      "no_asal": 5,
+      "kode_special_cmg": "DD-05-II",
+      "deskripsi": "Human Albumin for Septicaemia",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "A-4-10-I, A-4-10-II, A-4-10-III",
+      "kode_diagnosis": "A41.9",
+      "kode_prosedur": null
+    },
+    {
+      "no_asal": 5,
+      "kode_special_cmg": "DD-05-II",
+      "deskripsi": "Human Albumin for Septicaemia",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "A-4-10-I, A-4-10-II, A-4-10-III",
+      "kode_diagnosis": "A42.7",
+      "kode_prosedur": null
+    },
+    {
+      "no_asal": 5,
+      "kode_special_cmg": "DD-05-II",
+      "deskripsi": "Human Albumin for Septicaemia",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "A-4-10-I, A-4-10-II, A-4-10-III",
+      "kode_diagnosis": "B37.7",
+      "kode_prosedur": null
+    },
+    {
+      "no_asal": 5,
+      "kode_special_cmg": "DD-05-II",
+      "deskripsi": "Human Albumin for Septicaemia",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "A-4-10-I, A-4-10-II, A-4-10-III",
+      "kode_diagnosis": "R57.1",
+      "kode_prosedur": null
+    },
+    {
+      "no_asal": 6,
+      "kode_special_cmg": "DD-06-II",
+      "deskripsi": "Anti Hemofilia Factor",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "D-4-11-I, D-4-11-II, D-4-11-III",
+      "kode_diagnosis": "D66",
+      "kode_prosedur": null
+    },
+    {
+      "no_asal": 6,
+      "kode_special_cmg": "DD-06-II",
+      "deskripsi": "Anti Hemofilia Factor",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "D-4-11-I, D-4-11-II, D-4-11-III",
+      "kode_diagnosis": "D67",
+      "kode_prosedur": null
+    },
+    {
+      "no_asal": 7,
+      "kode_special_cmg": "DD-11-II",
+      "deskripsi": "Human Albumin for Burn",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "L-1-20-I, L-1-20-II, L-1-20-III, S-4-16-I, S-4-16-II, S-4-16-III",
+      "kode_diagnosis": "T20.3",
+      "kode_prosedur": "85.82, 85.83, 85.84, 85.85, 86.60, 86.61, 86.62, 86.63, 86.65, 86.66, 86.67, 86.69, 86.70, 86.71, 86.72, 86.73, 86.74, 86.75, 86.91, 86.93"
+    },
+    {
+      "no_asal": 7,
+      "kode_special_cmg": "DD-11-II",
+      "deskripsi": "Human Albumin for Burn",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "L-1-20-I, L-1-20-II, L-1-20-III, S-4-16-I, S-4-16-II, S-4-16-III",
+      "kode_diagnosis": "T20.7",
+      "kode_prosedur": "85.82, 85.83, 85.84, 85.85, 86.60, 86.61, 86.62, 86.63, 86.65, 86.66, 86.67, 86.69, 86.70, 86.71, 86.72, 86.73, 86.74, 86.75, 86.91, 86.93"
+    },
+    {
+      "no_asal": 7,
+      "kode_special_cmg": "DD-11-II",
+      "deskripsi": "Human Albumin for Burn",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "L-1-20-I, L-1-20-II, L-1-20-III, S-4-16-I, S-4-16-II, S-4-16-III",
+      "kode_diagnosis": "T21.3",
+      "kode_prosedur": "85.82, 85.83, 85.84, 85.85, 86.60, 86.61, 86.62, 86.63, 86.65, 86.66, 86.67, 86.69, 86.70, 86.71, 86.72, 86.73, 86.74, 86.75, 86.91, 86.93"
+    },
+    {
+      "no_asal": 7,
+      "kode_special_cmg": "DD-11-II",
+      "deskripsi": "Human Albumin for Burn",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "L-1-20-I, L-1-20-II, L-1-20-III, S-4-16-I, S-4-16-II, S-4-16-III",
+      "kode_diagnosis": "T21.7",
+      "kode_prosedur": "85.82, 85.83, 85.84, 85.85, 86.60, 86.61, 86.62, 86.63, 86.65, 86.66, 86.67, 86.69, 86.70, 86.71, 86.72, 86.73, 86.74, 86.75, 86.91, 86.93"
+    },
+    {
+      "no_asal": 7,
+      "kode_special_cmg": "DD-11-II",
+      "deskripsi": "Human Albumin for Burn",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "L-1-20-I, L-1-20-II, L-1-20-III, S-4-16-I, S-4-16-II, S-4-16-III",
+      "kode_diagnosis": "T22.3",
+      "kode_prosedur": "85.82, 85.83, 85.84, 85.85, 86.60, 86.61, 86.62, 86.63, 86.65, 86.66, 86.67, 86.69, 86.70, 86.71, 86.72, 86.73, 86.74, 86.75, 86.91, 86.93"
+    },
+    {
+      "no_asal": 7,
+      "kode_special_cmg": "DD-11-II",
+      "deskripsi": "Human Albumin for Burn",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "L-1-20-I, L-1-20-II, L-1-20-III, S-4-16-I, S-4-16-II, S-4-16-III",
+      "kode_diagnosis": "T22.7",
+      "kode_prosedur": "85.82, 85.83, 85.84, 85.85, 86.60, 86.61, 86.62, 86.63, 86.65, 86.66, 86.67, 86.69, 86.70, 86.71, 86.72, 86.73, 86.74, 86.75, 86.91, 86.93"
+    },
+    {
+      "no_asal": 7,
+      "kode_special_cmg": "DD-11-II",
+      "deskripsi": "Human Albumin for Burn",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "L-1-20-I, L-1-20-II, L-1-20-III, S-4-16-I, S-4-16-II, S-4-16-III",
+      "kode_diagnosis": "T23.3",
+      "kode_prosedur": "85.82, 85.83, 85.84, 85.85, 86.60, 86.61, 86.62, 86.63, 86.65, 86.66, 86.67, 86.69, 86.70, 86.71, 86.72, 86.73, 86.74, 86.75, 86.91, 86.93"
+    },
+    {
+      "no_asal": 7,
+      "kode_special_cmg": "DD-11-II",
+      "deskripsi": "Human Albumin for Burn",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "L-1-20-I, L-1-20-II, L-1-20-III, S-4-16-I, S-4-16-II, S-4-16-III",
+      "kode_diagnosis": "T23.7",
+      "kode_prosedur": "85.82, 85.83, 85.84, 85.85, 86.60, 86.61, 86.62, 86.63, 86.65, 86.66, 86.67, 86.69, 86.70, 86.71, 86.72, 86.73, 86.74, 86.75, 86.91, 86.93"
+    },
+    {
+      "no_asal": 7,
+      "kode_special_cmg": "DD-11-II",
+      "deskripsi": "Human Albumin for Burn",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "L-1-20-I, L-1-20-II, L-1-20-III, S-4-16-I, S-4-16-II, S-4-16-III",
+      "kode_diagnosis": "T24.3",
+      "kode_prosedur": "85.82, 85.83, 85.84, 85.85, 86.60, 86.61, 86.62, 86.63, 86.65, 86.66, 86.67, 86.69, 86.70, 86.71, 86.72, 86.73, 86.74, 86.75, 86.91, 86.93"
+    },
+    {
+      "no_asal": 7,
+      "kode_special_cmg": "DD-11-II",
+      "deskripsi": "Human Albumin for Burn",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "L-1-20-I, L-1-20-II, L-1-20-III, S-4-16-I, S-4-16-II, S-4-16-III",
+      "kode_diagnosis": "T24.7",
+      "kode_prosedur": "85.82, 85.83, 85.84, 85.85, 86.60, 86.61, 86.62, 86.63, 86.65, 86.66, 86.67, 86.69, 86.70, 86.71, 86.72, 86.73, 86.74, 86.75, 86.91, 86.93"
+    },
+    {
+      "no_asal": 7,
+      "kode_special_cmg": "DD-11-II",
+      "deskripsi": "Human Albumin for Burn",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "L-1-20-I, L-1-20-II, L-1-20-III, S-4-16-I, S-4-16-II, S-4-16-III",
+      "kode_diagnosis": "T25.3",
+      "kode_prosedur": "85.82, 85.83, 85.84, 85.85, 86.60, 86.61, 86.62, 86.63, 86.65, 86.66, 86.67, 86.69, 86.70, 86.71, 86.72, 86.73, 86.74, 86.75, 86.91, 86.93"
+    },
+    {
+      "no_asal": 7,
+      "kode_special_cmg": "DD-11-II",
+      "deskripsi": "Human Albumin for Burn",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "L-1-20-I, L-1-20-II, L-1-20-III, S-4-16-I, S-4-16-II, S-4-16-III",
+      "kode_diagnosis": "T25.7",
+      "kode_prosedur": "85.82, 85.83, 85.84, 85.85, 86.60, 86.61, 86.62, 86.63, 86.65, 86.66, 86.67, 86.69, 86.70, 86.71, 86.72, 86.73, 86.74, 86.75, 86.91, 86.93"
+    },
+    {
+      "no_asal": 7,
+      "kode_special_cmg": "DD-11-II",
+      "deskripsi": "Human Albumin for Burn",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "L-1-20-I, L-1-20-II, L-1-20-III, S-4-16-I, S-4-16-II, S-4-16-III",
+      "kode_diagnosis": "T29.3",
+      "kode_prosedur": "85.82, 85.83, 85.84, 85.85, 86.60, 86.61, 86.62, 86.63, 86.65, 86.66, 86.67, 86.69, 86.70, 86.71, 86.72, 86.73, 86.74, 86.75, 86.91, 86.93"
+    },
+    {
+      "no_asal": 7,
+      "kode_special_cmg": "DD-11-II",
+      "deskripsi": "Human Albumin for Burn",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "L-1-20-I, L-1-20-II, L-1-20-III, S-4-16-I, S-4-16-II, S-4-16-III",
+      "kode_diagnosis": "T29.7",
+      "kode_prosedur": "85.82, 85.83, 85.84, 85.85, 86.60, 86.61, 86.62, 86.63, 86.65, 86.66, 86.67, 86.69, 86.70, 86.71, 86.72, 86.73, 86.74, 86.75, 86.91, 86.93"
+    },
+    {
+      "no_asal": 7,
+      "kode_special_cmg": "DD-11-II",
+      "deskripsi": "Human Albumin for Burn",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "L-1-20-I, L-1-20-II, L-1-20-III, S-4-16-I, S-4-16-II, S-4-16-III",
+      "kode_diagnosis": "T31.4",
+      "kode_prosedur": "85.82, 85.83, 85.84, 85.85, 86.60, 86.61, 86.62, 86.63, 86.65, 86.66, 86.67, 86.69, 86.70, 86.71, 86.72, 86.73, 86.74, 86.75, 86.91, 86.93"
+    },
+    {
+      "no_asal": 7,
+      "kode_special_cmg": "DD-11-II",
+      "deskripsi": "Human Albumin for Burn",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "L-1-20-I, L-1-20-II, L-1-20-III, S-4-16-I, S-4-16-II, S-4-16-III",
+      "kode_diagnosis": "T31.5",
+      "kode_prosedur": "85.82, 85.83, 85.84, 85.85, 86.60, 86.61, 86.62, 86.63, 86.65, 86.66, 86.67, 86.69, 86.70, 86.71, 86.72, 86.73, 86.74, 86.75, 86.91, 86.93"
+    },
+    {
+      "no_asal": 7,
+      "kode_special_cmg": "DD-11-II",
+      "deskripsi": "Human Albumin for Burn",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "L-1-20-I, L-1-20-II, L-1-20-III, S-4-16-I, S-4-16-II, S-4-16-III",
+      "kode_diagnosis": "T31.6",
+      "kode_prosedur": "85.82, 85.83, 85.84, 85.85, 86.60, 86.61, 86.62, 86.63, 86.65, 86.66, 86.67, 86.69, 86.70, 86.71, 86.72, 86.73, 86.74, 86.75, 86.91, 86.93"
+    },
+    {
+      "no_asal": 7,
+      "kode_special_cmg": "DD-11-II",
+      "deskripsi": "Human Albumin for Burn",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "L-1-20-I, L-1-20-II, L-1-20-III, S-4-16-I, S-4-16-II, S-4-16-III",
+      "kode_diagnosis": "T31.7",
+      "kode_prosedur": "85.82, 85.83, 85.84, 85.85, 86.60, 86.61, 86.62, 86.63, 86.65, 86.66, 86.67, 86.69, 86.70, 86.71, 86.72, 86.73, 86.74, 86.75, 86.91, 86.93"
+    },
+    {
+      "no_asal": 7,
+      "kode_special_cmg": "DD-11-II",
+      "deskripsi": "Human Albumin for Burn",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "L-1-20-I, L-1-20-II, L-1-20-III, S-4-16-I, S-4-16-II, S-4-16-III",
+      "kode_diagnosis": "T31.8",
+      "kode_prosedur": "85.82, 85.83, 85.84, 85.85, 86.60, 86.61, 86.62, 86.63, 86.65, 86.66, 86.67, 86.69, 86.70, 86.71, 86.72, 86.73, 86.74, 86.75, 86.91, 86.93"
+    },
+    {
+      "no_asal": 7,
+      "kode_special_cmg": "DD-11-II",
+      "deskripsi": "Human Albumin for Burn",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "L-1-20-I, L-1-20-II, L-1-20-III, S-4-16-I, S-4-16-II, S-4-16-III",
+      "kode_diagnosis": "T31.9",
+      "kode_prosedur": "85.82, 85.83, 85.84, 85.85, 86.60, 86.61, 86.62, 86.63, 86.65, 86.66, 86.67, 86.69, 86.70, 86.71, 86.72, 86.73, 86.74, 86.75, 86.91, 86.93"
+    },
+    {
+      "no_asal": 7,
+      "kode_special_cmg": "DD-11-II",
+      "deskripsi": "Human Albumin for Burn",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "L-1-20-I, L-1-20-II, L-1-20-III, S-4-16-I, S-4-16-II, S-4-16-III",
+      "kode_diagnosis": "T32.4",
+      "kode_prosedur": "85.82, 85.83, 85.84, 85.85, 86.60, 86.61, 86.62, 86.63, 86.65, 86.66, 86.67, 86.69, 86.70, 86.71, 86.72, 86.73, 86.74, 86.75, 86.91, 86.93"
+    },
+    {
+      "no_asal": 7,
+      "kode_special_cmg": "DD-11-II",
+      "deskripsi": "Human Albumin for Burn",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "L-1-20-I, L-1-20-II, L-1-20-III, S-4-16-I, S-4-16-II, S-4-16-III",
+      "kode_diagnosis": "T32.5",
+      "kode_prosedur": "85.82, 85.83, 85.84, 85.85, 86.60, 86.61, 86.62, 86.63, 86.65, 86.66, 86.67, 86.69, 86.70, 86.71, 86.72, 86.73, 86.74, 86.75, 86.91, 86.93"
+    },
+    {
+      "no_asal": 7,
+      "kode_special_cmg": "DD-11-II",
+      "deskripsi": "Human Albumin for Burn",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "L-1-20-I, L-1-20-II, L-1-20-III, S-4-16-I, S-4-16-II, S-4-16-III",
+      "kode_diagnosis": "T32.6",
+      "kode_prosedur": "85.82, 85.83, 85.84, 85.85, 86.60, 86.61, 86.62, 86.63, 86.65, 86.66, 86.67, 86.69, 86.70, 86.71, 86.72, 86.73, 86.74, 86.75, 86.91, 86.93"
+    },
+    {
+      "no_asal": 7,
+      "kode_special_cmg": "DD-11-II",
+      "deskripsi": "Human Albumin for Burn",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "L-1-20-I, L-1-20-II, L-1-20-III, S-4-16-I, S-4-16-II, S-4-16-III",
+      "kode_diagnosis": "T32.7",
+      "kode_prosedur": "85.82, 85.83, 85.84, 85.85, 86.60, 86.61, 86.62, 86.63, 86.65, 86.66, 86.67, 86.69, 86.70, 86.71, 86.72, 86.73, 86.74, 86.75, 86.91, 86.93"
+    },
+    {
+      "no_asal": 7,
+      "kode_special_cmg": "DD-11-II",
+      "deskripsi": "Human Albumin for Burn",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "L-1-20-I, L-1-20-II, L-1-20-III, S-4-16-I, S-4-16-II, S-4-16-III",
+      "kode_diagnosis": "T32.8",
+      "kode_prosedur": "85.82, 85.83, 85.84, 85.85, 86.60, 86.61, 86.62, 86.63, 86.65, 86.66, 86.67, 86.69, 86.70, 86.71, 86.72, 86.73, 86.74, 86.75, 86.91, 86.93"
+    },
+    {
+      "no_asal": 7,
+      "kode_special_cmg": "DD-11-II",
+      "deskripsi": "Human Albumin for Burn",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "L-1-20-I, L-1-20-II, L-1-20-III, S-4-16-I, S-4-16-II, S-4-16-III",
+      "kode_diagnosis": "T32.9",
+      "kode_prosedur": "85.82, 85.83, 85.84, 85.85, 86.60, 86.61, 86.62, 86.63, 86.65, 86.66, 86.67, 86.69, 86.70, 86.71, 86.72, 86.73, 86.74, 86.75, 86.91, 86.93"
+    },
+    {
+      "no_asal": 8,
+      "kode_special_cmg": "RR-01-II",
+      "deskripsi": "Subdural Grid Electrode",
+      "jenis": "special_prosthesis",
+      "kode_group_inacbg": "G-1-10-I, G-1-10-II, G-1-10-III",
+      "kode_diagnosis": null,
+      "kode_prosedur": "02.93"
+    },
+    {
+      "no_asal": 9,
+      "kode_special_cmg": "RR-02-II",
+      "deskripsi": "Contegra",
+      "jenis": "special_prosthesis",
+      "kode_group_inacbg": "I-1-03-I, I-1-03-II, I-1-03-III",
+      "kode_diagnosis": null,
+      "kode_prosedur": "35.92"
+    },
+    {
+      "no_asal": 10,
+      "kode_special_cmg": "RR-03-III",
+      "deskripsi": "Temporomandibul ar Joint (TMJ) Prothesis",
+      "jenis": "special_prosthesis",
+      "kode_group_inacbg": "M-1-60-I, M-1-60-II, M-1-60-III",
+      "kode_diagnosis": null,
+      "kode_prosedur": "76.5"
+    },
+    {
+      "no_asal": 11,
+      "kode_special_cmg": "RR-04-III",
+      "deskripsi": "Hip Implant/Knee Implant",
+      "jenis": "special_prosthesis",
+      "kode_group_inacbg": "M-1-04-I, M-1-04-II, M-1-04-III",
+      "kode_diagnosis": null,
+      "kode_prosedur": "81.51, 81.52, 81.53, 81.54, 81.55"
+    },
+    {
+      "no_asal": 12,
+      "kode_special_cmg": "RR-05-III",
+      "deskripsi": "Prostesis Evar/Tevar",
+      "jenis": "special_prosthesis",
+      "kode_group_inacbg": "I-1-20-I, I-1-20-II, I-1-20-III",
+      "kode_diagnosis": null,
+      "kode_prosedur": "39.71, 39.73"
+    },
+    {
+      "no_asal": 13,
+      "kode_special_cmg": "YY-01-II",
+      "deskripsi": "Hip Replacement/ Knee Replacement",
+      "jenis": "special_procedure",
+      "kode_group_inacbg": "M-1-04-I, M-1-04-II, M-1-04-III",
+      "kode_diagnosis": null,
+      "kode_prosedur": "81.51, 81.52, 81.53, 81.54, 81.55"
+    },
+    {
+      "no_asal": 14,
+      "kode_special_cmg": "YY-02-III",
+      "deskripsi": "Percutaneous Coronary Intervention (PCI)",
+      "jenis": "special_procedure",
+      "kode_group_inacbg": "I-1-40-I, I-1-40-II, I-1-40-III",
+      "kode_diagnosis": null,
+      "kode_prosedur": "36.06, 36.07"
+    },
+    {
+      "no_asal": 15,
+      "kode_special_cmg": "YY-03-III",
+      "deskripsi": "Keratoplasty",
+      "jenis": "special_procedure",
+      "kode_group_inacbg": "H-1-30-I, H-1-30-II, H-1-30-III",
+      "kode_diagnosis": null,
+      "kode_prosedur": "11.60, 11.61, 11.62, 11.63, 11.64, 11.69"
+    },
+    {
+      "no_asal": 16,
+      "kode_special_cmg": "YY-04-III",
+      "deskripsi": "Pancreatectomy",
+      "jenis": "special_procedure",
+      "kode_group_inacbg": "B-1-10-I, B-1-10-II, B-1-10-III",
+      "kode_diagnosis": null,
+      "kode_prosedur": "52.51, 52.52, 52.53, 52.59, 52.6"
+    },
+    {
+      "no_asal": 17,
+      "kode_special_cmg": "YY-05-III",
+      "deskripsi": "Repair of Septal Defect of Heart with Prosthesis",
+      "jenis": "special_procedure",
+      "kode_group_inacbg": "I-1-06-I, I-1-06-II, I-1-06-III",
+      "kode_diagnosis": null,
+      "kode_prosedur": "35.50, 35.51, 35.52, 35.53, 35.55"
+    },
+    {
+      "no_asal": 18,
+      "kode_special_cmg": "YY-06-III",
+      "deskripsi": "Stereotactic Surgery & Radiotheraphy",
+      "jenis": "special_procedure",
+      "kode_group_inacbg": "C-4-12-I, C-4-12-II, C-4-12-III",
+      "kode_diagnosis": "Z51.0",
+      "kode_prosedur": "92.21, 92.22, 92.23, 92.24, 92.25, 92.26, 92.27, 92.28, 92.29, 92.30, 92.31, 92.32, 92.33, 92.39"
+    },
+    {
+      "no_asal": 19,
+      "kode_special_cmg": "YY-07-III",
+      "deskripsi": "Torakotomi",
+      "jenis": "special_procedure",
+      "kode_group_inacbg": "J-1-30-I, J-1-30-II, J-1-30-III",
+      "kode_diagnosis": null,
+      "kode_prosedur": "34.02, 34.03"
+    },
+    {
+      "no_asal": 20,
+      "kode_special_cmg": "YY-08-III",
+      "deskripsi": "Lobektomi/Bilobekto mi/Pneumonektomi",
+      "jenis": "special_procedure",
+      "kode_group_inacbg": "J-1-10-I, J-1-10-II, J-1-10-III",
+      "kode_diagnosis": null,
+      "kode_prosedur": "32.41, 32.49, 32.50, 32.59"
+    },
+    {
+      "no_asal": 21,
+      "kode_special_cmg": "YY-09-III",
+      "deskripsi": "Vitrectomy",
+      "jenis": "special_procedure",
+      "kode_group_inacbg": "H-1-30-I, H-1-30-II, H-1-30-III",
+      "kode_diagnosis": null,
+      "kode_prosedur": "14.71, 14.72, 14.73, 14.74"
+    },
+    {
+      "no_asal": 22,
+      "kode_special_cmg": "YY-13-III",
+      "deskripsi": "Coil",
+      "jenis": "special_procedure",
+      "kode_group_inacbg": "G-1-12-I, G-1-12-II, G-1-12-III",
+      "kode_diagnosis": null,
+      "kode_prosedur": "39.75"
+    },
+    {
+      "no_asal": 23,
+      "kode_special_cmg": "YY-14-III",
+      "deskripsi": "Trombektomi",
+      "jenis": "special_procedure",
+      "kode_group_inacbg": "G-1-12-I, G-1-12-II, G-1-12-III",
+      "kode_diagnosis": null,
+      "kode_prosedur": "39.74"
+    },
+    {
+      "no_asal": 24,
+      "kode_special_cmg": "YY-15-III",
+      "deskripsi": "Percutaneous Endoscopy Gastrostomy",
+      "jenis": "special_procedure",
+      "kode_group_inacbg": "E-4-10-I, E-4-10-II, E-4-10-III",
+      "kode_diagnosis": "E43",
+      "kode_prosedur": "43.11"
+    },
+    {
+      "no_asal": 24,
+      "kode_special_cmg": "YY-15-III",
+      "deskripsi": "Percutaneous Endoscopy Gastrostomy",
+      "jenis": "special_procedure",
+      "kode_group_inacbg": "E-4-10-I, E-4-10-II, E-4-10-III",
+      "kode_diagnosis": "E44.0",
+      "kode_prosedur": "43.11"
+    },
+    {
+      "no_asal": 24,
+      "kode_special_cmg": "YY-15-III",
+      "deskripsi": "Percutaneous Endoscopy Gastrostomy",
+      "jenis": "special_procedure",
+      "kode_group_inacbg": "E-4-10-I, E-4-10-II, E-4-10-III",
+      "kode_diagnosis": "E44.1",
+      "kode_prosedur": "43.11"
+    },
+    {
+      "no_asal": 25,
+      "kode_special_cmg": "DD-07-II",
+      "deskripsi": "Deferiprone",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "Q-5-44-0",
+      "kode_diagnosis": "D56.1",
+      "kode_prosedur": null
+    },
+    {
+      "no_asal": 26,
+      "kode_special_cmg": "DD-08-II",
+      "deskripsi": "Deferoksamin",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "Q-5-44-0",
+      "kode_diagnosis": "D56.1",
+      "kode_prosedur": null
+    },
+    {
+      "no_asal": 27,
+      "kode_special_cmg": "DD-09-II",
+      "deskripsi": "Deferasirox",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "Q-5-44-0",
+      "kode_diagnosis": "D56.1",
+      "kode_prosedur": null
+    },
+    {
+      "no_asal": 28,
+      "kode_special_cmg": "DD-10-II",
+      "deskripsi": "Anti Hemofilia Factor",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "Q-5-44-0",
+      "kode_diagnosis": "D66",
+      "kode_prosedur": null
+    },
+    {
+      "no_asal": 28,
+      "kode_special_cmg": "DD-10-II",
+      "deskripsi": "Anti Hemofilia Factor",
+      "jenis": "special_drugs",
+      "kode_group_inacbg": "Q-5-44-0",
+      "kode_diagnosis": "D67",
+      "kode_prosedur": null
+    },
+    {
+      "no_asal": 29,
+      "kode_special_cmg": "II-01-III",
+      "deskripsi": "Nuclear Medicine",
+      "jenis": "special_investigation",
+      "kode_group_inacbg": "Z-3-17-0",
+      "kode_diagnosis": null,
+      "kode_prosedur": "92.05, 92.15"
+    },
+    {
+      "no_asal": 30,
+      "kode_special_cmg": "II-02-III",
+      "deskripsi": "Magnetic Resonance Imaging (MRI)",
+      "jenis": "special_investigation",
+      "kode_group_inacbg": "Z-3-16-0",
+      "kode_diagnosis": null,
+      "kode_prosedur": "88.92, 88.93, 88.97"
+    },
+    {
+      "no_asal": 31,
+      "kode_special_cmg": "II-03-III",
+      "deskripsi": "Diagnostic and Imaging Procedures of Eye",
+      "jenis": "special_investigation",
+      "kode_group_inacbg": "H-3-13-0",
+      "kode_diagnosis": null,
+      "kode_prosedur": "95.12"
+    },
+    {
+      "no_asal": 32,
+      "kode_special_cmg": "YY-10-III",
+      "deskripsi": "Phacoemulsification",
+      "jenis": "special_procedure",
+      "kode_group_inacbg": "H-2-36-0",
+      "kode_diagnosis": null,
+      "kode_prosedur": "13.41"
+    },
+    {
+      "no_asal": 33,
+      "kode_special_cmg": "YY-11-III",
+      "deskripsi": "Microlaringoscopy",
+      "jenis": "special_procedure",
+      "kode_group_inacbg": "J-3-15-0",
+      "kode_diagnosis": null,
+      "kode_prosedur": "31.41, 31.42, 31.44"
+    },
+    {
+      "no_asal": 34,
+      "kode_special_cmg": "YY-12-III",
+      "deskripsi": "Cholangiograph",
+      "jenis": "special_procedure",
+      "kode_group_inacbg": "B-3-11-0",
+      "kode_diagnosis": null,
+      "kode_prosedur": "51.10, 51.11, 51.14, 51.15, 52.13"
+    },
+    {
+      "no_asal": 35,
+      "kode_special_cmg": "YY-16-III",
+      "deskripsi": "Odontektomi",
+      "jenis": "special_procedure",
+      "kode_group_inacbg": "U-3-16-0",
+      "kode_diagnosis": null,
+      "kode_prosedur": "23.19"
+    },
+    {
+      "no_asal": 36,
+      "kode_special_cmg": "YY-17-III",
+      "deskripsi": "Brakiterapi",
+      "jenis": "special_procedure",
+      "kode_group_inacbg": "C-3-10-0",
+      "kode_diagnosis": "Z51.0",
+      "kode_prosedur": "92.20, 92.27"
+    }
+  ]
+}

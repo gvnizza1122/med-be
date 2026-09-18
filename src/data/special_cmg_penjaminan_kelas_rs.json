@@ -1,0 +1,227 @@
+{
+  "meta": {
+    "generated_at": "2026-09-18T10:03:42.631856Z",
+    "total_rows": 11,
+    "rows_terkait_special_cmg": 9,
+    "rows_kelas_d_dilarang_atau_dibatasi": 7,
+    "rows_kelas_d_diizinkan": 4,
+    "description": "Ketentuan Penjaminan Bagian II PMK No. 3 Tahun 2023, Lampiran: \"II. KRITERIA PELAYANAN DAN KOMPETENSI UNTUK PELAYANAN KESEHATAN TERTENTU DI FKRTL\" (Pasal 34) -- memuat pembatasan/syarat top-up berdasarkan kelas RS untuk 9 Special CMG (RR-02-II, RR-04-III, RR-05-III, YY-13-III, YY-14-III, YY-15-III, YY-10-III, YY-16-III, YY-17-III) + 2 kriteria kompetensi non-Special-CMG (Kemoterapi, Hemodialisis).",
+    "source_name": "Peraturan Menteri Kesehatan (PMK) Nomor 3 Tahun 2023, Lampiran Bagian II",
+    "source_file_local": "D:/mod-gta/Permenkes Nomor 3 Tahun 2023.pdf (referensi lokal, tidak disertakan di repo)",
+    "source_pages": "85-91",
+    "rs_lestari_raharja_kelas": "D (Swasta) -- dipakai sbg konteks utk kolom boleh_kelas_d di tiap baris.",
+    "cross_check_task1": "WAJIB & LULUS: seluruh 9 kode_special_cmg di tabel ini (RR-02-II, RR-04-III, RR-05-III, YY-13-III, YY-14-III, YY-15-III, YY-10-III, YY-16-III, YY-17-III) ditemukan persis di special_cmg_kriteria.json (Tugas 1) DENGAN kode_group_inacbg yang identik 100% (dicek terprogram, bukan visual) -- deskripsi/jenis_layanan juga cocok kata-demi-kata (kecuali 2 kosmetik word-wrap \"Phacoemulsif ication\" -> \"Phacoemulsification\" yang sudah diperbaiki di kedua file). Ini mengonfirmasi kedua ekstraksi (kriteria top-up & ketentuan penjaminan) konsisten satu sama lain dan bukan hasil salah-baca yang kebetulan.",
+    "extraction_method": "PyMuPDF page.find_tables() (deteksi grid tabel asli, sama seperti Tugas 1) -- tabel ini py 7 kolom (termasuk KETENTUAN_PENJAMINAN berupa paragraf panjang berpoin yg meluber lintas halaman per baris logis, mis. baris Odontektomi meluber dari hlm 89 ke 90). Baris lanjutan (sel NO/KODE_SPECIAL_CMG/JENIS_LAYANAN kosong) digabung ke baris logis sebelumnya. Kolom KETENTUAN_PENJAMINAN digabung dengan SPASI (bukan newline) krn newline PDF di kolom ini murni artefak lebar kolom (kadang motong di tengah kata) -- 2 kasus word-wrap-di-tengah-kata (\"Phacoemulsif|ication\", \"Sp.BM/Sp.BMMF/do|kter\") sudah diperbaiki manual (dikonfirmasi via teks sumber, bukan tebakan).",
+    "pembatasan_kelas_rs_method": "Field allowed_kelas_rs/excluded_kelas_rs/boleh_kelas_d dikodekan MANUAL per baris (bukan regex otomatis) berdasarkan pembacaan literal catatan_lengkap tiap baris -- 6 dari 9 baris terkait Special CMG EKSPLISIT menyebut \"RS kelas D\" (RR-04-III, YY-13-III, YY-14-III, YY-15-III [kelas C DAN D], YY-17-III) atau membatasi ke \"RS Kelas A\" (RR-05-III, dan RR-02-II ke RS Khusus Jantung Kelas A Milik Pemerintah -- secara implisit juga mengecualikan Kelas D). HANYA 2 dari 9 (YY-10-III Phacoemulsification, YY-16-III Odontektomi) TIDAK py pembatasan kelas RS eksplisit -- keduanya boleh_kelas_d=true.",
+    "caveat": "Data ini HANYA baris yang eksplisit menyebut \"KETENTUAN PENJAMINAN\" di Lampiran Bagian II (hlm 85-91) -- kriteria kompetensi/kelas RS di bagian lain PMK 3/2023 (kalau ada, di luar rentang halaman yang diminta) TIDAK dicakup."
+  },
+  "penjaminan": [
+    {
+      "no": 1,
+      "kode_special_cmg": "RR-02-II",
+      "jenis_layanan": "Contegra",
+      "kode_group_inacbg": "I-1-03-I I-1-03-II I-1-03-III",
+      "kode_diagnosis": null,
+      "kode_prosedur": "35.92",
+      "allowed_kelas_rs": [
+        "A"
+      ],
+      "excluded_kelas_rs": null,
+      "boleh_kelas_d": false,
+      "catatan_kelas_rs": "Hanya RS Khusus Jantung Kelas A Milik Pemerintah (bukan sekadar \"Kelas A\" -- juga disyaratkan RS Khusus Jantung & milik Pemerintah).",
+      "catatan_lengkap": "Penjaminan top up hanya dilakukan di RS Khusus Jantung Kelas A Milik Pemerintah.",
+      "sumber_halaman": [
+        85
+      ],
+      "is_special_cmg_terkait": true
+    },
+    {
+      "no": 2,
+      "kode_special_cmg": "RR-04-III",
+      "jenis_layanan": "Hip Implant/ Knee Implant",
+      "kode_group_inacbg": "M-1-04-I M-1-04-II M-1-04-III",
+      "kode_diagnosis": null,
+      "kode_prosedur": "81.51, 81.52, 81.53, 81.54, 81.55",
+      "allowed_kelas_rs": null,
+      "excluded_kelas_rs": [
+        "D"
+      ],
+      "boleh_kelas_d": false,
+      "catatan_kelas_rs": "Eksplisit: \"Penjaminan tidak dapat dilakukan di RS kelas D\".",
+      "catatan_lengkap": "1. Penjaminan tidak dapat dilakukan di RS kelas D; 2. Layanan dilakukan oleh operator sesuai dengan kewenangan klinis dan kompetensinya; 3. Adanya ketersediaan alat untuk pelaksanaan operasi Hip/Knee Implant.",
+      "sumber_halaman": [
+        85
+      ],
+      "is_special_cmg_terkait": true
+    },
+    {
+      "no": 3,
+      "kode_special_cmg": "RR-05-III",
+      "jenis_layanan": "Prostesis Evar/Tevar",
+      "kode_group_inacbg": "I-1-20-I I-1-20-II I-1-20-III",
+      "kode_diagnosis": null,
+      "kode_prosedur": "39.71, 39.73",
+      "allowed_kelas_rs": [
+        "A"
+      ],
+      "excluded_kelas_rs": null,
+      "boleh_kelas_d": false,
+      "catatan_kelas_rs": "Hanya RS Kelas A Umum ATAU RS Khusus Jantung Kelas A.",
+      "catatan_lengkap": "1. Tarif layanan yang mendapatkan top up hanya berlaku untuk: - RS Kelas A Umum; - RS Khusus Jantung Kelas A. 2. Tarif layanan berlaku hanya untuk 1 kali penjaminan untuk setiap jenis prosedur yang menggunakan prosthesis Evar/Tevar; 3. Layanan dilakukan oleh dokter sesuai dengan kewenangan klinis dan kompetensinya.",
+      "sumber_halaman": [
+        85,
+        86
+      ],
+      "is_special_cmg_terkait": true
+    },
+    {
+      "no": 4,
+      "kode_special_cmg": "YY-13-III",
+      "jenis_layanan": "Coil",
+      "kode_group_inacbg": "G-1-12-I G-1-12-II G-1-12-III",
+      "kode_diagnosis": null,
+      "kode_prosedur": "39.75",
+      "allowed_kelas_rs": null,
+      "excluded_kelas_rs": [
+        "D"
+      ],
+      "boleh_kelas_d": false,
+      "catatan_kelas_rs": "Eksplisit: \"Penjaminan tidak dapat dilakukan di RS kelas D\". Juga ada kriteria pendukung (CT Scan Kepala 64 slice, rawat ICU neurologi/HCU neurologi pasca tindakan).",
+      "catatan_lengkap": "1. Penjaminan tidak dapat dilakukan di RS kelas D; 2. Kriteria pendukung: a. Hasil CT Scan Kepala minimal 64 Slice yang dilakukan pada saat pasien datang ke RS; b. Pasien dirawat diruang ICU neurologi/ICU atau HCU neurologi/ HCU setelah tindakan Coiling; c. Layanan dilakukan oleh operator sesuai dengan kewenangan klinis dan kompetensi.",
+      "sumber_halaman": [
+        86,
+        87
+      ],
+      "is_special_cmg_terkait": true
+    },
+    {
+      "no": 5,
+      "kode_special_cmg": "YY-14-III",
+      "jenis_layanan": "Trombektomi",
+      "kode_group_inacbg": "G-1-12-I G-1-12-II G-1-12-III",
+      "kode_diagnosis": null,
+      "kode_prosedur": "39.74",
+      "allowed_kelas_rs": null,
+      "excluded_kelas_rs": [
+        "D"
+      ],
+      "boleh_kelas_d": false,
+      "catatan_kelas_rs": "Eksplisit: \"Penjaminan tidak dapat dilakukan di RS kelas D\". Kriteria pendukung sama seperti Coil (CT Scan Kepala 64 slice, rawat ICU/HCU neurologi pasca tindakan).",
+      "catatan_lengkap": "1. Penjaminan tidak dapat dilakukan di RS kelas D; 2. Kriteria pendukung: a. Hasil CT Scan Kepala minimal 64 Slice yang dilakukan pada saat pasien datang ke RS; b. Pasien dirawat diruang ICU neurologi/ICU atau HCU neurologi/ HCU setelah tindakan Trombektomi; c. Layanan dilakukan oleh operator sesuai dengan kewenangan klinis dan kompetensinya.",
+      "sumber_halaman": [
+        87,
+        88
+      ],
+      "is_special_cmg_terkait": true
+    },
+    {
+      "no": 6,
+      "kode_special_cmg": "YY-15-III",
+      "jenis_layanan": "Percutaneous Endoscopy Gastrostomy",
+      "kode_group_inacbg": "E-4-10-I E-4-10-II E-4-10-III",
+      "kode_diagnosis": "E43 E44.0 E44.1",
+      "kode_prosedur": "43.11",
+      "allowed_kelas_rs": null,
+      "excluded_kelas_rs": [
+        "C",
+        "D"
+      ],
+      "boleh_kelas_d": false,
+      "catatan_kelas_rs": "Eksplisit: \"Penjaminan tidak dapat dilakukan di RS kelas C dan D\". Juga hanya utk rawat inap & indikasi terapeutik (bukan estetik/lainnya).",
+      "catatan_lengkap": "1. Penjaminan tidak dapat dilakukan di RS kelas C dan D; 2. Tarif top up untuk Percutaneous Endoscopy Gastrostomy hanya untuk rawat inap; 3. Standar kriteria sarana prasarana dan kewenangan klinis RS yang berkompetensi melakukan Percutaneous Endoscopy Gastrostomy; 4. Tindakan Percutaneous Endoscopy Gastrostomy hanya untuk indikasi terapeutik.",
+      "sumber_halaman": [
+        88
+      ],
+      "is_special_cmg_terkait": true
+    },
+    {
+      "no": 7,
+      "kode_special_cmg": "YY-10-III",
+      "jenis_layanan": "Phacoemulsification",
+      "kode_group_inacbg": "H-2-36-0",
+      "kode_diagnosis": null,
+      "kode_prosedur": "13.41",
+      "allowed_kelas_rs": null,
+      "excluded_kelas_rs": null,
+      "boleh_kelas_d": true,
+      "catatan_kelas_rs": "TIDAK ada pembatasan kelas RS eksplisit di baris ini -- kriteria penjaminan merujuk ke Peraturan BPJS Kesehatan terpisah (di luar cakupan PMK 3/2023 ini) + kesepakatan kapasitas BPJS-FKRTL utk kasus elektif.",
+      "catatan_lengkap": "1. Kriteria penjaminan untuk tindakan Phacoemulsification sesuai dengan Peraturan BPJS Kesehatan; 2. Untuk menghindari potensi moral hazard dilakukan kesepakatan kapasitas antara BPJS Kesehatan dengan FKRTL untuk tindakan Phacoemulsification elektif.",
+      "sumber_halaman": [
+        89
+      ],
+      "is_special_cmg_terkait": true
+    },
+    {
+      "no": 8,
+      "kode_special_cmg": "YY-16-III",
+      "jenis_layanan": "Odontektomi",
+      "kode_group_inacbg": "U-3-16-0",
+      "kode_diagnosis": null,
+      "kode_prosedur": "23.19",
+      "allowed_kelas_rs": null,
+      "excluded_kelas_rs": null,
+      "boleh_kelas_d": true,
+      "catatan_kelas_rs": "TIDAK ada pembatasan kelas RS eksplisit -- syaratnya rawat jalan saja (bukan rawat inap), dokter gigi Sp.BM/Sp.BMMF (atau rujuk kalau tidak tersedia), dan indikasi patologis (bukan estetik).",
+      "catatan_lengkap": "1. Tarif top up Odontektomi hanya berlaku di rawat jalan; 2. Tindakan odontektomi dilakukan oleh dokter gigi spesialis/ subspesialis sesuai dengan kewenangan klinis dan kompetensinya; 3. Pencabutan gigi yang dilakukan odontektomi disebabkan oleh kelainan patologis, bukan semata mata karena posisi anatomi; 4. Dalam hal ketiadaan Sp.BM/Sp.BMMF/dokter gigi spesialis sesuai kewenangan klinisnya di faskes maka tindakan elektif di rujuk ke faskes terdekat yang memiliki Sp.BM/Sp.BMMF/dokter gigi spesialis sesuai kewenangan klinisnya.",
+      "sumber_halaman": [
+        89,
+        90
+      ],
+      "is_special_cmg_terkait": true
+    },
+    {
+      "no": 9,
+      "kode_special_cmg": "YY-17-III",
+      "jenis_layanan": "Brakiterapi",
+      "kode_group_inacbg": "C-3-10-0",
+      "kode_diagnosis": "Z51.0",
+      "kode_prosedur": "92.20, 92.27",
+      "allowed_kelas_rs": null,
+      "excluded_kelas_rs": [
+        "D"
+      ],
+      "boleh_kelas_d": false,
+      "catatan_kelas_rs": "Eksplisit: \"Penjaminan tidak dapat dilakukan di RS kelas D\".",
+      "catatan_lengkap": "1. Penjaminan tidak dapat dilakukan di RS kelas D; 2. Pelayanan Radioterapi diberikan sesuai dengan PNPK atau PPK yang berlaku di fasyankes dan/atau keputusan Tumor Board sesuai dengan ketentuan perundangan yang berlaku.",
+      "sumber_halaman": [
+        90,
+        91
+      ],
+      "is_special_cmg_terkait": true
+    },
+    {
+      "no": 10,
+      "kode_special_cmg": null,
+      "jenis_layanan": "Kemoterapi",
+      "kode_group_inacbg": "Rawat Inap: C-4-13-I C-4-13-II C-4-13-III Rawat Jalan: C-3-23-0",
+      "kode_diagnosis": null,
+      "kode_prosedur": "99.25",
+      "allowed_kelas_rs": null,
+      "excluded_kelas_rs": null,
+      "boleh_kelas_d": true,
+      "catatan_kelas_rs": "TIDAK ada pembatasan kelas RS eksplisit di baris ini.",
+      "catatan_lengkap": "1. Pelayanan Kemoterapi diberikan sesuai dengan PNPK atau PPK, formularium nasional dan sesuai dengan ketentuan perundangan yang berlaku 2. Pelayanan Kemoterapi dilakukan oleh dokter yang memiliki kompetensi dibidang Onkologi sesuai pelayanan yang akan diberikan.",
+      "sumber_halaman": [
+        91
+      ],
+      "is_special_cmg_terkait": false
+    },
+    {
+      "no": 11,
+      "kode_special_cmg": null,
+      "jenis_layanan": "Hemodialisis",
+      "kode_group_inacbg": "N-3-15-0",
+      "kode_diagnosis": null,
+      "kode_prosedur": "39.95",
+      "allowed_kelas_rs": null,
+      "excluded_kelas_rs": null,
+      "boleh_kelas_d": true,
+      "catatan_kelas_rs": "TIDAK ada pembatasan kelas RS eksplisit di baris ini.",
+      "catatan_lengkap": "1. Alat dan bahan medis habis pakai pada tindakan hemodialisis digunakan secara single use; 2. Jika digunakan secara re-use maka tarif yang dibayarkan adalah 85% dari tarif yang berlaku.",
+      "sumber_halaman": [
+        91
+      ],
+      "is_special_cmg_terkait": false
+    }
+  ]
+}
