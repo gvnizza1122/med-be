@@ -41,9 +41,25 @@ pdfProcessingQueue.on('failed', (job, err) => {
   console.error(`Job ${job.id} failed:`, err.message);
 });
 
+// Queue untuk AI review background task
+const aiReviewQueue = new Queue('ai-review', {
+  connection: redisOptions,
+  defaultJobOptions: {
+    attempts: 3,
+    backoff: { type: 'exponential', delay: 2000 },
+    removeOnComplete: { age: 3600 },
+  },
+});
+
+aiReviewQueue.on('error', (err) => console.error('AI Review Queue Error:', err));
+aiReviewQueue.on('failed', (job, err) => {
+  console.error(`AI Review Job ${job.id} failed:`, err.message);
+});
+
 module.exports = {
   redisClient,
   redisSubscriber,
   pdfProcessingQueue,
+  aiReviewQueue,
   redisOptions,
 };
