@@ -12,6 +12,7 @@ const {
   extractClinicalFields,
   classifyPageContent,
   validateVitalSigns,
+  splitToList,
   CLINICAL_PATTERNS
 } = require('../../services/ocrEnhancement');
 
@@ -379,6 +380,180 @@ describe('OCR Enhancement Module', () => {
       const result = extractClinicalFields(mockPages);
 
       expect(result.vital_signs.HeartRate?.value).toBe('77');
+    });
+  });
+
+  describe('Resume Medis IGD: diagnosis, prosedur & findings notation', () => {
+    it('should extract Diagnosis Utama, Sekunder, dan Prosedur sebagai list', () => {
+      const mockPages = [{
+        page_number: 1,
+        text: `RESUME MEDIS IGD
+Diagnosis Utama : Demam Berdarah Dengue
+Diagnosis Sekunder : 1. Dehidrasi ringan
+2. Trombositopenia
+Tindakan/Prosedur : 1. Pemasangan infus
+2. Observasi tanda vital
+Keadaan Pulang: Membaik`,
+        confidence: 95
+      }];
+
+      const result = extractClinicalFields(mockPages);
+
+      expect(result.diagnosis_list).toEqual([
+        'Demam Berdarah Dengue', 'Dehidrasi ringan', 'Trombositopenia'
+      ]);
+      expect(result.prosedur_list).toEqual([
+        'Pemasangan infus', 'Observasi tanda vital'
+      ]);
+    });
+
+    it('should stop capture di batas halaman (tidak bocor ke halaman berikutnya)', () => {
+      const mockPages = [
+        { page_number: 1, text: 'Diagnosis Utama : Appendisitis Akut', confidence: 95 },
+        { page_number: 2, text: 'TRIASE IGD\nKeluhan Utama : Nyeri perut', confidence: 95 }
+      ];
+
+      const result = extractClinicalFields(mockPages);
+
+      expect(result.structured_text.DiagnosisUtama).toBe('Appendisitis Akut');
+      expect(result.structured_text.DiagnosisUtama).not.toMatch(/TRIASE|Keluhan/i);
+    });
+
+    it('should detect bilateral notation detail (+/+, −/−, +/−, −/+) per temuan', () => {
+      const mockPages = [{
+        page_number: 1,
+        text: 'Pemeriksaan fisik: ronchi +/+ whezing -/- edema +/- murmur -/+',
+        confidence: 95
+      }];
+
+      const result = extractClinicalFields(mockPages);
+
+      expect(result.clinical_findings_notation.whezing).toMatchObject({ ada: false, sisi: 'negatif' });
+      expect(result.clinical_findings_notation.edema).toMatchObject({ ada: true, sisi: 'kanan' });
+      expect(result.clinical_findings_notation.murmur).toMatchObject({ ada: true, sisi: 'kiri', page: 1 });
+    });
+
+    it('should detect Ronchi boolean finding dengan notasi slash (+/+)', () => {
+      const mockPages = [{
+        page_number: 1,
+        text: 'Auskultasi: Ronchi +/+ Whezing -/-',
+        confidence: 95
+      }];
+
+      const result = extractClinicalFields(mockPages);
+
+      expect(result.clinical_findings.Ronchi).toBe(true);
+    });
+  });
+
+  describe('Triage IGD: Vital Sign table, Pengkajian Keperawatan & Primary Survey', () => {
+    it('should parse tabel Vital Sign posisional (header + 1 baris nilai tanpa label)', () => {
+      const mockPages = [{
+        page_number: 2,
+        text: `VITAL SIGN
+BB   TB   TD   Heart Rate   RR   Temp
+55 kg   160 cm   110/70 mmHg   88 x/mnt   20 x/mnt   37.8 C
+PRIMARY SURVEY
+Airway : Paten`,
+        confidence: 95
+      }];
+
+      const result = extractClinicalFields(mockPages);
+
+      expect(result.vital_signs.Weight.value).toBe('55');
+      expect(result.vital_signs.Height.value).toBe('160');
+      expect(result.vital_signs.BloodPressure.value).toBe('110/70');
+      expect(result.vital_signs.HeartRate.value).toBe('88');
+      expect(result.vital_signs.Temperature.value).toBe('37.8');
+    });
+
+    it('should extract Pengkajian Keperawatan box (keluhan, riwayat, skala nyeri, skor ESI)', () => {
+      const mockPages = [{
+        page_number: 2,
+        text: `PENGKAJIAN KEPERAWATAN
+Keluhan Utama : Demam 3 hari, mual muntah
+Riwayat Penyakit Sekarang : Demam sejak 3 hari SMRS
+Skala Nyeri : 4
+Skor ESI : 2
+VITAL SIGN
+BB TB TD`,
+        confidence: 95
+      }];
+
+      const result = extractClinicalFields(mockPages);
+
+      expect(result.pengkajian_keperawatan.keluhan).toBe('Demam 3 hari, mual muntah');
+      expect(result.pengkajian_keperawatan.riwayat_penyakit).toBe('Demam sejak 3 hari SMRS');
+      expect(result.pengkajian_keperawatan.skala_nyeri).toBe('4');
+      expect(result.pengkajian_keperawatan.skor_esi).toBe('2');
+    });
+
+    it('should extract Primary Survey fields (Airway/Breathing/Circulation/Disability/Exposure)', () => {
+      const mockPages = [{
+        page_number: 2,
+        text: `PRIMARY SURVEY
+Airway : Paten, tidak ada sumbatan
+Breathing : Spontan, RR 20x/menit
+Circulation : Akral hangat, CRT < 2 detik
+Disability : GCS 15, compos mentis
+Exposure : Tidak ada jejas`,
+        confidence: 95
+      }];
+
+      const result = extractClinicalFields(mockPages);
+
+      expect(result.primary_survey.Airway).toBe('Paten, tidak ada sumbatan');
+      expect(result.primary_survey.Breathing).toBe('Spontan, RR 20x/menit');
+      expect(result.primary_survey.Circulation).toBe('Akral hangat, CRT < 2 detik');
+      expect(result.primary_survey.Disability).toBe('GCS 15, compos mentis');
+      expect(result.primary_survey.Exposure).toBe('Tidak ada jejas');
+    });
+  });
+
+  describe('Assessment/Lembar Lain: Psikososial, Diagnosis Keperawatan, Pengkajian Fungsional', () => {
+    it('should extract 3 field Assessment dan classify sebagai assessment_keperawatan', () => {
+      const mockPages = [{
+        page_number: 3,
+        text: `PSIKOSOSIAL/SPIRITUAL : Pasien kooperatif, didampingi keluarga
+DIAGNOSIS KEPERAWATAN : Hipertermi berhubungan dengan proses infeksi
+PENGKAJIAN FUNGSIONAL : Mandiri, tidak ada keterbatasan aktivitas`,
+        confidence: 95
+      }];
+
+      const result = extractClinicalFields(mockPages);
+      expect(result.assessment.psikososial_spiritual).toBe('Pasien kooperatif, didampingi keluarga');
+      expect(result.assessment.diagnosis_keperawatan).toBe('Hipertermi berhubungan dengan proses infeksi');
+      expect(result.assessment.pengkajian_fungsional).toBe('Mandiri, tidak ada keterbatasan aktivitas');
+
+      const classification = classifyPageContent(mockPages[0].text);
+      expect(classification.type).toBe('assessment_keperawatan');
+    });
+
+    it('should not downgrade type resume_medis_igd yang juga menyebut vital sign', () => {
+      const text = `RESUME MEDIS IGD
+Pasien: Firdan
+Triage: Sedang
+Vital Signs: HR 77, RR 18, SpO2 95%`;
+
+      const result = classifyPageContent(text);
+      expect(result.type).toBe('resume_medis_igd');
+    });
+  });
+
+  describe('splitToList', () => {
+    it('should split numbered list jadi array item', () => {
+      expect(splitToList('1. Pemasangan infus\n2. Observasi tanda vital')).toEqual([
+        'Pemasangan infus', 'Observasi tanda vital'
+      ]);
+    });
+
+    it('should return empty array untuk input kosong/null', () => {
+      expect(splitToList('')).toEqual([]);
+      expect(splitToList(null)).toEqual([]);
+    });
+
+    it('should strip bullet marker dan skip item kosong/"-"', () => {
+      expect(splitToList('- Infus\n-\n- Observasi')).toEqual(['Infus', 'Observasi']);
     });
   });
 });

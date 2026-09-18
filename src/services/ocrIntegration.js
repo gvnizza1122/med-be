@@ -27,6 +27,18 @@ async function applyOcrEnhancements(standardResult, filePath, options = {}) {
     vital_signs_from_ocr: {},
     clinical_findings_from_ocr: [],
     structured_text_from_ocr: {},
+    // Halaman Resume Medis IGD: diagnosis/prosedur sebagai list (bukan 1
+    // blok kalimat), plus detail bilateral (+/+, −/−, +/−, −/+) per temuan.
+    diagnosis_list_from_ocr: [],
+    prosedur_list_from_ocr: [],
+    clinical_findings_notation_from_ocr: {},
+    // Halaman Triage IGD: Primary Survey (ABCDE) & Pengkajian Keperawatan
+    // (keluhan, riwayat penyakit, skala nyeri, skor ESI).
+    primary_survey_from_ocr: {},
+    pengkajian_keperawatan_from_ocr: {},
+    // Halaman Assessment/Lembar Lain: Psikososial/Spiritual, Diagnosis
+    // Keperawatan, Pengkajian Fungsional.
+    assessment_from_ocr: {},
     enhancement_applied: false
   };
 
@@ -64,6 +76,17 @@ async function applyOcrEnhancements(standardResult, filePath, options = {}) {
         enhanced.structured_text_from_ocr = enhancementResult.pass2_clinical_extraction.structured_text;
       }
 
+      // Diagnosis/Prosedur sebagai list, temuan fisik bilateral, Primary
+      // Survey, Pengkajian Keperawatan, dan Assessment — lihat
+      // extractClinicalFields() di ocrEnhancement.js.
+      const clinicalExtraction = enhancementResult.pass2_clinical_extraction;
+      enhanced.diagnosis_list_from_ocr = clinicalExtraction.diagnosis_list || [];
+      enhanced.prosedur_list_from_ocr = clinicalExtraction.prosedur_list || [];
+      enhanced.clinical_findings_notation_from_ocr = clinicalExtraction.clinical_findings_notation || {};
+      enhanced.primary_survey_from_ocr = clinicalExtraction.primary_survey || {};
+      enhanced.pengkajian_keperawatan_from_ocr = clinicalExtraction.pengkajian_keperawatan || {};
+      enhanced.assessment_from_ocr = clinicalExtraction.assessment || {};
+
       // Append vital signs ke claimDataText untuk AI review
       if (enhancementResult.vital_signs_validated.validated_values &&
           Object.keys(enhancementResult.vital_signs_validated.validated_values).length > 0) {
@@ -89,11 +112,46 @@ async function applyOcrEnhancements(standardResult, filePath, options = {}) {
         enhanced.claimDataText = `${enhanced.claimDataText}\n\n${structText}`;
       }
 
+      // Append Primary Survey (Triage IGD) ke claimDataText
+      if (Object.keys(enhanced.primary_survey_from_ocr).length > 0) {
+        const ps = enhanced.primary_survey_from_ocr;
+        let psText = '[OCR ENHANCED - PRIMARY SURVEY]\n';
+        for (const field of ['Airway', 'Breathing', 'Circulation', 'Disability', 'Exposure']) {
+          if (ps[field]) psText += `${field}: ${ps[field]}\n`;
+        }
+        enhanced.claimDataText = `${enhanced.claimDataText}\n\n${psText}`;
+      }
+
+      // Append Pengkajian Keperawatan (Triage IGD) ke claimDataText
+      if (Object.keys(enhanced.pengkajian_keperawatan_from_ocr).length > 0) {
+        const pk = enhanced.pengkajian_keperawatan_from_ocr;
+        let pkText = '[OCR ENHANCED - PENGKAJIAN KEPERAWATAN]\n';
+        if (pk.keluhan) pkText += `Keluhan: ${pk.keluhan}\n`;
+        if (pk.riwayat_penyakit) pkText += `Riwayat Penyakit: ${pk.riwayat_penyakit}\n`;
+        if (pk.skala_nyeri) pkText += `Skala Nyeri: ${pk.skala_nyeri}\n`;
+        if (pk.skor_esi) pkText += `Skor ESI: ${pk.skor_esi}\n`;
+        enhanced.claimDataText = `${enhanced.claimDataText}\n\n${pkText}`;
+      }
+
+      // Append Assessment/Lembar Lain (Psikososial/Spiritual, Diagnosis
+      // Keperawatan, Pengkajian Fungsional) ke claimDataText
+      if (Object.keys(enhanced.assessment_from_ocr).length > 0) {
+        const asmt = enhanced.assessment_from_ocr;
+        let asmtText = '[OCR ENHANCED - ASSESSMENT KEPERAWATAN]\n';
+        if (asmt.psikososial_spiritual) asmtText += `Psikososial/Spiritual: ${asmt.psikososial_spiritual}\n`;
+        if (asmt.diagnosis_keperawatan) asmtText += `Diagnosis Keperawatan: ${asmt.diagnosis_keperawatan}\n`;
+        if (asmt.pengkajian_fungsional) asmtText += `Pengkajian Fungsional: ${asmt.pengkajian_fungsional}\n`;
+        enhanced.claimDataText = `${enhanced.claimDataText}\n\n${asmtText}`;
+      }
+
       enhanced.enhancement_applied = true;
       console.log('[OcrIntegration] Enhancement applied:', {
         vital_signs_found: Object.keys(enhanced.vital_signs_from_ocr).length,
         clinical_findings_found: enhanced.clinical_findings_from_ocr.length,
-        structured_text_found: Object.keys(enhanced.structured_text_from_ocr).length
+        structured_text_found: Object.keys(enhanced.structured_text_from_ocr).length,
+        diagnosis_list_found: enhanced.diagnosis_list_from_ocr.length,
+        prosedur_list_found: enhanced.prosedur_list_from_ocr.length,
+        pengkajian_keperawatan_found: Object.keys(enhanced.pengkajian_keperawatan_from_ocr).length
       });
     }
   } catch (error) {
@@ -148,6 +206,15 @@ function mergeEnhancementsIntoRecord(record, enhancementResult) {
   record._ocr_clinical_findings = enhancementResult.clinical_findings_from_ocr;
   record._ocr_structured_text = enhancementResult.structured_text_from_ocr;
   record._ocr_enhancement_applied = enhancementResult.enhancement_applied;
+  // Resume Medis IGD: diagnosis/prosedur sebagai list + detail bilateral temuan fisik.
+  record._ocr_diagnosis_list = enhancementResult.diagnosis_list_from_ocr || [];
+  record._ocr_prosedur_list = enhancementResult.prosedur_list_from_ocr || [];
+  record._ocr_clinical_findings_notation = enhancementResult.clinical_findings_notation_from_ocr || {};
+  // Triage IGD: Primary Survey (ABCDE) & Pengkajian Keperawatan.
+  record._ocr_primary_survey = enhancementResult.primary_survey_from_ocr || {};
+  record._ocr_pengkajian_keperawatan = enhancementResult.pengkajian_keperawatan_from_ocr || {};
+  // Assessment/Lembar Lain: Psikososial/Spiritual, Diagnosis Keperawatan, Pengkajian Fungsional.
+  record._ocr_assessment = enhancementResult.assessment_from_ocr || {};
 
   // Jika BERAT_BADAN terdeteksi dari OCR tapi field di record kosong, isi dari OCR
   if (!record.BERAT_BADAN && enhancementResult.vital_signs_from_ocr.Weight) {

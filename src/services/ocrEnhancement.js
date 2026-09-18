@@ -14,6 +14,15 @@
 const fs = require('fs');
 const path = require('path');
 const { ocrPdfPages } = require('./ocrService');
+// Bilateral notation (+/+, −/−, +/−, −/+) SUDAH punya parser dedicated —
+// dipakai lagi di sini (bukan reimplementasi) supaya clinical findings dari
+// OCR dapat detail sisi kanan/kiri, bukan cuma boolean "ditemukan/tidak".
+const { parsePhysicalExam } = require('./notasiMedisParser');
+const {
+  parseVitalSignsTable,
+  parsePengkajianKeperawatanBox,
+  parseAssessmentSection,
+} = require('./tableParsingService');
 
 /**
  * Pattern ekstraksi untuk vital signs dan clinical findings
@@ -28,13 +37,13 @@ const CLINICAL_PATTERNS = {
     /oxygen\s+saturation\s*[:=]\s*(\d{1,3})[\s%]?/i,
   ],
   HeartRate: [
-    /\bHR\s*[:=]\s*(\d{2,3})[\s/]?(?:bpm|x')/i,
-    /\bheart\s+rate\s*[:=]\s*(\d{2,3})[\s/]?(?:bpm|x')/i,
+    /\bHR\s*[:=]\s*(\d{2,3})[\s/]*(?:bpm|x')/i,
+    /\bheart\s+rate\s*[:=]\s*(\d{2,3})[\s/]*(?:bpm|x')/i,
     /\bnadi\s*[:=]\s*(\d{2,3})/i,
     /\bpuls\s*[:=]\s*(\d{2,3})/i,
   ],
   RespiratoryRate: [
-    /\bRR\s*[:=]\s*(\d{1,2})[\s/]?(?:x'|rpm)/i,
+    /\bRR\s*[:=]\s*(\d{1,2})[\s/]*(?:x'|rpm)/i,
     /\brespiratory\s+rate\s*[:=]\s*(\d{1,2})/i,
     /\bfrekuensi\s+napas\s*[:=]\s*(\d{1,2})/i,
   ],
@@ -59,46 +68,96 @@ const CLINICAL_PATTERNS = {
     /\bheight\s*[:=]\s*(\d{2,3})[\s]?cm/i,
   ],
 
-  // CLINICAL FINDINGS
+  // CLINICAL FINDINGS — notasi bilateral dokumen ini SELALU pakai pemisah
+  // "/" antara sisi kanan/kiri (mis. "+/+", bukan "+ +"/"++"), lihat
+  // notasiMedisParser.js. `\/?` di bawah membuat pattern tetap cocok untuk
+  // varian tanpa slash juga (jaga-jaga OCR menghilangkan karakter "/").
   Ronchi: [
-    /\bronchi\s*[:\s]*\+[\s]*\+/i,
-    /\brhonchi\s*[:\s]*\+[\s]*\+/i,
+    /\bronchi\s*[:\s]*\+\s*\/?\s*\+/i,
+    /\brhonchi\s*[:\s]*\+\s*\/?\s*\+/i,
     /\brales\s+rhonchus/i,
   ],
   Whezing: [
-    /\bwheez(?:ing)?\s*[:\s]*\+[\s]*\+/i,
-    /\bwheezing\s*[:\s]*\+[\s]*\+/i,
+    /\bwheez(?:ing)?\s*[:\s]*\+\s*\/?\s*\+/i,
+    /\bwheezing\s*[:\s]*\+\s*\/?\s*\+/i,
   ],
   Murmur: [
-    /\bmurmur\s*[:\s]*\+[\s]*\+/i,
+    /\bmurmur\s*[:\s]*\+\s*\/?\s*\+/i,
     /\bheart\s+murmur/i,
   ],
   Crackles: [
-    /\bcrackles?\s*[:\s]*\+[\s]*\+/i,
-    /\brales\s*[:\s]*\+[\s]*\+/i,
+    /\bcrackles?\s*[:\s]*\+\s*\/?\s*\+/i,
+    /\brales\s*[:\s]*\+\s*\/?\s*\+/i,
   ],
   Edema: [
-    /\bedema\s*[:\s]*\+[\s]*\+/i,
+    /\bedema\s*[:\s]*\+\s*\/?\s*\+/i,
     /\bpitting\s+edema/i,
   ],
 };
 
+// Label section berikutnya yang mungkin muncul setelah blok teks yang sedang
+// ditangkap — dipakai sebagai lookahead supaya capture multi-line (mis.
+// diagnosis 2-3 baris/numbered list) berhenti di section berikutnya, BUKAN
+// "menelan" seluruh sisa dokumen. Daftar ini diambil dari label section yang
+// benar-benar dipakai formulir RS ini (lihat KEGAWATDARURATAN_SYSTEM_PROMPT
+// di aiReviewService.js untuk daftar section Triage IGD).
+const NEXT_SECTION_LABELS = [
+  // Marker gabungan multi-halaman (lihat allText di extractClinicalFields) —
+  // WAJIB paling duluan supaya capture apapun tidak pernah menyeberang
+  // batas halaman, biarpun label section berikutnya tidak dikenali.
+  '\\[PAGE\\s+\\d+\\]', '---PAGE BREAK---',
+  'Diagnosis\\s+Utama', 'Diagnosis\\s+Sekunder', 'Diagnosis\\s+Keperawatan',
+  'Tindakan\\s*\\/\\s*Prosedur', 'Prosedur', 'Terapi(?:\\/pengobatan)?', 'Diet',
+  'Keadaan', 'Instruksi', 'Anjuran', 'Catatan', 'Kode\\s+ICD',
+  'Riwayat\\s+Penyakit', 'Riwayat\\s+Alergi', 'Keluhan', 'Skala\\s+Nyeri',
+  '(?:Skor\\s+)?ESI\\s*:', 'Primary\\s+Survey', 'Vital\\s+Sign',
+  'Psikososial', 'Pengkajian\\s+Fungsional', 'Pengkajian\\s+Keperawatan',
+  'Kesadaran', 'Tanggal', 'Dokter', 'Perawat', 'Ringkasan',
+  'Pemeriksaan\\s+Fisik', 'Triase', 'Triage', 'Resume\\s+Medis',
+];
+const NEXT_SECTION_LOOKAHEAD = `(?=${NEXT_SECTION_LABELS.join('|')}|$)`;
+
 /**
- * Pattern ekstraksi blok teks terstruktur (Diagnosis & Prosedur)
+ * Pattern ekstraksi blok teks terstruktur (Diagnosis & Prosedur, Resume Medis IGD)
  */
 const STRUCTURED_TEXT_PATTERNS = {
-  DiagnosisUtama: /Diagnosis\s+Utama\s*:\s*([\s\S]*?)(?=Diagnosis\s+Sekunder|Tindakan\/Prosedur|Terapi|Diet|Keadaan)/i,
-  DiagnosisSekunder: /Diagnosis\s+Sekunder\s*:\s*([\s\S]*?)(?=Tindakan\/Prosedur|Terapi|Diet|Keadaan)/i,
-  TindakanProsedur: /Tindakan\/Prosedur\s*:\s*([\s\S]*?)(?=Terapi\/pengobatan|Diet|Keadaan|Instruksi)/i
+  DiagnosisUtama: new RegExp(`Diagnosis\\s+Utama\\s*:\\s*([\\s\\S]*?)${NEXT_SECTION_LOOKAHEAD}`, 'i'),
+  DiagnosisSekunder: new RegExp(`Diagnosis\\s+Sekunder\\s*:\\s*([\\s\\S]*?)${NEXT_SECTION_LOOKAHEAD}`, 'i'),
+  TindakanProsedur: new RegExp(`Tindakan\\s*\\/\\s*Prosedur\\s*:\\s*([\\s\\S]*?)${NEXT_SECTION_LOOKAHEAD}`, 'i'),
+  // "Prosedur" berdiri sendiri (tanpa label "Tindakan/") — beberapa dokumen
+  // cuma menulis "Prosedur:" polos, bukan gabungan "Tindakan/Prosedur:".
+  Prosedur: new RegExp(`(?<!Tindakan\\s*\\/\\s*)\\bProsedur\\s*:\\s*([\\s\\S]*?)${NEXT_SECTION_LOOKAHEAD}`, 'i'),
 };
 
 /**
- * Pattern ekstraksi khusus untuk layout tabel Triage IGD
+ * Pattern ekstraksi Primary Survey (Triage IGD): Airway/Breathing/
+ * Circulation/Disability/Exposure — lihat catatan section di
+ * KEGAWATDARURATAN_SYSTEM_PROMPT (aiReviewService.js).
  */
-const TABLE_PATTERNS = {
-  // Format: BB TB TD Heart Rate RR Temp \n ... 182/106 mmHg 85 x/mnt 20 x/mnt 36.5°C
-  TriageVitalSigns: /(?:VITAL\s+SIGN|TD).*?\n.*?(?:(\d{2,3}\/\d{2,3})\s*mmHg).*?(\d{2,3})\s*x\/mnt.*?(\d{1,2})\s*x\/mnt.*?([\d\.]+)\s*°?C/i
+const PRIMARY_SURVEY_LOOKAHEAD_TAIL = NEXT_SECTION_LABELS.join('|');
+const PRIMARY_SURVEY_PATTERNS = {
+  Airway: new RegExp(`Airway\\s*:?\\s*([\\s\\S]*?)(?=Breathing|${PRIMARY_SURVEY_LOOKAHEAD_TAIL}|$)`, 'i'),
+  Breathing: new RegExp(`Breathing\\s*:?\\s*([\\s\\S]*?)(?=Circulation|${PRIMARY_SURVEY_LOOKAHEAD_TAIL}|$)`, 'i'),
+  Circulation: new RegExp(`Circulation\\s*:?\\s*([\\s\\S]*?)(?=Disability|${PRIMARY_SURVEY_LOOKAHEAD_TAIL}|$)`, 'i'),
+  Disability: new RegExp(`Disability\\s*:?\\s*([\\s\\S]*?)(?=Exposure|${PRIMARY_SURVEY_LOOKAHEAD_TAIL}|$)`, 'i'),
+  Exposure: new RegExp(`Exposure\\s*:?\\s*([\\s\\S]*?)(?=${PRIMARY_SURVEY_LOOKAHEAD_TAIL}|$)`, 'i'),
 };
+
+/**
+ * Pecah teks multi-item (diagnosis/prosedur) jadi array — dokumen sering
+ * menulis dalam bentuk numbered list ("1. ... 2. ...") atau baris terpisah,
+ * bukan satu kalimat tunggal.
+ *
+ * @param {string} text
+ * @returns {string[]}
+ */
+function splitToList(text) {
+  if (!text || typeof text !== 'string') return [];
+  return text
+    .split(/\r?\n|(?=\d{1,2}[\.\)]\s)|;/)
+    .map(s => s.replace(/^[-•\d\.\)]+\s*/, '').trim())
+    .filter(s => s.length > 1 && s !== '-');
+}
 
 
 /**
@@ -114,7 +173,15 @@ function extractClinicalFields(ocrPages) {
   const result = {
     vital_signs: {},
     clinical_findings: {},
+    // Detail bilateral (+/+, −/−, +/−, −/+) per temuan — pelengkap
+    // clinical_findings yang cuma boolean, lihat notasiMedisParser.js.
+    clinical_findings_notation: {},
     structured_text: {},
+    diagnosis_list: [],
+    prosedur_list: [],
+    primary_survey: {},
+    pengkajian_keperawatan: {},
+    assessment: {},
     raw_extractions: [],
     extraction_confidence: {}
   };
@@ -171,26 +238,25 @@ function extractClinicalFields(ocrPages) {
     }
   }
 
-  // Extract dari tabel Triage jika belum terisi dari teks linear
-  const triageMatch = allText.match(TABLE_PATTERNS.TriageVitalSigns);
-  if (triageMatch) {
-    const [, bp, hr, rr, temp] = triageMatch;
-    
-    if (!result.vital_signs.BloodPressure) {
-      result.vital_signs.BloodPressure = { value: bp, raw_match: bp, page: findPageNumberInMatch(allText, triageMatch.index), pattern_index: 99 };
-    }
-    if (!result.vital_signs.HeartRate) {
-      result.vital_signs.HeartRate = { value: hr, raw_match: hr, page: findPageNumberInMatch(allText, triageMatch.index), pattern_index: 99 };
-    }
-    if (!result.vital_signs.RespiratoryRate) {
-      result.vital_signs.RespiratoryRate = { value: rr, raw_match: rr, page: findPageNumberInMatch(allText, triageMatch.index), pattern_index: 99 };
-    }
-    if (!result.vital_signs.Temperature) {
-      result.vital_signs.Temperature = { value: temp, raw_match: temp, page: findPageNumberInMatch(allText, triageMatch.index), pattern_index: 99 };
+  // Extract dari tabel Vital Sign (Triage IGD) — jalan lewati label eksplisit
+  // dulu, fallback tabel posisional (header + 1 baris angka) kalau tidak ketemu.
+  // Diisi HANYA untuk field yang belum terisi dari CLINICAL_PATTERNS linear di atas.
+  const vitalSignsFromTable = parseVitalSignsTable(allText);
+  for (const [fieldName, data] of Object.entries(vitalSignsFromTable)) {
+    if (!result.vital_signs[fieldName]) {
+      const approxIndex = allText.indexOf(data.raw_match);
+      result.vital_signs[fieldName] = {
+        value: data.value,
+        raw_match: data.raw_match,
+        page: findPageNumberInMatch(allText, approxIndex >= 0 ? approxIndex : 0),
+        pattern_index: 99,
+        source: data.source
+      };
+      result.extraction_confidence[fieldName] = data.source === 'label' ? 'high' : 'medium';
     }
   }
 
-  // Extract structured text (Diagnosis & Procedure)
+  // Extract structured text (Diagnosis, Prosedur, Resume Medis IGD)
   for (const [fieldName, pattern] of Object.entries(STRUCTURED_TEXT_PATTERNS)) {
     const match = allText.match(pattern);
     if (match && match[1] && match[1].trim() && match[1].trim() !== '-') {
@@ -202,6 +268,58 @@ function extractClinicalFields(ocrPages) {
         page: findPageNumberInMatch(allText, match.index)
       });
     }
+  }
+
+  // Diagnosis utama + sekunder digabung jadi 1 list terurut (utama duluan) —
+  // dipecah per-item karena dokumen sering menulis multi-diagnosis.
+  result.diagnosis_list = [
+    ...splitToList(result.structured_text.DiagnosisUtama),
+    ...splitToList(result.structured_text.DiagnosisSekunder)
+  ];
+  // Prosedur/Tindakan: gabung dari label "Tindakan/Prosedur" dan "Prosedur" berdiri
+  // sendiri (dedupe karena bisa sama-sama cocok di dokumen yang beririsan).
+  result.prosedur_list = Array.from(new Set([
+    ...splitToList(result.structured_text.TindakanProsedur),
+    ...splitToList(result.structured_text.Prosedur)
+  ]));
+
+  // Primary Survey (Triage IGD): Airway/Breathing/Circulation/Disability/Exposure
+  for (const [fieldName, pattern] of Object.entries(PRIMARY_SURVEY_PATTERNS)) {
+    const match = allText.match(pattern);
+    if (match && match[1] && match[1].trim() && match[1].trim() !== '-') {
+      result.primary_survey[fieldName] = match[1].trim().replace(/\s*\n\s*/g, ' ');
+    }
+  }
+
+  // Pengkajian Keperawatan box (Triage IGD): keluhan, riwayat penyakit, skala
+  // nyeri, skor ESI.
+  result.pengkajian_keperawatan = parsePengkajianKeperawatanBox(allText);
+
+  // Assessment/Lembar Lain: Psikososial/Spiritual, Diagnosis Keperawatan,
+  // Pengkajian Fungsional.
+  result.assessment = parseAssessmentSection(allText);
+
+  // Temuan pemeriksaan fisik dengan detail bilateral (+/+, −/−, +/−, −/+) —
+  // dipakai notasiMedisParser yang sudah teruji, bukan reimplementasi regex
+  // baru. Discan PER HALAMAN (bukan allText gabungan) supaya marker
+  // "---PAGE BREAK---"/"[PAGE N]" tidak ikut "kebaca" sebagai notasi (garis
+  // "---" mengandung tanda "-" yang bisa salah tertangkap sebagai notasi
+  // tunggal), dan temuan tidak menyeberang dari satu halaman ke halaman lain.
+  try {
+    for (const page of ocrPages) {
+      const bilateralFindings = parsePhysicalExam(page.text || '');
+      for (const [temuan, detail] of Object.entries(bilateralFindings)) {
+        // Lewati temuan tanpa notasi jelas (ada:null) — bukan hasil ekstraksi
+        // yang bisa diandalkan, cuma noise baris teks tanpa tanda +/−.
+        // Field pertama yang ketemu menang (dokumen biasanya cuma sebut 1x).
+        if (detail && detail.ada !== null && !result.clinical_findings_notation[temuan]) {
+          result.clinical_findings_notation[temuan] = { ...detail, page: page.page_number };
+        }
+      }
+    }
+  } catch (err) {
+    // Non-blocking — parsing notasi bilateral bukan bagian kritikal ekstraksi.
+    console.warn('[EnhancedOCR] Parsing notasi bilateral gagal:', err.message || err);
   }
 
   return result;
@@ -254,10 +372,30 @@ function classifyPageContent(pageText) {
     classification.sections.push('physical_exam', 'assessment', 'plan');
   }
 
-  // Deteksi halaman Triase
+  // Deteksi halaman Triase — HANYA jadi type kalau belum ada type lebih
+  // spesifik yang terdeteksi (mis. "resume_medis_igd" di atas). Sebelumnya
+  // block ini SELALU menimpa classification.type biarpun sudah spesifik —
+  // halaman "RESUME MEDIS IGD" yang (wajar) juga menyebut "Vital Signs"
+  // salah kena downgrade jadi 'triage' generik.
   if (/triase|triage|vital\s+sign|pemeriksaan\s+fisik/i.test(pageText)) {
-    classification.type = 'triage';
+    if (classification.type === 'general') classification.type = 'triage';
     classification.sections.push('vital_signs', 'physical_exam');
+  }
+
+  // Deteksi box "Pengkajian Keperawatan" (keluhan, riwayat penyakit, skala
+  // nyeri, skor ESI) dan Primary Survey — biasanya di halaman Triage IGD.
+  if (/pengkajian\s+keperawatan|skor\s+esi|\bESI\s*[:=]/i.test(pageText)) {
+    classification.sections.push('pengkajian_keperawatan');
+  }
+  if (/primary\s+survey/i.test(pageText)) {
+    classification.sections.push('primary_survey');
+  }
+
+  // Deteksi halaman Assessment/Lembar Lain (Psikososial/Spiritual, Diagnosis
+  // Keperawatan, Pengkajian Fungsional) — biasanya lembar terpisah dari Triage.
+  if (/psikososial|diagnosis\s+keperawatan|pengkajian\s+fungsional/i.test(pageText)) {
+    if (classification.type === 'general') classification.type = 'assessment_keperawatan';
+    classification.sections.push('psikososial_spiritual', 'diagnosis_keperawatan', 'pengkajian_fungsional');
   }
 
   // Deteksi halaman Resep
@@ -335,6 +473,7 @@ function validateVitalSigns(vitalSigns) {
     if (spo2 < 80) {
       report.errors.push(`SpO2 ${spo2}% kritical (<80%), pasien perlu intervensi`);
       report.warnings.push('Nilai kritis, cek dokumen asli');
+      report.valid = false;
     } else if (spo2 > 100) {
       report.warnings.push(`SpO2 ${spo2}% di atas 100%, kemungkinan OCR error`);
     }
@@ -449,5 +588,8 @@ module.exports = {
   classifyPageContent,
   validateVitalSigns,
   enhancedOcrExtraction,
-  CLINICAL_PATTERNS
+  splitToList,
+  CLINICAL_PATTERNS,
+  STRUCTURED_TEXT_PATTERNS,
+  PRIMARY_SURVEY_PATTERNS
 };

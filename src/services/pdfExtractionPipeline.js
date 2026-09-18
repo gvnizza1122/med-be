@@ -365,6 +365,24 @@ async function extractFromPDF(filePath, options = {}) {
       // Lanjutkan tanpa error — parsing notasi bukan blocking operation
     }
 
+    // Ringkasan terstruktur 3-halaman (Resume Medis IGD, Triage IGD,
+    // Assessment/Lembar Lain) siap pakai untuk UI/audit — gabungan hasil OCR
+    // enhancement (extractClinicalFields di ocrEnhancement.js + tableParsingService.js,
+    // dimerge lewat mergeEnhancementsIntoRecord jadi field _ocr_* di atas) dan
+    // parser notasi medis (physical_exam_findings dari claimDataText, jalan
+    // untuk SEMUA dokumen, bukan cuma yang di-OCR). Field _ocr_* individual
+    // TETAP dipertahankan untuk audit trail granular — ini cuma rangkuman.
+    result.record.structured_extraction = {
+      diagnosis: result.record._ocr_diagnosis_list || [],
+      prosedur: result.record._ocr_prosedur_list || [],
+      vital_signs: result.record._ocr_vital_signs_detected || {},
+      pengkajian_keperawatan: result.record._ocr_pengkajian_keperawatan || {},
+      findings: {
+        ...(result.record.physical_exam_findings || {}),
+        ...(result.record._ocr_clinical_findings_notation || {})
+      }
+    };
+
     result.success = true;
   } catch (error) {
     result.errors.push(error.message);
