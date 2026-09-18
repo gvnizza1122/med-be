@@ -9,6 +9,7 @@
 
 const { classifyPdfPages, detectJenisKlaim, hasBpjsPageSignal, hasLaporanOperasiSignal, hasHasilPaSignal } = require('./pdfPageClassifier');
 const { extractClaimData } = require('./pdfExtractionService');
+const { parsePhysicalExam, translateClinicalText } = require('./notasiMedisParser');
 
 /**
  * Jaring pengaman deterministik (regex, BUKAN AI) untuk SEP/NOKARTU/KELAS_RAWAT
@@ -293,6 +294,29 @@ async function extractFromPDF(filePath, options = {}) {
     // menyertakan lampiran wajibnya atau belum (lihat 18 Sep 2026).
     result.record.has_laporan_operasi = hasLaporanOperasiSignal(allPagesText);
     result.record.has_hasil_pa = hasHasilPaSignal(allPagesText);
+
+    // Parse notasi medis dan singkatan klinis dari teks klain
+    try {
+      // Ekstrak teks objektif (pemeriksaan fisik) dari classification.claimDataText
+      // atau allPagesText untuk parsing notasi dan singkatan
+      const clinicalText = classification.claimDataText || allPagesText;
+
+      // Parse temuan pemeriksaan fisik dengan notasi bilaterality
+      const physicalExamFindings = parsePhysicalExam(clinicalText);
+      if (Object.keys(physicalExamFindings).length > 0) {
+        result.record.physical_exam_findings = physicalExamFindings;
+        console.log('[Pipeline] Notasi medis terparse:', Object.keys(physicalExamFindings).length, 'temuan');
+      }
+
+      // Terjemahkan singkatan klinis dalam resume/objective
+      if (result.record.OBJECTIVE_FINDINGS) {
+        result.record.OBJECTIVE_FINDINGS_TRANSLATED = translateClinicalText(result.record.OBJECTIVE_FINDINGS);
+      }
+    } catch (parseErr) {
+      console.warn('[Pipeline] Parsing notasi medis gagal:', parseErr.message || parseErr);
+      // Lanjutkan tanpa error — parsing notasi bukan blocking operation
+    }
+
     result.success = true;
   } catch (error) {
     result.errors.push(error.message);
