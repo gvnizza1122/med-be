@@ -84,6 +84,24 @@ const CLINICAL_PATTERNS = {
 };
 
 /**
+ * Pattern ekstraksi blok teks terstruktur (Diagnosis & Prosedur)
+ */
+const STRUCTURED_TEXT_PATTERNS = {
+  DiagnosisUtama: /Diagnosis\s+Utama\s*:\s*([\s\S]*?)(?=Diagnosis\s+Sekunder|Tindakan\/Prosedur|Terapi|Diet|Keadaan)/i,
+  DiagnosisSekunder: /Diagnosis\s+Sekunder\s*:\s*([\s\S]*?)(?=Tindakan\/Prosedur|Terapi|Diet|Keadaan)/i,
+  TindakanProsedur: /Tindakan\/Prosedur\s*:\s*([\s\S]*?)(?=Terapi\/pengobatan|Diet|Keadaan|Instruksi)/i
+};
+
+/**
+ * Pattern ekstraksi khusus untuk layout tabel Triage IGD
+ */
+const TABLE_PATTERNS = {
+  // Format: BB TB TD Heart Rate RR Temp \n ... 182/106 mmHg 85 x/mnt 20 x/mnt 36.5°C
+  TriageVitalSigns: /(?:VITAL\s+SIGN|TD).*?\n.*?(?:(\d{2,3}\/\d{2,3})\s*mmHg).*?(\d{2,3})\s*x\/mnt.*?(\d{1,2})\s*x\/mnt.*?([\d\.]+)\s*°?C/i
+};
+
+
+/**
  * Extract vital signs dan clinical findings dari OCR text multi-pass
  *
  * Pass 1: General text extraction
@@ -96,9 +114,11 @@ function extractClinicalFields(ocrPages) {
   const result = {
     vital_signs: {},
     clinical_findings: {},
+    structured_text: {},
     raw_extractions: [],
     extraction_confidence: {}
   };
+
 
   if (!Array.isArray(ocrPages) || ocrPages.length === 0) {
     return result;
@@ -148,6 +168,39 @@ function extractClinicalFields(ocrPages) {
           break;
         }
       }
+    }
+  }
+
+  // Extract dari tabel Triage jika belum terisi dari teks linear
+  const triageMatch = allText.match(TABLE_PATTERNS.TriageVitalSigns);
+  if (triageMatch) {
+    const [, bp, hr, rr, temp] = triageMatch;
+    
+    if (!result.vital_signs.BloodPressure) {
+      result.vital_signs.BloodPressure = { value: bp, raw_match: bp, page: findPageNumberInMatch(allText, triageMatch.index), pattern_index: 99 };
+    }
+    if (!result.vital_signs.HeartRate) {
+      result.vital_signs.HeartRate = { value: hr, raw_match: hr, page: findPageNumberInMatch(allText, triageMatch.index), pattern_index: 99 };
+    }
+    if (!result.vital_signs.RespiratoryRate) {
+      result.vital_signs.RespiratoryRate = { value: rr, raw_match: rr, page: findPageNumberInMatch(allText, triageMatch.index), pattern_index: 99 };
+    }
+    if (!result.vital_signs.Temperature) {
+      result.vital_signs.Temperature = { value: temp, raw_match: temp, page: findPageNumberInMatch(allText, triageMatch.index), pattern_index: 99 };
+    }
+  }
+
+  // Extract structured text (Diagnosis & Procedure)
+  for (const [fieldName, pattern] of Object.entries(STRUCTURED_TEXT_PATTERNS)) {
+    const match = allText.match(pattern);
+    if (match && match[1] && match[1].trim() && match[1].trim() !== '-') {
+      result.structured_text[fieldName] = match[1].trim().replace(/\n/g, ' ');
+      result.raw_extractions.push({
+        type: 'structured_text',
+        field: fieldName,
+        match: match[0],
+        page: findPageNumberInMatch(allText, match.index)
+      });
     }
   }
 

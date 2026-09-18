@@ -26,6 +26,7 @@ async function applyOcrEnhancements(standardResult, filePath, options = {}) {
     ocr_enhancement: null,
     vital_signs_from_ocr: {},
     clinical_findings_from_ocr: [],
+    structured_text_from_ocr: {},
     enhancement_applied: false
   };
 
@@ -58,6 +59,11 @@ async function applyOcrEnhancements(standardResult, filePath, options = {}) {
         .filter(([_, found]) => found)
         .map(([finding, _]) => finding);
 
+      // Extract structured text (Diagnosis/Procedure)
+      if (enhancementResult.pass2_clinical_extraction.structured_text) {
+        enhanced.structured_text_from_ocr = enhancementResult.pass2_clinical_extraction.structured_text;
+      }
+
       // Append vital signs ke claimDataText untuk AI review
       if (enhancementResult.vital_signs_validated.validated_values &&
           Object.keys(enhancementResult.vital_signs_validated.validated_values).length > 0) {
@@ -73,10 +79,21 @@ async function applyOcrEnhancements(standardResult, filePath, options = {}) {
         enhanced.claimDataText = `${enhanced.claimDataText}\n\n${clinicalText}`;
       }
 
+      // Append structured text ke claimDataText
+      if (Object.keys(enhanced.structured_text_from_ocr).length > 0) {
+        const struct = enhanced.structured_text_from_ocr;
+        let structText = '[OCR ENHANCED - DIAGNOSIS & PROSEDUR]\n';
+        if (struct.DiagnosisUtama) structText += `Diagnosis Utama: ${struct.DiagnosisUtama}\n`;
+        if (struct.DiagnosisSekunder) structText += `Diagnosis Sekunder: ${struct.DiagnosisSekunder}\n`;
+        if (struct.TindakanProsedur) structText += `Tindakan/Prosedur: ${struct.TindakanProsedur}\n`;
+        enhanced.claimDataText = `${enhanced.claimDataText}\n\n${structText}`;
+      }
+
       enhanced.enhancement_applied = true;
       console.log('[OcrIntegration] Enhancement applied:', {
         vital_signs_found: Object.keys(enhanced.vital_signs_from_ocr).length,
-        clinical_findings_found: enhanced.clinical_findings_from_ocr.length
+        clinical_findings_found: enhanced.clinical_findings_from_ocr.length,
+        structured_text_found: Object.keys(enhanced.structured_text_from_ocr).length
       });
     }
   } catch (error) {
@@ -129,6 +146,7 @@ function mergeEnhancementsIntoRecord(record, enhancementResult) {
   // Tambah field untuk OCR enhancements (bukan overwrite field standard)
   record._ocr_vital_signs_detected = enhancementResult.vital_signs_from_ocr;
   record._ocr_clinical_findings = enhancementResult.clinical_findings_from_ocr;
+  record._ocr_structured_text = enhancementResult.structured_text_from_ocr;
   record._ocr_enhancement_applied = enhancementResult.enhancement_applied;
 
   // Jika BERAT_BADAN terdeteksi dari OCR tapi field di record kosong, isi dari OCR
