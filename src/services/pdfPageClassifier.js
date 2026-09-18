@@ -148,4 +148,29 @@ function hasBpjsPageSignal(fullText) {
   return BPJS_PAGE_MARKERS.some(kw => lower.includes(kw));
 }
 
-module.exports = { classifyPdfPages, isClaimDataPage, detectJenisKlaim, hasBpjsPageSignal };
+// Penanda dokumen ini sudah menyertakan Laporan Operasi Eksisi / Hasil PA --
+// dipakai RV-12 (ruleEngine.js, BA 1247/2024: diagnosis tumor + prosedur
+// eksisi wajib lampiran ini) buat bedakan "genuinely belum dilampirkan" vs
+// "sudah ada, RV-12 jangan salah tuduh". Ditemukan 18 Sep 2026: RV-12
+// SEBELUMNYA selalu fire begitu kode diagnosis+prosedur cocok, TANPA pernah
+// cek isi dokumen -- klaim yang laporannya SUDAH lengkap tetap selalu
+// "Error". SENGAJA berdiri sendiri dari BPJS_PAGE_MARKERS (marker beda
+// konteks) -- "laporan operasi" cukup luas dipakai apa adanya (jarang
+// false-positive di dokumen klinis RS ini), "patologi anatomi"/"hasil pa"/
+// "histopatologi" sbg penanda tambahan PA spesifik.
+const OPERATION_REPORT_MARKERS = ['laporan operasi'];
+const PA_RESULT_MARKERS = ['patologi anatomi', 'hasil pa', 'histopatologi', 'histopatologis'];
+
+function hasLaporanOperasiSignal(fullText) {
+  if (!fullText) return false;
+  const lower = fullText.toLowerCase();
+  return OPERATION_REPORT_MARKERS.some(kw => lower.includes(kw));
+}
+
+function hasHasilPaSignal(fullText) {
+  if (!fullText) return false;
+  const lower = fullText.toLowerCase();
+  return PA_RESULT_MARKERS.some(kw => lower.includes(kw));
+}
+
+module.exports = { classifyPdfPages, isClaimDataPage, detectJenisKlaim, hasBpjsPageSignal, hasLaporanOperasiSignal, hasHasilPaSignal };

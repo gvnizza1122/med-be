@@ -409,14 +409,25 @@ function validateRecord(record, activeRules) {
           return !isNaN(num) && num < 87.0;
         });
 
-        if (hasSurgery) {
+        // 18 Sep 2026: SEBELUM ini RV-12 selalu fire begitu kode diagnosis+
+        // prosedur cocok, TANPA pernah cek apakah dokumennya sendiri SUDAH
+        // menyertakan Laporan Operasi/Hasil PA -- klaim yang lampirannya
+        // sudah lengkap tetap selalu ditandai "Error" (false positive nyata,
+        // ditemukan dari laporan user pada klaim riil). has_laporan_operasi/
+        // has_hasil_pa dihitung dari teks dokumen (deteksi marker, lihat
+        // pdfExtractionPipeline.js) -- konservatif: default false utk record
+        // lama sebelum kolom ini ada, jadi tidak melonggarkan validasi tanpa
+        // sengaja, cuma benar2 clear kalau markernya KETEMU eksplisit.
+        if (hasSurgery && !(record.has_laporan_operasi && record.has_hasil_pa)) {
           errors.push({
             rule_id: 'RV-12',
             field_name: 'diagnosa_list',
             severity: 'major',
             error_message: ruleMap['RV-12'].error_message || 'Diagnosis tumor neoplasma (C00-D48) terdeteksi dengan prosedur bedah. Sesuai BA 1247/2024, wajib melampirkan Laporan Operasi Eksisi dan Hasil Pemeriksaan Patologi Anatomi (PA).',
             expected_value: 'Hasil PA & Laporan Operasi Eksisi',
-            actual_value: `Diag: ${diags.join(', ')} | Procs: ${procs.join(', ')}`
+            actual_value: `Diag: ${diags.join(', ')} | Procs: ${procs.join(', ')}` +
+              (record.has_laporan_operasi ? ' | Laporan Operasi: ADA, Hasil PA: TIDAK TERDETEKSI' :
+                record.has_hasil_pa ? ' | Hasil PA: ADA, Laporan Operasi: TIDAK TERDETEKSI' : '')
           });
         }
       }

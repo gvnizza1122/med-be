@@ -7,7 +7,7 @@
  * Env: AI_PROVIDER_API_KEY (wajib), AI_PROVIDER_BASE_URL, AI_MODEL, AI_MAX_ATTEMPTS, AI_TIMEOUT_MS.
  */
 
-const { classifyPdfPages, detectJenisKlaim, hasBpjsPageSignal } = require('./pdfPageClassifier');
+const { classifyPdfPages, detectJenisKlaim, hasBpjsPageSignal, hasLaporanOperasiSignal, hasHasilPaSignal } = require('./pdfPageClassifier');
 const { extractClaimData } = require('./pdfExtractionService');
 
 /**
@@ -288,6 +288,11 @@ async function extractFromPDF(filePath, options = {}) {
     // Dipakai RV-01/RV-02 (ruleEngine.js) buat bedakan "AI gagal ekstrak
     // NOKARTU dari dokumen BPJS asli" vs "dokumen ini memang bukan klaim BPJS".
     result.record.has_bpjs_page = hasBpjsPageSignal(allPagesText);
+    // Dipakai RV-12 (BA 1247/2024, diagnosis tumor + eksisi) -- SEBELUM ini
+    // RV-12 selalu fire begitu kode cocok, tanpa cek dokumen ini sendiri sudah
+    // menyertakan lampiran wajibnya atau belum (lihat 18 Sep 2026).
+    result.record.has_laporan_operasi = hasLaporanOperasiSignal(allPagesText);
+    result.record.has_hasil_pa = hasHasilPaSignal(allPagesText);
     result.success = true;
   } catch (error) {
     result.errors.push(error.message);

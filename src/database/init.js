@@ -245,6 +245,8 @@ async function initializeSchema() {
         ai_review TEXT,
         raw_data TEXT,
         has_bpjs_page BOOLEAN DEFAULT TRUE,
+        has_laporan_operasi BOOLEAN DEFAULT FALSE,
+        has_hasil_pa BOOLEAN DEFAULT FALSE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
 
@@ -573,7 +575,14 @@ async function migrateSchema(db) {
       // NOKARTU dari dokumen BPJS asli" (tetap critical) vs "dokumennya
       // memang bukan klaim BPJS" (bukan error). Default TRUE supaya record
       // lama (sebelum kolom ini ada) tetap divalidasi ketat seperti biasa.
-      'has_bpjs_page': 'BOOLEAN DEFAULT TRUE'
+      'has_bpjs_page': 'BOOLEAN DEFAULT TRUE',
+      // RV-12 (BA 1247/2024, tumor+eksisi wajib Laporan Operasi/PA) --
+      // SEBELUM ini RV-12 selalu fire begitu kode cocok, tanpa cek dokumen
+      // sudah menyertakan lampiran atau belum (18 Sep 2026). Default FALSE
+      // (konservatif) -- record lama (sebelum kolom ini ada) tetap divalidasi
+      // ketat, cuma record yang deteksinya EKSPLISIT nemu marker yang lolos.
+      'has_laporan_operasi': 'BOOLEAN DEFAULT FALSE',
+      'has_hasil_pa': 'BOOLEAN DEFAULT FALSE'
     };
 
     for (const [col, type] of Object.entries(newCols)) {

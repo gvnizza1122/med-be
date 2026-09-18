@@ -1627,6 +1627,10 @@ async function processSinglePdfUpload(db, { filePath, originalName, jenisKlaim: 
     // teks mentah dokumen. Default true kalau tidak diset (dokumen lama/jalur
     // non-PDF) supaya tidak melonggarkan validasi RV-01/RV-02 tanpa sengaja.
     dbRecord.has_bpjs_page = result.record.has_bpjs_page !== false;
+    // RV-12: konservatif (default false) -- cuma true kalau detector benar2
+    // nemu markernya, lihat catatan di pdfExtractionPipeline.js.
+    dbRecord.has_laporan_operasi = result.record.has_laporan_operasi === true;
+    dbRecord.has_hasil_pa = result.record.has_hasil_pa === true;
 
     // Run validation on extracted record
     const activeRules = await db.prepare('SELECT * FROM validation_rules WHERE is_active = 1').all();
@@ -1656,8 +1660,9 @@ async function processSinglePdfUpload(db, { filePath, originalName, jenisKlaim: 
           id, file_id, row_number, kode_rs, sep, nokartu, nama_pasien, mrn,
           birth_date, gender, kelas_rawat, admission_date, discharge_date,
           discharge_status, diagnosa_list, prosedur_list, dpjp_name,
-          tarif_rs, jenis_klaim, validation_status, error_count, raw_data, klinik_poli, has_bpjs_page
-        ) VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          tarif_rs, jenis_klaim, validation_status, error_count, raw_data, klinik_poli, has_bpjs_page,
+          has_laporan_operasi, has_hasil_pa
+        ) VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
 
       await txInsertRecord.run(
@@ -1671,7 +1676,7 @@ async function processSinglePdfUpload(db, { filePath, originalName, jenisKlaim: 
         extractedData.DPJP,
         /^\d+$/.test(extractedData.TARIF_RS) ? parseInt(extractedData.TARIF_RS) : null, jenisKlaim,
         validationStatus, validationErrors.length, JSON.stringify(extractedData), extractedData.KLINIK_SEP || null,
-        dbRecord.has_bpjs_page
+        dbRecord.has_bpjs_page, dbRecord.has_laporan_operasi, dbRecord.has_hasil_pa
       );
 
       // Save validation errors if any
@@ -1797,6 +1802,8 @@ async function reprocessExistingRecord(db, { fileId, recordId, filePath, jenisKl
     const dbRecord = vclaimToDbFormat(extractedData);
     dbRecord.jenis_klaim = jenisKlaim;
     dbRecord.has_bpjs_page = result.record.has_bpjs_page !== false;
+    dbRecord.has_laporan_operasi = result.record.has_laporan_operasi === true;
+    dbRecord.has_hasil_pa = result.record.has_hasil_pa === true;
 
     const activeRules = await db.prepare('SELECT * FROM validation_rules WHERE is_active = 1').all();
     const validationErrors = validateRecord(dbRecord, activeRules);
@@ -1808,7 +1815,8 @@ async function reprocessExistingRecord(db, { fileId, recordId, filePath, jenisKl
           kode_rs = ?, sep = ?, nokartu = ?, nama_pasien = ?, mrn = ?,
           birth_date = ?, gender = ?, kelas_rawat = ?, admission_date = ?, discharge_date = ?,
           discharge_status = ?, diagnosa_list = ?, prosedur_list = ?, dpjp_name = ?,
-          tarif_rs = ?, validation_status = ?, error_count = ?, raw_data = ?, klinik_poli = ?, has_bpjs_page = ?
+          tarif_rs = ?, validation_status = ?, error_count = ?, raw_data = ?, klinik_poli = ?, has_bpjs_page = ?,
+          has_laporan_operasi = ?, has_hasil_pa = ?
         WHERE id = ?
       `).run(
         extractedData.KODE_RS, extractedData.SEP, extractedData.NOKARTU,
@@ -1821,7 +1829,7 @@ async function reprocessExistingRecord(db, { fileId, recordId, filePath, jenisKl
         extractedData.DPJP,
         /^\d+$/.test(extractedData.TARIF_RS) ? parseInt(extractedData.TARIF_RS) : null,
         validationStatus, validationErrors.length, JSON.stringify(extractedData), extractedData.KLINIK_SEP || null,
-        dbRecord.has_bpjs_page,
+        dbRecord.has_bpjs_page, dbRecord.has_laporan_operasi, dbRecord.has_hasil_pa,
         recordId
       );
 
@@ -2299,7 +2307,8 @@ router.post('/:record_id/update-values', authenticate, async (req, res) => {
     const existing = await db.prepare(`
       SELECT id, file_id, raw_data, kode_rs, sep, nokartu, nama_pasien, mrn,
         birth_date, gender, kelas_rawat, admission_date, discharge_date,
-        discharge_status, diagnosa_list, prosedur_list, dpjp_name, tarif_rs, has_bpjs_page
+        discharge_status, diagnosa_list, prosedur_list, dpjp_name, tarif_rs, has_bpjs_page,
+        has_laporan_operasi, has_hasil_pa
       FROM claim_records WHERE id = ?
     `).get(req.params.record_id);
 
@@ -2338,6 +2347,10 @@ router.post('/:record_id/update-values', authenticate, async (req, res) => {
     // has_bpjs_page bukan field vClaim (tidak lewat MAPPING) — bawa nilai
     // yang sudah tersimpan dari upload awal, edit form tidak mengubahnya.
     dbRecord.has_bpjs_page = existing.has_bpjs_page !== false;
+    // Sama seperti has_bpjs_page: bawa nilai deteksi RV-12 dari upload/baca
+    // ulang terakhir, edit field manual tidak mengubah/menghitung ulang ini.
+    dbRecord.has_laporan_operasi = existing.has_laporan_operasi === true;
+    dbRecord.has_hasil_pa = existing.has_hasil_pa === true;
     const activeRules = await db.prepare('SELECT * FROM validation_rules WHERE is_active = 1').all();
     const validationErrors = validateRecord(dbRecord, activeRules);
     const validationStatus = determineStatus(validationErrors);
