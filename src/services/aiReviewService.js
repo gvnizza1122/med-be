@@ -31,6 +31,7 @@ const {
 const { aggregateKriteria, KRITERIA_LABELS } = require('./kegawatdaruratanAggregation');
 const { getDb } = require('../database/init');
 const { assessPneumoniaSeverityMismatch } = require('./pneumoniaSeverityAssessment');
+const { getInacbgEstimasi } = require('./inacbgTarifDictionary');
 
 const AI_REVIEW_SYSTEM_PROMPT = `Kamu asisten audit klaim BPJS E-Claim untuk perawat/verifikator rumah sakit.
 Kamu diberi data lengkap satu rekam klaim (hasil ekstraksi), daftar field yang gagal validasi otomatis,
@@ -136,8 +137,11 @@ TUGAS:
    KEGAWATDARURATAN_SYSTEM_PROMPT) dengan alasan yang sama. Sama seperti alasan suggestDiagnosisCodesFallback
    dipisah dari task 3 di atas.
 
+7. ESTIMASI INA-CBG: Berdasarkan diagnosis utama yang diklaim (di DIAGLIST) ATAU yang kamu usulkan di "suggested_codes", berikan prediksi/estimasi Kode INA-CBG di properti "suggested_inacbg". Kode berformat HURUF-ANGKA-ANGKA-ROMAWI (contoh: "J-4-15-I" untuk pneumonia ringan, "I-4-10-I" untuk hipertensi, "A-4-14-I" untuk infeksi bakteri/virus). JANGAN tambahkan penjelasan apapun, hanya string kode. Kalau tidak bisa menebak, biarkan kosong ("").
+
 Output HANYA JSON, tanpa markdown/penjelasan, format:
 {
+  "suggested_inacbg": "J-4-15-I",
   "field_notes": { "<field_name>": "catatan & saran Indonesia" },
   "code_evidence": [
     { "code": "...", "type": "diagnosis|procedure", "found": true/false, "page_number": N, "quotation": "..." }
@@ -1472,7 +1476,17 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
         aiResult = JSON.parse(m[0]);
       }
 
-      const result = { field_notes: {}, code_evidence: [], suggested_codes: [], knowledge_updates: [], pending_risk_notes: [], kegawatdaruratan_assessment: null, tokens_used: tokensUsed };
+      const result = { 
+        field_notes: {}, 
+        code_evidence: [], 
+        suggested_codes: [], 
+        knowledge_updates: [], 
+        pending_risk_notes: [], 
+        kegawatdaruratan_assessment: null, 
+        tokens_used: tokensUsed,
+        suggested_inacbg: null,
+        suggested_tarif: null
+      };
       const jenisKlaimRecord = record.JENIS_KLAIM || record.jenis_klaim;
 
       // field_notes: hanya field yang benar-benar ada di validationErrors yang dipertahankan.
@@ -1667,6 +1681,15 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
         result.suggested_codes = await annotateKamusValid(result.suggested_codes);
       } catch (kamusErr) {
         console.warn(`[AI-REVIEW] annotateKamusValid gagal total: ${kamusErr.message}`);
+      }
+
+      // Proses Estimasi INA-CBG dari AI ke dictionary
+      if (aiResult.suggested_inacbg && typeof aiResult.suggested_inacbg === 'string') {
+        const estimasi = getInacbgEstimasi(aiResult.suggested_inacbg);
+        if (estimasi) {
+          result.suggested_inacbg = aiResult.suggested_inacbg;
+          result.suggested_tarif = estimasi.tarif;
+        }
       }
 
       result.generated_at = new Date().toISOString();
