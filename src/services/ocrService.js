@@ -70,6 +70,80 @@ function prioritizePagesForOcr(pageNums, criticalPageNums) {
   });
 }
 
+// ===== BUGFIX (19 Sep 2026 debug session): critical-page detection tidak
+// pernah kena untuk halaman SCAN ASLI =====
+// Root cause: classifyPdfPages()/isCriticalPage() (pdfPageClassifier.js,
+// pdfClassifyWorker.js) menandai is_critical dari TEKS NATIVE hasil
+// pdf-parse — teks itu diambil SEBELUM OCR jalan sama sekali. Untuk halaman
+// yang BENAR-BENAR hasil scan kertas (foto formulir TRIAGE IGD/RESUME MEDIS
+// tanpa text layer tertanam — persis definisi kenapa type-nya 'SCAN' dan
+// masuk antrean OCR), pdf-parse mengembalikan teks nyaris kosong (<50 char,
+// lihat SCAN_CHAR_THRESHOLD), jadi regex CRITICAL_PAGE_MARKERS TIDAK PERNAH
+// match. Akibatnya criticalPageNums selalu kosong utk dokumen full-scan,
+// prioritizePagesForOcr() jadi no-op (semua halaman "non-critical" & urut
+// nomor halaman apa adanya), dan skip logic di loop utama membuang halaman
+// berdasarkan nomor urut -- BUKAN berdasarkan isinya -- begitu deadline
+// mepet. Ini persis penyebab "vital_signs_found: 0" walau 7-8 halaman sudah
+// diproses.
+//
+// Fix: sebelum loop OCR utama, jalankan pre-scan CEPAT beresolusi RENDAH
+// (QUICK_SCAN_SCALE, jauh di bawah DEFAULT_SCALE render worker) khusus utk
+// mendeteksi CRITICAL_PAGE_MARKERS lewat OCR SUNGGUHAN (bukan pdf-parse) --
+// cukup buat baca judul besar halaman ("TRIAGE IGD"/"RESUME MEDIS"), TIDAK
+// perlu detail vital signs (itu tetap tugas pass utama beresolusi tinggi).
+// Dibatasi budget kecil (QUICK_SCAN_BUDGET_MS, diambil dari total budget
+// SUPAYA tidak pernah lebih longgar dari ENHANCEMENT_TIMEOUT_MS) -- begitu
+// budget pre-scan habis, sisa halaman diasumsikan non-critical (fallback ke
+// perilaku lama, bukan fatal) supaya pre-scan sendiri tidak menghabiskan
+// seluruh 180s.
+const QUICK_SCAN_SCALE = 1.5; // ~108 DPI -- cukup baca judul besar, jauh lebih murah dari DEFAULT_SCALE (4.0) di pdfRenderWorker.js
+// Diambil dari ENHANCEMENT_TIMEOUT_MS (bukan konstanta lepas) supaya kalau
+// OCR_ENHANCEMENT_TIMEOUT diubah, budget quick-scan ikut menyesuaikan --
+// dibatasi maksimal 30s supaya pre-scan sendiri tidak memakan seluruh budget
+// pada dokumen dengan banyak halaman scan.
+const QUICK_SCAN_BUDGET_MS = Math.min(30000, Math.floor(ENHANCEMENT_TIMEOUT_MS * 0.2));
+
+/**
+ * Pre-scan cepat (resolusi rendah) untuk deteksi halaman CRITICAL
+ * (TRIAGE IGD/RESUME MEDIS) di antara halaman yang BELUM ketahuan critical
+ * dari teks native (biasanya karena halaman itu scan murni tanpa text
+ * layer). Non-fatal per halaman -- error di satu halaman tidak menghentikan
+ * pre-scan halaman lain.
+ * @param {Buffer} buf - buffer PDF utuh
+ * @param {number[]} pageNums - halaman yang mau di-quick-scan
+ * @param {string} language
+ * @param {number} deadline - epoch ms, batas keras TOTAL budget ocrPdfPages()
+ * @returns {Promise<Set<number>>} halaman yang terdeteksi critical lewat quick-scan
+ */
+async function quickScanCriticalPages(buf, pageNums, language, deadline) {
+  const found = new Set();
+  if (pageNums.length === 0) return found;
+
+  const { isCriticalPage } = require('./pdfPageClassifier');
+  const subDeadline = Math.min(deadline, Date.now() + QUICK_SCAN_BUDGET_MS);
+  console.log(`[OCR][Phase1] Quick-scan critical-page dimulai: ${pageNums.length} halaman kandidat, budget ${QUICK_SCAN_BUDGET_MS}ms`);
+
+  for (const pageNum of pageNums) {
+    if (Date.now() >= subDeadline) {
+      const remaining = pageNums.slice(pageNums.indexOf(pageNum));
+      console.log(`[OCR][Phase1] Quick-scan budget habis -- halaman berikut diasumsikan non-critical (fallback): ${remaining.join(',')}`);
+      break;
+    }
+    try {
+      const pngBuffer = await getRenderPool().run({ bufferData: buf, pageNum, scaleOverride: QUICK_SCAN_SCALE });
+      const quick = await ocrSingleFile(pngBuffer, language);
+      if (isCriticalPage(quick.text)) {
+        found.add(pageNum);
+        console.log(`[OCR][Phase1] Quick-scan: halaman ${pageNum} terdeteksi CRITICAL`);
+      }
+    } catch (err) {
+      console.warn(`[OCR][Phase1] Quick-scan gagal utk halaman ${pageNum} (non-fatal, lanjut):`, err.message || err);
+    }
+  }
+
+  return found;
+}
+
 // Render halaman PDF->PNG via mupdf (dulu doc.loadPage/toPixmap/asPNG inline
 // di sini, resolusi 3x/~216 DPI) itu sendiri CPU-berat & SINKRON — sempat
 // "dibatasi" pakai semaphore Promise (OCR_JOB_CONCURRENCY), TAPI TERBUKTI
@@ -295,8 +369,28 @@ async function ocrPdfPages(pdfPath, pageNumbers = 'auto-scan', language = OCR_CO
       }
     }
 
+    console.log(`[OCR][Phase1] Target OCR: ${targetPages.length} halaman [${targetPages.join(',')}], critical dari teks native: ${criticalPageNums.size} [${[...criticalPageNums].join(',')}]`);
+
+    // BUGFIX (lihat catatan panjang di atas prioritizePagesForOcr()): teks
+    // native (pdf-parse) hampir selalu KOSONG untuk halaman scan murni, jadi
+    // criticalPageNums di atas biasanya kosong untuk dokumen full-scan.
+    // Quick-scan resolusi rendah di bawah ini pakai OCR SUNGGUHAN buat
+    // menemukan TRIAGE IGD/RESUME MEDIS yang tidak lolos deteksi native —
+    // hanya dijalankan kalau masih ada sisa waktu (kalau deadline sudah
+    // mepet, tidak ada gunanya, main loop di bawah akan skip semua non-critical
+    // lagi juga).
+    const pagesNeedingQuickScan = targetPages.filter(p => !criticalPageNums.has(p));
+    if (pagesNeedingQuickScan.length > 0 && Date.now() < deadline - CRITICAL_PAGE_TIMEOUT_MARGIN_MS) {
+      const quickFound = await quickScanCriticalPages(buf, pagesNeedingQuickScan, language, deadline);
+      quickFound.forEach(p => criticalPageNums.add(p));
+      console.log(`[OCR][Phase1] Quick-scan selesai: ${quickFound.size} halaman tambahan terdeteksi critical, total critical sekarang: ${criticalPageNums.size} [${[...criticalPageNums].join(',')}]`);
+    } else if (pagesNeedingQuickScan.length > 0) {
+      console.log('[OCR][Phase1] Quick-scan dilewati — budget sudah mepet sebelum sempat mulai.');
+    }
+
     // CRITICAL (TRIAGE IGD/RESUME MEDIS) duluan — lihat prioritizePagesForOcr().
     targetPages = prioritizePagesForOcr(targetPages, criticalPageNums);
+    console.log(`[OCR][Phase1] Urutan OCR final (critical duluan): [${targetPages.join(',')}]`);
 
     for (const pageNum of targetPages) {
       if (pageNum < 1 || pageNum > totalPages) {
@@ -304,15 +398,22 @@ async function ocrPdfPages(pdfPath, pageNumbers = 'auto-scan', language = OCR_CO
         continue;
       }
 
+      const msRemaining = deadline - Date.now();
+      if (msRemaining <= CRITICAL_PAGE_TIMEOUT_MARGIN_MS) {
+        console.log(`[OCR][Phase1] Deadline mepet (sisa ${msRemaining}ms) saat mau proses halaman ${pageNum} (critical: ${criticalPageNums.has(pageNum)})`);
+      }
+
       // Budget hampir habis & halaman ini BUKAN critical — skip supaya
       // halaman critical yang belum sempat diproses (kalau ada) tetap
       // kebagian waktu, dan Promise.race eksternal (ocrIntegration.js) tidak
       // memaksa "buang semua hasil" begitu batas keras tercapai.
       if (!criticalPageNums.has(pageNum) && Date.now() >= deadline - CRITICAL_PAGE_TIMEOUT_MARGIN_MS) {
+        console.log(`[OCR][Phase1] SKIP halaman ${pageNum} (non-critical, budget habis)`);
         result.skipped_pages.push({ page_number: pageNum, reason: 'ocr_timeout_budget_exceeded_non_critical' });
         continue;
       }
 
+      console.log(`[OCR][Phase1] Memproses halaman ${pageNum}${criticalPageNums.has(pageNum) ? ' (CRITICAL)' : ''}...`);
       const pageStart = Date.now();
       try {
         // Render (dulu inline: doc.loadPage/toPixmap/asPNG di thread utama —
@@ -453,6 +554,9 @@ module.exports = {
   isAvailable,
   shutdownOcrPool,
   prioritizePagesForOcr,
+  quickScanCriticalPages,
   OCR_CONFIG,
-  ENHANCEMENT_TIMEOUT_MS
+  ENHANCEMENT_TIMEOUT_MS,
+  QUICK_SCAN_BUDGET_MS,
+  QUICK_SCAN_SCALE
 };
