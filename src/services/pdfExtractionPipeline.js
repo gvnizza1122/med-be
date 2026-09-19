@@ -185,7 +185,7 @@ async function extractFromPDF(filePath, options = {}) {
   };
 
   try {
-    const classification = await classifyPdfPages(filePath);
+    let classification = await classifyPdfPages(filePath);
     result.classification = classification;
     result.metadata.pagesProcessed = classification.totalPages;
     result.metadata.claimDataPagesFound = classification.claimDataPages.length;
