@@ -482,6 +482,39 @@ function getAnyResumeMedisPageNumbers(evidencePool) {
 }
 
 /**
+ * Fallback document page getters (19 Sep 2026) — dipakai ketika Triase IGD
+ * tidak ada, untuk ekstrak vital signs dan lab data dari dokumen alternatif.
+ * Urutan fallback: Laporan Operasi → Hasil Lab → Radiology → EKG.
+ */
+function getLaporanOperasiPageNumbers(evidencePool) {
+  if (!Array.isArray(evidencePool)) return [];
+  return evidencePool
+    .filter(p => /laporan\s+operasi|laporan\s+tindakan\s+operatif/i.test(p.ocr_text || ''))
+    .map(p => p.page_number);
+}
+
+function getLabResultsPageNumbers(evidencePool) {
+  if (!Array.isArray(evidencePool)) return [];
+  return evidencePool
+    .filter(p => /hasil\s+pemeriksaan\s+laboratorium|pemeriksaan\s+laboratorium|hematologi|kimia\s+darah/i.test(p.ocr_text || ''))
+    .map(p => p.page_number);
+}
+
+function getRadiologyPageNumbers(evidencePool) {
+  if (!Array.isArray(evidencePool)) return [];
+  return evidencePool
+    .filter(p => /hasil\s+pemeriksaan\s+radiologi|radiologi|ct\s+scan|x[\s-]?ray|mri|ultrasound|sonografi/i.test(p.ocr_text || ''))
+    .map(p => p.page_number);
+}
+
+function getEkgPageNumbers(evidencePool) {
+  if (!Array.isArray(evidencePool)) return [];
+  return evidencePool
+    .filter(p => /ekg|elektrokardiogram|electrocardiogram|rekam\s+jantung/i.test(p.ocr_text || ''))
+    .map(p => p.page_number);
+}
+
+/**
  * Prompt fokus TUNGGAL — dipisah dari AI_REVIEW_SYSTEM_PROMPT (yang memuat
  * 7 tugas sekaligus) karena terbukti empiris (7 Sep 2026): saat DIAGLIST
  * kosong TOTAL dan dokumen tidak punya halaman "Berkas Klaim Individual",
@@ -816,7 +849,7 @@ harus persis seperti di atas; vital_findings WAJIB 8 key seperti di atas):
  * @param {Array<string>} [procedureCodes] - PROCLIST record ini (untuk K5, tidak butuh AI)
  * @returns {Promise<{ringkasan:string, parameter_findings:Array, vital_findings:Object, kriteria:Array}>}
  */
-async function assessKegawatdaruratan(evidencePool, triagePageNumbers, umurTahun, umurHari, procedureCodes = [], resumeMedisPageNumbers = []) {
+async function assessKegawatdaruratan(evidencePool, triagePageNumbers, umurTahun, umurHari, procedureCodes = [], resumeMedisPageNumbers = [], fallbackDocPageNumbers = {}) {
   const ageGroup = resolveAgeGroup(umurTahun, umurHari);
   // Instrumen skala nyeri yang diharapkan untuk usia pasien ini (4-tier,
   // dihitung DI SINI dari umur -- bukan AI -- jadi konsisten & auditable,
@@ -844,7 +877,39 @@ async function assessKegawatdaruratan(evidencePool, triagePageNumbers, umurTahun
 
   const apiKey = process.env.AI_PROVIDER_API_KEY;
   const triagePages = evidencePool.filter(p => triagePageNumbers.includes(p.page_number));
-  if (!apiKey || triagePages.length === 0) return emptyResult('Penilaian Kegawatdaruratan tidak dijalankan — tidak ada halaman Triase IGD.');
+
+  // Fallback: kalau tidak ada Triase IGD, coba gunakan Laporan Operasi (untuk vital signs)
+  let hasFallbackPages = false;
+  let fallbackSource = null;
+  let fallbackPages = [];
+
+  if (triagePages.length === 0) {
+    fallbackDocPageNumbers = fallbackDocPageNumbers || {};
+    const laporanOpPageNums = fallbackDocPageNumbers.laporan_operasi || [];
+    const labResultsPageNums = fallbackDocPageNumbers.lab_results || [];
+    const radiologyPageNums = fallbackDocPageNumbers.radiology || [];
+
+    // Prioritas fallback: Laporan Operasi (vital signs) → Lab Results → Radiology
+    if (laporanOpPageNums.length > 0) {
+      fallbackPages = evidencePool.filter(p => laporanOpPageNums.includes(p.page_number));
+      fallbackSource = 'laporan_operasi';
+      hasFallbackPages = true;
+    } else if (labResultsPageNums.length > 0) {
+      fallbackPages = evidencePool.filter(p => labResultsPageNums.includes(p.page_number));
+      fallbackSource = 'lab_results';
+      hasFallbackPages = true;
+    } else if (radiologyPageNums.length > 0) {
+      fallbackPages = evidencePool.filter(p => radiologyPageNums.includes(p.page_number));
+      fallbackSource = 'radiology';
+      hasFallbackPages = true;
+    }
+
+    if (!hasFallbackPages) {
+      return emptyResult('Penilaian Kegawatdaruratan tidak dijalankan — tidak ada halaman Triase IGD atau dokumen fallback (Laporan Operasi/Lab Results/Radiology).');
+    }
+  }
+
+  if (!apiKey || (triagePages.length === 0 && !hasFallbackPages)) return emptyResult('Penilaian Kegawatdaruratan tidak dijalankan — tidak ada halaman Triase IGD.');
   // Resume Medis Rawat Inap -- KONTEKS TAMBAHAN saja untuk Tabel 1 (keputusan
   // 11 Sep 2026, Opsi A), TIDAK mempengaruhi Bagian 2/3 atau agregasi K1-K5
   // (lihat catatan di getResumeMedisPageNumbers & prompt Bagian 1-3 di atas).
@@ -856,11 +921,34 @@ async function assessKegawatdaruratan(evidencePool, triagePageNumbers, umurTahun
 
   let userPrompt = umurTahun ? `UMUR_TAHUN pasien: ${umurTahun}\n\n` : '';
   if (painInstrument) userPrompt += `INSTRUMEN SKALA NYERI YANG DIHARAPKAN untuk pasien usia ini: ${painInstrument}\n\n`;
-  userPrompt += '=== TRIASE IGD ===\nTEKS HALAMAN TRIASE IGD (sumber utama, WAJIB untuk Bagian 2 & 3):\n================================\n';
-  const sorted = [...triagePages].sort((a, b) => a.page_number - b.page_number);
-  for (const ev of sorted) {
-    userPrompt += `=== Halaman ${ev.page_number} ===\n${ev.ocr_text}\n\n`;
+
+  // Gunakan Triase IGD jika ada, fallback ke dokumen alternatif jika tidak ada
+  if (triagePages.length > 0) {
+    userPrompt += '=== TRIASE IGD ===\nTEKS HALAMAN TRIASE IGD (sumber utama, WAJIB untuk Bagian 2 & 3):\n================================\n';
+    const sorted = [...triagePages].sort((a, b) => a.page_number - b.page_number);
+    for (const ev of sorted) {
+      userPrompt += `=== Halaman ${ev.page_number} ===\n${ev.ocr_text}\n\n`;
+    }
+  } else if (hasFallbackPages && fallbackSource === 'laporan_operasi') {
+    userPrompt += '=== LAPORAN OPERASI (FALLBACK - TRIASE IGD TIDAK ADA) ===\nTEKS HALAMAN LAPORAN OPERASI (dipakai sebagai fallback sumber vital signs, karena Triase IGD tidak ada):\n================================\n';
+    const sorted = [...fallbackPages].sort((a, b) => a.page_number - b.page_number);
+    for (const ev of sorted) {
+      userPrompt += `=== Halaman ${ev.page_number} ===\n${ev.ocr_text}\n\n`;
+    }
+  } else if (hasFallbackPages && fallbackSource === 'lab_results') {
+    userPrompt += '=== HASIL PEMERIKSAAN LABORATORIUM (FALLBACK - TRIASE IGD TIDAK ADA) ===\nTEKS HALAMAN HASIL LAB (dipakai sebagai fallback, karena Triase IGD tidak ada):\n================================\n';
+    const sorted = [...fallbackPages].sort((a, b) => a.page_number - b.page_number);
+    for (const ev of sorted) {
+      userPrompt += `=== Halaman ${ev.page_number} ===\n${ev.ocr_text}\n\n`;
+    }
+  } else if (hasFallbackPages && fallbackSource === 'radiology') {
+    userPrompt += '=== HASIL PEMERIKSAAN RADIOLOGI (FALLBACK - TRIASE IGD TIDAK ADA) ===\nTEKS HALAMAN RADIOLOGI (dipakai sebagai fallback, karena Triase IGD tidak ada):\n================================\n';
+    const sorted = [...fallbackPages].sort((a, b) => a.page_number - b.page_number);
+    for (const ev of sorted) {
+      userPrompt += `=== Halaman ${ev.page_number} ===\n${ev.ocr_text}\n\n`;
+    }
   }
+
   if (resumeMedisPages.length > 0) {
     userPrompt += '=== RESUME MEDIS RAWAT INAP ===\nTEKS HALAMAN RESUME MEDIS RAWAT INAP (KONTEKS TAMBAHAN untuk Bagian 1 SAJA -- ' +
       'JANGAN dipakai untuk Bagian 2 atau Bagian 3):\n================================\n';
@@ -931,12 +1019,17 @@ async function assessKegawatdaruratan(evidencePool, triagePageNumbers, umurTahun
 
     // --- Validasi & bangun parameter_findings (Bagian 1, anti-halusinasi) ---
     // Sumber diterima: TRIASE IGD (utama) ATAU RESUME MEDIS RAWAT INAP
-    // (konteks tambahan, Opsi A 11 Sep 2026) -- page_number WAJIB masuk
-    // salah satu daftar ini, kalau tidak (mis. halaman lain sama sekali)
-    // ditolak sama seperti sebelumnya. sumber_dokumen dihitung DI SINI dari
-    // page_number, BUKAN dipercaya dari klaim AI -- supaya tidak bisa salah
+    // (konteks tambahan, Opsi A 11 Sep 2026) ATAU FALLBACK DOCS (19 Sep 2026) --
+    // page_number WAJIB masuk salah satu daftar ini, kalau tidak (mis. halaman lain
+    // sama sekali) ditolak sama seperti sebelumnya. sumber_dokumen dihitung DI SINI
+    // dari page_number, BUKAN dipercaya dari klaim AI -- supaya tidak bisa salah
     // label sumber walau AI keliru.
-    const validParamPages = new Set([...triagePageNumbers, ...resumeMedisPageNumbers]);
+    const fallbackPageNums = fallbackPages.map(p => p.page_number);
+    const validParamPages = new Set([
+      ...triagePageNumbers,
+      ...resumeMedisPageNumbers,
+      ...fallbackPageNums
+    ]);
     const rawParams = Array.isArray(parsed.parameter_findings) ? parsed.parameter_findings : [];
     const paramByKey = new Map(rawParams.map(p => [p?.key, p]));
     const parameterFindings = PARAMETER_TABLE.map(spec => {
@@ -947,7 +1040,9 @@ async function assessKegawatdaruratan(evidencePool, triagePageNumbers, umurTahun
         && validateQuotation(p.kutipan, p.page_number, evidencePool) && !hasFinancialTerms(p.kutipan);
       if (!validQuote) return { key: spec.key, label: spec.label, ditemukan: false, status: null, nilai: null, page_number: null, kutipan: null, sumber_dokumen: null };
       const status = p.status === 'abnormal' ? 'abnormal' : p.status === 'normal' ? 'normal' : null;
-      const sumberDokumen = triagePageNumbers.includes(p.page_number) ? 'triase_igd' : 'resume_medis';
+      let sumberDokumen = 'resume_medis';
+      if (triagePageNumbers.includes(p.page_number)) sumberDokumen = 'triase_igd';
+      else if (fallbackPageNums.includes(p.page_number)) sumberDokumen = fallbackSource || 'fallback_doc';
       // retraksi_grade: HANYA berlaku utk key 'retraksi', diabaikan (selalu null) utk 10
       // parameter lain -- dipakai assessPneumoniaSeverityMismatch (modul pneumonia J12-J18),
       // TIDAK dipakai aggregateKriteria (K2 tetap murni cek status==='abnormal', tidak berubah).
@@ -963,13 +1058,18 @@ async function assessKegawatdaruratan(evidencePool, triagePageNumbers, umurTahun
     });
 
     // --- Validasi & bangun vital_findings (Bagian 2) + hitung band via lookupBand ---
+    // Dengan fallback: izinkan vital dari halaman fallback jika Triase IGD tidak ada (19 Sep 2026)
+    const validVitalPages = triagePages.length > 0 ? new Set(triagePageNumbers) : new Set(fallbackPages.map(p => p.page_number));
+    const sourceDocType = triagePages.length > 0 ? 'triase_igd' : fallbackSource || 'triase_igd';
+    const pagesForFormStatus = triagePages.length > 0 ? triagePages : fallbackPages;
+
     const rawVitals = parsed.vital_findings && typeof parsed.vital_findings === 'object' ? parsed.vital_findings : {};
     const vitalFindings = {};
     for (const key of ['RR', 'SpO2', 'HR', 'TD_sistolik', 'TD_diastolik', 'Suhu', 'GCS', 'Nyeri']) {
       const v = rawVitals[key];
       const nilai = v && Number.isFinite(Number(v.nilai)) ? Number(v.nilai) : null;
       const validQuote = nilai !== null && v.kutipan && v.page_number
-        && triagePageNumbers.includes(v.page_number)
+        && validVitalPages.has(v.page_number)
         && validateQuotation(v.kutipan, v.page_number, evidencePool) && !hasFinancialTerms(v.kutipan);
       const nyeriExtra = key === 'Nyeri' ? { instrumen_diharapkan: painInstrument } : {};
       // Tri-state (fix item 4, 19 Sep 2026): bedakan "kolomnya ada di form tapi
@@ -977,7 +1077,7 @@ async function assessKegawatdaruratan(evidencePool, triagePageNumbers, umurTahun
       // punya kolom itu" (not_in_form, BUKAN masalah -- mis. SpO2 tidak
       // dicetak di form Triase IGD RS ybs). Deterministik (regex ke teks
       // mentah halaman Triase), lihat documentFieldTemplate.js.
-      const formStatus = resolveFieldFormStatus(key, 'triase_igd', triagePages, validQuote);
+      const formStatus = resolveFieldFormStatus(key, sourceDocType, pagesForFormStatus, validQuote);
       if (!validQuote) {
         vitalFindings[key] = { nilai: null, band: null, page_number: null, kutipan: null, form_status: formStatus, ...nyeriExtra };
         continue;
@@ -991,11 +1091,13 @@ async function assessKegawatdaruratan(evidencePool, triagePageNumbers, umurTahun
     }
 
     // --- Validasi K1 (Bagian 3, tetap AI judgment) ---
+    // HANYA dari Triase IGD atau fallback pages (dengan preferensi Triase) - Opsi A, lihat catatan di atas
+    const validK1Pages = triagePages.length > 0 ? new Set(triagePageNumbers) : new Set(fallbackPages.map(p => p.page_number));
     const rawK1 = parsed.k1 || {};
     let k1Result = { status: 'tidak', page_number: null, kutipan: null, catatan: '' };
     if (rawK1.status === 'ya') {
       const validQuote = rawK1.kutipan && rawK1.page_number
-        && triagePageNumbers.includes(rawK1.page_number)
+        && validK1Pages.has(rawK1.page_number)
         && validateQuotation(rawK1.kutipan, rawK1.page_number, evidencePool) && !hasFinancialTerms(rawK1.kutipan);
       if (validQuote) {
         k1Result = {
@@ -1006,30 +1108,33 @@ async function assessKegawatdaruratan(evidencePool, triagePageNumbers, umurTahun
     }
 
     // --- Validasi tindakan_keperawatan & esi (Bagian 4, fix item 5) ---
-    // Sama seperti Bagian 2/3: WAJIB dari Triase IGD saja, quote-validated
+    // Sama seperti Bagian 2/3: WAJIB dari Triase IGD atau fallback docs, quote-validated
     // sama seperti field lain (anti-halusinasi, TIDAK ada pengecualian).
+    const validTindakanPages = triagePages.length > 0 ? new Set(triagePageNumbers) : new Set(fallbackPages.map(p => p.page_number));
     const rawTindakan = Array.isArray(parsed.tindakan_keperawatan) ? parsed.tindakan_keperawatan : [];
     const tindakanKeperawatan = [];
     for (const t of rawTindakan) {
       const validQuote = t && t.quotation && t.page_number
-        && triagePageNumbers.includes(t.page_number)
+        && validTindakanPages.has(t.page_number)
         && validateQuotation(t.quotation, t.page_number, evidencePool) && !hasFinancialTerms(t.quotation);
       if (validQuote) {
         tindakanKeperawatan.push({ quotation: String(t.quotation).substring(0, 200), page_number: t.page_number });
       }
     }
     // matchTindakanSegera (procedure_rules.json) dijalankan terhadap TEKS ASLI
-    // halaman Triase (bukan terhadap tindakanKeperawatan hasil ekstraksi AI di
+    // halaman Triase atau fallback (bukan terhadap tindakanKeperawatan hasil ekstraksi AI di
     // atas) -- deterministik murni, tidak tergantung AI menangkap semua
     // tindakan dengan benar. tindakanKeperawatan (ekstraksi AI, quote-
     // validated) tetap dikembalikan terpisah sebagai data mentah utk display.
-    const tindakanSegeraMatches = matchTindakanSegera(triagePages);
+    const pagesForTindakan = triagePages.length > 0 ? triagePages : fallbackPages;
+    const tindakanSegeraMatches = matchTindakanSegera(pagesForTindakan);
 
+    const validEsiPages = triagePages.length > 0 ? new Set(triagePageNumbers) : new Set(fallbackPages.map(p => p.page_number));
     const rawEsi = parsed.esi || {};
     let esiResult = { skor: null, page_number: null, kutipan: null };
     if (Number.isFinite(Number(rawEsi.skor))) {
       const validQuote = rawEsi.kutipan && rawEsi.page_number
-        && triagePageNumbers.includes(rawEsi.page_number)
+        && validEsiPages.has(rawEsi.page_number)
         && validateQuotation(rawEsi.kutipan, rawEsi.page_number, evidencePool) && !hasFinancialTerms(rawEsi.kutipan);
       if (validQuote) {
         esiResult = { skor: Number(rawEsi.skor), page_number: rawEsi.page_number, kutipan: rawEsi.kutipan.substring(0, 200) };
@@ -1037,11 +1142,13 @@ async function assessKegawatdaruratan(evidencePool, triagePageNumbers, umurTahun
     }
 
     // --- Agregasi K1-K5 (murni kode, lihat kegawatdaruratanAggregation.js) ---
-    // WAJIB pakai HANYA temuan bersumber Triase IGD -- temuan dari Resume
-    // Medis Rawat Inap TETAP ditampilkan di parameter_findings (Tabel 1,
-    // untuk konteks) tapi TIDAK BOLEH ikut menentukan verdict K1-K5 (Opsi A,
-    // lihat catatan di getIgdTriagePageNumbers/getResumeMedisPageNumbers).
-    const triageOnlyFindings = parameterFindings.filter(p => p.sumber_dokumen === 'triase_igd' || p.sumber_dokumen === null);
+    // WAJIB pakai HANYA temuan bersumber Triase IGD (atau fallback jika ada) --
+    // temuan dari Resume Medis Rawat Inap TETAP ditampilkan di parameter_findings
+    // (Tabel 1, untuk konteks) tapi TIDAK BOLEH ikut menentukan verdict K1-K5
+    // (Opsi A, lihat catatan di getIgdTriagePageNumbers/getResumeMedisPageNumbers).
+    // Dengan fallback: izinkan sumber fallback jika Triase IGD tidak ada (19 Sep 2026).
+    const primarySourceTypes = triagePages.length > 0 ? ['triase_igd', null] : [fallbackSource, null];
+    const triageOnlyFindings = parameterFindings.filter(p => primarySourceTypes.includes(p.sumber_dokumen));
     const kriteria = aggregateKriteria(triageOnlyFindings, vitalFindings, k1Result, procedureCodes, tindakanSegeraMatches, esiResult.skor !== null ? esiResult : null);
 
     const ringkasan = buildRingkasan(kriteria, ageGroup);
@@ -1770,16 +1877,23 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
       // sudah punya fallback kosong internal kalau panggilannya gagal total).
       const triagePageNumbers = getIgdTriagePageNumbers(evidencePool);
       const resumeMedisPageNumbers = getResumeMedisPageNumbers(evidencePool);
+      // Fallback dokumen (19 Sep 2026) — dipakai ketika Triase IGD tidak ada
+      const fallbackDocPageNumbers = {
+        laporan_operasi: getLaporanOperasiPageNumbers(evidencePool),
+        lab_results: getLabResultsPageNumbers(evidencePool),
+        radiology: getRadiologyPageNumbers(evidencePool),
+        ekg: getEkgPageNumbers(evidencePool),
+      };
       const [pendingRiskNotes, kegawatdaruratanAssessment] = await Promise.all([
         assessPendingRiskPatterns(record, evidencePool).catch(riskErr => {
           console.warn(`[AI-REVIEW] assessPendingRiskPatterns error: ${riskErr.message}`);
           return [];
         }),
-        hasIgdTriagePage(evidencePool)
+        hasIgdTriagePage(evidencePool) || Object.values(fallbackDocPageNumbers).some(arr => arr.length > 0)
           ? assessKegawatdaruratan(
               evidencePool, triagePageNumbers,
               record.UMUR_TAHUN || record.umur_tahun, record.UMUR_HARI || record.umur_hari,
-              codes.procedure, resumeMedisPageNumbers
+              codes.procedure, resumeMedisPageNumbers, fallbackDocPageNumbers
             ).catch(kegawatErr => {
               console.warn(`[AI-REVIEW] assessKegawatdaruratan error: ${kegawatErr.message}`);
               return null;
@@ -1952,4 +2066,9 @@ module.exports = {
   assessKegawatdaruratan,
   getIgdTriagePageNumbers,
   getResumeMedisPageNumbers,
+  // Fallback document page getters (19 Sep 2026)
+  getLaporanOperasiPageNumbers,
+  getLabResultsPageNumbers,
+  getRadiologyPageNumbers,
+  getEkgPageNumbers,
 };

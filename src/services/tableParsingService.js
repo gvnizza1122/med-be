@@ -254,11 +254,145 @@ function parseAssessmentSection(text) {
   return result;
 }
 
+/**
+ * Ekstrak vital signs dari Laporan Operasi: Time, Sistole, Diastole, Nadi,
+ * Respirasi, Suhu, SpO2 (ketujuh field sesuai tugas).
+ *
+ * @param {string} text - teks halaman Laporan Operasi
+ * @returns {{jam?: string, sistole?: string, diastole?: string, nadi?: string, respirasi?: string, suhu?: string, spo2?: string, raw_table?: Object}}
+ */
+function parseLaporanOperasiVitalSigns(text) {
+  const result = {};
+  if (!text || typeof text !== 'string') return result;
+
+  // Fokus ke sekitar tabel vital signs di Laporan Operasi
+  const sectionMatch = text.match(/(?:TABEL\s+VITAL\s+SIGN|VITAL\s+SIGN|VITAL\s+SIGNS?|MONITORING\s+TEKANAN\s+DARAH)[\s\S]{0,1000}?(?=ANESTETIK|OBAT|DIAGNOSIS|TINDAKAN|$)/i);
+  const scope = sectionMatch ? sectionMatch[0] : text;
+
+  // Ekstraksi tabel generik dari scope
+  const table = parseTable(scope);
+  if (table.header.length > 0 && table.rows.length > 0) {
+    // Simpan tabel raw untuk audit
+    result.raw_table = table;
+
+    // Map header ke field nama standard (case-insensitive)
+    const headerMap = {};
+    table.header.forEach((h, idx) => {
+      const lower = (h || '').toLowerCase();
+      if (/^(jam|waktu|time)$/i.test(lower)) headerMap[idx] = 'jam';
+      else if (/^sistole|^sys|^sbp/i.test(lower)) headerMap[idx] = 'sistole';
+      else if (/^diastole|^dia|^dbp/i.test(lower)) headerMap[idx] = 'diastole';
+      else if (/^nadi|^hr|^pulse|heart\s+rate/i.test(lower)) headerMap[idx] = 'nadi';
+      else if (/^respirasi|^rr|^resp/i.test(lower)) headerMap[idx] = 'respirasi';
+      else if (/^suhu|^temp|temperature/i.test(lower)) headerMap[idx] = 'suhu';
+      else if (/^spo2|^o2\s*sat|oxygen\s+sat/i.test(lower)) headerMap[idx] = 'spo2';
+    });
+
+    // Ekstrak baris pertama (waktu operasi biasanya)
+    if (table.rows.length > 0) {
+      const row = table.rows[0];
+      Object.entries(headerMap).forEach(([idx, field]) => {
+        const val = row[`col${Number(idx) + 1}`];
+        if (val && val.trim()) {
+          result[field] = val.trim();
+        }
+      });
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Ekstrak hasil laboratorium (Hematologi & Kimia) dari dokumen Hasil Pemeriksaan
+ * Laboratorium. Struktur: HEMATOLOGI (WBC, RBC, Hemoglobin, Hematocrit, Platelet, dll)
+ * dan KIMIA (Glucose, Creatinine, Bilirubin, Albumin, dll).
+ *
+ * @param {string} text - teks halaman Hasil Pemeriksaan Laboratorium
+ * @returns {{hematologi?: Array<{test?: string, value?: string, unit?: string, flag?: string}>, kimia?: Array<{test?: string, value?: string, unit?: string, flag?: string}>}}
+ */
+function parseLabResults(text) {
+  const result = { hematologi: [], kimia: [] };
+  if (!text || typeof text !== 'string') return result;
+
+  // Ekstraksi HEMATOLOGI
+  const hematologyMatch = text.match(/HEMATOLOGI[\s\S]{0,800}?(?=KIMIA|ANALISA|SEROLOGY|$)/i);
+  if (hematologyMatch) {
+    const hematologyText = hematologyMatch[0];
+    // Parse baris "NamaTest    Nilai    Unit    Flag" atau serupa
+    const hematologyLines = hematologyText.split(/\n/).slice(1); // skip header "HEMATOLOGI"
+    for (const line of hematologyLines) {
+      if (!line.trim() || /^(HEMATOLOGI|KIMIA|ANALISA)/i.test(line)) break;
+      const tokens = splitRowTokens(line);
+      if (tokens.length >= 2) {
+        result.hematologi.push({
+          test: tokens[0] || null,
+          value: tokens[1] || null,
+          unit: tokens[2] || null,
+          flag: tokens[3] || null
+        });
+      }
+    }
+  }
+
+  // Ekstraksi KIMIA
+  const chemistryMatch = text.match(/KIMIA|ANALISA\s+KIMIA[\s\S]{0,800}?(?=SEROLOGY|ANALISA|$)/i);
+  if (chemistryMatch) {
+    const chemistryText = chemistryMatch[0];
+    // Parse baris serupa dengan HEMATOLOGI
+    const chemistryLines = chemistryText.split(/\n/).slice(1); // skip header
+    for (const line of chemistryLines) {
+      if (!line.trim() || /^(HEMATOLOGI|KIMIA|SEROLOGY|ANALISA)/i.test(line)) break;
+      const tokens = splitRowTokens(line);
+      if (tokens.length >= 2) {
+        result.kimia.push({
+          test: tokens[0] || null,
+          value: tokens[1] || null,
+          unit: tokens[2] || null,
+          flag: tokens[3] || null
+        });
+      }
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Ekstrak temuan radiologi dari dokumen Hasil Pemeriksaan Radiologi
+ *
+ * @param {string} text - teks halaman radiologi
+ * @returns {{diagnosis_radiologi?: string, findings?: string, impression?: string, technique?: string}}
+ */
+function parseRadiologyFindings(text) {
+  const result = {};
+  if (!text || typeof text !== 'string') return result;
+
+  const patterns = {
+    diagnosis_radiologi: /DIAGNOSIS\s+RADIOLOGI\s*:?\s*([\s\S]*?)(?=FINDINGS|IMPRESSION|TEKNIK|$)/i,
+    findings: /FINDINGS?\s*:?\s*([\s\S]*?)(?=IMPRESSION|DIAGNOSIS|KESIMPULAN|REKOMENDASI|$)/i,
+    impression: /IMPRESSION|KESIMPULAN\s*:?\s*([\s\S]*?)(?=REKOMENDASI|TEKNIK|FINDINGS|DIAGNOSIS|$)/i,
+    technique: /TEKNIK|TECHNIQUE\s*:?\s*([\s\S]*?)(?=FINDINGS|IMPRESSION|DIAGNOSIS|$)/i,
+  };
+
+  for (const [key, pattern] of Object.entries(patterns)) {
+    const match = text.match(pattern);
+    if (match && match[1] !== undefined && match[1].trim() && match[1].trim() !== '-') {
+      result[key] = match[1].trim().replace(/\s*\n\s*/g, ' ').substring(0, 500);
+    }
+  }
+
+  return result;
+}
+
 module.exports = {
   parseTable,
   parseVitalSignsTable,
   parsePengkajianKeperawatanBox,
   parseAssessmentSection,
+  parseLaporanOperasiVitalSigns,
+  parseLabResults,
+  parseRadiologyFindings,
   // Diekspor untuk unit test granular
   splitRowTokens,
   looksLikeHeaderLine,

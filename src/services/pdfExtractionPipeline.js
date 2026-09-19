@@ -9,7 +9,7 @@
  * Env: OCR_ENHANCEMENT_ENABLED (default true) — enable multi-pass OCR enhancement
  */
 
-const { classifyPdfPages, detectJenisKlaim, hasBpjsPageSignal, hasLaporanOperasiSignal, hasHasilPaSignal } = require('./pdfPageClassifier');
+const { classifyPdfPages, detectJenisKlaim, hasBpjsPageSignal, hasLaporanOperasiSignal, hasHasilPaSignal, hasLaporanOperasiVitalSigns, hasLabResultsData, hasRadiologyData } = require('./pdfPageClassifier');
 const { extractClaimData } = require('./pdfExtractionService');
 const { parsePhysicalExam, translateClinicalText } = require('./notasiMedisParser');
 const { applyOcrEnhancements, mergeEnhancementsIntoRecord } = require('./ocrIntegration');
@@ -336,6 +336,11 @@ async function extractFromPDF(filePath, options = {}) {
     // menyertakan lampiran wajibnya atau belum (lihat 18 Sep 2026).
     result.record.has_laporan_operasi = hasLaporanOperasiSignal(allPagesText);
     result.record.has_hasil_pa = hasHasilPaSignal(allPagesText);
+    // Fallback document signals (19 Sep 2026) — dipakai buat fallback K1-K5
+    // assessment ketika Triase IGD tidak ada (lihat aiReviewService.js).
+    result.record.has_laporan_operasi_vital_signs = hasLaporanOperasiVitalSigns(allPagesText);
+    result.record.has_lab_results = hasLabResultsData(allPagesText);
+    result.record.has_radiology_data = hasRadiologyData(allPagesText);
 
     // ENHANCEMENT: Merge OCR enhancements (vital signs, clinical findings) ke record
     if (classification.ocr_enhancement && classification.enhancement_applied) {

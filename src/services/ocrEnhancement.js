@@ -22,6 +22,9 @@ const {
   parseVitalSignsTable,
   parsePengkajianKeperawatanBox,
   parseAssessmentSection,
+  parseLaporanOperasiVitalSigns,
+  parseLabResults,
+  parseRadiologyFindings,
 } = require('./tableParsingService');
 
 /**
@@ -141,6 +144,35 @@ const PRIMARY_SURVEY_PATTERNS = {
   Circulation: new RegExp(`Circulation\\s*:?\\s*([\\s\\S]*?)(?=Disability|${PRIMARY_SURVEY_LOOKAHEAD_TAIL}|$)`, 'i'),
   Disability: new RegExp(`Disability\\s*:?\\s*([\\s\\S]*?)(?=Exposure|${PRIMARY_SURVEY_LOOKAHEAD_TAIL}|$)`, 'i'),
   Exposure: new RegExp(`Exposure\\s*:?\\s*([\\s\\S]*?)(?=${PRIMARY_SURVEY_LOOKAHEAD_TAIL}|$)`, 'i'),
+};
+
+/**
+ * Pattern ekstraksi dari Laporan Operasi (fallback sources) — Diagnosis Pra/Pasca
+ * Tindakan, Tindakan Operasi, Anestetik, Obat-obatan.
+ */
+const LAPORAN_OPERASI_PATTERNS = {
+  DiagnosisPraTindakan: new RegExp(`Diagnosis\\s+Pra\\s*Tindakan\\s*:\\s*([\\s\\S]*?)${NEXT_SECTION_LOOKAHEAD}`, 'i'),
+  DiagnosisPascaTindakan: new RegExp(`Diagnosis\\s+Pasca\\s*Tindakan\\s*:\\s*([\\s\\S]*?)${NEXT_SECTION_LOOKAHEAD}`, 'i'),
+  TindakanOperasi: new RegExp(`Tindakan\\s+Operasi\\s*:\\s*([\\s\\S]*?)${NEXT_SECTION_LOOKAHEAD}`, 'i'),
+  Anestetik: new RegExp(`Anestetik\\s*:\\s*([\\s\\S]*?)${NEXT_SECTION_LOOKAHEAD}`, 'i'),
+  ObatObatan: new RegExp(`Obat(?:\\s*[-–]?\\s*obatan)?\\s*:\\s*([\\s\\S]*?)${NEXT_SECTION_LOOKAHEAD}`, 'i'),
+};
+
+/**
+ * Pattern ekstraksi dari Hasil Pemeriksaan Laboratorium
+ */
+const LAB_RESULTS_PATTERNS = {
+  Hematologi: new RegExp(`HEMATOLOGI\\s*([\\s\\S]*?)(?=KIMIA|ANALISA|SEROLOGY|$)`, 'i'),
+  Kimia: new RegExp(`KIMIA|ANALISA\\s+KIMIA\\s*([\\s\\S]*?)(?=SEROLOGY|ANALISA|$)`, 'i'),
+};
+
+/**
+ * Pattern ekstraksi dari Hasil Pemeriksaan Radiologi
+ */
+const RADIOLOGY_PATTERNS = {
+  DiagnosisRadiologi: new RegExp(`DIAGNOSIS\\s+RADIOLOGI\\s*:\\s*([\\s\\S]*?)${NEXT_SECTION_LOOKAHEAD}`, 'i'),
+  Findings: new RegExp(`FINDINGS?\\s*:\\s*([\\s\\S]*?)${NEXT_SECTION_LOOKAHEAD}`, 'i'),
+  Impression: new RegExp(`IMPRESSION|KESIMPULAN\\s*:\\s*([\\s\\S]*?)${NEXT_SECTION_LOOKAHEAD}`, 'i'),
 };
 
 /**
@@ -410,6 +442,30 @@ function classifyPageContent(pageText) {
     classification.sections.push('patient_info', 'eligibility');
   }
 
+  // Deteksi Laporan Operasi (fallback source, 19 Sep 2026)
+  if (/laporan\s+operasi|laporan\s+tindakan\s+operatif/i.test(pageText)) {
+    if (classification.type === 'general') classification.type = 'laporan_operasi';
+    classification.sections.push('vital_signs', 'diagnosis', 'prosedur', 'anestetik', 'obat');
+  }
+
+  // Deteksi Hasil Pemeriksaan Laboratorium (fallback source, 19 Sep 2026)
+  if (/hasil\s+pemeriksaan\s+laboratorium|pemeriksaan\s+laboratorium|hematologi|kimia\s+darah/i.test(pageText)) {
+    if (classification.type === 'general') classification.type = 'lab_results';
+    classification.sections.push('hematologi', 'kimia', 'lab_results');
+  }
+
+  // Deteksi Hasil Pemeriksaan Radiologi (fallback source, 19 Sep 2026)
+  if (/hasil\s+pemeriksaan\s+radiologi|radiologi|ct\s+scan|x[\s-]?ray|mri|ultrasound|sonografi/i.test(pageText)) {
+    if (classification.type === 'general') classification.type = 'radiology';
+    classification.sections.push('diagnosis_radiologi', 'findings', 'impression');
+  }
+
+  // Deteksi EKG (fallback source, 19 Sep 2026)
+  if (/ekg|elektrokardiogram|electrocardiogram|rekam\s+jantung/i.test(pageText)) {
+    if (classification.type === 'general') classification.type = 'ekg';
+    classification.sections.push('ekg', 'cardiac_findings');
+  }
+
   // Keyword detection untuk clinical findings
   const clinicalKeywords = [
     'ronchi', 'whezing', 'murmur', 'crackles', 'edema', 'auskultasi',
@@ -422,6 +478,97 @@ function classifyPageContent(pageText) {
   }
 
   return classification;
+}
+
+/**
+ * Extract fallback dokumen sources (Laporan Operasi, Lab Results, Radiology)
+ * — dipanggil ketika Triase IGD tidak ditemukan sebagai fallback untuk K1-K5
+ *
+ * @param {Array<{page_number, text, confidence}>} ocrPages - OCR results per page
+ * @returns {Object} Extracted data dari fallback sources
+ */
+function extractFallbackDocumentData(ocrPages) {
+  const result = {
+    laporan_operasi: {
+      vital_signs: null,
+      diagnosis_pra_tindakan: null,
+      diagnosis_pasca_tindakan: null,
+      tindakan_operasi: null,
+      anestetik: null,
+      obat_obatan: null,
+    },
+    lab_results: {
+      hematologi: [],
+      kimia: [],
+    },
+    radiology: {
+      diagnosis_radiologi: null,
+      findings: null,
+      impression: null,
+    },
+    ekg: {
+      interpretation: null,
+    },
+  };
+
+  if (!Array.isArray(ocrPages) || ocrPages.length === 0) {
+    return result;
+  }
+
+  const allText = ocrPages
+    .map(p => `[PAGE ${p.page_number}]\n${p.text}`)
+    .join('\n\n---PAGE BREAK---\n\n');
+
+  // Extract Laporan Operasi
+  for (const [fieldName, pattern] of Object.entries(LAPORAN_OPERASI_PATTERNS)) {
+    const match = allText.match(pattern);
+    if (match && match[1] && match[1].trim() && match[1].trim() !== '-') {
+      const fieldKey = fieldName.replace(/^([A-Z])/, s => s.toLowerCase()).replace(/([A-Z])/g, '_$1').toLowerCase();
+      result.laporan_operasi[fieldKey] = match[1].trim().replace(/\n/g, ' ').substring(0, 500);
+    }
+  }
+
+  // Ekstrak vital signs dari tabel Laporan Operasi
+  const operasiMatch = allText.match(/LAPORAN\s+OPERASI[\s\S]{0,2000}?(?=---PAGE|$)/i);
+  if (operasiMatch) {
+    const vitalSigns = parseLaporanOperasiVitalSigns(operasiMatch[0]);
+    if (Object.keys(vitalSigns).length > 0) {
+      result.laporan_operasi.vital_signs = vitalSigns;
+    }
+  }
+
+  // Extract Lab Results
+  const labMatch = allText.match(/HASIL\s+PEMERIKSAAN\s+LABORATORIUM[\s\S]{0,2000}?(?=---PAGE|$)/i);
+  if (labMatch) {
+    const labData = parseLabResults(labMatch[0]);
+    result.lab_results = labData;
+  }
+
+  // Extract Radiology
+  for (const [fieldName, pattern] of Object.entries(RADIOLOGY_PATTERNS)) {
+    const match = allText.match(pattern);
+    if (match && match[1] && match[1].trim() && match[1].trim() !== '-') {
+      const fieldKey = fieldName.replace(/^([A-Z])/, s => s.toLowerCase()).replace(/([A-Z])/g, '_$1').toLowerCase();
+      result.radiology[fieldKey] = match[1].trim().replace(/\n/g, ' ').substring(0, 500);
+    }
+  }
+
+  const radiologyMatch = allText.match(/HASIL\s+PEMERIKSAAN\s+RADIOLOGI[\s\S]{0,2000}?(?=---PAGE|$)/i);
+  if (radiologyMatch) {
+    const radiologyData = parseRadiologyFindings(radiologyMatch[0]);
+    Object.assign(result.radiology, radiologyData);
+  }
+
+  // Extract EKG (simplified — cukup deteksi adanya temuan EKG)
+  const ekgMatch = allText.match(/EKG|ELEKTROKARDIOGRAM[\s\S]{0,500}?(?=---PAGE|$)/i);
+  if (ekgMatch) {
+    const ekgInterpMatch = ekgMatch[0].match(/INTERPRETATION|INTERPRETASI|KESIMPULAN\s*:?\s*([^\n]+)/i);
+    if (ekgInterpMatch && ekgInterpMatch[1]) {
+      result.ekg.interpretation = ekgInterpMatch[1].trim().substring(0, 200);
+    }
+  }
+
+  return result;
 }
 
 /**
@@ -585,11 +732,15 @@ async function enhancedOcrExtraction(pdfPath, pageNumbers = null) {
 
 module.exports = {
   extractClinicalFields,
+  extractFallbackDocumentData,
   classifyPageContent,
   validateVitalSigns,
   enhancedOcrExtraction,
   splitToList,
   CLINICAL_PATTERNS,
   STRUCTURED_TEXT_PATTERNS,
-  PRIMARY_SURVEY_PATTERNS
+  PRIMARY_SURVEY_PATTERNS,
+  LAPORAN_OPERASI_PATTERNS,
+  LAB_RESULTS_PATTERNS,
+  RADIOLOGY_PATTERNS
 };

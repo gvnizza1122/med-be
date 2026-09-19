@@ -173,6 +173,38 @@ function hasHasilPaSignal(fullText) {
   return PA_RESULT_MARKERS.some(kw => lower.includes(kw));
 }
 
+// Penanda dokumen memiliki Laporan Operasi — dipakai sbg fallback sumber vital signs
+// ketika Triase IGD tidak ada (task 19 Sep 2026: fallback OCR extraction)
+const LAPORAN_OPERASI_MARKERS = ['laporan operasi', 'laporan tindakan operatif', 'laporan operasi eksisi'];
+
+function hasLaporanOperasiVitalSigns(fullText) {
+  if (!fullText) return false;
+  const lower = fullText.toLowerCase();
+  return LAPORAN_OPERASI_MARKERS.some(kw => lower.includes(kw)) &&
+         /vital\s*sign|sistole|diastole|nadi|respirasi|suhu|spo2|tekanan\s*darah/i.test(lower);
+}
+
+// Penanda dokumen memiliki Hasil Pemeriksaan Laboratorium — dipakai sbg fallback
+// sumber lab results ketika Triase IGD tidak ada
+const LAB_RESULTS_MARKERS = ['hasil pemeriksaan laboratorium', 'pemeriksaan laboratorium', 'hasil lab', 'laboratorium hasil', 'patologi klinik'];
+
+function hasLabResultsData(fullText) {
+  if (!fullText) return false;
+  const lower = fullText.toLowerCase();
+  return LAB_RESULTS_MARKERS.some(kw => lower.includes(kw)) &&
+         /hematologi|kimia|glukosa|creatinine|bilirubin|hemoglobin|wbc|rbc|platelet/i.test(lower);
+}
+
+// Penanda dokumen memiliki Hasil Pemeriksaan Radiologi
+const RADIOLOGY_MARKERS = ['hasil pemeriksaan radiologi', 'radiologi', 'ct scan', 'x-ray', 'mri', 'ultrasound', 'sonografi'];
+
+function hasRadiologyData(fullText) {
+  if (!fullText) return false;
+  const lower = fullText.toLowerCase();
+  return RADIOLOGY_MARKERS.some(kw => lower.includes(kw)) &&
+         /diagnosis\s+radiologi|findings|impressions|temuan radiologi|kesimpulan/i.test(lower);
+}
+
 /**
  * Klasifikasi TIPE DOKUMEN satu halaman -- ditambah 19 Sep 2026 (fix item 7:
  * provenance evidence code_evidence/suggested_codes SEBELUMNYA selalu
@@ -185,20 +217,36 @@ function hasHasilPaSignal(fullText) {
  * satu halaman bisa memuat >1 keyword (mis. halaman Rincian Biaya juga
  * menyebut "Diagnosa"), jadi urutan menentukan tipe mana yang menang.
  * @param {string} text - teks OCR/native satu halaman
- * @returns {'rincian_biaya'|'spri'|'sep'|'resume_medis'|'triase_igd'|'lab'|'berkas_eklaim'|'lainnya'}
+ * @returns {'rincian_biaya'|'spri'|'sep'|'resume_medis'|'triase_igd'|'lab_results'|'laporan_operasi'|'radiology'|'ekg'|'berkas_eklaim'|'lainnya'}
  */
 function classifyPageDocumentType(text) {
   if (!text) return 'lainnya';
   const t = text.toLowerCase();
 
+  // Spesifik dokumen terlebih dahulu (urutan terpenting ke kurang penting)
   if (/rincian\s*biaya/i.test(t)) return 'rincian_biaya';
   if (/triage\s+igd|skrining\s+awal\s+pasien\s+igd/i.test(t)) return 'triase_igd';
+  if (/laporan\s+operasi|laporan\s+tindakan\s+operatif/i.test(t)) return 'laporan_operasi';
+  if (/hasil\s+pemeriksaan\s+radiologi|radiologi\s+hasil|laporan\s+radiologi|ct\s+scan|x[\s-]?ray|mri|ultrasound|sonografi/i.test(t)) return 'radiology';
+  if (/hasil\s+pemeriksaan\s+laboratorium|pemeriksaan\s+laboratorium|hasil\s+lab|laboratorium\s+hasil|hematologi|kimia\s+darah|urinalisis|patologi\s*klinik/i.test(t)) return 'lab_results';
+  if (/ekg|elektrokardiogram|electrocardiogram|rekam\s+jantung/i.test(t)) return 'ekg';
+
   if (/surat\s*perintah\s*rawat\s*inap/i.test(t)) return 'spri';
   if (/berkas\s*klaim\s*individual/i.test(t)) return 'berkas_eklaim';
   if (/surat\s*eligibilitas\s*peserta|no\.?\s*sep\b|nomor\s*sep\b/i.test(t)) return 'sep';
   if (/resume\s*medis/i.test(t)) return 'resume_medis';
-  if (/hasil\s*laboratorium|pemeriksaan\s*laboratorium|patologi\s*klinik/i.test(t)) return 'lab';
   return 'lainnya';
 }
 
-module.exports = { classifyPdfPages, isClaimDataPage, detectJenisKlaim, hasBpjsPageSignal, hasLaporanOperasiSignal, hasHasilPaSignal, classifyPageDocumentType };
+module.exports = {
+  classifyPdfPages,
+  isClaimDataPage,
+  detectJenisKlaim,
+  hasBpjsPageSignal,
+  hasLaporanOperasiSignal,
+  hasHasilPaSignal,
+  hasLaporanOperasiVitalSigns,
+  hasLabResultsData,
+  hasRadiologyData,
+  classifyPageDocumentType
+};
