@@ -15,9 +15,11 @@
 const DATA = require('../data/tarif_inacbg_pmk3_2023_r1_kelasD_swasta.json');
 
 const TARIF_MAP = new Map();
-for (const row of (DATA.tarif || [])) {
-  if (row && row.kode_inacbg) {
-    TARIF_MAP.set(String(row.kode_inacbg).trim().toUpperCase(), row);
+// Data can be in either 'tarif' array (old format) or 'data' array (current format)
+const tariffData = DATA.tarif || DATA.data || [];
+for (const row of tariffData) {
+  if (row && row.code) {
+    TARIF_MAP.set(String(row.code).trim().toUpperCase(), row);
   }
 }
 
@@ -46,15 +48,22 @@ function getTarifResmi(kodeInacbg, kelasRawat) {
   const row = lookupTarifInacbg(kodeInacbg);
   if (!row) return undefined;
 
-  if (row.jenis_layanan === 'RAWAT_JALAN') {
-    return { tarif: row.tarif_kelas_3 ?? null, sumber: row };
+  // JSON uses kelasA, kelasB, kelasC, kelasD format
+  // Map BPJS kelas (1, 2, 3) to JSON kelas (A, B, C, D)
+  const kelas = Number(kelasRawat);
+  let tarifValue = null;
+
+  if (kelas === 3) {
+    tarifValue = row.kelasC ?? row.tarif_kelas_3 ?? null;
+  } else if (kelas === 2) {
+    tarifValue = row.kelasB ?? row.tarif_kelas_2 ?? null;
+  } else if (kelas === 1) {
+    tarifValue = row.kelasA ?? row.tarif_kelas_1 ?? null;
+  } else {
+    return undefined; // kelas_rawat tidak valid
   }
 
-  const kelas = Number(kelasRawat);
-  if (kelas === 3) return { tarif: row.tarif_kelas_3 ?? null, sumber: row };
-  if (kelas === 2) return { tarif: row.tarif_kelas_2 ?? null, sumber: row };
-  if (kelas === 1) return { tarif: row.tarif_kelas_1 ?? null, sumber: row };
-  return undefined; // kelas_rawat tidak valid (1/2/3) -- biarkan RV-07 yang menangani
+  return { tarif: tarifValue, sumber: row };
 }
 
 /**
