@@ -2005,7 +2005,7 @@ const MAX_BATCH_PDF_FILES = 300;
 const BATCH_AI_CONCURRENCY = Math.max(1, parseInt(process.env.BATCH_AI_CONCURRENCY || '15', 10));
 const pdfUploadBatch = multer({
   storage,
-  limits: { fileSize: 20 * 1024 * 1024 },
+  limits: { fileSize: 70 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     if (path.extname(file.originalname).toLowerCase() === '.pdf') cb(null, true);
     else cb(new Error('Hanya file PDF yang diperbolehkan.'));
