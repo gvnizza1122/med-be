@@ -11,6 +11,16 @@ const { detectSpecialCmg, calculateTotalTopup } = require('./specialCmgService')
  * Fungsi ini menggunakan diagnosis utama (primary diagnosis) untuk menentukan
  * kategori INA-CBG yang paling sesuai.
  *
+ * PENTING: Ini adalah heuristik prefix-matching sederhana yang men-generate
+ * BENTUK kode INA-CBG yang terlihat plausible (mis. 'J-4-15-II') sebagai
+ * fallback, dipakai HANYA kalau grouping resmi Permenkes tidak tersedia.
+ * Fungsi ini BUKAN grouper INA-CBG resmi/tersertifikasi Permenkes -- ia
+ * tidak menjamin kode yang dihasilkan benar-benar ada/valid di tabel tarif
+ * PMK No. 3 Tahun 2023 (lihat tarifInacbgLookup.js untuk data resmi).
+ * Fungsi ini sebaiknya HANYA dipakai kalau saran AI (suggested_inacbg) tidak
+ * tersedia atau terbukti tidak valid (tidak ada di tabel Permenkes) --
+ * lihat validasi di aiReviewService.js.
+ *
  * @param {Array<string>} diagnosisCodes - Array kode diagnosis ICD-10 (prioritas: urutan pertama adalah primary)
  * @param {Array<string>} procedureCodes - Array kode prosedur ICD-9-CM (opsional, untuk konteks)
  * @param {string} jenisKlaim - Jenis klaim: 'RAWAT_INAP', 'RAWAT_JALAN', 'GAWAT_DARURAT'

@@ -33,6 +33,43 @@ const OCR_CONFIG = {
   log_performance: true
 };
 
+// ===== OCR Phase 1: Critical page prioritization & timeout reduction =====
+// (19 Sep 2026, client approved) Total budget SATU pemanggilan ocrPdfPages()
+// buat memproses SEMUA halaman target, turun jadi 3 menit — dipakai dua
+// tempat: (1) di sini, sebagai penanda kapan halaman NON-CRITICAL mulai
+// di-skip (lihat prioritizePagesForOcr() & loop di ocrPdfPages di bawah);
+// (2) di ocrIntegration.js sebagai batas keras Promise.race pembungkus
+// seluruh enhancement pass. Keduanya SENGAJA pakai env var yang sama supaya
+// tidak pernah lebih longgar dari batas keras eksternalnya — kalau beda,
+// budget internal yang lebih longgar jadi percuma karena Promise.race di
+// luar sudah keburu membuang SELURUH hasil (termasuk halaman critical yang
+// sudah selesai) sebelum budget internal sempat berhenti sendiri.
+const ENHANCEMENT_TIMEOUT_MS = parseInt(process.env.OCR_ENHANCEMENT_TIMEOUT || '180000', 10);
+// Berhenti mulai halaman NON-CRITICAL 5 detik sebelum budget benar-benar
+// habis — jaga-jaga durasi render+OCR halaman yang lagi berjalan (bukan
+// yang mau dimulai) tidak bikin overshoot jauh dari ENHANCEMENT_TIMEOUT_MS.
+// Halaman CRITICAL (TRIAGE IGD/RESUME MEDIS) TIDAK kena aturan ini — tetap
+// diproses walau budget sudah lewat, karena itu satu-satunya sumber vital
+// signs/diagnosis (lihat isCriticalPage() di pdfPageClassifier.js).
+const CRITICAL_PAGE_TIMEOUT_MARGIN_MS = 5000;
+
+/**
+ * Urutkan halaman target OCR: CRITICAL (TRIAGE IGD/RESUME MEDIS) duluan,
+ * baru sisanya — masing-masing grup tetap urut nomor halaman ascending.
+ * Non-mutating (return array baru).
+ * @param {number[]} pageNums
+ * @param {Set<number>} criticalPageNums
+ * @returns {number[]}
+ */
+function prioritizePagesForOcr(pageNums, criticalPageNums) {
+  return [...pageNums].sort((a, b) => {
+    const ac = criticalPageNums.has(a) ? 0 : 1;
+    const bc = criticalPageNums.has(b) ? 0 : 1;
+    if (ac !== bc) return ac - bc;
+    return a - b;
+  });
+}
+
 // Render halaman PDF->PNG via mupdf (dulu doc.loadPage/toPixmap/asPNG inline
 // di sini, resolusi 3x/~216 DPI) itu sendiri CPU-berat & SINKRON — sempat
 // "dibatasi" pakai semaphore Promise (OCR_JOB_CONCURRENCY), TAPI TERBUKTI
@@ -185,9 +222,12 @@ async function ocrSingleFile(input, language = OCR_CONFIG.language) {
  * @param {string} pdfPath - Path to PDF file
  * @param {number[]|string} pageNumbers - Page numbers (1-indexed) or 'all' or 'auto-scan'
  * @param {string} language - Language code
- * @returns {Promise<{success, pages: {page_number, text, confidence, block_count, duration_ms}[]}>}
+ * @param {{timeoutMs?: number}} options - timeoutMs: override budget total (ms)
+ *   dipakai buat skip halaman non-critical (default ENHANCEMENT_TIMEOUT_MS,
+ *   lihat catatan OCR Phase 1 di atas OCR_CONFIG).
+ * @returns {Promise<{success, pages: {page_number, text, confidence, block_count, duration_ms}[], skipped_pages: {page_number, reason}[]}>}
  */
-async function ocrPdfPages(pdfPath, pageNumbers = 'auto-scan', language = OCR_CONFIG.language) {
+async function ocrPdfPages(pdfPath, pageNumbers = 'auto-scan', language = OCR_CONFIG.language, options = {}) {
   if (!Tesseract) {
     throw new Error('[OCR] tesseract.js not available. Install with: npm install tesseract.js');
   }
@@ -196,15 +236,23 @@ async function ocrPdfPages(pdfPath, pageNumbers = 'auto-scan', language = OCR_CO
     throw new Error(`[OCR] File not found: ${pdfPath}`);
   }
 
+  const timeoutMs = options.timeoutMs || ENHANCEMENT_TIMEOUT_MS;
+
   const result = {
     success: false,
     pdfPath,
     pages: [],
+    // Halaman NON-CRITICAL yang dilewati karena budget waktu sudah mepet —
+    // lihat CRITICAL_PAGE_TIMEOUT_MARGIN_MS/prioritizePagesForOcr() di atas.
+    // Fase 2 (Luna fallback, BELUM diimplementasi) akan pakai daftar ini
+    // buat tahu field mana yang perlu dicoba ekstraksi ulang lewat jalur lain.
+    skipped_pages: [],
     errors: [],
     total_duration_ms: 0
   };
 
   const startTime = Date.now();
+  const deadline = startTime + timeoutMs;
 
   try {
     const mupdf = await import('mupdf');
@@ -212,13 +260,17 @@ async function ocrPdfPages(pdfPath, pageNumbers = 'auto-scan', language = OCR_CO
     const doc = mupdf.Document.openDocument(buf, 'application/pdf');
     const totalPages = doc.countPages();
 
-    // Tentukan halaman mana yang mau di-OCR
+    // Tentukan halaman mana yang mau di-OCR, DAN halaman mana yang CRITICAL
+    // (TRIAGE IGD/RESUME MEDIS — lihat isCriticalPage() di
+    // pdfPageClassifier.js). Klasifikasi dijalankan untuk SEMUA mode (bukan
+    // cuma 'auto-scan') supaya prioritas critical-first tetap berlaku waktu
+    // dipanggil dengan 'all' (lihat ocrEnhancement.js/pdfExtractionPipeline.js)
+    // — kegagalan klasifikasi di mode 'all'/array SENGAJA tidak fatal
+    // (fallback ke urutan halaman apa adanya, tanpa prioritas) karena mode
+    // itu tidak WAJIB berhasil klasifikasi seperti 'auto-scan'.
     let targetPages;
-    if (Array.isArray(pageNumbers)) {
-      targetPages = pageNumbers;
-    } else if (pageNumbers === 'all') {
-      targetPages = Array.from({ length: totalPages }, (_, i) => i + 1);
-    } else {
+    const criticalPageNums = new Set();
+    if (pageNumbers === 'auto-scan') {
       // 'auto-scan' (default): pakai klasifikasi halaman yang sudah ada —
       // cuma halaman SCAN (bukan hasil ketik/NATIVE) yang perlu di-OCR.
       const { classifyPdfPages } = require('./pdfPageClassifier');
@@ -227,11 +279,37 @@ async function ocrPdfPages(pdfPath, pageNumbers = 'auto-scan', language = OCR_CO
         throw new Error('Gagal klasifikasi halaman: ' + (classified.errors[0]?.message || 'unknown'));
       }
       targetPages = classified.pages.filter(p => p.type === 'SCAN').map(p => p.page_num);
+      classified.pages.filter(p => p.is_critical).forEach(p => criticalPageNums.add(p.page_num));
+    } else {
+      targetPages = Array.isArray(pageNumbers)
+        ? pageNumbers
+        : Array.from({ length: totalPages }, (_, i) => i + 1);
+      try {
+        const { classifyPdfPages } = require('./pdfPageClassifier');
+        const classified = await classifyPdfPages(buf);
+        if (classified.success) {
+          classified.pages.filter(p => p.is_critical).forEach(p => criticalPageNums.add(p.page_num));
+        }
+      } catch (classifyErr) {
+        console.warn('[OCR] Klasifikasi critical-page gagal (non-fatal, lanjut tanpa prioritas):', classifyErr.message || classifyErr);
+      }
     }
+
+    // CRITICAL (TRIAGE IGD/RESUME MEDIS) duluan — lihat prioritizePagesForOcr().
+    targetPages = prioritizePagesForOcr(targetPages, criticalPageNums);
 
     for (const pageNum of targetPages) {
       if (pageNum < 1 || pageNum > totalPages) {
         result.errors.push({ type: 'invalid_page', message: `Halaman ${pageNum} di luar jangkauan (total ${totalPages})` });
+        continue;
+      }
+
+      // Budget hampir habis & halaman ini BUKAN critical — skip supaya
+      // halaman critical yang belum sempat diproses (kalau ada) tetap
+      // kebagian waktu, dan Promise.race eksternal (ocrIntegration.js) tidak
+      // memaksa "buang semua hasil" begitu batas keras tercapai.
+      if (!criticalPageNums.has(pageNum) && Date.now() >= deadline - CRITICAL_PAGE_TIMEOUT_MARGIN_MS) {
+        result.skipped_pages.push({ page_number: pageNum, reason: 'ocr_timeout_budget_exceeded_non_critical' });
         continue;
       }
 
@@ -374,5 +452,7 @@ module.exports = {
   ocrBatch,
   isAvailable,
   shutdownOcrPool,
-  OCR_CONFIG
+  prioritizePagesForOcr,
+  OCR_CONFIG,
+  ENHANCEMENT_TIMEOUT_MS
 };

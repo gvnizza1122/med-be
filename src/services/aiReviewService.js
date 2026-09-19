@@ -1953,14 +1953,29 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
       }
 
       // --- INA-CBG Grouping & Tariff Lookup Integration (19 Sep 2026) ---
-      // Langkah 1: Dapatkan INA-CBG code dari grouping service
+      // Langkah 1: Dapatkan INA-CBG code dari grouping service (fallback
+      // heuristik, BUKAN grouper resmi Permenkes -- lihat JSDoc di
+      // inacbgGroupingService.js)
       const inacbgGrouping = groupCodesToInaCBG(codes.diagnosis, codes.procedure, jenisKlaimRecord);
       let inacbgCodeForLookup = null;
       let inacbgResult = null;
 
-      // Prioritas: gunakan AI-suggested INA-CBG, fallback ke grouping service
+      // Prioritas: gunakan AI-suggested INA-CBG -- TAPI HANYA kalau kode itu
+      // benar-benar ada di tabel resmi Permenkes (PMK 3/2023 Regional 1
+      // Kelas D Swasta). AI kadang berhalusinasi kode yang formatnya valid
+      // tapi tidak pernah ada di tabel resmi (fix 19 Sep 2026) -- kalau
+      // begitu, JANGAN dipakai, degradasi anggun ke kode hasil grouping
+      // heuristik alih-alih menggagalkan seluruh pipeline.
       if (aiResult.suggested_inacbg && typeof aiResult.suggested_inacbg === 'string') {
-        inacbgCodeForLookup = aiResult.suggested_inacbg.trim().toUpperCase();
+        const aiSuggestedCode = aiResult.suggested_inacbg.trim().toUpperCase();
+        if (lookupTarifInacbg(aiSuggestedCode)) {
+          inacbgCodeForLookup = aiSuggestedCode;
+        } else {
+          console.warn(`[AI-REVIEW] AI suggested_inacbg "${aiSuggestedCode}" tidak ditemukan di tabel PMK 3/2023 (Regional 1 Kelas D Swasta) -- diabaikan, fallback ke grouping service.`);
+          if (inacbgGrouping) {
+            inacbgCodeForLookup = inacbgGrouping.code;
+          }
+        }
       } else if (inacbgGrouping) {
         inacbgCodeForLookup = inacbgGrouping.code;
       }
@@ -2009,19 +2024,26 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
               source: 'PMK_3_2023',
             };
           } else {
-            // Kode TIDAK DITEMUKAN di database PMK 3/2023 → generate estimasi tarif
+            // Kode TIDAK DITEMUKAN di tabel resmi PMK 3/2023 → cek kamus
+            // hardcoded kecil (12 entri data nyata) sebagai fallback kedua.
+            // FIX 19 Sep 2026: sebelumnya di sini ada rumus "estimasi" tarif
+            // sintetis (baseByFamily * multiplier severity) yang MENGARANG
+            // angka -- itu dihapus. Kalau kode benar-benar tidak ada di
+            // manapun, tarifResult tetap null (bukan angka fiktif); pemanggil
+            // di layer atas/FE harus menampilkan "tarif tidak tersedia".
             const estimasi = getInacbgEstimasi(inacbgCodeForLookup);
-            if (estimasi && estimasi.tarif) {
+            if (estimasi && estimasi.source === 'DICTIONARY' && estimasi.tarif) {
               tarifResult = {
                 amount: Number(estimasi.tarif),
                 region: '1',
                 class: 'D_SWASTA',
                 jenis_layanan: jenisKlaimRecord,
-                source: 'ESTIMATE',
+                source: 'DICTIONARY_FALLBACK',
                 kelas_rawat: kelasRawat,
-                note: `Estimasi tarif berdasarkan kategori diagnosis & prosedur. Kode "${inacbgCodeForLookup}" belum tersedia di PMK No. 3 Tahun 2023.`,
+                note: `Tarif dari kamus fallback (data sampel). Kode "${inacbgCodeForLookup}" belum ada di tabel PMK No. 3 Tahun 2023 Regional 1 Kelas D Swasta.`,
               };
             }
+            // else: estimasi.source === 'NOT_FOUND' -> tarifResult tetap null, tidak ada angka fiktif
 
             inacbgResult = {
               code: inacbgCodeForLookup,
@@ -2030,7 +2052,9 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
               reasoning: inacbgGrouping ? inacbgGrouping.reasoning : `Dari diagnosis utama ${codes.diagnosis[0] || 'unknown'}.`,
               severity_level: inacbgCodeForLookup.split('-').pop() || null,
               source: 'GENERATED',
-              note: `Kode dihasilkan dari diagnosis & prosedur. Belum ada di PMK No. 3 Tahun 2023.`,
+              note: tarifResult
+                ? `Kode dihasilkan dari diagnosis & prosedur (fallback heuristik, bukan grouper resmi). Belum ada di PMK No. 3 Tahun 2023, tarif dari kamus fallback.`
+                : `Kode dihasilkan dari diagnosis & prosedur (fallback heuristik, bukan grouper resmi). Belum ada di PMK No. 3 Tahun 2023 -- tarif tidak tersedia.`,
             };
           }
         } catch (tarifErr) {
@@ -2049,13 +2073,14 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
         }
       }
 
-      // Langkah 3: Tetap update legacy fields untuk backward compatibility
-      if (aiResult.suggested_inacbg && typeof aiResult.suggested_inacbg === 'string') {
-        const estimasi = getInacbgEstimasi(aiResult.suggested_inacbg);
-        if (estimasi) {
-          result.suggested_inacbg = aiResult.suggested_inacbg;
-          result.suggested_tarif = estimasi.tarif;
-        }
+      // Langkah 3: Tetap update legacy fields untuk backward compatibility --
+      // pakai kode & tarif yang SUDAH divalidasi di Langkah 1-2 di atas
+      // (inacbgCodeForLookup / tarifResult), BUKAN aiResult.suggested_inacbg
+      // mentah -- supaya field legacy ini juga tidak pernah membawa kode
+      // atau tarif fiktif (fix 19 Sep 2026).
+      if (inacbgCodeForLookup) {
+        result.suggested_inacbg = inacbgCodeForLookup;
+        result.suggested_tarif = tarifResult ? tarifResult.amount : null;
       }
 
       // Langkah 4: Set result fields

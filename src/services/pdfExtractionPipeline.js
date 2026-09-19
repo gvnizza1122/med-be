@@ -7,6 +7,27 @@
  *
  * Env: AI_PROVIDER_API_KEY (wajib), AI_PROVIDER_BASE_URL, AI_MODEL, AI_MAX_ATTEMPTS, AI_TIMEOUT_MS.
  * Env: OCR_ENHANCEMENT_ENABLED (default true) — enable multi-pass OCR enhancement
+ * Env: OCR_ENHANCEMENT_TIMEOUT (default 180000/3 menit) — batas keras budget
+ *   OCR enhancement (Phase 1, 19 Sep 2026, client approved, turun dari
+ *   sebelumnya). Lihat applyOcrEnhancements() di ocrIntegration.js untuk
+ *   Promise.race pembungkusnya.
+ *
+ * STRATEGI PRIORITAS HALAMAN CRITICAL (OCR Phase 1): dalam budget 3 menit,
+ * dokumen scan tebal (SPRI+SEP+Rincian Biaya+Resume Medis+Triage dst) bisa
+ * kehabisan waktu sebelum sampai ke halaman yang paling berharga secara
+ * klinis. Halaman TRIAGE IGD & RESUME MEDIS ditandai "CRITICAL" (lihat
+ * isCriticalPage() di pdfPageClassifier.js) karena keduanya SATU-SATUNYA
+ * sumber vital signs/diagnosis/prosedur (lihat extractClinicalFields() di
+ * ocrEnhancement.js) — tanpa keduanya field klinis inti klaim gawat darurat
+ * kosong total. ocrService.js#ocrPdfPages() mengurutkan antrean OCR supaya
+ * halaman CRITICAL diproses LEBIH DULU, lalu men-skip halaman non-critical
+ * begitu sisa waktu sudah mepet (lihat CRITICAL_PAGE_TIMEOUT_MARGIN_MS &
+ * prioritizePagesForOcr()) — jadi kalaupun timeout keras tercapai, hasil
+ * OCR halaman critical yang SUDAH selesai tetap terpakai (bukan dibuang
+ * semua oleh Promise.race di ocrIntegration.js). Halaman yang ke-skip
+ * dicatat di result.skipped_pages — daftar ini disiapkan sebagai input buat
+ * Phase 2 (Luna fallback untuk field yang hilang), BELUM diimplementasi di
+ * sini.
  */
 
 const { classifyPdfPages, detectJenisKlaim, hasBpjsPageSignal, hasLaporanOperasiSignal, hasHasilPaSignal, hasLaporanOperasiVitalSigns, hasLabResultsData, hasRadiologyData } = require('./pdfPageClassifier');

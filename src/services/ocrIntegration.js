@@ -7,6 +7,15 @@
 
 const { enhancedOcrExtraction } = require('./ocrEnhancement');
 
+// OCR Phase 1 (19 Sep 2026, client approved): batas keras total budget OCR
+// enhancement turun jadi 3 menit/180000ms (sebelumnya hardcode 120000ms) —
+// dibuat configurable lewat OCR_ENHANCEMENT_TIMEOUT, dan SENGAJA nilai yang
+// SAMA persis dipakai sebagai budget internal ocrPdfPages() (lihat
+// ENHANCEMENT_TIMEOUT_MS di ocrService.js) supaya loop halaman di dalamnya
+// sempat berhenti sendiri (skip halaman non-critical) SEBELUM Promise.race
+// di bawah ini memutus paksa dan membuang seluruh hasil yang sudah selesai.
+const OCR_ENHANCEMENT_TIMEOUT_MS = parseInt(process.env.OCR_ENHANCEMENT_TIMEOUT || '180000', 10);
+
 /**
  * Apply OCR enhancements ke hasil standard extraction
  *
@@ -49,12 +58,13 @@ async function applyOcrEnhancements(standardResult, filePath, options = {}) {
   try {
     console.log('[OcrIntegration] Applying OCR enhancements...');
 
-    // Timeout 120s untuk OCR enhancement (Tesseract + clinical extraction)
-    // Kalau timeout, skip enhancement dan lanjut dengan basic extraction saja
+    // Timeout untuk OCR enhancement (Tesseract + clinical extraction), lihat
+    // OCR_ENHANCEMENT_TIMEOUT_MS di atas. Kalau timeout, skip enhancement dan
+    // lanjut dengan basic extraction saja.
     const enhancementResult = await Promise.race([
       enhancedOcrExtraction(filePath, pageNumbers),
       new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('OCR enhancement timeout (120s)')), 120 * 1000)
+        setTimeout(() => reject(new Error(`OCR enhancement timeout (${OCR_ENHANCEMENT_TIMEOUT_MS / 1000}s)`)), OCR_ENHANCEMENT_TIMEOUT_MS)
       )
     ]);
 

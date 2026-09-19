@@ -1,0 +1,11 @@
+{
+  "_comment": "SKELETON ONLY - placeholder structure requested for the INA-CBG generation-vs-lookup fix task. Values below are NOT real Permenkes tarif figures. Real, already-parsed Permenkes PMK No. 3/2023 (Regional 1) data already exists at src/data/tarif_inacbg_pmk3_2023_r1_kelasD_swasta.json (1075 rows, used by src/services/tarifInacbgLookup.js). See documentation/handoff notes for how this skeleton relates to that existing file before populating it for real.",
+  "source": "Permenkes No. 3 Tahun 2023 (TBD - placeholder, not yet parsed)",
+  "codes": {
+    "INA-CBG-CODE": {
+      "tarif": 5000000,
+      "description": "PLACEHOLDER - contoh struktur, bukan data resmi"
+    }
+  },
+  "lastUpdated": "2026-09-19"
+}

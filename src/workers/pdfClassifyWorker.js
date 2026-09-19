@@ -16,12 +16,26 @@ const CLAIM_DATA_KEYWORDS = ['Nomor SEP', 'Berkas Klaim Individual', 'INA-CBG', 
 const EXTRA_KEYWORDS = ['Klaim Individual', 'Data Klaim', 'Resume Medis', 'Ringkasan Pasien Keluar', 'INACBG', 'INA CBG', 'Diagnosa', 'Prosedur', 'Kode ICD', 'Nomor Kartu', 'No. SEP', 'No. Kartu', 'No Kartu'];
 const PRIMARY_KEYWORD = 'Berkas Klaim Individual';
 const SCAN_CHAR_THRESHOLD = 50;
+// Duplikat isCriticalPage()/CRITICAL_PAGE_MARKERS dari pdfPageClassifier.js
+// (OCR Phase 1, 19 Sep 2026) -- lihat komentar lengkap di sana. Dipakai
+// ocrService.js buat prioritaskan halaman TRIAGE IGD/RESUME MEDIS dalam
+// antrean OCR sebelum budget waktu 180s habis.
+const CRITICAL_PAGE_MARKERS = [
+  /triage\s+igd/i,
+  /skrining\s+awal\s+pasien\s+igd/i,
+  /resume\s*medis/i,
+];
 
 function isClaimDataPage(text) {
   const t = text.toLowerCase();
   if (CLAIM_DATA_KEYWORDS.some(kw => t.includes(kw.toLowerCase()))) return true;
   const extraHits = EXTRA_KEYWORDS.filter(kw => t.includes(kw.toLowerCase()));
   return extraHits.length >= 2;
+}
+
+function isCriticalPage(text) {
+  if (!text) return false;
+  return CRITICAL_PAGE_MARKERS.some(re => re.test(text));
 }
 
 async function classify(filePath, bufferData) {
@@ -50,9 +64,10 @@ async function classify(filePath, bufferData) {
       const type = text.length < SCAN_CHAR_THRESHOLD ? 'SCAN' : 'NATIVE';
       const hasClaimData = isClaimDataPage(text);
       const isPrimarySource = text.toLowerCase().includes(PRIMARY_KEYWORD.toLowerCase());
+      const isCritical = isCriticalPage(text);
       const pageNum = i + 1;
       if (hasClaimData) result.claimDataPages.push({ page_num: pageNum, text });
-      result.pages.push({ page_num: pageNum, type, text_length: text.length, has_claim_data: hasClaimData, is_primary_source: isPrimarySource, text_sample: text.slice(0, 200), text_full: text });
+      result.pages.push({ page_num: pageNum, type, text_length: text.length, has_claim_data: hasClaimData, is_primary_source: isPrimarySource, is_critical: isCritical, text_sample: text.slice(0, 200), text_full: text });
       if (type === 'NATIVE') result.summary.nativeCount++; else result.summary.scanCount++;
     });
     result.totalPages = chunks.length;

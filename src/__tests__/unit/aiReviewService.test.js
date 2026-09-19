@@ -216,4 +216,88 @@ describe('generateAiReview — dengan AI dikonfigurasi (fetch dimock)', () => {
     expect(result.inacbg_result).toBeNull();
     expect(result.tariff_result).toBeNull();
   });
+
+  // Fix 19 Sep 2026: AI kadang berhalusinasi kode INA-CBG yang formatnya
+  // valid tapi tidak pernah ada di tabel resmi PMK 3/2023. Pipeline harus
+  // memvalidasi dulu, dan degradasi anggun ke grouping fallback -- BUKAN
+  // menempelkan tarif fiktif ke kode fiktif itu, dan BUKAN crash.
+  test('AI suggested_inacbg VALID (ada di tabel PMK 3/2023) tetap dipakai apa adanya', async () => {
+    mockFetchOk({
+      field_notes: {},
+      code_evidence: [],
+      suggested_codes: [],
+      suggested_inacbg: 'J-4-15-I', // diketahui valid, dipakai juga di test lain di atas
+    });
+
+    const evidencePool = [{ page_number: 1, ocr_text: 'Diagnosa: pneumonia', confidence: 100 }];
+
+    const result = await generateAiReview(
+      { sep: 'ABC', DIAGLIST: 'J18.9', PROCLIST: '87.44', KELAS_RAWAT: '3', JENIS_KLAIM: 'RAWAT_INAP' },
+      [],
+      evidencePool
+    );
+
+    expect(result).not.toBeNull();
+    expect(result.inacbg_result.code).toBe('J-4-15-I');
+    expect(result.inacbg_result.source).toBe('PMK_3_2023');
+    expect(result.suggested_inacbg).toBe('J-4-15-I');
+    expect(result.tariff_result.source).toBe('PMK_3_2023');
+  });
+
+  test('AI suggested_inacbg TIDAK VALID (bukan kode Permenkes asli) → fallback ke grouping service, bukan crash/kode fiktif', async () => {
+    mockFetchOk({
+      field_notes: {},
+      code_evidence: [],
+      suggested_codes: [],
+      // Kode ngasal ini secara sengaja BUKAN entri resmi di tabel PMK 3/2023 --
+      // meniru halusinasi AI.
+      suggested_inacbg: 'ZZ-9-99-XYZ-HALU',
+    });
+
+    const evidencePool = [{ page_number: 1, ocr_text: 'Diagnosa: pneumonia', confidence: 100 }];
+
+    const result = await generateAiReview(
+      { sep: 'ABC', DIAGLIST: 'J18.9', PROCLIST: '87.44', KELAS_RAWAT: '3', JENIS_KLAIM: 'RAWAT_INAP' },
+      [],
+      evidencePool
+    );
+
+    expect(result).not.toBeNull();
+    // Kode fiktif AI TIDAK boleh muncul di hasil manapun
+    expect(result.inacbg_result.code).not.toBe('ZZ-9-99-XYZ-HALU');
+    expect(result.suggested_inacbg).not.toBe('ZZ-9-99-XYZ-HALU');
+    expect(result.inacbg_result.code).toBeTruthy();
+    // Reasoning harus berasal dari grouping heuristik (bukti kode AI yang
+    // invalid benar2 diabaikan dan diganti hasil fallback, terlepas dari
+    // apakah kode fallback itu kebetulan match tabel resmi atau tidak).
+    expect(result.inacbg_result.reasoning).toContain('Pemetaan dari diagnosis utama');
+  });
+
+  test('AI suggested_inacbg tidak valid & kode fallback juga tidak ada di manapun → tariff_result null (bukan angka fiktif)', async () => {
+    mockFetchOk({
+      field_notes: {},
+      code_evidence: [],
+      suggested_codes: [],
+      suggested_inacbg: 'ZZ-9-99-XYZ-HALU',
+    });
+
+    // Diagnosis prefix 'Z' (faktor yang memengaruhi status kesehatan) --
+    // grouping heuristik akan memetakan ke 'Z-4-21-I', kode yang diverifikasi
+    // TIDAK ada di tabel resmi PMK 3/2023 maupun kamus fallback 13-entri.
+    const evidencePool = [{ page_number: 1, ocr_text: 'Diagnosa: perawatan paliatif', confidence: 100 }];
+
+    const result = await generateAiReview(
+      { sep: 'ABC', DIAGLIST: 'Z515', PROCLIST: '', KELAS_RAWAT: '3', JENIS_KLAIM: 'RAWAT_INAP' },
+      [],
+      evidencePool
+    );
+
+    expect(result).not.toBeNull();
+    expect(result.inacbg_result).not.toBeNull();
+    expect(result.inacbg_result.code).toBe('Z-4-21-I');
+    expect(result.inacbg_result.source).toBe('GENERATED');
+    // Tidak boleh ada tarif fiktif yang ditempelkan
+    expect(result.tariff_result).toBeNull();
+    expect(result.suggested_tarif).toBeNull();
+  });
 });

@@ -238,6 +238,31 @@ function classifyPageDocumentType(text) {
   return 'lainnya';
 }
 
+// ===== OCR Phase 1: Critical page prioritization (19 Sep 2026) =====
+// Client menyetujui batas waktu OCR keras 3 menit/180000ms (turun dari
+// budget sebelumnya) -- lihat OCR_ENHANCEMENT_TIMEOUT di ocrService.js &
+// ocrIntegration.js. Dalam budget sesempit itu, dokumen scan tebal (SPRI +
+// SEP + Rincian Biaya + Resume Medis + Triage, dst) bisa kehabisan waktu
+// sebelum sampai ke halaman yang paling bernilai. TRIAGE IGD & RESUME MEDIS
+// dipilih sebagai "CRITICAL" karena keduanya SATU-SATUNYA sumber vital
+// signs/diagnosis/prosedur klinis (lihat extractClinicalFields() di
+// ocrEnhancement.js) -- halaman lain (SEP/rincian biaya/SPRI) berguna tapi
+// tidak fatal kalau ke-skip, field-nya sering sudah bisa didapat dari teks
+// NATIVE (non-scan). is_critical dipakai ocrService.js buat mengurutkan
+// antrean OCR (critical duluan) dan melewati halaman non-critical begitu
+// waktu sudah mepet -- lihat prioritizePagesForOcr()/CRITICAL_PAGE_TIMEOUT_
+// MARGIN_MS di sana.
+const CRITICAL_PAGE_MARKERS = [
+  /triage\s+igd/i,
+  /skrining\s+awal\s+pasien\s+igd/i,
+  /resume\s*medis/i,
+];
+
+function isCriticalPage(text) {
+  if (!text) return false;
+  return CRITICAL_PAGE_MARKERS.some(re => re.test(text));
+}
+
 module.exports = {
   classifyPdfPages,
   isClaimDataPage,
@@ -248,5 +273,6 @@ module.exports = {
   hasLaporanOperasiVitalSigns,
   hasLabResultsData,
   hasRadiologyData,
-  classifyPageDocumentType
+  classifyPageDocumentType,
+  isCriticalPage
 };
