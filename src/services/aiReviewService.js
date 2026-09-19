@@ -1725,7 +1725,7 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
             const fallback = findCodeInEvidencePool(entry.code, evidencePool);
             result.code_evidence.push(fallback
               ? { code: entry.code, type: entry.type, found: true, page_number: fallback.page_number, quotation: fallback.quotation }
-              : { code: entry.code, type: entry.type, found: false, page_number: null, quotation: null, review_status: 'evidence_tidak_terverifikasi' });
+              : { code: entry.code, type: entry.type, found: false, page_number: null, quotation: null, review_status: 'PENDING' });
             continue;
           }
           const { page_number: pageNum, quotation } = entry;
@@ -1739,7 +1739,7 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
             if (fallback) {
               result.code_evidence.push({ code: entry.code, type: entry.type, found: true, page_number: fallback.page_number, quotation: fallback.quotation });
             } else {
-              result.code_evidence.push({ code: entry.code, type: entry.type, found: false, page_number: null, quotation: null, review_status: 'evidence_tidak_terverifikasi' });
+              result.code_evidence.push({ code: entry.code, type: entry.type, found: false, page_number: null, quotation: null, review_status: 'PENDING' });
             }
             continue;
           }
