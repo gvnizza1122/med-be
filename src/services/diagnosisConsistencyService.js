@@ -94,7 +94,7 @@ function evaluateDiagnosisConsistency(diagnosisCodes, evidencePool) {
     flags.push({
       code,
       family,
-      status: 'perlu_review',
+      status: 'PENDING',
       alternative_code: altEntry ? altEntry[0] : null,
       alternative_label: altEntry ? famRule.variant_label[altEntry[0]] : null,
       indicators_found: foundIndicators,
