@@ -2123,6 +2123,20 @@ router.get('/:file_id/extracted', authenticate, async (req, res) => {
 
     // Parse raw_data jika ada
     const data = record.raw_data ? JSON.parse(record.raw_data) : record;
+
+    // Merge ai_review data (kegawatdaruratan, inacbg, tariff, etc)
+    if (record.ai_review) {
+      const aiData = JSON.parse(record.ai_review);
+      data.kegawatdaruratan_assessment = aiData.kegawatdaruratan_assessment;
+      data.inacbg_result = aiData.inacbg_result;
+      data.tariff_result = aiData.tariff_result;
+      data.pending_risk_notes = aiData.pending_risk_notes;
+      data.suggested_codes = aiData.suggested_codes;
+    }
+
+    // Hide SEP field dari response
+    if (data.SEP) delete data.SEP;
+
     res.json(data);
   } catch (err) {
     console.error('Fetch extracted error:', err);
