@@ -48,7 +48,15 @@ async function applyOcrEnhancements(standardResult, filePath, options = {}) {
 
   try {
     console.log('[OcrIntegration] Applying OCR enhancements...');
-    const enhancementResult = await enhancedOcrExtraction(filePath, pageNumbers);
+
+    // Timeout 120s untuk OCR enhancement (Tesseract + clinical extraction)
+    // Kalau timeout, skip enhancement dan lanjut dengan basic extraction saja
+    const enhancementResult = await Promise.race([
+      enhancedOcrExtraction(filePath, pageNumbers),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('OCR enhancement timeout (120s)')), 120 * 1000)
+      )
+    ]);
 
     enhanced.ocr_enhancement = enhancementResult;
 
@@ -154,9 +162,14 @@ async function applyOcrEnhancements(standardResult, filePath, options = {}) {
         pengkajian_keperawatan_found: Object.keys(enhanced.pengkajian_keperawatan_from_ocr).length
       });
     }
-  } catch (error) {
-    console.warn('[OcrIntegration] Enhancement gagal, lanjut tanpa enhancement:', error.message);
-    // Jangan block pipeline — enhancement adalah optional enhancement
+  } catch (enhancementError) {
+    if (enhancementError.message.includes('timeout')) {
+      console.warn('[OcrIntegration] OCR enhancement timeout, skipping enhanced features:', enhancementError.message);
+      // Continue dengan basic extraction saja, jangan fail
+    } else {
+      console.error('[OcrIntegration] OCR enhancement error:', enhancementError);
+      throw enhancementError;
+    }
   }
 
   return enhanced;

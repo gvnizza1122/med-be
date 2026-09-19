@@ -2046,17 +2046,33 @@ router.post('/upload-pdf-batch', authenticate, pdfUploadBatch.array('files', MAX
       // benar-benar sedang mengerjakannya (antrean concurrency 5 sudah ada,
       // cuma progresnya tidak kelihatan). Lihat UploadJobContext.tsx di FE.
       if (io) io.emit('pdf-batch:file-start', { batchId, fileName: file.originalname });
-      const result = await processSinglePdfUpload(db, {
-        filePath: file.path,
-        originalName: file.originalname,
-        // jenisKlaim TIDAK diisi manual di sini — biarkan processSinglePdfUpload
-        // & extractFromPDF mendeteksi otomatis dari allowedJenisKlaim, KECUALI
-        // cuma 1 kategori yang ditoggle (tidak ambigu, langsung pasti).
-        jenisKlaim: allowedJenisKlaim.length === 1 ? allowedJenisKlaim[0] : undefined,
-        allowedJenisKlaim,
-        userId: req.user.id,
-        hospitalCode: req.user.hospital_code,
-      });
+
+      // Timeout 5 menit per file untuk mencegah infinite hanging
+      let result;
+      try {
+        result = await Promise.race([
+          processSinglePdfUpload(db, {
+            filePath: file.path,
+            originalName: file.originalname,
+            // jenisKlaim TIDAK diisi manual di sini — biarkan processSinglePdfUpload
+            // & extractFromPDF mendeteksi otomatis dari allowedJenisKlaim, KECUALI
+            // cuma 1 kategori yang ditoggle (tidak ambigu, langsung pasti).
+            jenisKlaim: allowedJenisKlaim.length === 1 ? allowedJenisKlaim[0] : undefined,
+            allowedJenisKlaim,
+            userId: req.user.id,
+            hospitalCode: req.user.hospital_code,
+          }),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Upload timeout: file processing took too long (> 5 minutes)')), 5 * 60 * 1000)
+          )
+        ]);
+      } catch (err) {
+        result = {
+          success: false,
+          original_name: file.originalname,
+          error: err.message || 'Terjadi kesalahan saat memproses file'
+        };
+      }
       completed++;
       if (io) {
         io.emit('pdf-batch:file-done', {
