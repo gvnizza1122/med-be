@@ -421,7 +421,7 @@ function hasFinancialTerms(text) {
  */
 function hasIgdTriagePage(evidencePool) {
   if (!Array.isArray(evidencePool)) return false;
-  return evidencePool.some(p => /triage\s+igd|skrining\s+awal\s+pasien\s+igd/i.test(p.ocr_text || ''));
+  return evidencePool.some(p => /tria[gs]e\s+igd|skrining\s+awal\s+pasien\s+igd|primary\s+survey|vital\s+sign|keadaan\s+umum/i.test(p.ocr_text || ''));
 }
 
 /**
