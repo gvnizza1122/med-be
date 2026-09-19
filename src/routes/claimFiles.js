@@ -1876,6 +1876,15 @@ async function reprocessExistingRecord(db, { fileId, recordId, filePath, jenisKl
       const bpjsExamples = await getRelevantBpjsExamples(db);
       aiReview = await generateAiReview(extractedData, validationErrors, evidencePool, knowledgeEntries, bpjsExamples);
       if (aiReview) {
+        // Update validation_status to PENDING jika ada pending_risk_notes dari AI review
+        let finalStatus = validationStatus;
+        if (aiReview.pending_risk_notes && aiReview.pending_risk_notes.length > 0) {
+          finalStatus = 'pending';
+          // Update status di database
+          await db.prepare('UPDATE claim_records SET validation_status = ? WHERE id = ?')
+            .run(finalStatus, recordId);
+        }
+
         await db.prepare('UPDATE claim_records SET ai_review = ? WHERE id = ?')
           .run(JSON.stringify(aiReview), recordId);
         recordKnowledge(db, aiReview.knowledge_updates).catch(kbErr =>
