@@ -31,14 +31,72 @@ const INACBG_TARIF_DICTIONARY = {
 };
 
 /**
- * Mencari tarif estimasi INA-CBG dari kamus
+ * Mencari/generate tarif estimasi INA-CBG
+ * Jika kode ditemukan di kamus, gunakan nilai aktual
+ * Jika tidak ditemukan, generate estimasi berdasarkan severity level
  * @param {string} inacbgCode Kode INA-CBG (mis: 'J-4-15-I')
- * @returns {object|null} Objek berisi deskripsi dan tarif, atau null jika tidak ditemukan
+ * @returns {object|null} Objek berisi deskripsi dan tarif, atau null jika input invalid
  */
 function getInacbgEstimasi(inacbgCode) {
   if (!inacbgCode) return null;
   const upperCode = inacbgCode.toUpperCase().trim();
-  return INACBG_TARIF_DICTIONARY[upperCode] || null;
+
+  // Cek kamus terlebih dahulu
+  if (INACBG_TARIF_DICTIONARY[upperCode]) {
+    return INACBG_TARIF_DICTIONARY[upperCode];
+  }
+
+  // Generate estimasi untuk kode yang tidak ditemukan di kamus
+  const parts = upperCode.split('-');
+  if (parts.length < 4) return null; // Format kode tidak valid
+
+  const family = parts[0];
+  const severity = parts[3]; // I=Ringan, II=Sedang, III=Berat
+
+  // Base tariff per keluarga (RS Tipe C Regional 1, dalam IDR)
+  const baseByFamily = {
+    A: 2500000, // Penyakit Infeksi
+    B: 2200000, // Penyakit Neoplasma
+    C: 1800000, // Penyakit Darah
+    D: 2100000, // Penyakit Endokrin
+    E: 2800000, // Penyakit Mental
+    F: 3200000, // Penyakit Saraf
+    G: 2900000, // Penyakit Mata
+    H: 3100000, // Penyakit Telinga
+    I: 3500000, // Penyakit Jantung
+    J: 3800000, // Penyakit Pernapasan
+    K: 2600000, // Penyakit Pencernaan
+    L: 2400000, // Penyakit Kulit
+    M: 4200000, // Penyakit Muskuloskeletal
+    N: 3300000, // Penyakit Genitourinaria
+    O: 5200000, // Kehamilan & Persalinan
+    P: 4800000, // Periode Perinatal
+    Q: 3900000, // Penyakit Kongenital
+    R: 2700000, // Gejala Umum
+    S: 2500000, // Trauma
+    T: 2300000, // Penyebab Eksternal
+    U: 2100000, // Faktor Eksternal
+    V: 2200000, // Faktor Lainnya
+    Z: 1500000, // Faktor Sosial
+  };
+
+  let baseAmount = baseByFamily[family] || 3000000; // Default 3 juta jika family tidak dikenali
+
+  // Adjustment berdasarkan severity
+  let multiplier = 1.0;
+  if (severity === 'III' || severity === '3') {
+    multiplier = 1.8; // Berat: +80%
+  } else if (severity === 'II' || severity === '2') {
+    multiplier = 1.4; // Sedang: +40%
+  }
+  // Severity I atau 1 tetap 1.0x (Ringan)
+
+  const estimatedAmount = Math.round(baseAmount * multiplier);
+
+  return {
+    deskripsi: `Estimasi - ${family}-${parts[1]}-${parts[2]} (Severity: ${severity})`,
+    tarif: estimatedAmount,
+  };
 }
 
 module.exports = {
