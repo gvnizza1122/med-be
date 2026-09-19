@@ -48,6 +48,10 @@ function groupCodesToInaCBG(diagnosisCodes, procedureCodes = [], jenisKlaim = 'R
         // Asthma
         suggestedCategory = 'J-4-16';
         confidence = 0.7;
+      } else {
+        // Fallback untuk penyakit respirasi lainnya
+        suggestedCategory = 'J-4-18';
+        confidence = 0.5;
       }
       break;
 
@@ -60,6 +64,10 @@ function groupCodesToInaCBG(diagnosisCodes, procedureCodes = [], jenisKlaim = 'R
         // Heart failure
         suggestedCategory = 'I-4-11';
         confidence = 0.65;
+      } else {
+        // Fallback untuk penyakit kardiovaskular lainnya
+        suggestedCategory = 'I-4-12';
+        confidence = 0.5;
       }
       break;
 
@@ -68,6 +76,10 @@ function groupCodesToInaCBG(diagnosisCodes, procedureCodes = [], jenisKlaim = 'R
         // Gastroenteritis
         suggestedCategory = 'K-4-17';
         confidence = 0.7;
+      } else {
+        // Fallback untuk penyakit digestif lainnya
+        suggestedCategory = 'K-4-18';
+        confidence = 0.5;
       }
       break;
 
@@ -76,6 +88,10 @@ function groupCodesToInaCBG(diagnosisCodes, procedureCodes = [], jenisKlaim = 'R
         // Bacterial/viral infections
         suggestedCategory = 'A-4-14';
         confidence = 0.6;
+      } else {
+        // Fallback untuk infeksi lainnya
+        suggestedCategory = 'A-4-15';
+        confidence = 0.5;
       }
       break;
 
@@ -84,8 +100,104 @@ function groupCodesToInaCBG(diagnosisCodes, procedureCodes = [], jenisKlaim = 'R
         // Diabetes mellitus
         suggestedCategory = 'E-4-10';
         confidence = 0.7;
+      } else {
+        // Fallback untuk penyakit endokrin lainnya
+        suggestedCategory = 'E-4-11';
+        confidence = 0.5;
       }
       break;
+
+    case 'M': // Musculoskeletal diseases
+      suggestedCategory = 'M-4-13';
+      confidence = 0.5;
+      break;
+
+    case 'N': // Genitourinary diseases
+      suggestedCategory = 'N-4-14';
+      confidence = 0.5;
+      break;
+
+    case 'O': // Pregnancy, childbirth, postpartum (Obstetri)
+      suggestedCategory = 'O-4-15';
+      confidence = 0.6;
+      break;
+
+    case 'P': // Perinatal conditions
+      suggestedCategory = 'P-4-16';
+      confidence = 0.5;
+      break;
+
+    case 'Q': // Congenital anomalies
+      suggestedCategory = 'Q-4-17';
+      confidence = 0.5;
+      break;
+
+    case 'R': // Symptoms, signs, abnormal findings
+      suggestedCategory = 'R-4-18';
+      confidence = 0.4;
+      break;
+
+    case 'B': // Parasitic diseases
+      suggestedCategory = 'B-4-14';
+      confidence = 0.5;
+      break;
+
+    case 'C': // Malignant neoplasms
+      suggestedCategory = 'C-4-19';
+      confidence = 0.6;
+      break;
+
+    case 'D': // In-situ, benign neoplasms
+      suggestedCategory = 'D-4-20';
+      confidence = 0.5;
+      break;
+
+    case 'F': // Mental, behavioral disorders
+      suggestedCategory = 'F-4-11';
+      confidence = 0.5;
+      break;
+
+    case 'G': // Nervous system diseases
+      suggestedCategory = 'G-4-12';
+      confidence = 0.5;
+      break;
+
+    case 'H': // Eye, ear diseases
+      suggestedCategory = 'H-4-13';
+      confidence = 0.5;
+      break;
+
+    case 'L': // Skin, subcutaneous tissue diseases
+      suggestedCategory = 'L-4-14';
+      confidence = 0.5;
+      break;
+
+    case 'T': // Injury, poisoning, consequences
+      suggestedCategory = 'T-4-19';
+      confidence = 0.5;
+      break;
+
+    case 'V': // External causes (factors)
+    case 'W':
+    case 'X':
+    case 'Y':
+      suggestedCategory = 'T-4-19'; // Grouped with injury/poisoning
+      confidence = 0.4;
+      break;
+
+    case 'U': // External causes of morbidity (unspecified)
+      suggestedCategory = 'U-4-20';
+      confidence = 0.4;
+      break;
+
+    case 'Z': // Factors influencing health status
+      suggestedCategory = 'Z-4-21';
+      confidence = 0.3;
+      break;
+
+    default:
+      // Truly unknown prefix
+      return null;
   }
 
   if (!suggestedCategory) {
