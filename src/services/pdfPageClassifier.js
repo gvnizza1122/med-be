@@ -263,6 +263,26 @@ function isCriticalPage(text) {
   return CRITICAL_PAGE_MARKERS.some(re => re.test(text));
 }
 
+// Halaman SEP tidak pernah memuat vital signs/temuan klinis — isinya
+// administratif (nomor SEP, no kartu, jenis rawat). Dipakai ocrService.js
+// buat membuang halaman SEP dari antrean OCR enhancement, TAPI hanya kalau
+// teks native halaman itu sudah terbaca (type NATIVE): untuk dokumen
+// full-scan, OCR adalah SATU-SATUNYA cara membaca nomor SEP/no kartu, jadi
+// di sana halaman SEP tetap wajib di-OCR (lihat catatan di kepala file soal
+// 'Surat Eligibilitas Peserta' & error "wajib diisi").
+//
+// Guard isCriticalPage() di depan BUKAN basa-basi: di
+// classifyPageDocumentType() cek 'sep' jatuh SEBELUM 'resume_medis', jadi
+// halaman RESUME MEDIS yang mencantumkan "No. SEP" (lazim — resume medis
+// dicetak lengkap dengan identitas klaim) akan dikembalikan sebagai 'sep'.
+// Tanpa guard ini halaman paling bernilai untuk vital signs justru yang
+// terbuang duluan. Halaman critical TIDAK PERNAH dianggap SEP.
+function isSepPage(text) {
+  if (!text) return false;
+  if (isCriticalPage(text)) return false;
+  return classifyPageDocumentType(text) === 'sep';
+}
+
 module.exports = {
   classifyPdfPages,
   isClaimDataPage,
@@ -274,5 +294,6 @@ module.exports = {
   hasLabResultsData,
   hasRadiologyData,
   classifyPageDocumentType,
-  isCriticalPage
+  isCriticalPage,
+  isSepPage
 };

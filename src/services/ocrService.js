@@ -344,6 +344,12 @@ async function ocrPdfPages(pdfPath, pageNumbers = 'auto-scan', language = OCR_CO
     // itu tidak WAJIB berhasil klasifikasi seperti 'auto-scan'.
     let targetPages;
     const criticalPageNums = new Set();
+    // Halaman SEP yang teks native-nya SUDAH terbaca — buang dari antrean OCR
+    // (isinya administratif, tidak pernah memuat vital signs). Lihat
+    // isSepPage() di pdfPageClassifier.js soal kenapa syarat "native sudah
+    // terbaca" WAJIB: di dokumen full-scan, OCR satu-satunya sumber nomor
+    // SEP/no kartu, jadi di sana halaman SEP tetap harus diproses.
+    const sepNativePages = new Set();
     if (pageNumbers === 'auto-scan') {
       // 'auto-scan' (default): pakai klasifikasi halaman yang sudah ada —
       // cuma halaman SCAN (bukan hasil ketik/NATIVE) yang perlu di-OCR.
@@ -359,14 +365,23 @@ async function ocrPdfPages(pdfPath, pageNumbers = 'auto-scan', language = OCR_CO
         ? pageNumbers
         : Array.from({ length: totalPages }, (_, i) => i + 1);
       try {
-        const { classifyPdfPages } = require('./pdfPageClassifier');
+        const { classifyPdfPages, isSepPage } = require('./pdfPageClassifier');
         const classified = await classifyPdfPages(buf);
         if (classified.success) {
           classified.pages.filter(p => p.is_critical).forEach(p => criticalPageNums.add(p.page_num));
+          classified.pages
+            .filter(p => p.type === 'NATIVE' && !p.is_critical && isSepPage(p.text_full))
+            .forEach(p => sepNativePages.add(p.page_num));
         }
       } catch (classifyErr) {
         console.warn('[OCR] Klasifikasi critical-page gagal (non-fatal, lanjut tanpa prioritas):', classifyErr.message || classifyErr);
       }
+    }
+
+    if (sepNativePages.size > 0) {
+      targetPages = targetPages.filter(p => !sepNativePages.has(p));
+      [...sepNativePages].forEach(p => result.skipped_pages.push({ page_number: p, reason: 'sep_page_native_text_available' }));
+      console.log(`[OCR][Phase1] SKIP ${sepNativePages.size} halaman SEP (teks native sudah ada): [${[...sepNativePages].join(',')}]`);
     }
 
     console.log(`[OCR][Phase1] Target OCR: ${targetPages.length} halaman [${targetPages.join(',')}], critical dari teks native: ${criticalPageNums.size} [${[...criticalPageNums].join(',')}]`);
