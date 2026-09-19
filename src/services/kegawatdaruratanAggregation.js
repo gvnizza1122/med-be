@@ -210,6 +210,9 @@ function buildCatatanK2K4(paramKeys, vitalKeys, parameterFindings, vitalFindings
     if (e.sumber === 'vital_findings') return `${e.key}=${e.nilai} (${e.band})`;
     return `${e.label || e.key}: ${e.nilai || 'abnormal'}`;
   });
+  if (status === 'borderline') {
+    return `Status BORDERLINE: Ditemukan parameter di ambang batas (borderline) pada: ${parts.join(', ')}. Verifikator wajib mengevaluasi secara klinis apakah kondisi ini merupakan gawat atau tidak berdasarkan konteks klinis pasien.`;
+  }
   return `${status === 'ya' ? 'Ditemukan' : 'Ada indikasi borderline pada'}: ${parts.join(', ')}.`;
 }
 
@@ -218,7 +221,11 @@ function buildCatatanK3(gcs, kesadaran, status) {
   if (gcs && Number.isFinite(Number(gcs.nilai))) parts.push(`GCS ${gcs.nilai}`);
   if (kesadaran && kesadaran.nilai) parts.push(`kesadaran: ${kesadaran.nilai}`);
   if (parts.length === 0) return status === 'tidak' ? 'Data GCS/kesadaran tidak tercatat di formulir.' : '';
-  return parts.join(', ') + '.';
+  const partsSummary = parts.join(', ') + '.';
+  if (status === 'borderline') {
+    return `Status BORDERLINE: ${partsSummary} Penurunan kesadaran di ambang batas -- verifikator wajib mengevaluasi klinis apakah pasien benar-benar mengalami penurunan kesadaran yang signifikan.`;
+  }
+  return partsSummary;
 }
 
 module.exports = { aggregateKriteria, KRITERIA_LABELS };
