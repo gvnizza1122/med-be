@@ -46,6 +46,7 @@ services:
       - BATCH_AI_CONCURRENCY=${BATCH_AI_CONCURRENCY:-15}
       - DB_POOL_MAX=${DB_POOL_MAX:-30}
       - SKIP_OCR_EVIDENCE=${SKIP_OCR_EVIDENCE:-false}
+      - OCR_ENHANCEMENT_TIMEOUT=${OCR_ENHANCEMENT_TIMEOUT:-180000}
     depends_on:
       - db
     volumes:
