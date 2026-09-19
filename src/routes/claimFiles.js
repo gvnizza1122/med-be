@@ -1876,9 +1876,29 @@ async function reprocessExistingRecord(db, { fileId, recordId, filePath, jenisKl
       const bpjsExamples = await getRelevantBpjsExamples(db);
       aiReview = await generateAiReview(extractedData, validationErrors, evidencePool, knowledgeEntries, bpjsExamples);
       if (aiReview) {
-        // Update validation_status to PENDING jika ada pending_risk_notes dari AI review
+        // Update validation_status to PENDING jika:
+        // 1. Ada pending_risk_notes dari AI review, ATAU
+        // 2. Ada kriteria kegawatdaruratan dengan status 'ya' atau 'TERPENUHI' (critical), ATAU
+        // 3. Ada parameter findings dengan status abnormal
         let finalStatus = validationStatus;
+        let shouldSetPending = false;
+
         if (aiReview.pending_risk_notes && aiReview.pending_risk_notes.length > 0) {
+          shouldSetPending = true;
+        }
+
+        // Check kegawatdaruratan criteria untuk findings yang critical/abnormal
+        if (aiReview.kegawatdaruratan_assessment && aiReview.kegawatdaruratan_assessment.kriteria) {
+          const kriteria = aiReview.kegawatdaruratan_assessment.kriteria;
+          for (const k of kriteria) {
+            if (k.status === 'ya' || k.status === 'TERPENUHI' || k.status === 'borderline') {
+              shouldSetPending = true;
+              break;
+            }
+          }
+        }
+
+        if (shouldSetPending) {
           finalStatus = 'pending';
           // Update status di database
           await db.prepare('UPDATE claim_records SET validation_status = ? WHERE id = ?')
