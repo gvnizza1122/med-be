@@ -1782,33 +1782,33 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
         const page = entry.found && entry.page_number ? evidencePool.find(p => p.page_number === entry.page_number) : null;
         entry.document_type = page ? classifyPageDocumentType(page.ocr_text) : null;
         if (!entry.found) {
-          entry.review_status = 'evidence_tidak_terverifikasi';
+          entry.review_status = 'PENDING';
           entry.review_flags = [{ reason: 'Tidak ditemukan kutipan yang terverifikasi (cocok persis) di halaman dokumen manapun untuk kode ini.' }];
           continue;
         }
         if (entry.type === 'procedure') {
           const codability = checkProcedureCodability(entry.code);
           if (codability.review) {
-            entry.review_status = 'perlu_review';
+            entry.review_status = 'PENDING';
             entry.review_flags = [{ reason: codability.reason }];
             continue;
           }
         }
-        entry.review_status = 'valid';
+        entry.review_status = 'VALID';
         entry.review_flags = [];
       }
 
       // Konsistensi klinis diagnosis (item 9) -- MURNI deterministik (regex ke
       // evidencePool), TIDAK PERNAH mengubah DIAGLIST. Hasilnya ditempel juga
-      // ke code_evidence entry yang cocok (review_status -> perlu_review) supaya
+      // ke code_evidence entry yang cocok (review_status -> PENDING) supaya
       // badge per-kode di frontend konsisten dengan flag detailnya di
       // diagnosis_consistency_flags.
       try {
         result.diagnosis_consistency_flags = evaluateDiagnosisConsistency(codes.diagnosis, evidencePool);
         for (const flag of result.diagnosis_consistency_flags) {
           const evEntry = result.code_evidence.find(e => e.code === flag.code && e.type === 'diagnosis');
-          if (evEntry && evEntry.review_status !== 'evidence_tidak_terverifikasi') {
-            evEntry.review_status = 'perlu_review';
+          if (evEntry && evEntry.review_status !== 'PENDING') {
+            evEntry.review_status = 'PENDING';
             evEntry.review_flags = [...(evEntry.review_flags || []), { reason: flag.reason, alternative_code: flag.alternative_code, action: flag.action }];
           }
         }
