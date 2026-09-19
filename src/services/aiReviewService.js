@@ -857,6 +857,7 @@ async function assessKegawatdaruratan(evidencePool, triagePageNumbers, umurTahun
   const painInstrument = resolvePainInstrument(umurTahun, umurHari, ageGroup);
   const emptyResult = (catatan) => ({
     ringkasan: catatan,
+    has_data: false,
     parameter_findings: PARAMETER_TABLE.map(p => ({ key: p.key, label: p.label, ditemukan: false, status: null, nilai: null, page_number: null, kutipan: null, sumber_dokumen: null, ...(p.key === 'retraksi' ? { retraksi_grade: null } : {}) })),
     vital_findings: Object.fromEntries(['RR', 'SpO2', 'HR', 'TD_sistolik', 'TD_diastolik', 'Suhu', 'GCS', 'Nyeri'].map(k =>
       [k, {
@@ -1153,7 +1154,7 @@ async function assessKegawatdaruratan(evidencePool, triagePageNumbers, umurTahun
 
     const ringkasan = buildRingkasan(kriteria, ageGroup);
     return {
-      ringkasan, parameter_findings: parameterFindings, vital_findings: vitalFindings, kriteria,
+      ringkasan, has_data: true, parameter_findings: parameterFindings, vital_findings: vitalFindings, kriteria,
       tindakan_keperawatan: tindakanKeperawatan, esi: esiResult, age_group: ageGroup,
     };
   } catch (error) {
