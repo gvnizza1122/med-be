@@ -1969,9 +1969,10 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
       if (inacbgCodeForLookup) {
         try {
           const tarifData = lookupTarifInacbg(inacbgCodeForLookup);
+          const kelasRawat = record.KELAS_RAWAT || record.kelas_rawat || '3';
+
           if (tarifData) {
-            // Tentukan kelas rawat untuk lookup
-            const kelasRawat = record.KELAS_RAWAT || record.kelas_rawat || '3';
+            // Kode DITEMUKAN di database PMK 3/2023
             const tarifInfo = getTarifResmi(inacbgCodeForLookup, kelasRawat);
 
             if (tarifInfo && tarifInfo.tarif !== null) {
@@ -1982,6 +1983,7 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
                 jenis_layanan: tarifData.jenis_layanan || jenisKlaimRecord,
                 source: 'PMK_3_2023',
                 kelas_rawat: kelasRawat,
+                note: 'Tarif resmi dari PMK No. 3 Tahun 2023',
               };
             } else if (tarifInfo) {
               // Tarif data ada tapi tarif null (tidak berlaku untuk kelas ini)
@@ -1992,6 +1994,7 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
                 jenis_layanan: tarifData.jenis_layanan || jenisKlaimRecord,
                 source: 'PMK_3_2023',
                 kelas_rawat: kelasRawat,
+                note: 'Kode ada di PMK No. 3 Tahun 2023 tapi tarif tidak berlaku untuk kelas rawat ini',
               };
             }
 
@@ -1999,18 +2002,34 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
             inacbgResult = {
               code: inacbgCodeForLookup,
               description: tarifData.deskripsi || null,
-              confidence: inacbgGrouping ? inacbgGrouping.confidence : 0.8, // AI suggestion biasanya lebih confident
+              confidence: inacbgGrouping ? inacbgGrouping.confidence : 0.8,
               reasoning: inacbgGrouping ? inacbgGrouping.reasoning : `Dari diagnosis utama ${codes.diagnosis[0] || 'unknown'}.`,
-              severity_level: inacbgCodeForLookup.split('-').pop() || null, // Ambil severity dari kode (I/II/III)
+              severity_level: inacbgCodeForLookup.split('-').pop() || null,
+              source: 'PMK_3_2023',
             };
-          } else if (inacbgGrouping) {
-            // Code tidak ditemukan di tariff table, tapi ada dari grouping service
+          } else {
+            // Kode TIDAK DITEMUKAN di database PMK 3/2023 → generate estimasi tarif
+            const estimasi = getInacbgEstimasi(inacbgCodeForLookup);
+            if (estimasi && estimasi.tarif) {
+              tarifResult = {
+                amount: Number(estimasi.tarif),
+                region: '1',
+                class: 'D_SWASTA',
+                jenis_layanan: jenisKlaimRecord,
+                source: 'ESTIMATE',
+                kelas_rawat: kelasRawat,
+                note: `Estimasi tarif berdasarkan kategori diagnosis & prosedur. Kode "${inacbgCodeForLookup}" belum tersedia di PMK No. 3 Tahun 2023.`,
+              };
+            }
+
             inacbgResult = {
-              code: inacbgGrouping.code,
+              code: inacbgCodeForLookup,
               description: null,
-              confidence: inacbgGrouping.confidence,
-              reasoning: inacbgGrouping.reasoning,
-              severity_level: inacbgGrouping.code.split('-').pop() || null,
+              confidence: inacbgGrouping ? inacbgGrouping.confidence : 0.8,
+              reasoning: inacbgGrouping ? inacbgGrouping.reasoning : `Dari diagnosis utama ${codes.diagnosis[0] || 'unknown'}.`,
+              severity_level: inacbgCodeForLookup.split('-').pop() || null,
+              source: 'GENERATED',
+              note: `Kode dihasilkan dari diagnosis & prosedur. Belum ada di PMK No. 3 Tahun 2023.`,
             };
           }
         } catch (tarifErr) {
@@ -2023,6 +2042,7 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
               confidence: inacbgGrouping.confidence,
               reasoning: inacbgGrouping.reasoning,
               severity_level: inacbgGrouping.code.split('-').pop() || null,
+              source: 'FALLBACK',
             };
           }
         }
