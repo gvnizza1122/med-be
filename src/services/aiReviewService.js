@@ -1617,7 +1617,7 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
             const fallback = findCodeInEvidencePool(entry.code, evidencePool);
             result.code_evidence.push(fallback
               ? { code: entry.code, type: entry.type, found: true, page_number: fallback.page_number, quotation: fallback.quotation }
-              : { code: entry.code, type: entry.type, found: false, page_number: null, quotation: null });
+              : { code: entry.code, type: entry.type, found: false, page_number: null, quotation: null, review_status: 'evidence_tidak_terverifikasi' });
             continue;
           }
           const { page_number: pageNum, quotation } = entry;
@@ -1630,6 +1630,8 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
             const fallback = findCodeInEvidencePool(entry.code, evidencePool);
             if (fallback) {
               result.code_evidence.push({ code: entry.code, type: entry.type, found: true, page_number: fallback.page_number, quotation: fallback.quotation });
+            } else {
+              result.code_evidence.push({ code: entry.code, type: entry.type, found: false, page_number: null, quotation: null, review_status: 'evidence_tidak_terverifikasi' });
             }
             continue;
           }
