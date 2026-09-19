@@ -300,4 +300,34 @@ describe('generateAiReview — dengan AI dikonfigurasi (fetch dimock)', () => {
     expect(result.tariff_result).toBeNull();
     expect(result.suggested_tarif).toBeNull();
   });
+
+  // Fix 19 Sep 2026: kode day-care/RJTL (mis. B-2-12-0) di tabel PMK 3/2023
+  // hanya punya tarif di kolom kelasD (tidak distratifikasi per kelas kamar).
+  // Sebelum fix ini, kode-kode itu selalu tampil "tarif tidak berlaku"
+  // walau kodenya valid dan tarifnya ada.
+  test('AI suggested_inacbg berupa kode day-care/RJTL (tarif hanya di kelasD) tetap tampilkan tarif resmi, bukan tidak ditemukan', async () => {
+    mockFetchOk({
+      field_notes: {},
+      code_evidence: [],
+      suggested_codes: [],
+      suggested_inacbg: 'B-2-12-0',
+    });
+
+    const evidencePool = [{ page_number: 1, ocr_text: 'Prosedur kolesistektomi tanpa laparoskopi', confidence: 100 }];
+
+    const result = await generateAiReview(
+      { sep: 'ABC', DIAGLIST: 'K80.2', PROCLIST: '51.22', JENIS_KLAIM: 'RAWAT_JALAN' },
+      [],
+      evidencePool
+    );
+
+    expect(result).not.toBeNull();
+    expect(result.inacbg_result.code).toBe('B-2-12-0');
+    expect(result.inacbg_result.source).toBe('PMK_3_2023');
+    expect(result.inacbg_result.description).toBeTruthy();
+    expect(result.tariff_result).not.toBeNull();
+    expect(result.tariff_result.amount).toBeGreaterThan(0);
+    expect(result.tariff_result.source).toBe('PMK_3_2023');
+    expect(result.suggested_tarif).toBe(result.tariff_result.amount);
+  });
 });

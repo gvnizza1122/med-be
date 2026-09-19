@@ -59,8 +59,25 @@ function getTarifResmi(kodeInacbg, kelasRawat) {
     tarifValue = row.kelasB ?? row.tarif_kelas_2 ?? null;
   } else if (kelas === 1) {
     tarifValue = row.kelasA ?? row.tarif_kelas_1 ?? null;
-  } else {
-    return undefined; // kelas_rawat tidak valid
+  }
+  // kelas_rawat kosong/tidak dikenal (mis. klaim RAWAT_JALAN yang memang
+  // tidak mengisi kelas_rawat) -> tarifValue tetap null di titik ini,
+  // JANGAN langsung `return undefined` di sini -- lanjut ke fallback kelasD
+  // di bawah dulu sebelum menyerah, karena kode ini BISA SAJA valid.
+
+  // Fix (19 Sep 2026): ~287 dari 1075 kode di tabel PMK 3/2023 ini adalah
+  // kode day-care/RJTL yang TIDAK distratifikasi per kelas kamar (1/2/3) --
+  // datanya hanya terisi di kolom kelasD (satu tarif tunggal, kelasA/B/C
+  // memang "-"/null untuk kode-kode itu). RV-21 di ruleEngine.js sudah lama
+  // mendokumentasikan niat ini ("kelas rawat diabaikan untuk RAWAT_JALAN"),
+  // tapi implementasi di sini sebelumnya TIDAK PERNAH membaca kelasD sama
+  // sekali -- akibatnya kode-kode day-care/RJTL yang sebenarnya valid & ada
+  // tarifnya selalu tampil "tidak ditemukan"/"tarif tidak berlaku". Kalau
+  // kolom kelas rawat yang diminta kosong TAPI kelasD terisi, pakai kelasD
+  // sebagai tarif tunggal tsb -- ini murni membaca field lain di baris resmi
+  // yang sama, BUKAN mengarang/mengestimasi angka.
+  if (tarifValue === null && row.kelasD != null) {
+    tarifValue = row.kelasD;
   }
 
   return { tarif: tarifValue, sumber: row };

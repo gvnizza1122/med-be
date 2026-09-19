@@ -2076,31 +2076,76 @@ router.post('/upload-pdf-batch', authenticate, pdfUploadBatch.array('files', MAX
       // cuma progresnya tidak kelihatan). Lihat UploadJobContext.tsx di FE.
       if (io) io.emit('pdf-batch:file-start', { batchId, fileName: file.originalname });
 
-      // Timeout 5 menit per file untuk mencegah infinite hanging
+      // Kill-switch timeout per file — TIDAK boleh lebih pendek dari total
+      // budget wajar pipeline-nya sendiri, kalau tidak setiap dokumen yang
+      // sekadar "berat/lambat" (bukan benar-benar macet) ikut ditandai
+      // "Gagal" di respons batch walau processSinglePdfUpload TETAP lanjut
+      // di background dan BERHASIL menyimpan data (jadi file muncul benar di
+      // Riwayat Upload walau UI upload sempat bilang gagal — root cause bug
+      // "berhasil diproses tapi status Gagal").
+      // Worst-case realistis 1 file: ekstraksi (3x percobaan @60s ~182s,
+      // pdfExtractionService.js) + OCR evidence (maks 180s,
+      // gatherEvidencePool di atas) + AI review utama (3x percobaan @60s
+      // ~182s) + assessment paralel pendingRisk/kegawatdaruratan (~182s) +
+      // fallback saran diagnosis (hard-timeout 70s, aiReviewService.js) —
+      // bisa >13 menit total TANPA ada yang benar-benar hang, apalagi saat
+      // BATCH_AI_CONCURRENCY tinggi menekan provider AI. Timeout lama (5
+      // menit) SELALU lebih pendek dari budget itu sendiri. 20 menit jauh di
+      // atas worst-case wajar, jadi sekarang murni pengaman untuk file yang
+      // BENAR-BENAR macet (bug), bukan yang cuma lambat.
+      const PER_FILE_TIMEOUT_MS = 20 * 60 * 1000;
       let result;
+      let timedOut = false;
+      const uploadPromise = processSinglePdfUpload(db, {
+        filePath: file.path,
+        originalName: file.originalname,
+        // jenisKlaim TIDAK diisi manual di sini — biarkan processSinglePdfUpload
+        // & extractFromPDF mendeteksi otomatis dari allowedJenisKlaim, KECUALI
+        // cuma 1 kategori yang ditoggle (tidak ambigu, langsung pasti).
+        jenisKlaim: allowedJenisKlaim.length === 1 ? allowedJenisKlaim[0] : undefined,
+        allowedJenisKlaim,
+        userId: req.user.id,
+        hospitalCode: req.user.hospital_code,
+      });
       try {
         result = await Promise.race([
-          processSinglePdfUpload(db, {
-            filePath: file.path,
-            originalName: file.originalname,
-            // jenisKlaim TIDAK diisi manual di sini — biarkan processSinglePdfUpload
-            // & extractFromPDF mendeteksi otomatis dari allowedJenisKlaim, KECUALI
-            // cuma 1 kategori yang ditoggle (tidak ambigu, langsung pasti).
-            jenisKlaim: allowedJenisKlaim.length === 1 ? allowedJenisKlaim[0] : undefined,
-            allowedJenisKlaim,
-            userId: req.user.id,
-            hospitalCode: req.user.hospital_code,
-          }),
+          uploadPromise,
           new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('Upload timeout: file processing took too long (> 5 minutes)')), 5 * 60 * 1000)
+            setTimeout(() => reject(new Error(`Upload timeout: file processing took too long (> ${PER_FILE_TIMEOUT_MS / 60000} minutes)`)), PER_FILE_TIMEOUT_MS)
           )
         ]);
       } catch (err) {
+        timedOut = true;
         result = {
           success: false,
           original_name: file.originalname,
           error: err.message || 'Terjadi kesalahan saat memproses file'
         };
+      }
+      if (timedOut) {
+        // uploadPromise TIDAK bisa dibatalkan (sama seperti pola OCR di
+        // runDedupedOcr) — tetap jalan di background dan BISA saja tetap
+        // berhasil. Rekonsiliasi best-effort: kalau nanti sungguh berhasil,
+        // catat di log server + emit event terkoreksi (dipakai kalau ada
+        // listener socket real-time di masa depan) supaya kejadian "gagal
+        // menurut respons HTTP tapi sebenarnya tersimpan" tidak diam-diam
+        // hilang tanpa jejak.
+        uploadPromise.then(realResult => {
+          if (realResult.success) {
+            console.warn(`[upload-pdf-batch] File "${file.originalname}" dilaporkan timeout (>${PER_FILE_TIMEOUT_MS / 60000} menit) tapi TETAP berhasil diproses di background (file_id=${realResult.file_id}). Data sudah tersimpan, lihat Riwayat Upload.`);
+            if (io) {
+              io.emit('pdf-batch:file-done', {
+                batchId, fileName: file.originalname, success: true, error: null,
+                file_id: realResult.file_id,
+                jenis_klaim: realResult.jenis_klaim || null,
+                jenis_klaim_detection: realResult.jenis_klaim_detection || null,
+                reconciled: true,
+              });
+            }
+          }
+        }).catch(bgErr => {
+          console.warn(`[upload-pdf-batch] File "${file.originalname}" gagal permanen di background setelah timeout: ${bgErr.message}`);
+        });
       }
       completed++;
       if (io) {

@@ -2015,9 +2015,12 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
             }
 
             // Buat inacbg_result dengan informasi dari tariff data
+            // (field asli di JSON PMK 3/2023 adalah "description", bukan
+            // "deskripsi" -- fix 19 Sep 2026, sebelumnya selalu null karena
+            // nama field salah)
             inacbgResult = {
               code: inacbgCodeForLookup,
-              description: tarifData.deskripsi || null,
+              description: tarifData.description || tarifData.deskripsi || null,
               confidence: inacbgGrouping ? inacbgGrouping.confidence : 0.8,
               reasoning: inacbgGrouping ? inacbgGrouping.reasoning : `Dari diagnosis utama ${codes.diagnosis[0] || 'unknown'}.`,
               severity_level: inacbgCodeForLookup.split('-').pop() || null,
