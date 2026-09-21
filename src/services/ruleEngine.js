@@ -529,6 +529,19 @@ function validateRecord(record, activeRules) {
   // pakai severity 'minor' (severity CHECK di DB cuma terima
   // critical/major/minor; determineStatus() memetakan minor -> status
   // "pending", TIDAK memblokir submit, konsisten dengan RV-10).
+  // TIDAK AKTIF sejak 21 Sep 2026 (disengaja, keputusan klien). Kategori
+  // GAWAT_DARURAT dihapus -- kunjungan IGD kini berkategori RAWAT_JALAN --
+  // sehingga syarat di bawah tidak akan pernah terpenuhi lagi. Tampilan
+  // RV-20 di frontend juga sudah disembunyikan lebih dulu.
+  //
+  // Untuk menghidupkannya kembali: syaratnya TIDAK BISA sekadar diganti ke
+  // RAWAT_JALAN (itu akan menyalakan RV-20 untuk semua rawat jalan biasa,
+  // bukan cuma IGD). validateRecord() hanya menerima record dan dipanggil
+  // dari 11 tempat -- sebagian tanpa akses teks PDF -- jadi pemicu berbasis
+  // isi dokumen seperti hasIgdVisitSignal() (lihat pdfPageClassifier.js,
+  // dipakai aiReviewService.js untuk kegawatan_lemah) tidak bisa dipakai di
+  // sini. Yang dibutuhkan: penanda kunjungan IGD yang ikut TERSIMPAN di
+  // record (kolom baru, diisi saat ekstraksi).
   if (ruleMap['RV-20']?.is_active && record.jenis_klaim === 'GAWAT_DARURAT') {
     const NYERI_CODES = [/^R10/i, /^R51/i, /^R52/i, /^R07/i, /^M54/i, /^G43/i, /^M79/i];
     const KEGAWATAN_CODES = [/^I21/i, /^I22/i, /^I46/i, /^J96/i, /^J18/i, /^N17/i, /^K35/i, /^R57/i, /^A41/i, /^R41/i];
