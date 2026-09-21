@@ -1535,7 +1535,8 @@ const JENIS_KLAIM_OPTIONS = ['RAWAT_JALAN', 'RAWAT_INAP'];
 /**
  * P1-6: cek apakah SEP yang baru diekstrak SUDAH ada di claim_records
  * manapun (lintas file_id -- bukan cuma dalam batch/file yang sama). Dipakai
- * untuk cegah upload duplikat: kasus nyata SEP yang sama sempat ke-upload 2x
+ * untuk MEMPERINGATKAN upload duplikat (sejak 21 Sep 2026 tidak lagi menolak,
+ * lihat pemakaiannya): kasus nyata SEP yang sama sempat ke-upload 2x
  * sebagai kategori berbeda (IGD & Rawat Jalan) di hari yang sama, risiko
  * klaim ganda kalau lolos ke vClaim. Scoped per hospital_code sama seperti
  * detectAndFlagInternalEpisodes() -- SEP BPJS pada praktiknya cuma relevan
@@ -1588,17 +1589,30 @@ async function processSinglePdfUpload(db, { filePath, originalName, jenisKlaim: 
     // LANGSUNG ke BPJS, bukan sekadar pola yang perlu direview. Dicek di sini
     // (sebelum insert claim_files/claim_records) supaya tidak ada baris
     // setengah-tersimpan kalau ditolak.
+    // TIDAK LAGI menolak (21 Sep 2026, permintaan klien): rumah sakit memang
+    // mengupload berkas yang sama berulang kali, dan penolakan membuat alur
+    // kerja mereka buntu. Semua upload kini disimpan sebagai baris tersendiri
+    // supaya jejak auditnya utuh.
+    //
+    // Deteksinya SENGAJA dipertahankan sebagai peringatan: risiko yang dulu
+    // memicu pengecekan ini -- SEP sama terkirim 2x ke vClaim sebagai klaim
+    // ganda -- tidak hilang hanya karena uploadnya diizinkan. Sekarang jadi
+    // catatan di log, bukan penghalang.
+    //
+    // KONSEKUENSI yang disadari: Riwayat Upload bisa memuat beberapa baris
+    // dengan SEP sama, dan rekap yang menghitung per baris bisa terhitung ganda.
     if (extractedData.SEP) {
-      const duplicate = await findExistingRecordBySep(db, { hospitalCode, sep: extractedData.SEP });
-      if (duplicate) {
-        const uploadedAt = duplicate.created_at
-          ? new Date(duplicate.created_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', dateStyle: 'medium', timeStyle: 'short' })
-          : 'waktu tidak diketahui';
-        return {
-          success: false,
-          original_name: originalName,
-          error: `SEP ${extractedData.SEP} sudah pernah diupload sebelumnya sebagai kategori ${duplicate.jenis_klaim || '(tidak diketahui)'} pada ${uploadedAt} (berkas: "${duplicate.file_name || '-'}"). Upload ini ditolak untuk mencegah klaim ganda ke BPJS -- periksa apakah ini genuinely klaim berbeda atau salah upload sebelum lanjut.`,
-        };
+      try {
+        const duplikat = await findExistingRecordBySep(db, { hospitalCode, sep: extractedData.SEP });
+        if (duplikat) {
+          const diuploadPada = duplikat.created_at
+            ? new Date(duplikat.created_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', dateStyle: 'medium', timeStyle: 'short' })
+            : 'waktu tidak diketahui';
+          console.warn(`[Upload] SEP ${extractedData.SEP} sudah pernah diupload pada ${diuploadPada} -- tetap diproses sebagai baris baru.`);
+        }
+      } catch (errDuplikat) {
+        // Peringatan saja: kegagalan pengecekan tidak boleh menggagalkan upload.
+        console.warn(`[Upload] Gagal cek duplikat SEP: ${errDuplikat.message || errDuplikat}`);
       }
     }
 
