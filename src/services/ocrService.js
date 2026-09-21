@@ -350,6 +350,20 @@ async function ocrPdfPages(pdfPath, pageNumbers = 'auto-scan', language = OCR_CO
     // terbaca" WAJIB: di dokumen full-scan, OCR satu-satunya sumber nomor
     // SEP/no kartu, jadi di sana halaman SEP tetap harus diproses.
     const sepNativePages = new Set();
+    // Teks halaman yang sudah terbaca tanpa OCR. Dipakai sebagai PENGGANTI
+    // hasil OCR untuk halaman itu, bukan sebagai alasan membuangnya:
+    // ocrEnhancement.js#extractClinicalFields() HANYA membaca ocrResult.pages,
+    // jadi halaman yang tidak masuk situ hilang sama sekali dari ekstraksi
+    // klinis. Diverifikasi di berkas produksi: 8 dari 32 halaman NATIVE
+    // memuat kata tanda vital, jadi membuangnya berarti membuang data.
+    //
+    // Untuk halaman ini teks asli PDF justru LEBIH akurat daripada OCR (teks
+    // sungguhan vs pengenalan gambar), sekaligus menghemat render + OCR.
+    // Ambangnya sengaja tinggi: halaman ber-teks sedikit bisa jadi campuran
+    // teks + tabel gambar, dan tabel itulah yang memuat tanda vital -- yang
+    // begitu tetap di-OCR.
+    const NATIVE_TEXT_MIN_CHARS = 500;
+    const nativeTextByPage = new Map();
     if (pageNumbers === 'auto-scan') {
       // 'auto-scan' (default): pakai klasifikasi halaman yang sudah ada —
       // cuma halaman SCAN (bukan hasil ketik/NATIVE) yang perlu di-OCR.
@@ -372,6 +386,9 @@ async function ocrPdfPages(pdfPath, pageNumbers = 'auto-scan', language = OCR_CO
           classified.pages
             .filter(p => p.type === 'NATIVE' && !p.is_critical && isSepPage(p.text_full))
             .forEach(p => sepNativePages.add(p.page_num));
+          classified.pages
+            .filter(p => p.type === 'NATIVE' && (p.text_full || '').trim().length >= NATIVE_TEXT_MIN_CHARS)
+            .forEach(p => nativeTextByPage.set(p.page_num, p.text_full));
         }
       } catch (classifyErr) {
         console.warn('[OCR] Klasifikasi critical-page gagal (non-fatal, lanjut tanpa prioritas):', classifyErr.message || classifyErr);
@@ -425,6 +442,24 @@ async function ocrPdfPages(pdfPath, pageNumbers = 'auto-scan', language = OCR_CO
       if (!criticalPageNums.has(pageNum) && Date.now() >= deadline - CRITICAL_PAGE_TIMEOUT_MARGIN_MS) {
         console.log(`[OCR][Phase1] SKIP halaman ${pageNum} (non-critical, budget habis)`);
         result.skipped_pages.push({ page_number: pageNum, reason: 'ocr_timeout_budget_exceeded_non_critical' });
+        continue;
+      }
+
+      // Teks halaman ini sudah terbaca tanpa OCR -- pakai apa adanya.
+      // Bukan pelewatan: halamannya tetap masuk result.pages, jadi ekstraksi
+      // klinis tetap melihatnya. Yang dihemat render + OCR-nya.
+      const teksNative = nativeTextByPage.get(pageNum);
+      if (teksNative) {
+        result.pages.push({
+          page_number: pageNum,
+          text: teksNative,
+          confidence: 100, // teks asli PDF, bukan hasil pengenalan gambar
+          confidence_status: 'readable',
+          block_count: 0,
+          duration_ms: 0,
+          source: 'native_text',
+        });
+        console.log(`[OCR][Phase1] Halaman ${pageNum} pakai teks asli PDF (${teksNative.length} char) -- render+OCR dilewati`);
         continue;
       }
 
