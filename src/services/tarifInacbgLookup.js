@@ -51,6 +51,7 @@ function getTarifResmi(kodeInacbg, kelasRawat) {
   // JSON uses kelasA, kelasB, kelasC, kelasD format
   // Map BPJS kelas (1, 2, 3) to JSON kelas (A, B, C, D)
   const kelas = Number(kelasRawat);
+  const kelasRawatValid = kelas === 1 || kelas === 2 || kelas === 3;
   let tarifValue = null;
 
   if (kelas === 3) {
@@ -80,7 +81,42 @@ function getTarifResmi(kodeInacbg, kelasRawat) {
     tarifValue = row.kelasD;
   }
 
-  return { tarif: tarifValue, sumber: row };
+  // Fix (21 Sep 2026): kasus produksi G-4-22-I (kode rawat inap murni --
+  // kelasA/B/C terisi, kelasD null, jadi fallback di atas TIDAK berlaku).
+  // Sebelum fix ini, pemanggil (aiReviewService.js) diam-diam mengganti
+  // kelas_rawat yang kosong dengan default '3' SEBELUM sampai ke fungsi ini,
+  // jadi kalau field kelas_rawat hasil ekstraksi berisi sampah non-numerik
+  // (mis. AI salah menyalin "-"/"IGD" alih-alih benar-benar mengosongkan
+  // field itu -- lihat aturan 8 di pdfExtractionService.js), default '3' itu
+  // TIDAK ikut menyelamatkan (default cuma jalan kalau field itu falsy/
+  // kosong total, bukan kalau isinya sampah tapi truthy) -> Number(kelasRawat)
+  // jadi NaN, tidak ada kolom kelas yang cocok, tarifValue tetap null SAMPAI
+  // SINI tanpa ada penjelasan ke pengguna kenapa -- panel FE cuma menampilkan
+  // "Tidak ditemukan" walau kode & deskripsinya sendiri sudah ketemu (row
+  // bukan undefined). aiReviewService.js sekarang TIDAK lagi mendefault
+  // kelas_rawat ke '3' sebelum memanggil fungsi ini -- nilai mentah
+  // diteruskan apa adanya supaya kelasRawatValid di atas benar-benar
+  // mencerminkan apakah kelas kamar pasien diketahui, lalu alasanTarifKosong
+  // di bawah membedakan 2 penyebab tarif null yang beda maknanya:
+  //  1. kelas_rawat tidak diketahui/tidak valid -> kita GENUINELY tidak tahu
+  //     kolom mana yang harus dibaca, JANGAN menebak salah satu (itu sama
+  //     saja mengarang angka).
+  //  2. kelas_rawat valid (1/2/3) TAPI kolom itu sendiri "-"/kosong di
+  //     dokumen PMK 3/2023 sumber untuk kode ini (kode ada, tapi memang
+  //     tidak dijamin BPJS untuk kelas rawat tsb).
+  let alasanTarifKosong = null;
+  if (tarifValue === null) {
+    if (kelasRawatValid) {
+      alasanTarifKosong = `Kode ${row.code} ditemukan di PMK No. 3 Tahun 2023 (Regional 1, Kelas D Swasta), tapi tarif untuk kelas rawat ${kelas} memang tidak berlaku/tidak dijamin ("-") di dokumen sumber untuk kode ini.`;
+    } else {
+      const nilaiMentah = kelasRawat === undefined || kelasRawat === null || kelasRawat === ''
+        ? '(kosong)'
+        : JSON.stringify(String(kelasRawat));
+      alasanTarifKosong = `Kode ${row.code} ditemukan di PMK No. 3 Tahun 2023 (Regional 1, Kelas D Swasta), tapi kelas rawat pasien tidak diketahui/tidak valid (nilai kelas_rawat: ${nilaiMentah}), sehingga tarif kelas 1/2/3 untuk kode ini belum bisa ditentukan. Kode ini juga bukan kode day-care/RJTL (tidak punya tarif tunggal kelas D).`;
+    }
+  }
+
+  return { tarif: tarifValue, sumber: row, kelasRawatValid, alasanTarifKosong };
 }
 
 /**
@@ -97,7 +133,21 @@ function validateTarifDiscrepancy(kodeInacbg, kelasRawat, tarifKlaim) {
     return { valid: true, status: 'KODE_TIDAK_DITEMUKAN', selisih: 0, tarifResmi: null, tarifKlaim: Number(tarifKlaim) || null };
   }
   if (resmi.tarif === null) {
-    return { valid: false, status: 'TARIF_TIDAK_BERLAKU', selisih: 0, tarifResmi: null, tarifKlaim: Number(tarifKlaim) || null };
+    return {
+      valid: false,
+      status: 'TARIF_TIDAK_BERLAKU',
+      selisih: 0,
+      tarifResmi: null,
+      tarifKlaim: Number(tarifKlaim) || null,
+      // Fix 21 Sep 2026: status di atas tetap 'TARIF_TIDAK_BERLAKU' apa
+      // adanya (jangan pecah jadi status baru) supaya ruleEngine.js RV-21
+      // yang sudah switch di atas status ini tidak diam-diam berhenti
+      // menandai error -- tapi pemanggil sekarang bisa membaca alasan/
+      // kelasRawatValid untuk pesan yang lebih spesifik daripada teks
+      // generik "tidak berlaku" saja.
+      alasan: resmi.alasanTarifKosong,
+      kelasRawatValid: resmi.kelasRawatValid,
+    };
   }
   const claimValue = Number(tarifKlaim);
   if (isNaN(claimValue) || claimValue <= 0) {

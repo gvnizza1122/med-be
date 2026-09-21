@@ -598,7 +598,12 @@ function validateRecord(record, activeRules) {
           rule_id: 'RV-21',
           field_name: 'inacbg_code',
           severity: 'minor',
-          error_message: ruleMap['RV-21'].error_message ||
+          // Fix 21 Sep 2026: pakai alasan spesifik dari getTarifResmi kalau
+          // ada -- ini membedakan "kelas rawat tidak diketahui/tidak valid"
+          // dari "kode ada tapi kolom kelas ini memang '-' di dokumen
+          // sumber", dua penyebab yang sebelumnya sama-sama tampil sebagai
+          // pesan generik "TIDAK memiliki tarif" tanpa penjelasan.
+          error_message: ruleMap['RV-21'].error_message || resVal.alasan ||
             `Kode INACBG ${kode} ditemukan di tabel resmi PMK 3/2023, tapi TIDAK memiliki tarif yang dijamin (tanda "-") untuk Regional 1 x Kelas D Swasta pada kelas rawat klaim ini. Periksa ulang ketepatan kode/kelas rawat.`,
           expected_value: 'Kode dengan tarif resmi berlaku untuk kelas rawat ini',
           actual_value: `${kode} (kelas_rawat=${record.kelas_rawat ?? '(kosong)'})`

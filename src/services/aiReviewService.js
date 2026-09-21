@@ -1985,7 +1985,22 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
       if (inacbgCodeForLookup) {
         try {
           const tarifData = lookupTarifInacbg(inacbgCodeForLookup);
-          const kelasRawat = record.KELAS_RAWAT || record.kelas_rawat || '3';
+          // Fix (21 Sep 2026): SEBELUMNYA field kosong/tidak dikenal di sini
+          // diam-diam diganti '3' -- tapi default itu cuma jalan kalau
+          // record.KELAS_RAWAT/record.kelas_rawat falsy (kosong total), TIDAK
+          // menyelamatkan kalau field itu berisi sampah non-numerik yang
+          // truthy (mis. AI ekstraksi salah menyalin "-"/"IGD" -- lihat
+          // aturan 8 di pdfExtractionService.js). Akibatnya getTarifResmi()
+          // menerima kelas_rawat yang SUDAH "divalidasi" jadi '3' padahal
+          // kelas kamar pasien sebenarnya tidak diketahui, dan untuk kode
+          // rawat-inap-murni (kelasD null, mis. G-4-22-I) yang tarifnya
+          // TIDAK distratifikasi bisa dibaca lewat kelasD, hasil akhirnya
+          // tarif null tanpa penjelasan sama sekali -- panel FE cuma
+          // menampilkan "Tidak ditemukan" walau kode & deskripsinya sendiri
+          // sudah ketemu. Sekarang nilai mentah diteruskan apa adanya;
+          // getTarifResmi sendiri yang menilai valid/tidaknya & menyusun
+          // alasan spesifik (lihat tarifInacbgLookup.js).
+          const kelasRawat = record.KELAS_RAWAT || record.kelas_rawat;
 
           if (tarifData) {
             // Kode DITEMUKAN di database PMK 3/2023
@@ -1998,19 +2013,22 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
                 class: tarifData.tipe_rs || 'D_SWASTA',
                 jenis_layanan: tarifData.jenis_layanan || jenisKlaimRecord,
                 source: 'PMK_3_2023',
-                kelas_rawat: kelasRawat,
+                kelas_rawat: kelasRawat ?? null,
                 note: 'Tarif resmi dari PMK No. 3 Tahun 2023',
               };
             } else if (tarifInfo) {
-              // Tarif data ada tapi tarif null (tidak berlaku untuk kelas ini)
+              // Tarif data ada tapi tarif null -- pakai alasan spesifik dari
+              // getTarifResmi (beda pesan utk "kelas rawat tidak diketahui"
+              // vs "kode ada tapi tarif kelas ini memang '-' di sumber")
+              // alih-alih satu kalimat generik yang tidak menjelaskan sebab.
               tarifResult = {
                 amount: null,
                 region: tarifData.regional || '1',
                 class: tarifData.tipe_rs || 'D_SWASTA',
                 jenis_layanan: tarifData.jenis_layanan || jenisKlaimRecord,
                 source: 'PMK_3_2023',
-                kelas_rawat: kelasRawat,
-                note: 'Kode ada di PMK No. 3 Tahun 2023 tapi tarif tidak berlaku untuk kelas rawat ini',
+                kelas_rawat: kelasRawat ?? null,
+                note: tarifInfo.alasanTarifKosong || 'Kode ada di PMK No. 3 Tahun 2023 tapi tarif tidak berlaku untuk kelas rawat ini',
               };
             }
 
