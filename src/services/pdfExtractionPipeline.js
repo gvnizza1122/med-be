@@ -72,14 +72,26 @@ function applyDeterministicFallback(record, allPagesText, jenisKlaim, originalNa
     }
   }
   const isOutpatientLike = jenisKlaim === 'RAWAT_JALAN' || jenisKlaim === 'GAWAT_DARURAT';
-  if (!record.KELAS_RAWAT && isOutpatientLike) {
+  // Syaratnya BUKAN 'masih kosong' melainkan 'belum berisi 1/2/3'. Aturan 8 di
+  // pdfExtractionService.js sendiri memberitahu AI bahwa field 'Kelas Rawat'
+  // pada berkas rawat jalan/IGD wajar berisi "-", dan AI memang kadang
+  // menyalin "-" itu apa adanya alih-alih mengambil dari 'Kls Hak'. Karena
+  // "-" itu truthy, syarat lama (!record.KELAS_RAWAT) membuat jaring pengaman
+  // ini justru DILEWATI persis pada kasus yang paling membutuhkannya: nilai
+  // sampah lolos ke hilir, Number("-") jadi NaN di getTarifResmi(), dan tarif
+  // resmi hilang tanpa sebab yang jelas walau kodenya ketemu di PMK 3/2023.
+  const kelasRawatSudahValid = /^[123]$/.test(String(record.KELAS_RAWAT || '').trim());
+  if (!kelasRawatSudahValid && isOutpatientLike) {
     // Label field bervariasi "Kelas Hak"/"Kls Hak", nilainya bisa "Kelas 2" atau
     // langsung "2" — regex ini tangani kombinasi label singkat/panjang x nilai
     // dengan/tanpa kata "Kelas" di depan angka.
     const m = /(?:kelas|kls\.?)\s*hak\s*:?\s*(?:kelas\s*)?(\d)\b/i.exec(allPagesText);
     if (m) {
       record.KELAS_RAWAT = m[1];
-      console.log('[Pipeline] Fallback regex mengisi KELAS_RAWAT dari Kelas Hak (rawat jalan, AI mengembalikan kosong).');
+      console.log('[Pipeline] Fallback regex mengisi KELAS_RAWAT dari Kelas Hak (rawat jalan/IGD).');
+    } else if (record.KELAS_RAWAT) {
+      console.log('[Pipeline] KELAS_RAWAT ' + JSON.stringify(record.KELAS_RAWAT) + ' bukan 1/2/3 dan Kls Hak tidak terbaca -- dikosongkan supaya tidak menutupi nilai tervalidasi di hilir.');
+      record.KELAS_RAWAT = '';
     }
   }
   if (isOutpatientLike && (!record.ADMISSION_DATE || !record.DISCHARGE_DATE)) {
@@ -425,4 +437,4 @@ async function classifyOnly(filePath) {
   return extractFromPDF(filePath, { skipAI: true });
 }
 
-module.exports = { extractFromPDF, classifyOnly, PESAN };
+module.exports = { extractFromPDF, classifyOnly, PESAN, applyDeterministicFallback };
