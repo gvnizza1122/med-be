@@ -154,10 +154,23 @@ const THRESHOLD_TABLE = {
     bayi: { normal: [100, 190], gawatUnder: 100, gawatOver: 190 },
     neonatus: { normal: [100, 205], gawatUnder: 100, gawatOver: 205 },
   },
+  // Band DEWASA & LANSIA disesuaikan ke ESH/ESC 2023 (21 Sep 2026, atas
+  // konfirmasi dokter). Sebelumnya angkanya dikonstruksi sendiri, bukan
+  // dikutip dari pedoman mana pun. Klasifikasi ESH 2023: optimal <120/<80,
+  // normal 120-129/80-84, high-normal 130-139/85-89, hipertensi grade 1
+  // 140-159/90-99, grade 2 160-179/100-109, grade 3 >=180/>=110.
+  //
+  // Band ANAK (neonatus s/d remaja) SENGAJA TIDAK diubah: ESH adalah
+  // pedoman hipertensi dewasa dan tidak mencakup anak, dan dokter belum
+  // menentukan acuan untuk anak -- angka PALS di bawah tetap dipakai.
+  //
+  // Sisi RENDAH (gawatUnder: hipotensi/syok) juga TIDAK berasal dari ESH:
+  // ESH mengatur hipertensi, bukan kegawatan hemodinamik. Ambang bawahnya
+  // dibiarkan apa adanya karena justru itu yang relevan untuk klaim IGD.
   TD_sistolik: {
     unit: 'mmHg',
-    dewasa: { normal: [90, 140], borderline: [[141, 179], [80, 89]], gawatUnder: 80, gawatOver: 180 },
-    lansia: { normal: [90, 140], borderline: [[141, 179], [80, 89]], gawatUnder: 80, gawatOver: 180 }, // sama dewasa, tidak ada dasar literatur kuat u/ geser
+    dewasa: { normal: [90, 139], borderline: [[140, 179], [80, 89]], gawatUnder: 80, gawatOver: 180 },
+    lansia: { normal: [90, 139], borderline: [[140, 179], [80, 89]], gawatUnder: 80, gawatOver: 180 }, // sama dewasa, tidak ada dasar literatur kuat u/ geser
     remaja: { normal: [112, 128], gawatUnder: 90 },
     // Ambang hipotensi pediatrik baku PALS sebenarnya rumus dinamis 70+(usia_tahun x2)
     // mmHg, BUKAN angka statis -- diaproksimasi jadi angka statis per kelompok usia
@@ -203,8 +216,8 @@ const THRESHOLD_TABLE = {
   // BA/pengguna), flagged eksplisit di sini supaya tidak dikira setara.
   TD_diastolik: {
     unit: 'mmHg',
-    dewasa: { normal: [60, 89], borderline: [[90, 120], [50, 59]], gawatUnder: 50, gawatOver: 120 },
-    lansia: { normal: [60, 89], borderline: [[90, 120], [50, 59]], gawatUnder: 50, gawatOver: 120 },
+    dewasa: { normal: [60, 89], borderline: [[90, 109], [50, 59]], gawatUnder: 50, gawatOver: 110 },
+    lansia: { normal: [60, 89], borderline: [[90, 109], [50, 59]], gawatUnder: 50, gawatOver: 110 },
     remaja: { normal: [64, 83], gawatUnder: 64 },
     usia_sekolah: { normal: [57, 76], gawatUnder: 57 },
     prasekolah: { normal: [46, 72], gawatUnder: 46 },
