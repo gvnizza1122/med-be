@@ -1079,6 +1079,25 @@ async function assessKegawatdaruratan(evidencePool, triagePageNumbers, umurTahun
       // dicetak di form Triase IGD RS ybs). Deterministik (regex ke teks
       // mentah halaman Triase), lihat documentFieldTemplate.js.
       const formStatus = resolveFieldFormStatus(key, sourceDocType, pagesForFormStatus, validQuote);
+      // TD yang di dokumen tertulis 0 BUKAN hasil pengukuran: tekanan darah
+      // sistolik 0 pada pasien hidup mustahil secara klinis, itu cara petugas
+      // menandai "tidak diukur". Sebelumnya angka itu jatuh di bawah
+      // gawatUnder (bayi: 70) sehingga lookupBand menilainya "gawat" -- bayi
+      // yang tekanan darahnya memang tidak diukur rutin jadi ikut terhitung
+      // punya kondisi gawat, dan itu menaikkan penilaian kegawatdaruratan
+      // klaim atas dasar angka yang bukan pengukuran.
+      //
+      // Kutipannya tetap disimpan supaya tampilan bisa menjelaskan dari mana
+      // angka 0 itu berasal (lihat tercatat_nol di results/[fileId]/page.tsx).
+      if ((key === "TD_sistolik" || key === "TD_diastolik") && nilai === 0) {
+        vitalFindings[key] = {
+          nilai: null, band: null,
+          page_number: validQuote ? v.page_number : null,
+          kutipan: validQuote ? v.kutipan.substring(0, 200) : null,
+          form_status: formStatus, tercatat_nol: true, ...nyeriExtra,
+        };
+        continue;
+      }
       if (!validQuote) {
         vitalFindings[key] = { nilai: null, band: null, page_number: null, kutipan: null, form_status: formStatus, ...nyeriExtra };
         continue;
