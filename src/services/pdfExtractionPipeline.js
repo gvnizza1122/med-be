@@ -71,7 +71,7 @@ function applyDeterministicFallback(record, allPagesText, jenisKlaim, originalNa
       console.log('[Pipeline] Fallback regex mengisi NOKARTU (AI mengembalikan kosong).');
     }
   }
-  const isOutpatientLike = jenisKlaim === 'RAWAT_JALAN' || jenisKlaim === 'GAWAT_DARURAT';
+  const isOutpatientLike = jenisKlaim === 'RAWAT_JALAN';
   // Syaratnya BUKAN 'masih kosong' melainkan 'belum berisi 1/2/3'. Aturan 8 di
   // pdfExtractionService.js sendiri memberitahu AI bahwa field 'Kelas Rawat'
   // pada berkas rawat jalan/IGD wajar berisi "-", dan AI memang kadang

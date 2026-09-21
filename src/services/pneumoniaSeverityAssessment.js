@@ -99,15 +99,20 @@ function computeSeverityTier(ageTier, { napasCepat, retraksiPresent, retraksiGra
  * @param {string} diagnosaList
  * @param {Object|Array|null} kegawatdaruratanAssessment - hasil assessKegawatdaruratan (bentuk baru)
  * @param {string} jenisKlaim
+ * @param {boolean} [isKunjunganIgd] - berkas ini kunjungan IGD (dari isi dokumen, lihat hasIgdVisitSignal)
  * @returns {{pattern:string,page_number:number|null,basis:string,note:string}|null}
  */
-function assessPneumoniaSeverityMismatch(diagnosaList, kegawatdaruratanAssessment, jenisKlaim) {
+function assessPneumoniaSeverityMismatch(diagnosaList, kegawatdaruratanAssessment, jenisKlaim, isKunjunganIgd) {
   const pneumoniaCodes = extractPneumoniaCodes(diagnosaList);
   if (pneumoniaCodes.length === 0) return null;
 
   // Hanya relevan utk klaim yg menagih level rawat-inap/gawat-darurat -- tidak
   // ada dasar utk menilai RAWAT_JALAN terhadap Kriteria Rawat Inap.
-  if (jenisKlaim !== 'RAWAT_INAP' && jenisKlaim !== 'GAWAT_DARURAT') return null;
+  // Kunjungan IGD dikenali dari ISI dokumen, bukan dari kategori klaim:
+  // kategori GAWAT_DARURAT dihapus 21 Sep 2026 dan berkas IGD kini
+  // berkategori RAWAT_JALAN, jadi cek kategori saja akan mematikan
+  // penilaian ini untuk semua berkas IGD.
+  if (jenisKlaim !== 'RAWAT_INAP' && !isKunjunganIgd) return null;
 
   // Data lama (array, pra-restrukturisasi) atau memang tidak ada (bukan lewat
   // Triase IGD) -- tidak bisa dinilai, JANGAN memaksa/menebak.
@@ -148,7 +153,7 @@ function assessPneumoniaSeverityMismatch(diagnosaList, kegawatdaruratanAssessmen
   if (!evidence) return null; // tidak ada kutipan tervalidasi apapun -- jangan melapor tanpa basis
 
   const ageTierLabel = ageTier === 'muda' ? 'bayi di bawah 2 bulan' : 'anak 2 bulan-5 tahun';
-  const jenisLabel = jenisKlaim === 'GAWAT_DARURAT' ? 'gawat darurat' : 'rawat inap';
+  const jenisLabel = isKunjunganIgd ? 'gawat darurat' : 'rawat inap';
   const note = `Diagnosis pneumonia (kode ${pneumoniaCodes.join(', ')}) ditagihkan sebagai klaim ${jenisLabel} untuk pasien kelompok usia ${ageTierLabel}, tetapi Tabel 1/2 (data dari formulir Triase IGD) tidak menunjukkan kriteria WHO Pneumonia Berat (napas cepat dan/atau retraksi dinding dada, per PNPK Tatalaksana Pneumonia pada Anak IDAI) maupun tanda bahaya lain pada Kriteria Rawat Inap PNPK (saturasi oksigen rendah/sianosis). Ini bahan cek klinis, SARAN untuk verifikator/koder memastikan bukti keparahan tercatat di tempat lain (mis. hasil radiologis, catatan naratif dokter) yang tidak tertangkap Tabel 1/2 Triase -- BUKAN tuduhan bahwa keputusan rawat inap/gawat daruratnya pasti tidak tepat.`;
 
   return {

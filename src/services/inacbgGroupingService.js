@@ -23,7 +23,7 @@ const { detectSpecialCmg, calculateTotalTopup } = require('./specialCmgService')
  *
  * @param {Array<string>} diagnosisCodes - Array kode diagnosis ICD-10 (prioritas: urutan pertama adalah primary)
  * @param {Array<string>} procedureCodes - Array kode prosedur ICD-9-CM (opsional, untuk konteks)
- * @param {string} jenisKlaim - Jenis klaim: 'RAWAT_INAP', 'RAWAT_JALAN', 'GAWAT_DARURAT'
+ * @param {string} jenisKlaim - Jenis klaim: 'RAWAT_INAP', 'RAWAT_JALAN'
  * @returns {Object|null} {code, confidence, reasoning} atau null jika tidak bisa memetakan
  */
 function groupCodesToInaCBG(diagnosisCodes, procedureCodes = [], jenisKlaim = 'RAWAT_INAP') {

@@ -14,7 +14,7 @@
  * supaya daftar ini tetap jadi checklist yang bisa diaudit, bukan cuma
  * tambalan tersebar.
  *
- * jenis_klaim yang valid: 'RAWAT_JALAN' | 'RAWAT_INAP' | 'GAWAT_DARURAT'
+ * jenis_klaim yang valid: 'RAWAT_JALAN' | 'RAWAT_INAP' (GAWAT_DARURAT dihapus 21 Sep 2026, kunjungan IGD masuk RAWAT_JALAN)
  * (lihat JENIS_KLAIM_OPTIONS di frontend, results/[fileId]/page.tsx)
  *
  * VERIFIKASI DATA REAL (2026-08-20): 150 sampel PDF produksi asli RS Lestari
@@ -26,27 +26,27 @@
 const FIELD_BEHAVIOR_BY_JENIS_KLAIM = [
   {
     field: 'KELAS_RAWAT',
-    note: 'RAWAT_JALAN & GAWAT_DARURAT-tanpa-rawat-inap: dokumen TIDAK punya "Kelas Rawat" (pasien tidak menginap) — ambil dari "Kelas Hak" (kelas kepesertaan BPJS) sebagai gantinya. RAWAT_INAP: ambil dari "Kelas Rawat" asli, JANGAN dari "Kelas Hak".',
+    note: 'RAWAT_JALAN (termasuk kunjungan IGD): dokumen TIDAK punya "Kelas Rawat" (pasien tidak menginap) — ambil dari "Kelas Hak" (kelas kepesertaan BPJS) sebagai gantinya. RAWAT_INAP: ambil dari "Kelas Rawat" asli, JANGAN dari "Kelas Hak".',
     handledIn: ['pdfExtractionService.js (kelasRawatRule)'],
     status: 'implemented',
   },
   {
     field: 'ADMISSION_DATE / DISCHARGE_DATE',
-    note: 'RAWAT_JALAN & GAWAT_DARURAT-tanpa-rawat-inap: dokumen TIDAK punya "Tanggal Masuk"/"Tanggal Keluar" terpisah (satu hari kunjungan) — pakai "Tanggal Pelayanan"/"Tanggal Kunjungan"/"Tgl Periksa" untuk KEDUANYA. RAWAT_INAP: pakai tanggal masuk & keluar asli, bisa beda hari.',
-    handledIn: ['pdfExtractionService.js (tanggalRawatJalanRule, sekarang mencakup RAWAT_JALAN + GAWAT_DARURAT)'],
+    note: 'RAWAT_JALAN (termasuk kunjungan IGD): dokumen TIDAK punya "Tanggal Masuk"/"Tanggal Keluar" terpisah (satu hari kunjungan) — pakai "Tanggal Pelayanan"/"Tanggal Kunjungan"/"Tgl Periksa" untuk KEDUANYA. RAWAT_INAP: pakai tanggal masuk & keluar asli, bisa beda hari.',
+    handledIn: ['pdfExtractionService.js (tanggalRawatJalanRule, sekarang mencakup RAWAT_JALAN (termasuk IGD))'],
     status: 'implemented',
     verifiedAgainstRealData: '2026-08-20 — dicek 2 sampel PDF IGD asli (Resume Medis IGD), keduanya cuma punya field "Tgl Periksa" tunggal, sama persis pola RAWAT_JALAN. Rule diperluas mencakup GAWAT_DARURAT.',
   },
   {
     field: 'ICU_INDIKATOR / ICU_LOS / VENT_HOUR',
-    note: 'Cuma relevan untuk RAWAT_INAP. Untuk RAWAT_JALAN/GAWAT_DARURAT-tanpa-inap, field ini wajib "0"/kosong, dan field_notes AI dilarang menyinggung ICU/ventilator sama sekali.',
+    note: 'Cuma relevan untuk RAWAT_INAP. Untuk RAWAT_JALAN (termasuk kunjungan IGD), field ini wajib "0"/kosong, dan field_notes AI dilarang menyinggung ICU/ventilator sama sekali.',
     handledIn: ['aiReviewService.js (hasInpatientOnlyTerms filter, system prompt larangan eksplisit)'],
     status: 'implemented',
     caveat: 'Filter ini ada di sisi AI review (buang saran yang menyinggung rawat inap), TAPI belum ada rule serupa di pdfExtractionService.js untuk memastikan ekstraksi awal juga tidak salah isi nilai — kalau AI ekstraksi tetap ngarang ICU_LOS untuk RAWAT_JALAN, belum ada penjaga di titik ekstraksi. Belum jadi prioritas karena belum ada bukti nyata ini kejadian.',
   },
   {
     field: 'LOS (Length of Stay)',
-    note: 'RAWAT_JALAN/GAWAT_DARURAT-tanpa-inap: dokumen TIDAK PERNAH mencantumkan label "LOS"/"Lama Rawat" sama sekali — field kosong di kasus ini SUDAH BENAR (sesuai aturan 6 "jangan menebak"), bukan bug. RAWAT_INAP: belum ada sampel PDF asli untuk diverifikasi.',
+    note: 'RAWAT_JALAN (termasuk kunjungan IGD): dokumen TIDAK PERNAH mencantumkan label "LOS"/"Lama Rawat" sama sekali — field kosong di kasus ini SUDAH BENAR (sesuai aturan 6 "jangan menebak"), bukan bug. RAWAT_INAP: belum ada sampel PDF asli untuk diverifikasi.',
     handledIn: [],
     status: 'checked-no-issue-for-outpatient',
     verifiedAgainstRealData: '2026-08-20 — dicek 2 sampel PDF RJ/IGD asli, tidak ada satupun mention "LOS"/"Lama Rawat"/"Lama Dirawat". Tidak ada rule validasi format LOS di ruleEngine.js juga, jadi tidak berdampak ke error/pending saat ini.',
@@ -54,7 +54,7 @@ const FIELD_BEHAVIOR_BY_JENIS_KLAIM = [
   },
   {
     field: 'Kriteria kegawatan (S/O di resume medis)',
-    note: 'GAWAT_DARURAT: keluhan (S) yang cuma "nyeri"/keluhan ringan tanpa tanda objektif (O) pendukung, dikombinasikan dengan TTV normal semua, sering ditolak BPJS ("false emergency"/"unklaim"/"tidak memenuhi kriteria gawat darurat") — pola pending #3 terbesar (8.8% RJ, ~9-30% RI tergantung kategorisasi). Bukan validasi format field, tapi pola risiko semantik dari isi dokumen.',
+    note: 'Kunjungan IGD: keluhan (S) yang cuma "nyeri"/keluhan ringan tanpa tanda objektif (O) pendukung, dikombinasikan dengan TTV normal semua, sering ditolak BPJS ("false emergency"/"unklaim"/"tidak memenuhi kriteria gawat darurat") — pola pending #3 terbesar (8.8% RJ, ~9-30% RI tergantung kategorisasi). Bukan validasi format field, tapi pola risiko semantik dari isi dokumen.',
     handledIn: ['aiReviewService.js (pola pending_risk_notes: kegawatan_lemah)'],
     status: 'implemented',
   },

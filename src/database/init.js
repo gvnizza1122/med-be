@@ -763,7 +763,7 @@ async function migrateSchema(db) {
           await db.query(`ALTER TABLE claim_files ADD COLUMN ai_total_tokens INTEGER DEFAULT 0`);
         } catch (e) {}
       }
-      // Kategori pelayanan (RAWAT_JALAN/RAWAT_INAP/GAWAT_DARURAT) dipilih user
+      // Kategori pelayanan (RAWAT_JALAN/RAWAT_INAP) dipilih user
       // saat upload PDF di halaman Extract - dipakai sebagai konteks AI review
       // (supaya tidak salah saran, mis. saran ruangan rawat inap untuk klaim
       // rawat jalan) dan untuk filter/tampilan di Riwayat Upload.

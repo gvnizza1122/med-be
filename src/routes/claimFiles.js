@@ -1517,7 +1517,10 @@ async function detectAndFlagPRB(db, { hospitalCode, mrn, nokartu, admissionDate,
 // isi dokumennya rawat jalan/IGD - akibatnya rule RV-17 (odontektomi) salah
 // nyala untuk klaim rawat jalan, dan AI review menyarankan hal-hal rawat
 // inap (ruangan, dst) untuk klaim yang sebenarnya rawat jalan.
-const JENIS_KLAIM_OPTIONS = ['RAWAT_JALAN', 'RAWAT_INAP', 'GAWAT_DARURAT'];
+// GAWAT_DARURAT dihapus 21 Sep 2026: kunjungan IGD ternyata termasuk
+// rawat jalan, dan mengategorikannya tersendiri membuat kategori
+// RAWAT_JALAN nyaris tidak pernah terisi.
+const JENIS_KLAIM_OPTIONS = ['RAWAT_JALAN', 'RAWAT_INAP'];
 
 /**
  * Proses SATU PDF end-to-end: AI extraction -> rule engine -> simpan DB ->

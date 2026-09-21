@@ -13,7 +13,7 @@ const TEKS_SEP = [
 
 function jalankan(nilaiDariAi, teks = TEKS_SEP) {
   const record = { KELAS_RAWAT: nilaiDariAi };
-  applyDeterministicFallback(record, teks, 'GAWAT_DARURAT', 'berkas.pdf');
+  applyDeterministicFallback(record, teks, 'RAWAT_JALAN', 'berkas.pdf');
   return record.KELAS_RAWAT;
 }
 

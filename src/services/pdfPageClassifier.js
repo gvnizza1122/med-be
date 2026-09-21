@@ -76,6 +76,25 @@ async function shutdownClassifyPool() {
 process.on('SIGTERM', () => { shutdownClassifyPool(); });
 process.on('SIGINT', () => { shutdownClassifyPool(); });
 
+// Penanda bahwa berkas ini kunjungan IGD/UGD. Sengaja DIPISAH dari
+// detectJenisKlaim(): sejak kategori GAWAT_DARURAT dihapus (semua jadi
+// RAWAT_JALAN, 21 Sep 2026), pemicu audit kegawatan -- kegawatan_lemah,
+// penilaian K1-K4, RV-20 -- tidak boleh lagi bergantung pada kategori
+// klaim, karena kategori itu tidak lagi membedakan IGD dari rawat jalan
+// biasa. Pemicunya dipindah ke ISI dokumen lewat fungsi ini.
+function hasIgdVisitSignal(fullText) {
+  if (!fullText) return false;
+  const igdMarkers = [
+    'resume medis igd', 'triage igd', 'instalasi gawat darurat',
+  ];
+  const lower = fullText.toLowerCase();
+  if (igdMarkers.some(k => lower.includes(k))) return true;
+  // Klinik : UGD — cek terpisah (bukan cuma substring "ugd" yang gampang
+  // false-positive, mis. singkatan lain) — harus persis pola "Klinik : UGD".
+  if (/klinik[ \t]*:[ \t]*ugd\b/i.test(fullText)) return true;
+  return false;
+}
+
 /**
  * Deteksi kategori pelayanan (jenis_klaim) dari ISI dokumen — dipakai buat
  * upload batch kategori-campur, supaya verifikator tidak perlu pilih
@@ -86,7 +105,8 @@ process.on('SIGINT', () => { shutdownClassifyPool(); });
  * terhadap 150+ sampel PDF produksi asli RS Lestari Raharja (Jun-Jul 2026):
  * 1. Penanda IGD eksplisit ("RESUME MEDIS IGD", "TRIAGE IGD", klinik
  *    "INSTALASI GAWAT DARURAT"/"UGD") — paling reliabel, selalu ada
- *    kata-kata khas ini di berkas IGD.
+ *    kata-kata khas ini di berkas IGD. Sejak 21 Sep 2026 hasilnya
+ *    RAWAT_JALAN (kategori IGD dihapus), lihat hasIgdVisitSignal().
  * 2. Field "Jns Rawat" di halaman SEP — dicetak resmi oleh sistem BPJS,
  *    isinya literal "Rawat Jalan" atau "Rawat Inap". CATATAN: field ini
  *    TIDAK membedakan IGD vs rawat jalan biasa (keduanya sama-sama bisa
@@ -98,19 +118,16 @@ process.on('SIGINT', () => { shutdownClassifyPool(); });
  * @param {string} fullText - gabungan teks semua halaman (bukan cuma
  *   claimDataText, supaya penanda IGD di halaman Triage tetap kena walau
  *   halaman itu tidak lolos klasifikasi claim-data).
- * @returns {'RAWAT_JALAN'|'RAWAT_INAP'|'GAWAT_DARURAT'|null} null = tidak yakin.
+ * @returns {'RAWAT_JALAN'|'RAWAT_INAP'|null} null = tidak yakin.
  */
 function detectJenisKlaim(fullText) {
   if (!fullText) return null;
 
-  const igdMarkers = [
-    'resume medis igd', 'triage igd', 'instalasi gawat darurat',
-  ];
-  const lower = fullText.toLowerCase();
-  if (igdMarkers.some(k => lower.includes(k))) return 'GAWAT_DARURAT';
-  // Klinik : UGD — cek terpisah (bukan cuma substring "ugd" yang gampang
-  // false-positive, mis. singkatan lain) — harus persis pola "Klinik : UGD".
-  if (/klinik[ \t]*:[ \t]*ugd\b/i.test(fullText)) return 'GAWAT_DARURAT';
+  // Kunjungan IGD dihitung RAWAT_JALAN (21 Sep 2026): aplikasi ini cuma
+  // mengenal dua kategori klaim. Berkas IGD selama ini dikategorikan
+  // tersendiri, itulah sebabnya kategori rawat jalan nyaris tak pernah
+  // terisi. Penandanya tidak dibuang -- lihat hasIgdVisitSignal() di atas.
+  if (hasIgdVisitSignal(fullText)) return 'RAWAT_JALAN';
 
   // Field resmi SEP — WAJIB pakai [ \t]* (bukan \s*) sebelum capture group:
   // \s* melahap newline kalau field-nya kosong, jadi nyerempet ke baris
@@ -295,5 +312,6 @@ module.exports = {
   hasRadiologyData,
   classifyPageDocumentType,
   isCriticalPage,
-  isSepPage
+  isSepPage,
+  hasIgdVisitSignal
 };

@@ -64,3 +64,41 @@ describe('classifyPageDocumentType — fix item 7 (provenance dari metadata hala
     expect(classifyPageDocumentType(mixed)).toBe('rincian_biaya');
   });
 });
+
+describe('kategori IGD dihapus — kunjungan IGD masuk RAWAT_JALAN', () => {
+  const { detectJenisKlaim, hasIgdVisitSignal } = require('../../services/pdfPageClassifier');
+
+  // 21 Sep 2026: aplikasi cuma mengenal RAWAT_JALAN & RAWAT_INAP. Berkas IGD
+  // selama ini dikategorikan tersendiri, itulah sebabnya kategori rawat jalan
+  // nyaris tidak pernah terisi.
+  test('penanda IGD menghasilkan RAWAT_JALAN, bukan GAWAT_DARURAT', () => {
+    for (const teks of ['TRIAGE IGD', 'RESUME MEDIS IGD', 'INSTALASI GAWAT DARURAT', 'Klinik : UGD']) {
+      expect(detectJenisKlaim(teks)).toBe('RAWAT_JALAN');
+    }
+  });
+
+  test('detectJenisKlaim tidak pernah lagi mengembalikan GAWAT_DARURAT', () => {
+    const contoh = [
+      'TRIAGE IGD', 'RESUME MEDIS IGD', 'Klinik : UGD', 'Jns Rawat : Rawat Inap',
+      'Jns Rawat : Rawat Jalan', 'Laporan Operasi', 'dokumen tanpa penanda apapun',
+    ];
+    for (const teks of contoh) {
+      expect(detectJenisKlaim(teks)).not.toBe('GAWAT_DARURAT');
+    }
+  });
+
+  // Penanda IGD-nya sendiri TIDAK dibuang: audit kegawatan (kegawatan_lemah,
+  // K1-K4) kini dipicu dari sini, bukan dari kategori klaim.
+  test('penanda IGD tetap bisa dibaca terpisah dari kategori', () => {
+    expect(hasIgdVisitSignal('TRIAGE IGD')).toBe(true);
+    expect(hasIgdVisitSignal('RESUME MEDIS IGD')).toBe(true);
+    expect(hasIgdVisitSignal('Klinik : UGD')).toBe(true);
+    expect(hasIgdVisitSignal('Jns Rawat : Rawat Jalan')).toBe(false);
+    expect(hasIgdVisitSignal('RESUME MEDIS RAWAT INAP')).toBe(false);
+    expect(hasIgdVisitSignal('')).toBe(false);
+  });
+
+  test('rawat inap tidak ikut terpengaruh', () => {
+    expect(detectJenisKlaim('Jns Rawat : Rawat Inap')).toBe('RAWAT_INAP');
+  });
+});

@@ -35,7 +35,7 @@ const { getInacbgEstimasi } = require('./inacbgTarifDictionary');
 const { resolveFieldFormStatus } = require('./documentFieldTemplate');
 const { matchTindakanSegera, checkProcedureCodability } = require('./procedureRulesService');
 const { evaluateDiagnosisConsistency } = require('./diagnosisConsistencyService');
-const { classifyPageDocumentType } = require('./pdfPageClassifier');
+const { classifyPageDocumentType, hasIgdVisitSignal } = require('./pdfPageClassifier');
 const { groupCodesToInaCBG } = require('./inacbgGroupingService');
 const { getTarifResmi, lookupTarifInacbg } = require('./tarifInacbgLookup');
 
@@ -44,11 +44,11 @@ Kamu diberi data lengkap satu rekam klaim (hasil ekstraksi), daftar field yang g
 dan (kalau ada) teks bukti dokumen pendukung (hasil OCR/teks asli PDF).
 
 PENTING — jenis klaim: field "JENIS_KLAIM"/"jenis_klaim" pada data rekam menunjukkan kategori
-pelayanan (RAWAT_JALAN, RAWAT_INAP, atau GAWAT_DARURAT), dipilih sendiri oleh perawat saat upload —
+pelayanan (RAWAT_JALAN atau RAWAT_INAP), dipilih sendiri oleh perawat saat upload —
 selalu akurat, jangan diragukan. SEMUA catatan/saran yang kamu beri WAJIB konsisten dengan kategori
 ini. Untuk klaim RAWAT_JALAN: JANGAN sarankan/singgung ruangan rawat inap, kelas rawat inap, ICU,
 lama hari rawat (LOS) sebagai rawat inap, atau hal lain yang cuma relevan untuk pasien yang menginap.
-Untuk klaim RAWAT_INAP/GAWAT_DARURAT: kembali ke penilaian normal.
+Untuk klaim RAWAT_INAP: kembali ke penilaian normal.
 
 TUGAS:
 1. Untuk setiap field yang gagal validasi (daftar "FIELD_ERRORS"): beri catatan dalam Bahasa Indonesia
@@ -415,7 +415,7 @@ function hasFinancialTerms(text) {
  * Alasan (8 Sep 2026): banyak klaim RAWAT_INAP pasiennya masuk lewat IGD
  * dulu (ada halaman Triase IGD/Skrining Awal Pasien IGD di berkasnya) —
  * kriteria Permenkes 47/2018 tetap relevan buat kasus itu, bukan cuma
- * klaim berkategori GAWAT_DARURAT murni. Kalau tidak ada halaman Triase
+ * berkas kunjungan IGD. Kalau tidak ada halaman Triase
  * IGD sama sekali (mis. rawat inap terjadwal tanpa lewat IGD), tabel ini
  * tidak relevan — tidak ditampilkan.
  */
@@ -1190,9 +1190,9 @@ secara otomatis (butuh penilaian klinis atas isi dokumen). Kalau YA dan kamu bis
 dari dokumen sebagai dasarnya, laporkan di "pending_risk_notes". Kalau TIDAK ada indikasi, atau tidak ada
 kutipan pasti, JANGAN laporkan apa pun untuk pola itu — lebih baik diam daripada menuduh salah.
 PENTING — jenis klaim: field "JENIS_KLAIM"/"jenis_klaim" pada data rekam menunjukkan kategori pelayanan
-(RAWAT_JALAN, RAWAT_INAP, atau GAWAT_DARURAT), dipilih sendiri oleh perawat saat upload — selalu akurat,
+(RAWAT_JALAN atau RAWAT_INAP), dipilih sendiri oleh perawat saat upload — selalu akurat,
 jangan diragukan. Pola-pola yang menyinggung rawat inap/ICU/LOS TIDAK relevan untuk RAWAT_JALAN.
-   a. [kegawatan_lemah] — Khusus GAWAT_DARURAT (atau kunjungan IGD): keluhan/subjektif pasien HANYA
+   a. [kegawatan_lemah] — Khusus kunjungan IGD/UGD: keluhan/subjektif pasien HANYA
       menyebut nyeri/tidak nyaman tanpa tanda objektif pendukung, DAN tanda vital (TTV) yang tercatat
       normal semua. Kombinasi ini sering ditolak BPJS dengan alasan "tidak memenuhi kriteria gawat
       darurat". Jangan laporkan kalau ada tanda objektif abnormal (mis. TTV di luar normal, temuan
@@ -1515,6 +1515,12 @@ async function assessPendingRiskPatterns(record, evidencePool) {
   if (!apiKey || evidencePool.length === 0) return [];
 
   const jenisKlaimRecord = record.JENIS_KLAIM || record.jenis_klaim;
+  // Pemicu kegawatan_lemah dibaca dari ISI dokumen, bukan dari kategori
+  // klaim. Kategori GAWAT_DARURAT dihapus 21 Sep 2026 (kunjungan IGD
+  // ternyata termasuk RAWAT_JALAN), jadi kategori tidak bisa lagi
+  // membedakan berkas IGD dari rawat jalan biasa -- kalau pemicunya tetap
+  // digantung di sana, pola ini tidak akan pernah aktif lagi.
+  const isKunjunganIgd = hasIgdVisitSignal(evidencePool.map(e => (e && e.ocr_text) || '').join(String.fromCharCode(10)));
   const baseUrl = process.env.AI_PROVIDER_BASE_URL || 'https://api.openai.com/v1';
   const model = process.env.AI_MODEL || 'gpt-4o-mini';
   const timeoutMs = Number(process.env.AI_TIMEOUT_MS || 60000);
@@ -1570,7 +1576,7 @@ async function assessPendingRiskPatterns(record, evidencePool) {
     for (const entry of raw.slice(0, 10)) {
       const { pattern, page_number: pageNum, basis, note } = entry || {};
       if (!KNOWN_PENDING_PATTERNS.has(pattern)) continue;
-      if (pattern === 'kegawatan_lemah' && jenisKlaimRecord !== 'GAWAT_DARURAT') continue;
+      if (pattern === 'kegawatan_lemah' && !isKunjunganIgd) continue;
       if (typeof note !== 'string' || !note.trim()) continue;
       if (!basis) continue;
       // diagnosis_vitals_mismatch: basis = "kutipan diagnosis || kutipan vital
@@ -1909,7 +1915,8 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
       // Tabel 1/2 yang sudah diekstrak & divalidasi), TIDAK ada panggilan AI
       // tambahan. Lihat pneumoniaSeverityAssessment.js utk scope & batasan.
       const pneumoniaFinding = assessPneumoniaSeverityMismatch(
-        record.DIAGLIST || record.diagnosa_list, kegawatdaruratanAssessment, jenisKlaimRecord
+        record.DIAGLIST || record.diagnosa_list, kegawatdaruratanAssessment, jenisKlaimRecord,
+        hasIgdVisitSignal(evidencePool.map(e => (e && e.ocr_text) || '').join(String.fromCharCode(10)))
       );
       if (pneumoniaFinding) result.pending_risk_notes = [...result.pending_risk_notes, pneumoniaFinding];
 

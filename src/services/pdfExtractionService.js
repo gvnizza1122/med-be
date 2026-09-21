@@ -6,7 +6,7 @@ const { PDF_FIELDS, SYSTEM_FIELDS, buildRecord, toTSV, COLUMNS } = require('./vc
  * data itu tidak ada di PDF; mengarang nilainya = data palsu.
  *
  * @param {string} claimDataText - hasil classifyPdfPages().claimDataText
- * @param {string} [jenisKlaim] - kategori pelayanan (RAWAT_JALAN/RAWAT_INAP/GAWAT_DARURAT),
+ * @param {string} [jenisKlaim] - kategori pelayanan (RAWAT_JALAN/RAWAT_INAP),
  *   dipilih user saat upload — dipakai untuk instruksi khusus KELAS_RAWAT (lihat prompt).
  * @returns {Promise<{success, record, tokens, missingSystemFields, errors}>}
  */
@@ -27,12 +27,12 @@ async function extractClaimData(claimDataText, jenisKlaim) {
   if (!apiKey) { result.errors.push('AI_PROVIDER_API_KEY tidak diisi di .env'); return result; }
   if (!claimDataText || !claimDataText.trim()) { result.errors.push('claimDataText kosong'); return result; }
 
-  // RAWAT_JALAN dan GAWAT_DARURAT (IGD tanpa lanjut rawat inap) sama-sama
+  // RAWAT_JALAN (termasuk IGD tanpa lanjut rawat inap)
   // pasien tidak menginap — diverifikasi dari sampel PDF IGD asli (Resume
   // Medis IGD/Triage IGD, Juni-Juli 2026): sama sekali tidak ada field
   // "Kelas Rawat" atau "Tanggal Masuk"/"Tanggal Keluar" terpisah, cuma
   // "Tgl Periksa" tunggal — persis pola rawat jalan.
-  const isOutpatientLike = jenisKlaim === 'RAWAT_JALAN' || jenisKlaim === 'GAWAT_DARURAT';
+  const isOutpatientLike = jenisKlaim === 'RAWAT_JALAN';
 
   const kelasRawatRule = isOutpatientLike
     ? `8. KELAS_RAWAT khusus rawat jalan/IGD (tanpa rawat inap): pasien TIDAK dirawat inap, jadi field "Kelas Rawat"/"Kls Rawat" di dokumen wajar KOSONG atau "-". Untuk kasus ini, isi KELAS_RAWAT dari NOMOR KELAS di field "Kelas Hak"/"Kls Hak" (kelas hak kepesertaan BPJS pasien, BUKAN kelas ruangan rawat inap) — ambil hanya angkanya (contoh: "Kelas 2" -> "2"). Kalau "Kelas Hak" juga tidak ada, baru isi KELAS_RAWAT dengan "".`
