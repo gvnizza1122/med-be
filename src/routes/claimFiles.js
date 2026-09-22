@@ -341,6 +341,11 @@ router.post('/upload', authenticate, upload.single('file'), async (req, res) => 
             totalAiTokens += aiReview.tokens_used || 0;
             await db.prepare('UPDATE claim_records SET ai_review = ? WHERE id = ?')
               .run(JSON.stringify(aiReview), record.id);
+            // Kode saran yang sudah terverifikasi kamus ICD-10 langsung mengisi
+            // DIAGLIST/PROCLIST yang masih kosong -- koder tidak perlu mengetik
+            // ulang. Best-effort: kegagalan di sini tidak menggagalkan review.
+            await isiKodeDariSaranTervalidasi(db, record.id, record, aiReview).catch(errIsi =>
+              console.warn(`[AutoIsi] gagal untuk record ${record.id}: ${errIsi.message || errIsi}`));
             recordKnowledge(db, aiReview.knowledge_updates).catch(kbErr =>
               console.warn(`[AI Review] Gagal simpan knowledge base: ${kbErr.message}`));
           }
@@ -896,6 +901,11 @@ router.post('/:id/ai-audit', authenticate, async (req, res) => {
         if (aiReview) {
           await db.prepare('UPDATE claim_records SET ai_review = ? WHERE id = ?')
             .run(JSON.stringify(aiReview), record.id);
+          // Kode saran yang sudah terverifikasi kamus ICD-10 langsung mengisi
+          // DIAGLIST/PROCLIST yang masih kosong -- koder tidak perlu mengetik
+          // ulang. Best-effort: kegagalan di sini tidak menggagalkan review.
+          await isiKodeDariSaranTervalidasi(db, record.id, record, aiReview).catch(errIsi =>
+            console.warn(`[AutoIsi] gagal untuk record ${record.id}: ${errIsi.message || errIsi}`));
           recordKnowledge(db, aiReview.knowledge_updates).catch(kbErr =>
             console.warn(`[AI Review] Gagal simpan knowledge base: ${kbErr.message}`));
         }
@@ -1533,6 +1543,70 @@ const JENIS_KLAIM_OPTIONS = ['RAWAT_JALAN', 'RAWAT_INAP'];
  *   tidak menghentikan file lain dalam batch.
  */
 /**
+ * Isi DIAGLIST/PROCLIST otomatis dari saran AI (21 Sep 2026, permintaan
+ * klien: "tidak usah ada tombol terapkan, langsung saja ditampilkan").
+ *
+ * HANYA kode dengan kamus_valid === true yang dipakai. Batasan ini bukan
+ * kehati-hatian berlebihan: fitur saran ini pernah menghasilkan kode
+ * ICD-10-CM (Amerika) alih-alih ICD-10 WHO yang dipakai BPJS -- itulah
+ * sebabnya tombol "Terapkan" dulu dimatikan total (lihat annotateKamusValid
+ * di aiReviewService.js). Kode yang belum terverifikasi kamus TIDAK diisi,
+ * tetap jadi saran yang diketik manual koder.
+ *
+ * TIDAK pernah menimpa isian yang sudah ada -- kalau koder sudah mengetik
+ * kode sendiri, itu yang menang.
+ *
+ * Validasi dijalankan ULANG setelah pengisian: tanpa itu, error "DIAGLIST
+ * wajib diisi" tetap menempel padahal kolomnya sudah terisi.
+ */
+async function isiKodeDariSaranTervalidasi(db, recordId, record, aiReview) {
+  const saran = Array.isArray(aiReview && aiReview.suggested_codes) ? aiReview.suggested_codes : [];
+  if (saran.length === 0) return;
+
+  const ambil = (tipe) => [...new Set(
+    saran.filter(s => s && s.type === tipe && s.code && s.kamus_valid === true).map(s => String(s.code).trim())
+  )];
+
+  const kosong = (v) => !v || String(v).trim() === '';
+  const perubahan = {};
+  if (kosong(record.DIAGLIST || record.diagnosa_list)) {
+    const d = ambil('diagnosis');
+    if (d.length > 0) perubahan.diagnosa_list = d.join(';');
+  }
+  if (kosong(record.PROCLIST || record.prosedur_list)) {
+    const p = ambil('procedure');
+    if (p.length > 0) perubahan.prosedur_list = p.join(';');
+  }
+  if (Object.keys(perubahan).length === 0) return;
+
+  for (const [kolom, nilai] of Object.entries(perubahan)) {
+    await db.prepare(`UPDATE claim_records SET ${kolom} = ? WHERE id = ?`).run(nilai, recordId);
+    console.log(`[AutoIsi] record ${recordId}: ${kolom} diisi dari saran tervalidasi kamus -> ${nilai}`);
+  }
+
+  // Hitung ulang validasi supaya error lama tidak menempel.
+  try {
+    const barisTerbaru = await db.prepare('SELECT * FROM claim_records WHERE id = ?').get(recordId);
+    if (!barisTerbaru) return;
+    const activeRules = await db.prepare('SELECT * FROM validation_rules WHERE is_active = 1').all();
+    const errorBaru = validateRecord(barisTerbaru, activeRules);
+    await db.prepare('DELETE FROM validation_errors WHERE record_id = ?').run(recordId);
+    if (errorBaru.length > 0) {
+      const insert = db.prepare(`
+        INSERT INTO validation_errors (id, record_id, rule_id, field_name, error_message, expected_value, actual_value, severity)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      for (const e of errorBaru) {
+        await insert.run(uuidv4(), recordId, e.rule_id, e.field_name, e.error_message, e.expected_value || '', e.actual_value || '', e.severity);
+      }
+    }
+    await db.prepare('UPDATE claim_records SET validation_status = ? WHERE id = ?').run(determineStatus(errorBaru), recordId);
+  } catch (errValidasi) {
+    console.warn(`[AutoIsi] Gagal hitung ulang validasi record ${recordId}: ${errValidasi.message || errValidasi}`);
+  }
+}
+
+/**
  * P1-6: cek apakah SEP yang baru diekstrak SUDAH ada di claim_records
  * manapun (lintas file_id -- bukan cuma dalam batch/file yang sama). Dipakai
  * untuk MEMPERINGATKAN upload duplikat (sejak 21 Sep 2026 tidak lagi menolak,
@@ -1751,6 +1825,11 @@ async function processSinglePdfUpload(db, { filePath, originalName, jenisKlaim: 
       if (aiReview) {
         await db.prepare('UPDATE claim_records SET ai_review = ? WHERE id = ?')
           .run(JSON.stringify(aiReview), recordId);
+        // Kode saran yang sudah terverifikasi kamus ICD-10 langsung mengisi
+        // DIAGLIST/PROCLIST yang masih kosong -- koder tidak perlu mengetik
+        // ulang. Best-effort: kegagalan di sini tidak menggagalkan review.
+        await isiKodeDariSaranTervalidasi(db, recordId, extractedData, aiReview).catch(errIsi =>
+          console.warn(`[AutoIsi] gagal untuk record ${recordId}: ${errIsi.message || errIsi}`));
         recordKnowledge(db, aiReview.knowledge_updates).catch(kbErr =>
           console.warn(`[upload-pdf] Gagal simpan knowledge base: ${kbErr.message}`));
       }
@@ -1924,6 +2003,11 @@ async function reprocessExistingRecord(db, { fileId, recordId, filePath, jenisKl
 
         await db.prepare('UPDATE claim_records SET ai_review = ? WHERE id = ?')
           .run(JSON.stringify(aiReview), recordId);
+        // Kode saran yang sudah terverifikasi kamus ICD-10 langsung mengisi
+        // DIAGLIST/PROCLIST yang masih kosong -- koder tidak perlu mengetik
+        // ulang. Best-effort: kegagalan di sini tidak menggagalkan review.
+        await isiKodeDariSaranTervalidasi(db, recordId, extractedData, aiReview).catch(errIsi =>
+          console.warn(`[AutoIsi] gagal untuk record ${recordId}: ${errIsi.message || errIsi}`));
         recordKnowledge(db, aiReview.knowledge_updates).catch(kbErr =>
           console.warn(`[reread] Gagal simpan knowledge base: ${kbErr.message}`));
       } else {
