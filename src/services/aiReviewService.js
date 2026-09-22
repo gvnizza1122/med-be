@@ -36,6 +36,7 @@ const { resolveFieldFormStatus } = require('./documentFieldTemplate');
 const { matchTindakanSegera, checkProcedureCodability } = require('./procedureRulesService');
 const { evaluateDiagnosisConsistency } = require('./diagnosisConsistencyService');
 const { classifyPageDocumentType, hasIgdVisitSignal } = require('./pdfPageClassifier');
+const { evaluasiKombinasiKode } = require('./ketentuanKlaimService');
 const { groupCodesToInaCBG } = require('./inacbgGroupingService');
 const { getTarifResmi, lookupTarifInacbg } = require('./tarifInacbgLookup');
 
@@ -1976,6 +1977,29 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
         result.suggested_codes = await annotateKamusValid(result.suggested_codes);
       } catch (kamusErr) {
         console.warn(`[AI-REVIEW] annotateKamusValid gagal total: ${kamusErr.message}`);
+      }
+
+      // --- Ketentuan Klaim Tipe 3: aturan kombinasi kode (22 Sep 2026) ---
+      // Dievaluasi terhadap kode FINAL, yaitu DIAGLIST yang ada DITAMBAH
+      // saran yang sudah terverifikasi kamus -- karena saran itulah yang
+      // sesaat lagi mengisi DIAGLIST (isiKodeDariSaranTervalidasi di
+      // claimFiles.js). Kalau cuma DIAGLIST yang dibaca, klaim yang
+      // kodenya baru akan terisi otomatis tidak akan pernah ikut dinilai.
+      try {
+        const kodeFinal = [
+          ...String(record.DIAGLIST || record.diagnosa_list || '').split(/[;,]/),
+          ...(result.suggested_codes || [])
+            .filter(s => s && s.type === 'diagnosis' && s.kamus_valid === true && s.code)
+            .map(s => s.code),
+        ].map(k => String(k).trim()).filter(Boolean);
+
+        const temuanKombinasi = evaluasiKombinasiKode([...new Set(kodeFinal)]);
+        if (temuanKombinasi.length > 0) {
+          result.kombinasi_kode = temuanKombinasi;
+          console.log(`[Ketentuan] ${temuanKombinasi.length} aturan kombinasi kode terpicu: ${temuanKombinasi.map(t => t.kode).join(', ')}`);
+        }
+      } catch (errKombinasi) {
+        console.warn(`[Ketentuan] Evaluasi kombinasi kode gagal: ${errKombinasi.message || errKombinasi}`);
       }
 
       // --- INA-CBG Grouping & Tariff Lookup Integration (19 Sep 2026) ---

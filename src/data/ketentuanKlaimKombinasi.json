@@ -1,0 +1,119 @@
+{
+  "_catatan": "Tipe 3 (aturan kombinasi kode) dari catatan revisi dokter: gabungan catatan casemix RS Lestari Raharja + Berita Acara Kesepakatan Kemenkes-BPJS No. JP.02.03/3/2411/2018 & 620/BA/1118. Aturan dievaluasi HANYA terhadap DIAGLIST -- tidak perlu membaca dokumen, lab, atau kamus.",
+  "_tentang_diverifikasi": "false = kode ICD-nya belum dipastikan koder. Dokumen sumber menyebut aturan ini dengan NAMA penyakit (mis. 'GTCS', 'stupor', 'trombositopenia'), bukan kode, jadi pemetaannya ke ICD-10 adalah tafsir yang wajib ditelaah tim casemix sebelum diaktifkan.",
+  "aturan": [
+    {
+      "kode": "KMB-01", "nama": "Stroke + GTCS",
+      "kode_diagnosis": ["I60", "I61", "I62", "I63", "I64"],
+      "kode_pasangan": ["G40.3", "R56.8"],
+      "aksi": "buang_pasangan",
+      "pesan": "GTCS adalah manifestasi stroke, cukup kode stroke saja.",
+      "sumber": "casemix_rs", "kutipan_sumber": "Stroke + GTCS: cukup kode stroke - GTCS adalah manifestasi",
+      "diverifikasi": false, "alasan_belum": "Kode untuk GTCS belum dipastikan: G40.3 (epilepsi umum idiopatik) atau R56.8 (kejang lain). Perlu konfirmasi koder."
+    },
+    {
+      "kode": "KMB-02", "nama": "Stroke + stupor",
+      "kode_diagnosis": ["I60", "I61", "I62", "I63", "I64"],
+      "kode_pasangan": ["R40.1"],
+      "aksi": "buang_pasangan",
+      "pesan": "Stupor adalah manifestasi stroke, cukup kode stroke saja.",
+      "sumber": "casemix_rs", "kutipan_sumber": "Stroke + stupor: cukup kode stroke",
+      "diverifikasi": true
+    },
+    {
+      "kode": "KMB-03", "nama": "Tifoid + GEA",
+      "kode_diagnosis": ["A01.0"],
+      "kode_pasangan": ["A09"],
+      "aksi": "buang_pasangan",
+      "pesan": "GEA tidak perlu dikoding bersama tifoid.",
+      "sumber": "casemix_rs", "kutipan_sumber": "Tifoid + GEA: GEA tidak perlu dikoding",
+      "diverifikasi": true
+    },
+    {
+      "kode": "KMB-04", "nama": "Renal colic + ISK",
+      "kode_diagnosis": ["N23"],
+      "kode_pasangan": ["N39.0"],
+      "aksi": "buang_pasangan",
+      "pesan": "Cukup N23 (renal colic).",
+      "sumber": "casemix_rs", "kutipan_sumber": "Renal colic + ISK: cukup N23",
+      "diverifikasi": true
+    },
+    {
+      "kode": "KMB-05", "nama": "N19 + I10 jadi I12.0",
+      "kode_diagnosis": ["N19"],
+      "kode_pasangan": ["I10"],
+      "aksi": "ganti_gabungan", "kode_gabungan": "I12.0",
+      "pesan": "Gagal ginjal dengan hipertensi digabung jadi I12.0.",
+      "sumber": "casemix_rs", "kutipan_sumber": "N19 + I10: jadi I12.0",
+      "diverifikasi": true
+    },
+    {
+      "kode": "KMB-06", "nama": "Trombositopenia + A90",
+      "kode_diagnosis": ["A90"],
+      "kode_pasangan": ["D69.6"],
+      "aksi": "buang_pasangan",
+      "pesan": "Trombositopenia adalah bagian dari dengue, cukup A90.",
+      "sumber": "casemix_rs", "kutipan_sumber": "Trombositopenia + A90: cukup A90",
+      "diverifikasi": false, "alasan_belum": "Kode trombositopenia D69.6 (tidak spesifik) belum dipastikan koder; bisa juga D69.5."
+    },
+    {
+      "kode": "KMB-07", "nama": "Pneumonia + kejang demam",
+      "kode_diagnosis": ["J22", "J18.0"],
+      "kode_pasangan": ["R56.0"],
+      "aksi": "buang_pasangan",
+      "pesan": "R56.0 tidak dikode bersama J22/J18.0.",
+      "sumber": "casemix_rs", "kutipan_sumber": "J22 / J18.0 + R56.0: R56.0 tidak dikode",
+      "diverifikasi": true
+    },
+    {
+      "kode": "KMB-08", "nama": "Asma + COPD",
+      "kode_diagnosis": ["J45"],
+      "kode_pasangan": ["J44"],
+      "aksi": "ganti_gabungan", "kode_gabungan": "J45.9",
+      "pesan": "Asma bersama COPD digabung jadi J45.9.",
+      "sumber": "casemix_rs", "kutipan_sumber": "Asma + COPD: jadi J45.9",
+      "diverifikasi": true
+    },
+    {
+      "kode": "KMB-09", "nama": "HHD + Cardiomegaly",
+      "kode_diagnosis": ["I11"],
+      "kode_pasangan": ["I51.7"],
+      "aksi": "buang_pasangan",
+      "pesan": "Cukup HHD. Berlaku juga bila pasangannya angina pektoris.",
+      "sumber": "casemix_rs", "kutipan_sumber": "HHD + Cardiomegaly: cukup HHD - berlaku juga untuk angina pektoris",
+      "diverifikasi": false, "alasan_belum": "Dokumen menyebut aturan ini berlaku juga untuk angina pektoris (I20.-), tapi tidak menyebut kode pasangannya secara eksplisit."
+    },
+    {
+      "kode": "KMB-10", "nama": "HF/HHD + Pulmonary oedema",
+      "kode_diagnosis": ["I50", "I11"],
+      "kode_pasangan": ["J81"],
+      "aksi": "buang_pasangan",
+      "pesan": "J81 tidak perlu dikoding lagi bersama HF/HHD.",
+      "sumber": "keduanya", "kutipan_sumber": "HF/HHD + Pulmonary oedema: J81 tidak perlu dikoding lagi",
+      "diverifikasi": true
+    },
+    {
+      "kode": "KMB-11", "nama": "Oligohidramnion + KPD",
+      "kode_diagnosis": ["O41.0"],
+      "kode_pasangan": ["O42"],
+      "aksi": "ganti_gabungan", "kode_gabungan": "O42",
+      "pesan": "Oligohidramnion dengan KPD jadi satu kode O42.-",
+      "sumber": "casemix_rs", "kutipan_sumber": "Oligohidramnion + KPD: jadi satu kode O42.-",
+      "diverifikasi": false, "alasan_belum": "Dokumen menulis O42.- (kategori), subkode pastinya perlu ditentukan koder."
+    },
+    {
+      "kode": "KMB-12", "nama": "Pneumonia + PPOK",
+      "kode_diagnosis": ["J18", "J22"],
+      "kode_pasangan": ["J44"],
+      "aksi": "ganti_gabungan", "kode_gabungan": "J44.0",
+      "pesan": "J44.0 sudah mencakup PPOK dengan infeksi saluran napas bawah.",
+      "sumber": "ba_2018", "kutipan_sumber": "BA: J44.0 sudah menggantikan PPOK dengan infeksi saluran napas bawah",
+      "diverifikasi": true
+    }
+  ],
+  "_belum_dimasukkan": [
+    { "nama": "Anemia saat operasi", "alasan": "Butuh konteks operasi, bukan sekadar membaca DIAGLIST. Masuk Tipe 2 (syarat tindakan), bukan Tipe 3." },
+    { "nama": "Kode R sebagai dx utama", "alasan": "Bukan aturan kombinasi dua kode, melainkan syarat kapan kode R boleh jadi diagnosis utama. Perlu bentuk aturan tersendiri." },
+    { "nama": "I12.0 + Ascites (R18)", "alasan": "Dokumen menyebut 'kriteria tersendiri di BA' tanpa merinci aksinya. Perlu dibaca langsung dari Berita Acara." }
+  ]
+}
