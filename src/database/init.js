@@ -787,6 +787,37 @@ async function migrateSchema(db) {
           await db.query(`ALTER TABLE claim_files ADD COLUMN jenis_klaim TEXT`);
         } catch (e) {}
       }
+
+      // Arsip menggantikan hapus. Daftar harian tetap bersih, tapi datanya
+      // tidak hilang — dan itu penting: seluruh rencana pengukuran recall
+      // bergantung pada klaim lama yang masih ada saat rekap pending BPJS
+      // datang, sekitar tiga bulan kemudian. Klaim yang terlanjur dihapus
+      // tidak bisa dipakai membuktikan apa pun.
+      //
+      // Siapa dan kapan ikut disimpan supaya pengarsipan bisa ditelusuri dan
+      // dibatalkan, bukan sekadar hilang dari pandangan.
+      const kolomArsip = {
+        diarsipkan_pada: 'TIMESTAMP',
+        diarsipkan_oleh: 'TEXT REFERENCES users(id) ON DELETE SET NULL',
+        // Yang memakan tempat adalah PDF, yang bernilai untuk pengukuran
+        // adalah barisan datanya. Kalau PDF-nya dibuang, barisnya tetap ada
+        // dan penanda ini membuat tombol "Lihat Dokumen Asli" bisa
+        // menjelaskan kenapa berkasnya tidak ada, bukan sekadar gagal.
+        pdf_dihapus_pada: 'TIMESTAMP',
+      };
+      for (const [kolom, tipe] of Object.entries(kolomArsip)) {
+        if (fileCols.includes(kolom)) continue;
+        try {
+          await db.query(`ALTER TABLE claim_files ADD COLUMN ${kolom} ${tipe}`);
+        } catch (e) {
+          // kolom mungkin sudah ada
+        }
+      }
+      try {
+        await db.query(`CREATE INDEX IF NOT EXISTS idx_claim_files_arsip ON claim_files(diarsipkan_pada)`);
+      } catch (e) {
+        // index sudah ada
+      }
     }
 
     // Migrate bpjs_pending_responses table (kolom tambahan untuk import XLSX)

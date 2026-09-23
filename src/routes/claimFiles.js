@@ -442,11 +442,17 @@ router.post('/upload', authenticate, upload.single('file'), async (req, res) => 
 router.get('/', authenticate, async (req, res) => {
   try {
     const db = getDb();
-    const { page = 1, limit = 20, status, jenis_klaim, from_date, to_date, search } = req.query;
+    const { page = 1, limit = 20, status, jenis_klaim, from_date, to_date, search, arsip } = req.query;
     const offset = (parseInt(page) - 1) * parseInt(limit);
 
     let where = 'WHERE 1=1';
     const params = [];
+
+    // Berkas terarsip disembunyikan dari daftar aktif secara bawaan — itulah
+    // gunanya arsip. Dengan ?arsip=1 justru HANYA yang terarsip yang tampil,
+    // sehingga ada tempat untuk melihat dan mengembalikannya. Tanpa tampilan
+    // itu, arsip tidak berbeda dari penghapusan.
+    where += arsip === '1' ? ' AND cf.diarsipkan_pada IS NOT NULL' : ' AND cf.diarsipkan_pada IS NULL';
 
     if (status) {
       where += ' AND cf.status = ?';
@@ -837,12 +843,16 @@ router.get('/export/daftar-kerja', authenticate, async (req, res) => {
     const { periode, kategori } = req.query;
 
     const syarat = ["cr.validation_status <> 'valid'"];
+    // Klaim yang berkasnya sudah diarsipkan tidak muncul di lembar kerja
+    // harian — kalau ikut, koder akan mengerjakan ulang yang sudah sengaja
+    // disingkirkan.
+    syarat.push('cf.diarsipkan_pada IS NULL');
     const nilai = [];
     if (periode) { syarat.push('cr.periode = ?'); nilai.push(periode); }
     if (kategori) { syarat.push('cr.jenis_klaim = ?'); nilai.push(kategori); }
 
     const records = await db.prepare(
-      'SELECT cr.* FROM claim_records cr WHERE ' + syarat.join(' AND ') +
+      'SELECT cr.* FROM claim_records cr JOIN claim_files cf ON cf.id = cr.file_id WHERE ' + syarat.join(' AND ') +
       ' ORDER BY cr.periode DESC, cr.nama_pasien ASC'
     ).all(...nilai);
 
@@ -1033,13 +1043,99 @@ router.delete('/:id', authenticate, authorize('admin', 'supervisor'), async (req
 });
 
 /**
+ * POST /api/v1/claim-files/bulk-archive
+ *
+ * Arsip massal — pengganti hapus massal untuk merapikan daftar.
+ *
+ * Daftar harian jadi bersih tanpa kehilangan data. Ini bukan sekadar lebih
+ * aman: pengukuran recall bergantung pada klaim lama yang masih ada saat
+ * rekap pending BPJS datang sekitar tiga bulan kemudian. Klaim yang sudah
+ * dihapus tidak bisa dipakai membuktikan apa pun.
+ *
+ * Bisa dibatalkan lewat /bulk-restore, dan tercatat di Audit Log.
+ */
+router.post('/bulk-archive', authenticate, authorize('admin', 'supervisor'), async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: 'ids wajib berupa array berisi minimal 1 file_id.' });
+    }
+    if (ids.length > 500) {
+      return res.status(400).json({ error: 'Maksimal 500 id per panggilan — bagi jadi beberapa batch.' });
+    }
+    const db = getDb();
+    // Yang sudah diarsipkan dilewati, supaya mengarsipkan dua kali tidak
+    // menimpa catatan siapa yang pertama mengarsipkan.
+    const hasil = await db.run(
+      'UPDATE claim_files SET diarsipkan_pada = CURRENT_TIMESTAMP, diarsipkan_oleh = ? WHERE id = ANY(?) AND diarsipkan_pada IS NULL',
+      [req.user.id, ids]
+    );
+
+    logAudit({
+      userId: req.user.id, userEmail: req.user.email,
+      action: 'bulk_archive', resourceType: 'claim_file', resourceId: ids.join(','),
+      details: { jumlah_diminta: ids.length, jumlah_diarsipkan: hasil.changes },
+      ipAddress: req.ip,
+    });
+
+    res.json({ archived: hasil.changes });
+  } catch (err) {
+    console.error('[claimFiles] bulk-archive error:', err);
+    res.status(500).json({ error: 'Terjadi gangguan pada sistem. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' });
+  }
+});
+
+/**
+ * POST /api/v1/claim-files/bulk-restore
+ *
+ * Kembalikan dari arsip. Pengarsipan harus bisa dibatalkan — kalau tidak,
+ * ia cuma penghapusan dengan nama yang lebih ramah.
+ */
+router.post('/bulk-restore', authenticate, authorize('admin', 'supervisor'), async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: 'ids wajib berupa array berisi minimal 1 file_id.' });
+    }
+    if (ids.length > 500) {
+      return res.status(400).json({ error: 'Maksimal 500 id per panggilan — bagi jadi beberapa batch.' });
+    }
+    const db = getDb();
+    const hasil = await db.run(
+      'UPDATE claim_files SET diarsipkan_pada = NULL, diarsipkan_oleh = NULL WHERE id = ANY(?) AND diarsipkan_pada IS NOT NULL',
+      [ids]
+    );
+
+    logAudit({
+      userId: req.user.id, userEmail: req.user.email,
+      action: 'bulk_restore', resourceType: 'claim_file', resourceId: ids.join(','),
+      details: { jumlah_diminta: ids.length, jumlah_dikembalikan: hasil.changes },
+      ipAddress: req.ip,
+    });
+
+    res.json({ restored: hasil.changes });
+  } catch (err) {
+    console.error('[claimFiles] bulk-restore error:', err);
+    res.status(500).json({ error: 'Terjadi gangguan pada sistem. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' });
+  }
+});
+
+/**
  * POST /api/v1/claim-files/bulk-delete
- * Hapus banyak claim_files sekaligus dalam 1 request — dibutuhkan untuk
- * cleanup cepat setelah testing batch besar (mis. 10.000 file), karena
- * DELETE /:id satu-satu akan kena rate limiter global (100 req/menit,
- * lihat index.js) kalau dipanggil ribuan kali berturut-turut.
- * Body: { ids: string[] } (maks 500 per panggilan — sisanya di-chunk oleh
- * pemanggil, mis. scripts/bulkTestCleanup.js).
+ *
+ * Penghapusan PERMANEN. Untuk merapikan daftar, pakai /bulk-archive —
+ * jalur ini disisakan hanya untuk kekeliruan upload yang memang harus
+ * lenyap, dan untuk cleanup setelah testing batch besar.
+ *
+ * Panggilan tanpa `konfirmasi: true` TIDAK menghapus apa pun; ia
+ * mengembalikan rincian apa yang akan hilang (berapa berkas, berapa baris
+ * klaim, periode apa saja) supaya konfirmasi di layar bisa menyebutkannya.
+ * Sebelumnya permintaan hapus langsung dieksekusi tanpa pernah menyatakan
+ * cakupannya — dan di Audit Log tersisa beberapa aksi hapus massal berisi
+ * ratusan UUID tanpa keterangan isi sama sekali.
+ *
+ * Body: { ids: string[], konfirmasi?: boolean, alasan?: string }
+ * Maks 500 per panggilan.
  */
 router.post('/bulk-delete', authenticate, authorize('admin', 'supervisor'), async (req, res) => {
   try {
@@ -1051,11 +1147,30 @@ router.post('/bulk-delete', authenticate, authorize('admin', 'supervisor'), asyn
       return res.status(400).json({ error: 'Maksimal 500 id per panggilan — bagi jadi beberapa batch.' });
     }
     const db = getDb();
+
+    // Selalu hitung dulu apa yang akan hilang — dipakai untuk pratinjau
+    // maupun untuk dicatat di Audit Log saat penghapusan benar dijalankan.
+    const rincian = await db.prepare(
+      'SELECT count(DISTINCT cf.id) AS berkas, count(cr.id) AS baris_klaim, ' +
+      "coalesce(string_agg(DISTINCT cr.periode, ', ' ORDER BY cr.periode), '-') AS periode " +
+      'FROM claim_files cf LEFT JOIN claim_records cr ON cr.file_id = cf.id WHERE cf.id = ANY(?)'
+    ).get([ids]);
+
+    if (req.body.konfirmasi !== true) {
+      return res.status(409).json({
+        error: 'Penghapusan permanen perlu konfirmasi.',
+        perlu_konfirmasi: true,
+        akan_hilang: rincian,
+        saran: 'Untuk sekadar merapikan daftar, pakai arsip massal — datanya tetap tersimpan dan bisa dikembalikan.',
+      });
+    }
+
     const result = await db.run('DELETE FROM claim_files WHERE id = ANY(?)', [ids]);
 
     logAudit({
       userId: req.user.id, userEmail: req.user.email,
       action: 'bulk_delete', resourceType: 'claim_file', resourceId: ids.join(','),
+      details: { jumlah_berkas: rincian.berkas, jumlah_baris_klaim: rincian.baris_klaim, periode: rincian.periode, alasan: req.body.alasan || null },
       ipAddress: req.ip
     });
 

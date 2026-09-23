@@ -32,7 +32,7 @@ async function bulkDelete(baseUrl, accessToken, ids) {
   const res = await fetch(`${baseUrl}/api/v1/claim-files/bulk-delete`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ids }),
+    body: JSON.stringify({ ids, konfirmasi: true, alasan: "cleanup setelah testing batch besar" }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(`Bulk-delete gagal: HTTP ${res.status} ${JSON.stringify(data)}`);
