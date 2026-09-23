@@ -107,17 +107,31 @@ function parseTable(text) {
  * lebih akurat daripada parsing posisional tabel (tidak tergantung urutan
  * kolom OCR yang kadang berantakan).
  */
+// Pemisah antara nama field dan nilainya: spasi MENDATAR saja, tidak pernah
+// ganti baris. Di formulir Triage IGD format baru, nama kolom berjejer di
+// satu baris ("VITAL SIGN BB TB TD Heart Rate RR Temp SpO2") dan nilainya di
+// baris berikutnya. Kalau pemisahnya membolehkan ganti baris, kata "SpO2" di
+// ujung baris header menyambar angka PERTAMA baris nilai di bawahnya --
+// terbukti pada berkas MUNAWIR: SpO2 terbaca 141, padahal 141 itu tekanan
+// darah sistolik dan SpO2 sebenarnya 88%. Saturasi kritis jadi tampak normal,
+// justru kebalikan dari tujuan pembacaan ini.
+// [^\S\r\n] = spasi mendatar saja. Dipakai sebagai ganti \s di antara nama
+// field dan nilainya.
 const VITAL_SIGN_FIELD_PATTERNS = {
-  Weight: [/\bBB\s*[:=]?\s*(\d{1,3}(?:[.,]\d)?)\s*kg/i],
-  Height: [/\bTB\s*[:=]?\s*(\d{2,3})\s*cm/i],
+  Weight: [/\bBB[^\S\r\n]*[:=]?[^\S\r\n]*(\d{1,3}(?:[.,]\d)?)\s*kg/i],
+  Height: [/\bTB[^\S\r\n]*[:=]?[^\S\r\n]*(\d{2,3})\s*cm/i],
   BloodPressure: [
-    /\bTD\s*[:=]?\s*(\d{2,3})\s*[\/\-]\s*(\d{2,3})/i,
-    /\bTensi\s*[:=]?\s*(\d{2,3})\s*[\/\-]\s*(\d{2,3})/i,
+    /\bTD[^\S\r\n]*[:=]?[^\S\r\n]*(\d{2,3})\s*[/-]\s*(\d{2,3})/i,
+    /\bTensi[^\S\r\n]*[:=]?[^\S\r\n]*(\d{2,3})\s*[/-]\s*(\d{2,3})/i,
   ],
-  HeartRate: [/\b(?:Heart\s*Rate|HR|Nadi)\s*[:=]?\s*(\d{2,3})\s*x/i],
-  RespiratoryRate: [/\bRR\s*[:=]?\s*(\d{1,2})\s*x/i],
-  Temperature: [/\bTemp(?:erature)?\s*[:=]?\s*([\d.,]{2,4})\s*°?\s*C/i],
-  SpO2: [/\bSpO2\s*[:=]?\s*(\d{1,3})\s*%?/i],
+  HeartRate: [/\b(?:Heart\s*Rate|HR|Nadi)[^\S\r\n]*[:=]?[^\S\r\n]*(\d{2,3})\s*x/i],
+  RespiratoryRate: [/\bRR[^\S\r\n]*[:=]?[^\S\r\n]*(\d{1,2})\s*x/i],
+  Temperature: [/\bTemp(?:erature)?[^\S\r\n]*[:=]?[^\S\r\n]*([\d.,]{2,4})\s*°?\s*C/i],
+  // Tanda % WAJIB di jalur label ini. Tanpa itu, "SpO2" apa pun yang diikuti
+  // angka akan diterima — termasuk nama kolom yang diikuti nilai kolom lain.
+  // Tabel tanpa tanda % tetap terbaca lewat jalur posisional di bawah, yang
+  // mencocokkan kolom menurut urutannya.
+  SpO2: [/\bSpO2[^\S\r\n]*[:=]?[^\S\r\n]*(\d{1,3})\s*%/i],
 };
 
 // Header alias yang mungkin muncul di baris header tabel (nama kolom "as
@@ -132,6 +146,69 @@ const VITAL_SIGN_HEADER_ALIASES = [
   { field: 'Temperature', re: /^temp/i },
   { field: 'SpO2', re: /^spo2$/i },
 ];
+
+/**
+ * Baca baris nilai tabel Vital Sign menurut SATUAN yang tercetak, bukan
+ * menurut posisi kolom.
+ *
+ * Pemetaan posisional tidak bisa dipakai di formulir ini. Headernya punya 7
+ * kolom ("BB TB TD Heart Rate RR Temp SpO2") tapi baris nilainya sering hanya
+ * berisi 5 — BB dan TB kerap dikosongkan — sehingga kolom ke-n tidak berpadanan
+ * dengan nilai ke-n. Contoh nyata dari berkas MUNAWIR:
+ *
+ *   VITAL SIGN BB TB TD Heart Rate RR Temp SpO2
+ *   141/86 mmHg 71 x/mnt 20 x/mnt 36.9oC 88%
+ *
+ * Satuannya justru tidak ambigu: mmHg untuk tekanan darah, % untuk saturasi,
+ * C untuk suhu. Yang bertumpang tindih hanya nadi dan laju napas — keduanya
+ * "x/mnt" — dan itu dipisahkan menurut urutan kemunculan, mengikuti urutan
+ * kolomnya di header.
+ *
+ * @returns {Object} map field -> {value, raw_match, source}
+ */
+function bacaVitalMenurutSatuan(barisNilai) {
+  const hasil = {};
+  if (!barisNilai) return hasil;
+
+  // "mmHg" opsional: formulir format lama menulis tekanan darah tanpa satuan
+  // ("141/86 71 Kali 20 Kali 36.9oC"). Aman di sini karena fungsi ini hanya
+  // dipanggil untuk baris tepat di bawah header Vital Sign — di luar konteks
+  // itu, pola dua angka berpisah garis miring terlalu longgar.
+  const td = barisNilai.match(/(\d{2,3})\s*\/\s*(\d{2,3})(?:\s*mmHg)?/i);
+  if (td) hasil.BloodPressure = { value: `${td[1]}/${td[2]}`, raw_match: td[0], source: 'satuan' };
+
+  const spo2 = barisNilai.match(/(\d{1,3})\s*%/);
+  if (spo2) hasil.SpO2 = { value: spo2[1], raw_match: spo2[0], source: 'satuan' };
+
+  // "36.9oC" — huruf o di berkas ini menggantikan lambang derajat.
+  const suhu = barisNilai.match(/([\d]{2}(?:[.,]\d)?)\s*[o°]?\s*C\b/i);
+  if (suhu) hasil.Temperature = { value: suhu[1], raw_match: suhu[0], source: 'satuan' };
+
+  const bb = barisNilai.match(/(\d{1,3}(?:[.,]\d)?)\s*kg/i);
+  if (bb) hasil.Weight = { value: bb[1], raw_match: bb[0], source: 'satuan' };
+
+  const tb = barisNilai.match(/(\d{2,3})\s*cm/i);
+  if (tb) hasil.Height = { value: tb[1], raw_match: tb[0], source: 'satuan' };
+
+  // Nadi dan laju napas sama-sama "x/mnt". Urutan kemunculan dipakai karena di
+  // header Heart Rate selalu mendahului RR; kalau hanya ada satu nilai, ia
+  // TIDAK ditebak ke salah satunya — menebak di sini berarti mengarang angka
+  // nadi atau laju napas yang tidak pernah tertulis.
+  // "x/mnt" pada formulir format baru, "Kali" pada format lama.
+  const xmnt = [...barisNilai.matchAll(/(\d{1,3})\s*(?:x\s*\/\s*m(?:e?nit|nt)|kali)/gi)];
+  if (xmnt.length >= 2) {
+    hasil.HeartRate = { value: xmnt[0][1], raw_match: xmnt[0][0], source: 'satuan' };
+    hasil.RespiratoryRate = { value: xmnt[1][1], raw_match: xmnt[1][0], source: 'satuan' };
+  }
+
+  return hasil;
+}
+
+/** Baris yang memuat setidaknya tiga nama kolom vital yang dikenal. */
+function barisHeaderVital(baris) {
+  const nama = [/\bBB\b/i, /\bTB\b/i, /\bTD\b/i, /heart\s*rate/i, /\bRR\b/i, /\btemp/i, /\bspo2\b/i];
+  return nama.filter(re => re.test(baris)).length >= 3;
+}
 
 /**
  * Ekstrak tabel Vital Sign (BB, TB, TD, Heart Rate, RR, Temp, SpO2) dari
@@ -166,6 +243,22 @@ function parseVitalSignsTable(text) {
           : { value: match[1], raw_match: match[0], source: 'label' };
         break;
       }
+    }
+  }
+
+  // Cadangan menurut satuan — dipakai untuk formulir Triage IGD format baru,
+  // yang menaruh nama kolom di satu baris dan nilainya di baris berikutnya.
+  // Dicoba SEBELUM jalur posisional karena di formulir itu kolom kosong
+  // membuat urutan nilai tidak lagi berpadanan dengan urutan kolom.
+  if (Object.keys(VITAL_SIGN_FIELD_PATTERNS).some(f => !result[f])) {
+    const barisScope = scope.split(/\r?\n/);
+    for (let i = 0; i < barisScope.length - 1; i++) {
+      if (!barisHeaderVital(barisScope[i])) continue;
+      const dariSatuan = bacaVitalMenurutSatuan(barisScope[i + 1]);
+      for (const [field, nilai] of Object.entries(dariSatuan)) {
+        if (!result[field]) result[field] = nilai;
+      }
+      break;
     }
   }
 

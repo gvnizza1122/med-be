@@ -83,16 +83,34 @@ describe('Table Parsing Service', () => {
       expect(result.Temperature).toMatchObject({ value: '36.8', source: 'label' });
     });
 
-    it('should fallback ke tabel posisional kalau tidak ada label eksplisit', () => {
+    // Baris nilai ini membawa satuan lengkap (kg, cm, mmHg, x/mnt, C), jadi
+    // sejak 23 Sep 2026 ia dibaca lewat jalur SATUAN, bukan posisional.
+    // Nilainya sama persis; yang berubah hanya penanda asal-usulnya, dan
+    // 'satuan' memang lebih jujur menggambarkan cara ia terbaca. Jalur satuan
+    // didahulukan karena kolom yang dikosongkan membuat urutan nilai tidak
+    // lagi berpadanan dengan urutan kolom — lihat vitalSignTabelTriase.test.js.
+    it('membaca baris nilai bersatuan lewat jalur satuan', () => {
       const text = 'VITAL SIGN\nBB   TB   TD   Heart Rate   RR   Temp\n55 kg   160 cm   110/70 mmHg   88 x/mnt   20 x/mnt   37.8 C';
       const result = parseVitalSignsTable(text);
 
-      expect(result.Weight).toMatchObject({ value: '55', source: 'table' });
-      expect(result.HeartRate).toMatchObject({ value: '88', source: 'table' });
-      expect(result.RespiratoryRate).toMatchObject({ value: '20', source: 'table' });
+      expect(result.Weight).toMatchObject({ value: '55', source: 'satuan' });
+      expect(result.HeartRate).toMatchObject({ value: '88', source: 'satuan' });
+      expect(result.RespiratoryRate).toMatchObject({ value: '20', source: 'satuan' });
       // Field non-BloodPressure tidak boleh menyisakan karakter "/" dari unit "x/mnt"
       expect(result.HeartRate.value).not.toContain('/');
       expect(result.RespiratoryRate.value).not.toContain('/');
+    });
+
+    it('should fallback ke tabel posisional kalau nilainya tanpa satuan', () => {
+      // Tanpa satuan, jalur satuan tidak bisa mengenali apa pun selain tekanan
+      // darah — sisanya harus ditangani pemetaan posisional.
+      const text = 'VITAL SIGN\nBB   TB   TD   Heart Rate   RR   Temp\n55   160   110/70   88   20   37.8';
+      const result = parseVitalSignsTable(text);
+
+      expect(result.Weight).toMatchObject({ value: '55', source: 'table' });
+      expect(result.Height).toMatchObject({ value: '160', source: 'table' });
+      expect(result.HeartRate).toMatchObject({ value: '88', source: 'table' });
+      expect(result.RespiratoryRate).toMatchObject({ value: '20', source: 'table' });
     });
 
     it('should return object kosong kalau tidak ada heading VITAL SIGN dan tidak ada label', () => {

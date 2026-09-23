@@ -161,14 +161,18 @@ describe('evaluasiSyaratPenunjang — kehati-hatian', () => {
     expect(evaluasiSyaratPenunjang(null, null, null)).toEqual([]);
   });
 
-  // Seluruh aturan berasal dari kalimat verifikator BPJS dan sebagian menyebut
-  // "sesuai BA Kesepakatan" — kesepakatan lokal yang belum tentu berlaku umum.
-  // Selama belum ditelaah tim casemix, aturannya tampil sebagai catatan dan
-  // tidak boleh memicu peringatan.
-  test('seluruh aturan masih berstatus belum diverifikasi', () => {
+  // Tim casemix RS Lestari Raharja mengesahkan kelima aturan pada 23 Sep 2026,
+  // sehingga semuanya aktif. Sebelum itu statusnya belum diverifikasi dan
+  // temuannya tidak ikut dihitung sebagai peringatan di layar.
+  //
+  // Status ini tetap diuji karena menentukan apakah sebuah aturan boleh
+  // memunculkan peringatan. Ambangnya berasal dari kesepakatan lokal dengan
+  // BPJS setempat; kalau sistem dipakai RS lain, seluruh ambang wajib
+  // ditelaah ulang dan status ini dikembalikan ke false.
+  test('kelima aturan sudah disahkan tim casemix', () => {
     const t = evaluasiSyaratPenunjang('J18.9;D63.8;N17.9;I67.8;O14.1', '', []);
-    expect(t.length).toBeGreaterThan(0);
-    for (const aturan of t) expect(aturan.diverifikasi).toBe(false);
+    expect(t).toHaveLength(5);
+    for (const aturan of t) expect(aturan.diverifikasi).toBe(true);
   });
 
   // Kalimat asli verifikator membuat tiap aturan bisa dipertanggungjawabkan:
