@@ -30,6 +30,7 @@ const {
   bukanHasilPengukuran,
   tekananDarahTertulisNol,
 } = require('./kegawatdaruratanReference');
+const { verifikasiIdentitas } = require('./identitasLintasHalamanService');
 const { aggregateKriteria, KRITERIA_LABELS } = require('./kegawatdaruratanAggregation');
 const { getDb } = require('../database/init');
 const { assessPneumoniaSeverityMismatch } = require('./pneumoniaSeverityAssessment');
@@ -1990,6 +1991,21 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
       ]);
       result.pending_risk_notes = pendingRiskNotes;
       result.kegawatdaruratan_assessment = kegawatdaruratanAssessment;
+
+      // Verifikasi identitas lintas halaman -- deterministik, tanpa panggilan
+      // AI dan tanpa token. Menangkap berkas yang ketumpangan halaman milik
+      // pasien lain; tanpa ini, klaim bisa dinilai dari kondisi klinis orang
+      // lain. Ambangnya sengaja menuntut dua sinyal sebelum menuduh, lihat
+      // identitasLintasHalamanService.js.
+      try {
+        result.identitas_halaman = verifikasiIdentitas(evidencePool, {
+          nama_pasien: record.NAMA_PASIEN || record.nama_pasien,
+          mrn: record.MRN || record.mrn,
+        });
+      } catch (identErr) {
+        console.warn(`[AI-REVIEW] verifikasiIdentitas error: ${identErr.message}`);
+        result.identitas_halaman = [];
+      }
 
       // Modul Pneumonia (Fase 2, 12-13 Sep 2026) -- MURNI kode deterministik,
       // dijalankan SETELAH kegawatdaruratanAssessment tersedia (piggyback pada
