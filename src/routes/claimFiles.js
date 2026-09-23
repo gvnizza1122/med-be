@@ -8,6 +8,7 @@ const { authenticate, authorize } = require('../middleware/auth');
 const { parseClaimFile, normalizeColumnName } = require('../services/fileParser');
 const { validateRecord, determineStatus } = require('../services/ruleEngine');
 const { generateExcel } = require('../services/exportService');
+const { buatDaftarKerja, namaBerkasDaftarKerja } = require('../services/daftarKerjaExportService');
 const { logAudit } = require('../services/auditService');
 const { estimatePromptTokens, estimateCompletionTokens } = require('../services/aiValidationService');
 const { generateAiReview } = require('../services/aiReviewService');
@@ -815,6 +816,64 @@ router.post('/:id/approve', authenticate, authorize('supervisor', 'admin'), asyn
     });
   } catch (err) {
     console.error('[claimFiles] error:', err);
+    res.status(500).json({ error: 'Terjadi gangguan pada sistem. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' });
+  }
+});
+
+/**
+ * GET /api/v1/claim-files/export/daftar-kerja
+ *
+ * Lembar kerja harian koder: klaim yang ditandai bermasalah oleh medaudit.
+ * Cakupannya mengikuti tampilan yang sedang dibuka (periode & kategori),
+ * bukan seluruh basis data — dan cakupan itu ikut tertulis di nama berkas
+ * serta di lembar Ringkasan supaya tidak ada salah paham saat beredar.
+ *
+ * Berisi PENDING INTERNAL saja. Pending BPJS punya arti yang jauh berbeda
+ * dan sengaja tidak pernah dicampur ke berkas ini.
+ */
+router.get('/export/daftar-kerja', authenticate, async (req, res) => {
+  try {
+    const db = getDb();
+    const { periode, kategori } = req.query;
+
+    const syarat = ["cr.validation_status <> 'valid'"];
+    const nilai = [];
+    if (periode) { syarat.push('cr.periode = ?'); nilai.push(periode); }
+    if (kategori) { syarat.push('cr.jenis_klaim = ?'); nilai.push(kategori); }
+
+    const records = await db.prepare(
+      'SELECT cr.* FROM claim_records cr WHERE ' + syarat.join(' AND ') +
+      ' ORDER BY cr.periode DESC, cr.nama_pasien ASC'
+    ).all(...nilai);
+
+    const getErrors = db.prepare('SELECT * FROM validation_errors WHERE record_id = ?');
+    const klaim = [];
+    for (const rec of records) {
+      klaim.push({ ...rec, errors: await getErrors.all(rec.id) });
+    }
+
+    const cakupan = {
+      periode: periode || null,
+      kategori: kategori || null,
+      diexportOleh: req.user.email,
+    };
+    const buffer = await buatDaftarKerja(klaim, cakupan);
+
+    // Begitu berkas diunduh, medaudit kehilangan kendali atasnya — isinya
+    // nama pasien, nomor kartu BPJS, dan diagnosis. Setiap export dicatat
+    // supaya selalu bisa ditelusuri siapa mengeluarkan data apa, kapan.
+    logAudit({
+      userId: req.user.id, userEmail: req.user.email,
+      action: 'export', resourceType: 'daftar_kerja', resourceId: null,
+      details: { format: 'excel', periode: periode || 'semua', kategori: kategori || 'semua', jumlah_klaim: klaim.length },
+      ipAddress: req.ip,
+    });
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename=${namaBerkasDaftarKerja(cakupan)}`);
+    res.send(Buffer.from(buffer));
+  } catch (err) {
+    console.error('[daftar-kerja] error:', err);
     res.status(500).json({ error: 'Terjadi gangguan pada sistem. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' });
   }
 });
