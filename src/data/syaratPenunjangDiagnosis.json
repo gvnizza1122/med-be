@@ -1,0 +1,102 @@
+{
+  "_tentang": "Syarat penunjang diagnosis — Tipe 2 (tindakan ada) & Tipe 1 (hasilnya mendukung). Kelima aturan di bawah berasal dari kalimat verifikator BPJS pada rekap pending RS Lestari Raharja sendiri, bukan dari pedoman klinis umum. RS ini pernah benar-benar kehilangan klaim karena alasan-alasan itu.",
+
+  "_peringatan_penting": "Nilai ambang di sini (Hb < 8, kenaikan kreatinin 1,5-1,9) berasal dari kalimat verifikator, dan sebagian menyebut 'sesuai dengan BA Kesepakatan' yang berarti kesepakatan lokal dengan BPJS setempat. Bisa berbeda di RS lain. Karena itu SELURUH aturan masuk dengan diverifikasi=false: tampil sebagai catatan, tidak memicu peringatan, sampai tim casemix menelaah tiap barisnya.",
+
+  "_kode_prosedur": "Seluruh kode ICD-9-CM di bawah diperiksa ke kamus icd9_cm_procedures di basis data sistem ini, bukan dari ingatan. 87.44 Routine chest x-ray · 87.03 CT of head · 90.41 Bacterial smear sputum · 91.39 Microscopic examination of urine · 90.59 Microscopic examination of blood.",
+
+  "aturan": [
+    {
+      "id": "SP-01",
+      "kode_diagnosis": "J18",
+      "nama_diagnosis": "Pneumonia",
+      "diverifikasi": false,
+      "sumber_aturan": "Rekap pending BPJS RS Lestari Raharja: \"tidak didukung dengan adanya pemeriksaan gram, serta pemberian terapi antibiotik intravena selama 72 jam\"",
+      "syarat": [
+        {
+          "nama": "Rontgen toraks",
+          "kode_prosedur": ["87.44"],
+          "kata_kunci_hasil": ["infiltrat", "konsolidasi", "perselubungan", "bercak"],
+          "tingkat_risiko": "wajib"
+        },
+        {
+          "nama": "Pemeriksaan gram sputum",
+          "kode_prosedur": ["90.41"],
+          "kata_kunci_hasil": ["gram positif", "gram negatif", "pewarnaan gram"],
+          "tingkat_risiko": "wajib"
+        },
+        {
+          "nama": "Antibiotik intravena minimal 72 jam",
+          "kode_prosedur": [],
+          "tingkat_risiko": "wajib",
+          "dapat_diperiksa_sistem": false,
+          "catatan_batasan": "Tidak dapat diperiksa sistem. Daftar obat di berkas klaim RS ini berbentuk tabel berkolom yang nyaris tidak terbaca OCR — diperiksa pada 6 klaim J18 di server, yang tersisa hanya potongan seperti 'Lwopexarin'. Melaporkannya sebagai 'tidak ada' akan berarti menuduh pasien pneumonia tidak diberi antibiotik, padahal yang gagal adalah pembacaannya. Lama pemberian 72 jam pun tidak tercatat dalam bentuk yang bisa dihitung. Perlu diperiksa manusia pada berkas aslinya."
+        }
+      ]
+    },
+    {
+      "id": "SP-02",
+      "kode_diagnosis": "I67.8",
+      "nama_diagnosis": "Penyakit serebrovaskular lain yang ditentukan",
+      "diverifikasi": false,
+      "sumber_aturan": "Rekap pending BPJS RS Lestari Raharja: \"tidak ada bukti adanya pemeriksaan CT Scan, harap rslksi kode DU I67.8\"",
+      "syarat": [
+        {
+          "nama": "CT Scan kepala",
+          "kode_prosedur": ["87.03"],
+          "kata_kunci_hasil": ["ct scan kepala", "msct", "ct-head", "hasil ct"],
+          "tingkat_risiko": "wajib"
+        }
+      ]
+    },
+    {
+      "id": "SP-03",
+      "kode_diagnosis": "N17.9",
+      "nama_diagnosis": "Gagal ginjal akut",
+      "diverifikasi": false,
+      "sumber_aturan": "Rekap pending BPJS RS Lestari Raharja: \"tidak didukung adanya bukti kenaikan creatinin 1,5-1,9 dari baseline, rslksi kode N19\"",
+      "syarat": [
+        {
+          "nama": "Kreatinin serum",
+          "kode_prosedur": ["90.59"],
+          "parameter_lab": "kreatinin",
+          "tingkat_risiko": "wajib",
+          "catatan_batasan": "Syaratnya KENAIKAN 1,5-1,9 kali dari baseline, sedangkan berkas klaim tidak memuat nilai baseline pasien. Yang bisa diperiksa sistem hanya apakah nilai kreatinin tercatat; perbandingan dengan baseline tetap perlu dilakukan manusia."
+        }
+      ]
+    },
+    {
+      "id": "SP-04",
+      "kode_diagnosis": "D63.8",
+      "nama_diagnosis": "Anemia pada penyakit kronis",
+      "diverifikasi": false,
+      "sumber_aturan": "Rekap pending BPJS RS Lestari Raharja: \"dapat dikode jika nilai HB kurang dari 8, pada pasien nilai HB masih diatas 8. hapus kode anaemia\"",
+      "syarat": [
+        {
+          "nama": "Hemoglobin di bawah 8 g/dL",
+          "kode_prosedur": ["90.59"],
+          "parameter_lab": "hemoglobin",
+          "operator": "<",
+          "nilai_ambang": 8,
+          "satuan": "g/dL",
+          "tingkat_risiko": "wajib"
+        }
+      ]
+    },
+    {
+      "id": "SP-05",
+      "kode_diagnosis": "O14.1",
+      "nama_diagnosis": "Preeklampsia berat",
+      "diverifikasi": false,
+      "sumber_aturan": "Rekap pending BPJS RS Lestari Raharja: \"tidak didukung dengan adanya lab urine yang menyatakan positive protein. Rslksi kode DU O13\"",
+      "syarat": [
+        {
+          "nama": "Protein urin positif",
+          "kode_prosedur": ["91.39"],
+          "kata_kunci_hasil": ["protein urin", "proteinuria", "albumin urin"],
+          "tingkat_risiko": "wajib"
+        }
+      ]
+    }
+  ]
+}

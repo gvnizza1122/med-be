@@ -31,6 +31,7 @@ const {
   tekananDarahTertulisNol,
 } = require('./kegawatdaruratanReference');
 const { verifikasiIdentitas } = require('./identitasLintasHalamanService');
+const { evaluasiSyaratPenunjang } = require('./syaratPenunjangService');
 const { aggregateKriteria, KRITERIA_LABELS } = require('./kegawatdaruratanAggregation');
 const { getDb } = require('../database/init');
 const { assessPneumoniaSeverityMismatch } = require('./pneumoniaSeverityAssessment');
@@ -2005,6 +2006,21 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
       } catch (identErr) {
         console.warn(`[AI-REVIEW] verifikasiIdentitas error: ${identErr.message}`);
         result.identitas_halaman = [];
+      }
+
+      // Syarat penunjang diagnosis — Tipe 2 (tindakan ada di PROCLIST) dan
+      // Tipe 1 (hasilnya memenuhi ambang). Deterministik, tanpa token.
+      // Yang diperiksa verifikator BPJS adalah HASILNYA, bukan ada-tidaknya
+      // tindakan; lihat syaratPenunjangService.js.
+      try {
+        result.syarat_penunjang = evaluasiSyaratPenunjang(
+          record.DIAGLIST || record.diagnosa_list,
+          record.PROCLIST || record.prosedur_list,
+          evidencePool
+        );
+      } catch (syaratErr) {
+        console.warn(`[AI-REVIEW] evaluasiSyaratPenunjang error: ${syaratErr.message}`);
+        result.syarat_penunjang = [];
       }
 
       // Modul Pneumonia (Fase 2, 12-13 Sep 2026) -- MURNI kode deterministik,
