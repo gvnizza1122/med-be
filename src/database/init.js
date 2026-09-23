@@ -693,7 +693,13 @@ async function migrateSchema(db) {
       'kutipan': 'TEXT',
       'status_usulan': `VARCHAR(50) CHECK (status_usulan IN ('usulan', 'disetujui', 'ditolak'))`,
       'disetujui_oleh': 'TEXT REFERENCES users(id) ON DELETE SET NULL',
-      'disetujui_pada': 'TIMESTAMP'
+      'disetujui_pada': 'TIMESTAMP',
+      // Periode pelayanan (bukan tanggal unggah). Dipakai untuk mengelompokkan
+      // Riwayat Upload, mengarsipkan per bulan, dan mencocokkan dengan rekap
+      // pending BPJS yang datang per periode. sumber_periode ikut disimpan agar
+      // periode hasil tebakan bisa ditandai belum pasti, bukan diam-diam salah bulan.
+      'periode': 'CHAR(7)',
+      'sumber_periode': `VARCHAR(20) CHECK (sumber_periode IN ('sep', 'tgl_masuk', 'tgl_upload'))`
     };
 
     for (const [col, type] of Object.entries(newCols)) {
@@ -704,6 +710,15 @@ async function migrateSchema(db) {
           // Column may already exist
         }
       }
+    }
+
+    // Index periode dibuat DI SINI, bukan bersama index lain di atas: kolomnya
+    // baru lahir dari loop ALTER TABLE barusan, jadi di database lama index ini
+    // akan gagal kalau dijalankan lebih awal.
+    try {
+      await db.query(`CREATE INDEX IF NOT EXISTS idx_claim_records_periode ON claim_records(periode)`);
+    } catch (e) {
+      // index sudah ada
     }
 
     // Add constraint: If jenis_field='Koding', kutipan must NOT be NULL

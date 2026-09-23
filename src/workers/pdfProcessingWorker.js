@@ -5,6 +5,7 @@ const { parsePDF } = require('../services/pdfParser');
 const { validateRecord, determineStatus } = require('../services/ruleEngine');
 const { updateBatchProgress, logQueueEvent, getBatchStatus } = require('../services/queueService');
 const { v4: uuidv4 } = require('uuid');
+const { isiPeriodeUntukFile } = require('../services/periodeKlaimService');
 
 const redisOptions = {
   host: process.env.REDIS_HOST || 'localhost',
@@ -96,6 +97,15 @@ const worker = new Worker('pdf-processing', async (job) => {
           VALUES (?, ?, ?, ?)
         `).run(recordId, error.rule_id || 'UNKNOWN', error.severity || 'major', error.error_message || error.message);
       }
+    }
+
+    // Periode diisi di sini, setelah record tersimpan, supaya pengelompokan
+    // dan arsip per bulan ikut terbentuk untuk berkas yang baru masuk.
+    try {
+      await isiPeriodeUntukFile(db, fileId);
+    } catch (e) {
+      // periode bukan syarat berkas dianggap berhasil diproses
+      console.warn('[periode] gagal mengisi periode:', e.message);
     }
 
     const duration = Date.now() - startTime;

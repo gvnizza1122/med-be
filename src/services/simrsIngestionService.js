@@ -6,6 +6,7 @@
 const { v4: uuidv4 } = require('uuid');
 const { parsePDF } = require('./pdfParser');
 const { runRuleBasedAudit, extractErrorFields } = require('./aiValidationService');
+const { isiPeriodeUntukFile } = require('./periodeKlaimService');
 
 /**
  * Ingest JSON records from SIMRS
@@ -112,6 +113,15 @@ async function ingestJsonRecords(db, records, hospitalCode = '3371084') {
         error: err.message,
       });
     }
+  }
+
+  // Periode diisi di sini, setelah record tersimpan, supaya pengelompokan
+  // dan arsip per bulan ikut terbentuk untuk berkas yang baru masuk.
+  try {
+    await isiPeriodeUntukFile(db, fileId);
+  } catch (e) {
+    // periode bukan syarat berkas dianggap berhasil diproses
+    console.warn('[periode] gagal mengisi periode:', e.message);
   }
 
   // Update file stats

@@ -14,6 +14,7 @@ const { generateAiReview } = require('../services/aiReviewService');
 const { getRelevantKnowledge, recordKnowledge, getRelevantBpjsExamples } = require('../services/errorKnowledgeService');
 const { matchPrbCategory } = require('../services/prbRules');
 const { linkPendingBpjsForSep } = require('../services/bpjsPendingLink');
+const { isiPeriodeUntukFile } = require('../services/periodeKlaimService');
 
 const router = express.Router();
 
@@ -312,6 +313,15 @@ router.post('/upload', authenticate, upload.single('file'), async (req, res) => 
         }
       }
     });
+
+    // Periode diisi di sini, setelah record tersimpan, supaya pengelompokan
+    // dan arsip per bulan ikut terbentuk untuk berkas yang baru masuk.
+    try {
+      await isiPeriodeUntukFile(db, fileId);
+    } catch (e) {
+      // periode bukan syarat berkas dianggap berhasil diproses
+      console.warn('[periode] gagal mengisi periode:', e.message);
+    }
 
     // Alur AI ekstraksi -> rule engine -> AI review — ONLY error/pending
     // records (skip valid, hemat token). Evidence pool selalu kosong di sini
@@ -1811,6 +1821,15 @@ async function processSinglePdfUpload(db, { filePath, originalName, jenisKlaim: 
     // tapi tadinya "belum ditemukan" (diimpor sebelum klaim ini diupload),
     // otomatis ke-link sekarang. Lihat bpjsPendingLink.js.
     await linkPendingBpjsForSep(db, extractedData.SEP, recordId);
+
+    // Periode diisi di sini, setelah record tersimpan, supaya pengelompokan
+    // dan arsip per bulan ikut terbentuk untuk berkas yang baru masuk.
+    try {
+      await isiPeriodeUntukFile(db, fileId);
+    } catch (e) {
+      // periode bukan syarat berkas dianggap berhasil diproses
+      console.warn('[periode] gagal mengisi periode:', e.message);
+    }
 
     // Alur AI ekstraksi -> rule engine -> AI review: setelah record tersimpan
     // (dibutuhkan supaya ocr_results punya record_id valid untuk FK), kumpulkan

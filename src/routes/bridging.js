@@ -7,6 +7,7 @@ const { getDb } = require('../database/init');
 const { validateRecord, determineStatus } = require('../services/ruleEngine');
 const { validateRecordWithAI } = require('../services/aiValidationService');
 const { parseClaimFile } = require('../services/fileParser');
+const { isiPeriodeUntukFile } = require('../services/periodeKlaimService');
 
 const router = express.Router();
 
@@ -273,6 +274,15 @@ async function processSinglePdf(filePath, originalFilename, hospitalCode, public
       }
     }
   });
+
+  // Periode diisi di sini, setelah record tersimpan, supaya pengelompokan
+  // dan arsip per bulan ikut terbentuk untuk berkas yang baru masuk.
+  try {
+    await isiPeriodeUntukFile(db, fileId);
+  } catch (e) {
+    // periode bukan syarat berkas dianggap berhasil diproses
+    console.warn('[periode] gagal mengisi periode:', e.message);
+  }
 
   return {
     success: true,
