@@ -27,6 +27,8 @@
 const {
   PARAMETER_TABLE, AGE_GROUP_LABELS, THRESHOLD_TABLE,
   K5_WHITELIST_CODES, resolveAgeGroup, lookupBand, resolvePainInstrument,
+  bukanHasilPengukuran,
+  tekananDarahTertulisNol,
 } = require('./kegawatdaruratanReference');
 const { aggregateKriteria, KRITERIA_LABELS } = require('./kegawatdaruratanAggregation');
 const { getDb } = require('../database/init');
@@ -1070,31 +1072,42 @@ async function assessKegawatdaruratan(evidencePool, triagePageNumbers, umurTahun
     for (const key of ['RR', 'SpO2', 'HR', 'TD_sistolik', 'TD_diastolik', 'Suhu', 'GCS', 'Nyeri']) {
       const v = rawVitals[key];
       const nilai = v && Number.isFinite(Number(v.nilai)) ? Number(v.nilai) : null;
-      const validQuote = nilai !== null && v.kutipan && v.page_number
+      // Kesahihan kutipan dipisah dari keterbacaan angka: TD yang ditulis
+      // "0/0" tidak menghasilkan angka, tapi kutipannya tetap perlu disimpan
+      // supaya tampilan bisa menunjukkan dari mana nilai 0 itu berasal.
+      const kutipanSah = !!(v && v.kutipan && v.page_number
         && validVitalPages.has(v.page_number)
-        && validateQuotation(v.kutipan, v.page_number, evidencePool) && !hasFinancialTerms(v.kutipan);
+        && validateQuotation(v.kutipan, v.page_number, evidencePool) && !hasFinancialTerms(v.kutipan));
+      const validQuote = nilai !== null && kutipanSah;
       const nyeriExtra = key === 'Nyeri' ? { instrumen_diharapkan: painInstrument } : {};
       // Tri-state (fix item 4, 19 Sep 2026): bedakan "kolomnya ada di form tapi
       // kosong" (empty_on_form, perlu ditindak) dari "form ini memang tidak
       // punya kolom itu" (not_in_form, BUKAN masalah -- mis. SpO2 tidak
       // dicetak di form Triase IGD RS ybs). Deterministik (regex ke teks
       // mentah halaman Triase), lihat documentFieldTemplate.js.
-      const formStatus = resolveFieldFormStatus(key, sourceDocType, pagesForFormStatus, validQuote);
-      // TD yang di dokumen tertulis 0 BUKAN hasil pengukuran: tekanan darah
-      // sistolik 0 pada pasien hidup mustahil secara klinis, itu cara petugas
-      // menandai "tidak diukur". Sebelumnya angka itu jatuh di bawah
-      // gawatUnder (bayi: 70) sehingga lookupBand menilainya "gawat" -- bayi
-      // yang tekanan darahnya memang tidak diukur rutin jadi ikut terhitung
-      // punya kondisi gawat, dan itu menaikkan penilaian kegawatdaruratan
-      // klaim atas dasar angka yang bukan pengukuran.
+      // Dua bentuk "tertulis nol": angka 0 yang terbaca (mis. SpO2 0, HR 0,
+      // GCS di bawah 3) dan tekanan darah yang ditulis sebagai satu teks
+      // "0/0" atau "0/" sehingga tidak terparsing jadi angka sama sekali.
+      const tdTeksNol = (key === "TD_sistolik" || key === "TD_diastolik")
+        && v && tekananDarahTertulisNol(v.nilai);
+      const tertulisNol = bukanHasilPengukuran(key, nilai) || tdTeksNol;
+      const formStatus = resolveFieldFormStatus(key, sourceDocType, pagesForFormStatus, validQuote || tdTeksNol);
+      // TTV yang tertulis nol diperlakukan sebagai TIDAK DIUKUR, bukan dinilai
+      // band-nya. Nilai seperti SpO2 0%, nadi 0, atau suhu 0 derajat mustahil
+      // pada pasien yang hidup; itu cara petugas menandai kolom yang tidak
+      // diukur. Kalau ditelan mentah, angkanya jatuh di bawah gawatUnder dan
+      // klaim jadi terlihat gawat darurat atas dasar sesuatu yang bukan
+      // pengukuran -- ke BPJS artinya kami mengajukan pembenaran klinis yang
+      // tidak ada di dokumen. Skala Nyeri sengaja dikecualikan: 0 di sana
+      // berarti benar-benar tidak nyeri. Lihat bukanHasilPengukuran().
       //
       // Kutipannya tetap disimpan supaya tampilan bisa menjelaskan dari mana
       // angka 0 itu berasal (lihat tercatat_nol di results/[fileId]/page.tsx).
-      if ((key === "TD_sistolik" || key === "TD_diastolik") && nilai === 0) {
+      if (tertulisNol) {
         vitalFindings[key] = {
           nilai: null, band: null,
-          page_number: validQuote ? v.page_number : null,
-          kutipan: validQuote ? v.kutipan.substring(0, 200) : null,
+          page_number: kutipanSah ? v.page_number : null,
+          kutipan: kutipanSah ? v.kutipan.substring(0, 200) : null,
           form_status: formStatus, tercatat_nol: true, ...nyeriExtra,
         };
         continue;
@@ -1136,12 +1149,19 @@ async function assessKegawatdaruratan(evidencePool, triagePageNumbers, umurTahun
       if (!dariTabel) continue;
       const angka = Number(dariTabel.value);
       if (!Number.isFinite(angka)) continue;
+      // Sel tabel yang berisi 0 sama tidak bermaknanya dengan 0 yang dibaca
+      // model -- kalau tidak ditolak di sini, nilai yang baru saja dikenali
+      // sebagai "tidak diukur" akan terisi ulang lewat jalur ini.
+      if (bukanHasilPengukuran(kunciVital, angka)) continue;
       // Halaman sumbernya wajib halaman vital yang sah, bukan resume medis.
       const hal = dariTabel.page;
       if (hal && validVitalPages.size > 0 && !validVitalPages.has(hal)) continue;
 
       vitalFindings[kunciVital] = {
         ...(vitalFindings[kunciVital] || {}),
+        // Angka asli sudah ketemu, jadi penanda "tertulis nol" dari pembacaan
+        // model tidak berlaku lagi dan tidak boleh ikut terbawa ke tampilan.
+        tercatat_nol: false,
         nilai: angka,
         band: ageGroup ? lookupBand(kunciVital, angka, ageGroup) : null,
         page_number: hal || null,

@@ -311,7 +311,59 @@ const K5_WHITELIST_CODES = {
   '93.90': 'Oksigenasi/ventilasi non-invasif (CPAP/NIV)',
 };
 
+// --- TTV yang tertulis 0 ---
+//
+// Di formulir triase, angka 0 pada tanda vital hampir selalu berarti "tidak
+// diukur", bukan hasil pengukuran: saturasi 0%, nadi 0, atau suhu 0 derajat
+// pada pasien yang datang berjalan ke IGD mustahil secara klinis. Petugas
+// memakai 0 sebagai cara mengisi kolom yang tidak sempat/tidak perlu diukur.
+//
+// Kalau angka itu ditelan mentah, lookupBand() menilainya jatuh di bawah
+// gawatUnder dan klaim jadi terlihat gawat darurat atas dasar sesuatu yang
+// bukan pengukuran. Itu menaikkan penilaian kegawatdaruratan secara keliru,
+// dan ke BPJS artinya kami mengajukan pembenaran klinis yang tidak ada di
+// dokumen.
+//
+// PENGECUALIAN PENTING: skala Nyeri. Di sana 0 adalah nilai yang sah dan
+// sering benar -- lihat THRESHOLD_TABLE.Nyeri yang normalnya [0, 0]. Pasien
+// yang tidak nyeri memang bernilai 0, dan itu tidak boleh dihapus.
+const NOL_BERARTI_TIDAK_DIUKUR = new Set([
+  'RR', 'SpO2', 'HR', 'TD_sistolik', 'TD_diastolik', 'Suhu',
+]);
+
+// GCS terendah yang mungkin adalah 3 (masing-masing dari tiga komponen minimal
+// bernilai 1). Nilai 0, 1, atau 2 tidak bisa berasal dari penilaian GCS yang
+// benar-benar dilakukan.
+const GCS_MINIMUM = 3;
+
+/**
+ * Apakah angka ini mustahil sebagai hasil pengukuran, sehingga harus
+ * diperlakukan sebagai "tidak diukur" alih-alih dinilai band-nya?
+ */
+function bukanHasilPengukuran(key, nilai) {
+  if (!Number.isFinite(nilai)) return false;
+  if (key === 'GCS') return nilai < GCS_MINIMUM;
+  return nilai === 0 && NOL_BERARTI_TIDAK_DIUKUR.has(key);
+}
+
+/**
+ * Tekanan darah yang ditulis sebagai satu teks: "0/0", "0/", "0 / 0", "000/00".
+ *
+ * Bentuk ini perlu dikenali terpisah karena tidak lolos parsing angka biasa
+ * (Number('0/0') = NaN), jadi tanpa ini ia cuma tampak sebagai kolom kosong
+ * dan tampilan tidak bisa menjelaskan bahwa di dokumennya memang tertulis 0.
+ */
+function tekananDarahTertulisNol(teks) {
+  if (teks === null || teks === undefined) return false;
+  return /^\s*0+\s*\/\s*0*\s*$/.test(String(teks));
+}
+
+
 module.exports = {
+  NOL_BERARTI_TIDAK_DIUKUR,
+  GCS_MINIMUM,
+  bukanHasilPengukuran,
+  tekananDarahTertulisNol,
   PARAMETER_TABLE,
   AGE_GROUP_LABELS,
   THRESHOLD_TABLE,
