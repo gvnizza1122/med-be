@@ -850,7 +850,7 @@ harus persis seperti di atas; vital_findings WAJIB 8 key seperti di atas):
  * @param {Array<string>} [procedureCodes] - PROCLIST record ini (untuk K5, tidak butuh AI)
  * @returns {Promise<{ringkasan:string, parameter_findings:Array, vital_findings:Object, kriteria:Array}>}
  */
-async function assessKegawatdaruratan(evidencePool, triagePageNumbers, umurTahun, umurHari, procedureCodes = [], resumeMedisPageNumbers = [], fallbackDocPageNumbers = {}) {
+async function assessKegawatdaruratan(evidencePool, triagePageNumbers, umurTahun, umurHari, procedureCodes = [], resumeMedisPageNumbers = [], fallbackDocPageNumbers = {}, vitalDariTabel = {}) {
   const ageGroup = resolveAgeGroup(umurTahun, umurHari);
   // Instrumen skala nyeri yang diharapkan untuk usia pasien ini (4-tier,
   // dihitung DI SINI dari umur -- bukan AI -- jadi konsisten & auditable,
@@ -1109,6 +1109,46 @@ async function assessKegawatdaruratan(evidencePool, triagePageNumbers, umurTahun
         form_status: formStatus,
         ...nyeriExtra,
       };
+    }
+
+    // Cadangan dari pembacaan TABEL Vital Sign (23 Sep 2026, permintaan
+    // klien: "SpO2 difokuskan dari triase, bukan resume medis").
+    //
+    // Formulir Triase IGD terbaru menaruh vital di TABEL berkolom
+    // (BB | TB | TD | Heart Rate | RR | Temp | SpO2) -- bentuk yang paling
+    // sering gagal dibaca model dari teks mentah. tableParsingService.js
+    // sudah bisa membaca tabel itu, TAPI hasilnya selama ini hanya mampir
+    // ke structured_extraction untuk tampilan dan tidak pernah dipakai
+    // menilai apa pun -- sehingga SpO2 tetap tercatat kosong walau angkanya
+    // jelas tertulis di formulir.
+    //
+    // Hanya mengisi yang MASIH kosong (pembacaan model tetap menang) dan
+    // hanya dari halaman yang sah sebagai sumber vital -- yaitu Triase IGD
+    // selama halamannya ada (lihat validVitalPages di atas).
+    const VITAL_DARI_TABEL = {
+      SpO2: 'SpO2', HeartRate: 'HR', RespiratoryRate: 'RR', Temperature: 'Suhu',
+    };
+    const vitalTabel = vitalDariTabel || {};
+    for (const [kunciTabel, kunciVital] of Object.entries(VITAL_DARI_TABEL)) {
+      const sudahAda = vitalFindings[kunciVital] && vitalFindings[kunciVital].nilai !== null;
+      if (sudahAda) continue;
+      const dariTabel = vitalTabel[kunciTabel];
+      if (!dariTabel) continue;
+      const angka = Number(dariTabel.value);
+      if (!Number.isFinite(angka)) continue;
+      // Halaman sumbernya wajib halaman vital yang sah, bukan resume medis.
+      const hal = dariTabel.page;
+      if (hal && validVitalPages.size > 0 && !validVitalPages.has(hal)) continue;
+
+      vitalFindings[kunciVital] = {
+        ...(vitalFindings[kunciVital] || {}),
+        nilai: angka,
+        band: ageGroup ? lookupBand(kunciVital, angka, ageGroup) : null,
+        page_number: hal || null,
+        kutipan: dariTabel.raw_match ? String(dariTabel.raw_match).substring(0, 200) : null,
+        sumber_nilai: 'tabel_vital_triase',
+      };
+      console.log(`[Vital] ${kunciVital} diisi dari tabel Vital Sign triase: ${angka} (hal ${hal || '?'})`);
     }
 
     // --- Validasi K1 (Bagian 3, tetap AI judgment) ---
@@ -1920,7 +1960,8 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
           ? assessKegawatdaruratan(
               evidencePool, triagePageNumbers,
               record.UMUR_TAHUN || record.umur_tahun, record.UMUR_HARI || record.umur_hari,
-              codes.procedure, resumeMedisPageNumbers, fallbackDocPageNumbers
+              codes.procedure, resumeMedisPageNumbers, fallbackDocPageNumbers,
+              record._ocr_vital_signs_detected || {}
             ).catch(kegawatErr => {
               console.warn(`[AI-REVIEW] assessKegawatdaruratan error: ${kegawatErr.message}`);
               return null;
