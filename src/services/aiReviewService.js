@@ -33,6 +33,7 @@ const {
 const { verifikasiIdentitas } = require('./identitasLintasHalamanService');
 const { evaluasiSyaratPenunjang } = require('./syaratPenunjangService');
 const { bacaTemuanTindakan, periksaSilangTindakan } = require('./temuanTindakanService');
+const { evaluasiKonsistensi } = require('./konsistensiAntarDataService');
 const { aggregateKriteria, KRITERIA_LABELS } = require('./kegawatdaruratanAggregation');
 const { getDb } = require('../database/init');
 const { assessPneumoniaSeverityMismatch } = require('./pneumoniaSeverityAssessment');
@@ -2038,6 +2039,17 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
         console.warn(`[AI-REVIEW] bacaTemuanTindakan error: ${tindakanErr.message}`);
         result.temuan_tindakan = [];
         result.silang_tindakan = [];
+      }
+
+      // Konsistensi antar data — "kalau Data A ada, Data B harus ada".
+      // Verifikator BPJS mencari ketidakcocokan di mana pun: antara resume
+      // dan triase, antara prosedur dan resep, antara klaim dan SEP. Aturannya
+      // data, bukan kode, jadi koder bisa menambah pasangan tanpa deploy.
+      try {
+        result.konsistensi_data = evaluasiKonsistensi(record, evidencePool, result.temuan_tindakan || []);
+      } catch (konsErr) {
+        console.warn(`[AI-REVIEW] evaluasiKonsistensi error: ${konsErr.message}`);
+        result.konsistensi_data = [];
       }
 
       // Modul Pneumonia (Fase 2, 12-13 Sep 2026) -- MURNI kode deterministik,

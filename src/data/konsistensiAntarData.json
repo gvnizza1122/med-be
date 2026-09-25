@@ -1,0 +1,292 @@
+{
+  "_tentang": "Pemeriksaan konsistensi antar data: kalau Data A ada, Data B yang menyertainya harus ada. Verifikator BPJS mencari ketidakcocokan di mana pun — antara resume dan triase, antara prosedur dan resep, antara klaim dan SEP. Satu data yang berdiri sendiri tanpa pendukungnya adalah alasan pending yang gampang ditemukan.",
+  "_status": "SELURUH aturan masuk dengan diverifikasi=false: tampil sebagai catatan, tidak memicu peringatan, sampai tim casemix menelaah satu per satu. Alasannya bukan kehati-hatian kosong — tiga kali aturan yang dirancang tanpa diuji ke berkas nyata ternyata salah seluruhnya, dan alarm yang sering keliru akan diabaikan juga ketika ia benar.",
+  "_cara_menambah": "Salin salah satu aturan di bawah, ubah bagian jika/maka. Kosakata kondisi: field_terisi, field_kosong, field_cocok{field,pola}, kode_prosedur, diagnosis_awalan, tindakan, ada_halaman, kata_di_halaman{jenis,salah_satu}. Tidak perlu deploy ulang kode — cukup restart proses.",
+  "aturan": [
+    {
+      "id": "KD-01",
+      "nama": "Nebulisasi tanpa obat pendukung di resep",
+      "keparahan": "tinggi",
+      "diverifikasi": false,
+      "jika": {
+        "tindakan": "nebulisasi"
+      },
+      "maka": {
+        "kata_di_halaman": {
+          "jenis": "resep",
+          "salah_satu": [
+            "salbutamol",
+            "ventasal",
+            "combivent",
+            "nebul",
+            "ipratropium",
+            "budesonide",
+            "pulmicort",
+            "nacl"
+          ]
+        }
+      },
+      "yang_dicari": "Obat atau alat nebulisasi di halaman resep",
+      "pesan": "Nebulisasi tercatat sebagai tindakan, tetapi di resep tidak ada obat maupun alat nebulisasi yang mendukungnya. Tindakan tanpa obat pendukung adalah ketidakcocokan yang mudah ditemukan verifikator.",
+      "sumber_aturan": "Prinsip pencocokan antar data: tindakan yang diklaim harus punya jejak di resep."
+    },
+    {
+      "id": "KD-02",
+      "nama": "Cara bayar di resume tidak sesuai penjamin SEP",
+      "keparahan": "tinggi",
+      "diverifikasi": false,
+      "jika": {
+        "kata_di_halaman": {
+          "jenis": "resume_medis",
+          "salah_satu": [
+            "cara bayar: umum",
+            "cara bayar : umum",
+            "pembayaran: umum"
+          ]
+        }
+      },
+      "maka": {
+        "field_kosong": [
+          "sep"
+        ]
+      },
+      "yang_dicari": "Resume menyebut pasien UMUM padahal klaim ini punya SEP BPJS",
+      "pesan": "Resume medis mencatat cara bayar UMUM, sementara klaim ini diajukan dengan SEP BPJS. Pertentangan ini terlihat langsung oleh verifikator dan mempertanyakan keabsahan penjaminan.",
+      "sumber_aturan": "Ditemukan pada berkas 0170R0110926V001943 (MUNAWIR): resume tertulis UMUM, SEP-nya BPJS PBI (APBN)."
+    },
+    {
+      "id": "KD-03",
+      "nama": "Rawat inap tanpa tanggal keluar",
+      "keparahan": "tinggi",
+      "diverifikasi": false,
+      "jika": {
+        "field_cocok": {
+          "field": "jenis_klaim",
+          "pola": "^RAWAT_INAP$"
+        }
+      },
+      "maka": {
+        "field_terisi": [
+          "discharge_date"
+        ]
+      },
+      "yang_dicari": "Tanggal keluar pada klaim rawat inap",
+      "pesan": "Klaim rawat inap tetapi tanggal keluar kosong. Lama rawat tidak bisa dihitung, dan tarif rawat inap tidak bisa dipertanggungjawabkan tanpa itu.",
+      "sumber_aturan": "Kelengkapan dasar klaim rawat inap."
+    },
+    {
+      "id": "KD-04",
+      "nama": "Penanda ICU tanpa lama rawat ICU maupun jam ventilator",
+      "keparahan": "tinggi",
+      "diverifikasi": false,
+      "jika": {
+        "field_terisi": [
+          "icu_indikator"
+        ]
+      },
+      "maka": {
+        "field_terisi": [
+          "icu_los"
+        ]
+      },
+      "yang_dicari": "Lama rawat ICU (icu_los)",
+      "pesan": "Penanda ICU terisi tetapi lama rawat ICU kosong. Perawatan intensif yang diklaim tanpa durasinya adalah biaya yang tidak bisa dibuktikan.",
+      "sumber_aturan": "Kelengkapan dasar klaim ICU."
+    },
+    {
+      "id": "KD-05",
+      "nama": "Prosedur operasi tanpa laporan operasi",
+      "keparahan": "tinggi",
+      "diverifikasi": false,
+      "jika": {
+        "kata_di_halaman": {
+          "salah_satu": [
+            "laporan operasi",
+            "tindakan operatif",
+            "operasi elektif",
+            "post op",
+            "pasca operasi"
+          ]
+        }
+      },
+      "maka": {
+        "kata_di_halaman": {
+          "salah_satu": [
+            "laporan operasi",
+            "diagnosa pra bedah",
+            "diagnosa pasca bedah",
+            "jenis operasi",
+            "operator",
+            "tindakan operatif"
+          ]
+        }
+      },
+      "yang_dicari": "Isi laporan operasi di berkas",
+      "pesan": "Berkas menyebut tindakan operasi, tetapi halaman Laporan Operasi tidak ada. Laporan operasi adalah bukti utama tindakan bedah; tanpa itu klaim operasi hampir pasti dipertanyakan.",
+      "sumber_aturan": "Kelengkapan berkas tindakan bedah.",
+      "_catatan_rancangan": "Memakai isi halaman, bukan klasifikasinya — alasan sama dengan KD-06."
+    },
+    {
+      "id": "KD-06",
+      "nama": "Pemeriksaan darah diklaim tanpa halaman hasil laboratorium",
+      "keparahan": "sedang",
+      "diverifikasi": false,
+      "jika": {
+        "kode_prosedur": "90.59"
+      },
+      "maka": {
+        "kata_di_halaman": {
+          "salah_satu": [
+            "hematologi",
+            "leukosit",
+            "hemoglobin",
+            "trombosit",
+            "eritrosit",
+            "hasil laboratorium",
+            "kimia darah"
+          ]
+        }
+      },
+      "yang_dicari": "Nilai hasil laboratorium di berkas",
+      "pesan": "Pemeriksaan darah (90.59) ada di daftar prosedur, tetapi halaman hasil laboratorium tidak ditemukan di berkas. Yang diperiksa verifikator adalah hasilnya, bukan ada-tidaknya tindakan.",
+      "sumber_aturan": "Rekap pending BPJS RS Lestari Raharja berulang kali mempersoalkan bukti hasil, bukan tindakan.",
+      "_catatan_rancangan": "Sengaja TIDAK memakai klasifikasi halaman. Diuji ke 41 klaim produksi: klasifikasi gagal mengenali halaman lab pada 4 klaim yang jelas memuat hematologi/leukosit, sehingga aturan ini menghasilkan alarm palsu. Isi halaman lebih kokoh daripada jenis halaman."
+    },
+    {
+      "id": "KD-07",
+      "nama": "Rontgen toraks diklaim tanpa hasil radiologi",
+      "keparahan": "sedang",
+      "diverifikasi": false,
+      "jika": {
+        "kode_prosedur": "87.44"
+      },
+      "maka": {
+        "kata_di_halaman": {
+          "salah_satu": [
+            "kesan",
+            "infiltrat",
+            "konsolidasi",
+            "cor dan pulmo",
+            "tidak tampak kelainan",
+            "perselubungan"
+          ]
+        }
+      },
+      "yang_dicari": "Bacaan hasil rontgen di berkas",
+      "pesan": "Rontgen toraks (87.44) ada di daftar prosedur, tetapi bacaan hasilnya tidak terbaca di berkas. Tindakan tanpa hasil adalah keadaan yang paling sering dipersoalkan.",
+      "sumber_aturan": "Rekap pending BPJS RS Lestari Raharja."
+    },
+    {
+      "id": "KD-08",
+      "nama": "Saturasi rendah tanpa tindakan penanganan",
+      "keparahan": "sedang",
+      "diverifikasi": false,
+      "jika": {
+        "kata_di_halaman": {
+          "salah_satu": [
+            "spo2 8",
+            "spo2 7",
+            "saturasi 8",
+            "saturasi 7"
+          ]
+        }
+      },
+      "maka": {
+        "kata_di_halaman": {
+          "salah_satu": [
+            "oksigen",
+            "o2",
+            "nebul",
+            "nasal kanul",
+            "nrm"
+          ]
+        }
+      },
+      "yang_dicari": "Catatan pemberian oksigen atau nebulisasi",
+      "pesan": "Saturasi tercatat rendah tetapi tidak ada catatan pemberian oksigen maupun nebulisasi. Kalau penanganannya memang dilakukan tetapi belum tercatat, bukti kegawatan klaim ini jadi lemah di mata verifikator.",
+      "sumber_aturan": "84% pending Mei 2026 beralasan 'harap cek kembali penagihan kondisi kegawatan'."
+    },
+    {
+      "id": "KD-09",
+      "nama": "Diagnosis paru berat tanpa penunjang apa pun",
+      "keparahan": "tinggi",
+      "diverifikasi": false,
+      "jika": {
+        "diagnosis_awalan": "J18"
+      },
+      "maka": {
+        "kata_di_halaman": {
+          "salah_satu": [
+            "hasil laboratorium",
+            "hematologi",
+            "leukosit",
+            "rontgen",
+            "radiologi",
+            "foto thorax",
+            "foto toraks"
+          ]
+        }
+      },
+      "yang_dicari": "Hasil laboratorium atau radiologi",
+      "pesan": "Pneumonia dikoding tetapi berkas tidak memuat hasil laboratorium maupun radiologi sama sekali. Diagnosis berat tanpa satu pun penunjang adalah risiko pending tertinggi.",
+      "sumber_aturan": "Ditemukan pada berkas 0170R0110926V001943: 'Penunjang lain: -' padahal diagnosisnya Pneumonia dan PPOK."
+    },
+    {
+      "id": "KD-10",
+      "nama": "Temuan paru resume bertentangan dengan triase",
+      "keparahan": "sedang",
+      "diverifikasi": false,
+      "jika": {
+        "kata_di_halaman": {
+          "jenis": "resume_medis",
+          "salah_satu": [
+            "rh +/+",
+            "rh+/+",
+            "ronkhi +/+"
+          ]
+        }
+      },
+      "maka": {
+        "kata_di_halaman": {
+          "jenis": "triase_igd",
+          "salah_satu": [
+            "ronkhi",
+            "rh +",
+            "tidak normal",
+            "abnormal"
+          ]
+        }
+      },
+      "yang_dicari": "Temuan paru abnormal di triase",
+      "pesan": "Resume mencatat ronki pada kedua paru, sementara triase mencatat pemeriksaan thorak normal. Dua dokumen dalam satu klaim yang saling bertentangan mudah ditemukan verifikator.",
+      "sumber_aturan": "Ditemukan pada berkas 0170R0110926V001943: resume 'rh +/+, wh +/+', triase 'Thorak Normal'."
+    },
+    {
+      "id": "KD-11",
+      "nama": "Kelas rawat tidak sesuai kelas hak peserta",
+      "keparahan": "sedang",
+      "diverifikasi": false,
+      "jika": {
+        "field_terisi": [
+          "kelas_rawat"
+        ],
+        "kata_di_halaman": {
+          "jenis": "sep",
+          "salah_satu": [
+            "kls hak",
+            "kelas hak"
+          ]
+        }
+      },
+      "maka": {
+        "field_cocok": {
+          "field": "kelas_rawat",
+          "pola": "^[123]$"
+        }
+      },
+      "yang_dicari": "Kelas rawat 1, 2, atau 3 yang sejalan dengan kelas hak di SEP",
+      "pesan": "Kelas rawat pada klaim tidak berupa angka 1, 2, atau 3 yang sah, padahal SEP mencantumkan kelas hak peserta. Selisih kelas adalah selisih tarif, dan itu diperiksa.",
+      "sumber_aturan": "Kesesuaian klaim dengan SEP."
+    }
+  ]
+}
