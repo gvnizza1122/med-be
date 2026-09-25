@@ -252,6 +252,12 @@ function classifyPageDocumentType(text) {
   if (/berkas\s*klaim\s*individual/i.test(t)) return 'berkas_eklaim';
   if (/surat\s*eligibilitas\s*peserta|no\.?\s*sep\b|nomor\s*sep\b/i.test(t)) return 'sep';
   if (/resume\s*medis/i.test(t)) return 'resume_medis';
+  // Resep. Sebelumnya tidak dikenali sama sekali dan jatuh ke 'lainnya' —
+  // padahal di situlah bukti tindakan sering tercatat (mis. "Masker Nebul",
+  // "Ventasal NEBUL" pada berkas 0170R0110926V001943). Penanda "R/" adalah
+  // lambang resep yang dicetak di tiap barisnya; dicek dengan batas kata dan
+  // garis miring supaya tidak tertukar dengan huruf R biasa.
+  if (/\bR\s*\/\s*\S/.test(text) || /\bresep\b|\bobat\s+pulang\b/i.test(t)) return 'resep';
   return 'lainnya';
 }
 

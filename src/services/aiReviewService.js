@@ -32,6 +32,7 @@ const {
 } = require('./kegawatdaruratanReference');
 const { verifikasiIdentitas } = require('./identitasLintasHalamanService');
 const { evaluasiSyaratPenunjang } = require('./syaratPenunjangService');
+const { bacaTemuanTindakan, periksaSilangTindakan } = require('./temuanTindakanService');
 const { aggregateKriteria, KRITERIA_LABELS } = require('./kegawatdaruratanAggregation');
 const { getDb } = require('../database/init');
 const { assessPneumoniaSeverityMismatch } = require('./pneumoniaSeverityAssessment');
@@ -2021,6 +2022,22 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
       } catch (syaratErr) {
         console.warn(`[AI-REVIEW] evaluasiSyaratPenunjang error: ${syaratErr.message}`);
         result.syarat_penunjang = [];
+      }
+
+      // Temuan tindakan — membaca APA yang dilakukan ke pasien, terpisah dari
+      // keputusan mengkodekannya. PROCLIST hanya memuat kode final koder dan
+      // tidak pernah mencatat isi berkas, sehingga tindakan yang jelas
+      // tertulis bisa sama sekali tidak terlihat. Untuk pasien IGD yang
+      // dipulangkan, tindakan seperti nebulisasi adalah bukti kegawatan.
+      // Deterministik, tanpa token.
+      try {
+        const tindakan = bacaTemuanTindakan(evidencePool);
+        result.temuan_tindakan = tindakan;
+        result.silang_tindakan = periksaSilangTindakan(tindakan);
+      } catch (tindakanErr) {
+        console.warn(`[AI-REVIEW] bacaTemuanTindakan error: ${tindakanErr.message}`);
+        result.temuan_tindakan = [];
+        result.silang_tindakan = [];
       }
 
       // Modul Pneumonia (Fase 2, 12-13 Sep 2026) -- MURNI kode deterministik,
