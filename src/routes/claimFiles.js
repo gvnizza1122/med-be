@@ -52,6 +52,29 @@ async function saveOcrResultsToDb(db, recordId, ocrResult) {
   }
 }
 
+/**
+ * Simpan halaman yang teksnya berasal dari lapisan teks asli PDF.
+ *
+ * Ditandai sumber 'native_text' supaya bisa dibedakan dari hasil OCR: teks asli
+ * sempurna tanpa salah huruf, sedangkan hasil OCR selalu punya kemungkinan
+ * keliru baca. Perbedaan itu penting saat menilai seberapa jauh sebuah kutipan
+ * bisa dipercaya.
+ *
+ * Tidak menimpa baris yang sudah ada dari OCR — kalau sebuah halaman pernah
+ * di-OCR, hasil itulah yang dipakai sistem, dan menimpanya diam-diam akan
+ * mengubah bukti di bawah kaki temuan yang sudah tercatat.
+ */
+async function simpanHalamanNative(db, recordId, nativePages) {
+  const simpan = db.prepare(`
+    INSERT INTO ocr_results (id, record_id, page_number, ocr_text, confidence, block_count, processing_duration_ms, sumber)
+    VALUES (?, ?, ?, ?, ?, 0, 0, 'native_text')
+    ON CONFLICT(record_id, page_number) DO NOTHING
+  `);
+  for (const hal of nativePages) {
+    await simpan.run(uuidv4(), recordId, hal.page_number, hal.ocr_text || '', 100);
+  }
+}
+
 // Jalankan (atau gabung ke) satu-satunya proses OCR aktif untuk record ini.
 // Hasil SELALU disimpan ke DB begitu proses benar-benar selesai, terlepas dari
 // apakah request HTTP yang memicunya masih menunggu atau sudah timeout duluan.
@@ -141,6 +164,21 @@ async function gatherEvidencePool(db, recordId, filePath) {
         .filter(p => p.type === 'NATIVE' && !p.is_primary_source && !scanPageNumbers.has(p.page_num) && p.text_length > 0)
         .map(p => ({ page_number: p.page_num, ocr_text: p.text_full, confidence: 100 }));
       evidencePool = [...evidencePool, ...nativePages];
+
+      // Halaman teks asli ikut DISIMPAN, bukan cuma dipakai sekali lalu dibuang.
+      // Sebelumnya halaman ini dibaca ulang dari PDF tiap kali dibutuhkan dan
+      // tidak pernah masuk basis data, sehingga klaim dari PDF digital penuh
+      // punya nol halaman tersimpan — dan analisis belakangan (penambangan
+      // aturan dari rekap pending, pemeriksaan ulang konsistensi) buta terhadap
+      // klaim seperti itu. Best-effort: kegagalan menyimpan tidak boleh
+      // menggagalkan audit yang sedang berjalan.
+      if (nativePages.length > 0) {
+        try {
+          await simpanHalamanNative(db, recordId, nativePages);
+        } catch (simpanErr) {
+          console.warn(`[gatherEvidencePool] Gagal menyimpan halaman teks asli: ${simpanErr.message}`);
+        }
+      }
     }
   } catch (classifyErr) {
     console.warn(`[gatherEvidencePool] Gagal ambil halaman NATIVE: ${classifyErr.message}`);

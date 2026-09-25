@@ -721,6 +721,18 @@ async function migrateSchema(db) {
       // index sudah ada
     }
 
+    // Asal-usul teks tiap halaman. Halaman yang teksnya diambil dari lapisan
+    // teks asli PDF tidak pernah melalui OCR, dan sebelumnya juga tidak pernah
+    // DISIMPAN — ia dibaca ulang dari berkas setiap kali dibutuhkan. Akibatnya
+    // klaim dari PDF digital penuh (mis. MUNAWIR) punya nol baris di sini, dan
+    // analisis belakangan — penambangan aturan dari rekap pending, pemeriksaan
+    // ulang konsistensi — jadi buta terhadap klaim seperti itu.
+    try {
+      await db.query(`ALTER TABLE ocr_results ADD COLUMN sumber TEXT DEFAULT 'ocr'`);
+    } catch (e) {
+      // kolom sudah ada
+    }
+
     // Add constraint: If jenis_field='Koding', kutipan must NOT be NULL
     // PostgreSQL CHECK constraint validation
     try {
