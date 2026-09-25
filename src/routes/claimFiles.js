@@ -1783,7 +1783,11 @@ const JENIS_KLAIM_OPTIONS = ['RAWAT_JALAN', 'RAWAT_INAP'];
  */
 async function isiKodeDariSaranTervalidasi(db, recordId, record, aiReview) {
   const saran = Array.isArray(aiReview && aiReview.suggested_codes) ? aiReview.suggested_codes : [];
-  if (saran.length === 0) return;
+  const tindakanTerbaca = Array.isArray(aiReview && aiReview.temuan_tindakan) ? aiReview.temuan_tindakan : [];
+  // Berhenti hanya kalau KEDUA sumbernya kosong. Sebelumnya cukup saran kode
+  // yang kosong untuk membuat fungsi ini berhenti — dan tindakan yang jelas
+  // tertulis di berkas tidak akan pernah sampai ke daftar prosedur.
+  if (saran.length === 0 && tindakanTerbaca.length === 0) return;
 
   const ambil = (tipe) => [...new Set(
     saran.filter(s => s && s.type === tipe && s.code && s.kamus_valid === true).map(s => String(s.code).trim())
@@ -1797,7 +1801,29 @@ async function isiKodeDariSaranTervalidasi(db, recordId, record, aiReview) {
   }
   if (kosong(record.PROCLIST || record.prosedur_list)) {
     const p = ambil('procedure');
-    if (p.length > 0) perubahan.prosedur_list = p.join(';');
+
+    // Tindakan yang terbaca dari berkas ikut mengisi daftar prosedur.
+    //
+    // Saran kode dari AI sering tidak memuat tindakan yang jelas-jelas tertulis
+    // di resume: nebulisasi tertulis tiga kali di berkas 0170R0110926V001943
+    // dan daftar prosedurnya tetap kosong. Pembacaan tindakan bersifat
+    // deterministik — kata "Nebulisasi" pada kolom Tindakan resume, bukan
+    // tebakan model — sehingga kodenya layak diisikan.
+    //
+    // Tiga pembatas, karena isi kolom ini ikut terkirim ke BPJS dan mengklaim
+    // tindakan yang tidak dilakukan adalah temuan serius terhadap rumah sakit:
+    //   1. Hanya tindakan yang kodenya SUDAH PASTI (kode_usulan terisi).
+    //      Pemasangan infus tidak ikut — kodenya belum ditentukan koder.
+    //   2. Hanya yang terbaca dari resume medis atau triase. Resep saja tidak
+    //      cukup: obat nebul di resep belum tentu berarti tindakannya dilakukan.
+    //   3. Tidak pernah menimpa isian koder (dijaga kosong() di atas).
+    const dariTindakan = (Array.isArray(aiReview && aiReview.temuan_tindakan) ? aiReview.temuan_tindakan : [])
+      .filter(t => t && t.kode_usulan
+        && (t.bukti || []).some(b => b.sumber === 'resume_medis' || b.sumber === 'triase_igd'))
+      .map(t => String(t.kode_usulan).trim());
+
+    const gabungan = [...new Set([...p, ...dariTindakan])];
+    if (gabungan.length > 0) perubahan.prosedur_list = gabungan.join(';');
   }
   if (Object.keys(perubahan).length === 0) return;
 
