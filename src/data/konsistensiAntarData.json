@@ -1,13 +1,13 @@
 {
   "_tentang": "Pemeriksaan konsistensi antar data: kalau Data A ada, Data B yang menyertainya harus ada. Verifikator BPJS mencari ketidakcocokan di mana pun — antara resume dan triase, antara prosedur dan resep, antara klaim dan SEP. Satu data yang berdiri sendiri tanpa pendukungnya adalah alasan pending yang gampang ditemukan.",
-  "_status": "SELURUH aturan masuk dengan diverifikasi=false: tampil sebagai catatan, tidak memicu peringatan, sampai tim casemix menelaah satu per satu. Alasannya bukan kehati-hatian kosong — tiga kali aturan yang dirancang tanpa diuji ke berkas nyata ternyata salah seluruhnya, dan alarm yang sering keliru akan diabaikan juga ketika ia benar.",
+  "_status": "Seluruh aturan AKTIF. Sebelumnya masuk sebagai catatan yang menunggu telaah koder, tapi itu berarti koder memeriksa ulang apa yang sudah diperiksa sistem — kerja dua kali, dan gunanya hilang. Aturan yang ternyata keliru diperbaiki atau dimatikan di berkas ini, bukan dengan menahan seluruhnya.",
   "_cara_menambah": "Salin salah satu aturan di bawah, ubah bagian jika/maka. Kosakata kondisi: field_terisi, field_kosong, field_cocok{field,pola}, kode_prosedur, diagnosis_awalan, tindakan, ada_halaman, kata_di_halaman{jenis,salah_satu}. Tidak perlu deploy ulang kode — cukup restart proses.",
   "aturan": [
     {
       "id": "KD-01",
       "nama": "Nebulisasi tanpa obat pendukung di resep",
       "keparahan": "tinggi",
-      "diverifikasi": false,
+      "diverifikasi": true,
       "jika": {
         "tindakan": "nebulisasi"
       },
@@ -34,7 +34,7 @@
       "id": "KD-02",
       "nama": "Cara bayar di resume tidak sesuai penjamin SEP",
       "keparahan": "tinggi",
-      "diverifikasi": false,
+      "diverifikasi": true,
       "jika": {
         "kata_di_halaman": {
           "jenis": "resume_medis",
@@ -58,7 +58,7 @@
       "id": "KD-03",
       "nama": "Rawat inap tanpa tanggal keluar",
       "keparahan": "tinggi",
-      "diverifikasi": false,
+      "diverifikasi": true,
       "jika": {
         "field_cocok": {
           "field": "jenis_klaim",
@@ -78,7 +78,7 @@
       "id": "KD-04",
       "nama": "Penanda ICU tanpa lama rawat ICU maupun jam ventilator",
       "keparahan": "tinggi",
-      "diverifikasi": false,
+      "diverifikasi": true,
       "jika": {
         "field_terisi": [
           "icu_indikator"
@@ -97,7 +97,7 @@
       "id": "KD-05",
       "nama": "Prosedur operasi tanpa laporan operasi",
       "keparahan": "tinggi",
-      "diverifikasi": false,
+      "diverifikasi": true,
       "jika": {
         "kata_di_halaman": {
           "salah_satu": [
@@ -130,7 +130,7 @@
       "id": "KD-06",
       "nama": "Pemeriksaan darah diklaim tanpa halaman hasil laboratorium",
       "keparahan": "sedang",
-      "diverifikasi": false,
+      "diverifikasi": true,
       "jika": {
         "kode_prosedur": "90.59"
       },
@@ -156,7 +156,7 @@
       "id": "KD-07",
       "nama": "Rontgen toraks diklaim tanpa hasil radiologi",
       "keparahan": "sedang",
-      "diverifikasi": false,
+      "diverifikasi": true,
       "jika": {
         "kode_prosedur": "87.44"
       },
@@ -180,7 +180,7 @@
       "id": "KD-08",
       "nama": "Saturasi rendah tanpa tindakan penanganan",
       "keparahan": "sedang",
-      "diverifikasi": false,
+      "diverifikasi": true,
       "jika": {
         "kata_di_halaman": {
           "salah_satu": [
@@ -210,7 +210,7 @@
       "id": "KD-09",
       "nama": "Diagnosis paru berat tanpa penunjang apa pun",
       "keparahan": "tinggi",
-      "diverifikasi": false,
+      "diverifikasi": true,
       "jika": {
         "diagnosis_awalan": "J18"
       },
@@ -235,7 +235,7 @@
       "id": "KD-10",
       "nama": "Temuan paru resume bertentangan dengan triase",
       "keparahan": "sedang",
-      "diverifikasi": false,
+      "diverifikasi": true,
       "jika": {
         "kata_di_halaman": {
           "jenis": "resume_medis",
@@ -265,7 +265,7 @@
       "id": "KD-11",
       "nama": "Kelas rawat tidak sesuai kelas hak peserta",
       "keparahan": "sedang",
-      "diverifikasi": false,
+      "diverifikasi": true,
       "jika": {
         "field_terisi": [
           "kelas_rawat"

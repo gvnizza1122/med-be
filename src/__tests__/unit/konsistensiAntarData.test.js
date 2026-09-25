@@ -131,12 +131,14 @@ describe('kehati-hatian', () => {
     expect(evaluasiKonsistensi(null, [], [])).toEqual([]);
   });
 
-  // Aturan berasal dari dugaan atas pola pending, bukan dari kesepakatan
-  // tertulis. Selama belum ditelaah koder, ia tampil sebagai catatan.
-  test('seluruh aturan masih berstatus belum diverifikasi', () => {
+  // Seluruh aturan AKTIF. Sebelumnya masuk sebagai catatan yang menunggu
+  // telaah koder, tapi itu berarti koder memeriksa ulang apa yang sudah
+  // diperiksa sistem — kerja dua kali. Aturan yang ternyata keliru diperbaiki
+  // atau dimatikan di berkas aturannya, bukan dengan menahan seluruhnya.
+  test('seluruh aturan aktif', () => {
     const t = evaluasiKonsistensi({ prosedur_list: '90.59;87.44' }, [hal(1, 'SEP')], []);
     expect(t.length).toBeGreaterThan(0);
-    for (const x of t) expect(x.diverifikasi).toBe(false);
+    for (const x of t) expect(x.diverifikasi).toBe(true);
   });
 
   test('setiap temuan membawa dasar aturannya', () => {

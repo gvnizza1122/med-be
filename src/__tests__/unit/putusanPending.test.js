@@ -55,13 +55,15 @@ describe('urutan alasan', () => {
 });
 
 describe('kehati-hatian', () => {
-  // Aturan yang masih dugaan tetap ditampilkan, tapi tidak boleh membuat
-  // sebuah klaim dinyatakan berisiko atas dasar yang belum disepakati.
-  test('aturan belum disahkan tidak menentukan status', () => {
+  // Semua alasan menentukan status, termasuk dari aturan yang belum ditelaah
+  // koder. Menahan temuan di belakang gerbang persetujuan berarti koder tetap
+  // harus membaca dan menilainya sendiri — memeriksa ulang apa yang sudah
+  // diperiksa sistem, yaitu kerja dua kali. Aturan yang keliru diperbaiki di
+  // berkas aturannya, bukan dengan menahan seluruh temuan.
+  test('aturan yang belum disahkan tetap menentukan status', () => {
     const p = susunPutusan({ konsistensi_data: [kons({ keparahan: 'tinggi', diverifikasi: false })] }, []);
-    expect(p.status).toBe(STATUS.BERSIH);
+    expect(p.status).toBe(STATUS.BERISIKO);
     expect(p.alasan).toHaveLength(1);
-    expect(p.jumlah.belum_disahkan).toBe(1);
   });
 
   // Daftar obat di berkas RS ini nyaris tidak terbaca OCR. Menyebut itu sebagai

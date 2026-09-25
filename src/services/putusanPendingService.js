@@ -156,11 +156,15 @@ function susunPutusan(aiReviewMasuk = {}, validationErrorsMasuk = []) {
     return bobot(a.keparahan) - bobot(b.keparahan);
   });
 
-  // Hanya alasan yang sudah disahkan koder yang menentukan status. Aturan yang
-  // masih dugaan tetap ditampilkan, tapi tidak boleh membuat sebuah klaim
-  // dinyatakan berisiko atas dasar yang belum disepakati.
-  const sah = alasan.filter(a => a.diverifikasi);
-  const berat = sah.filter(a => bobot(a.keparahan) === 0);
+  // SELURUH alasan menentukan status, termasuk yang aturannya belum ditelaah
+  // koder. Sebelumnya yang belum disahkan hanya ditampilkan tanpa memengaruhi
+  // putusan — tapi itu berarti koder tetap harus membaca dan menilainya
+  // sendiri, yaitu memeriksa ulang apa yang sudah diperiksa sistem. Kerja dua
+  // kali, dan gunanya hilang.
+  //
+  // Aturan yang ternyata keliru diperbaiki atau dimatikan di berkas aturannya,
+  // bukan dengan menahan seluruh temuan di belakang gerbang persetujuan.
+  const berat = alasan.filter(a => bobot(a.keparahan) === 0);
 
   let status = STATUS.BERSIH;
   let ringkasan = 'Tidak ditemukan alasan yang biasa membuat klaim dipending.';
@@ -169,12 +173,11 @@ function susunPutusan(aiReviewMasuk = {}, validationErrorsMasuk = []) {
     ringkasan = berat.length === 1
       ? 'Ada 1 hal yang berisiko membuat klaim ini dipending.'
       : `Ada ${berat.length} hal yang berisiko membuat klaim ini dipending.`;
-  } else if (sah.length > 0) {
+  } else if (alasan.length > 0) {
     status = STATUS.PERLU_DICEK;
-    ringkasan = `Ada ${sah.length} hal yang sebaiknya dicek sebelum submit.`;
+    ringkasan = `Ada ${alasan.length} hal yang sebaiknya dicek sebelum submit.`;
   }
 
-  const belumSah = alasan.length - sah.length;
 
   return {
     status,
@@ -186,8 +189,6 @@ function susunPutusan(aiReviewMasuk = {}, validationErrorsMasuk = []) {
     jumlah: {
       total: alasan.length,
       berat: berat.length,
-      sudah_disahkan: sah.length,
-      belum_disahkan: belumSah,
       dari_rekap_pending: alasan.filter(a => a.dari_rekap_pending).length,
     },
   };
