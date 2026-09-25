@@ -34,6 +34,7 @@ const { verifikasiIdentitas } = require('./identitasLintasHalamanService');
 const { evaluasiSyaratPenunjang } = require('./syaratPenunjangService');
 const { bacaTemuanTindakan, periksaSilangTindakan } = require('./temuanTindakanService');
 const { evaluasiKonsistensi } = require('./konsistensiAntarDataService');
+const { susunPutusan } = require('./putusanPendingService');
 const { aggregateKriteria, KRITERIA_LABELS } = require('./kegawatdaruratanAggregation');
 const { getDb } = require('../database/init');
 const { assessPneumoniaSeverityMismatch } = require('./pneumoniaSeverityAssessment');
@@ -2050,6 +2051,16 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
       } catch (konsErr) {
         console.warn(`[AI-REVIEW] evaluasiKonsistensi error: ${konsErr.message}`);
         result.konsistensi_data = [];
+      }
+
+      // Putusan pending — satu jawaban untuk pertanyaan yang sebenarnya
+      // ditanyakan koder: "pending atau tidak, dan kalau iya karena apa?"
+      // Dijalankan PALING AKHIR karena merangkum seluruh pemeriksaan di atas.
+      try {
+        result.putusan_pending = susunPutusan(result, record._validation_errors || []);
+      } catch (putusanErr) {
+        console.warn(`[AI-REVIEW] susunPutusan error: ${putusanErr.message}`);
+        result.putusan_pending = null;
       }
 
       // Modul Pneumonia (Fase 2, 12-13 Sep 2026) -- MURNI kode deterministik,
