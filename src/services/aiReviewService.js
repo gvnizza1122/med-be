@@ -32,7 +32,8 @@ const {
 } = require('./kegawatdaruratanReference');
 const { verifikasiIdentitas } = require('./identitasLintasHalamanService');
 const { evaluasiSyaratPenunjang } = require('./syaratPenunjangService');
-const { bacaTemuanTindakan, periksaSilangTindakan } = require('./temuanTindakanService');
+const { bacaTemuanTindakan, periksaSilangTindakan, kalimatTindakanTakDikenal } = require('./temuanTindakanService');
+const { kodekanTindakanBaru } = require('./kodeTindakanBaruService');
 const { evaluasiKonsistensi } = require('./konsistensiAntarDataService');
 const { susunPutusan } = require('./putusanPendingService');
 const { aggregateKriteria, KRITERIA_LABELS } = require('./kegawatdaruratanAggregation');
@@ -2084,6 +2085,33 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
       // Deterministik, tanpa token.
       try {
         const tindakan = bacaTemuanTindakan(evidencePool);
+        // Tindakan yang tidak dikenali kamus bawaan diberi kode lewat AI,
+        // lalu disaring terhadap kamus ICD-9-CM resmi. Pemetaannya disimpan,
+        // sehingga istilah yang sama pada klaim berikutnya dijawab tanpa AI.
+        try {
+          const takDikenal = kalimatTindakanTakDikenal(evidencePool);
+          if (takDikenal.length > 0) {
+            const baru = await kodekanTindakanBaru(takDikenal);
+            for (const b of baru) {
+              // Halaman asal dicari ulang supaya kutipannya tetap bisa
+              // ditelusuri ke dokumen, sama seperti tindakan dari kamus bawaan.
+              const hal = evidencePool.find(e => (e.ocr_text || '').includes(b.teks));
+              tindakan.push({
+                id: `ai_${b.kode}`,
+                nama: b.nama,
+                kode_usulan: b.kode,
+                bukti: [{
+                  page_number: hal ? hal.page_number : null,
+                  sumber: 'resume_medis',
+                  kutipan: b.teks,
+                }],
+              });
+            }
+          }
+        } catch (baruErr) {
+          console.warn(`[AI-REVIEW] kodekanTindakanBaru error: ${baruErr.message}`);
+        }
+
         result.temuan_tindakan = tindakan;
         result.silang_tindakan = periksaSilangTindakan(tindakan);
       } catch (tindakanErr) {

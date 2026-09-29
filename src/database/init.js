@@ -733,6 +733,31 @@ async function migrateSchema(db) {
       // kolom sudah ada
     }
 
+    // Kamus tindakan yang dipelajari dari berkas nyata.
+    //
+    // Kamus bawaan hanya memuat segelintir istilah. Tindakan baru diberi kode
+    // oleh AI sekali, lalu pemetaannya disimpan di sini — kemunculan
+    // berikutnya dijawab tanpa memanggil AI sama sekali.
+    //
+    // teks_asal disimpan karena pagar kamus ICD-9 hanya bisa menangkap kode
+    // yang TIDAK ADA, bukan kode yang nyata tetapi keliru. Kalau suatu saat
+    // sebuah pemetaan ternyata salah, baris ini satu-satunya cara
+    // memperbaikinya sekaligus untuk seluruh klaim yang terdampak.
+    //
+    // kode NULL berarti sudah pernah ditanyakan dan AI tidak yakin —
+    // disimpan supaya tidak ditanyakan berulang dan membayar token untuk
+    // kalimat yang memang bukan tindakan.
+    await dbHelper.query(`
+      CREATE TABLE IF NOT EXISTS kamus_tindakan_dipelajari (
+        kunci            TEXT PRIMARY KEY,
+        kode             TEXT,
+        nama             TEXT,
+        teks_asal        TEXT,
+        dipelajari_pada  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        dipakai_terakhir TIMESTAMP
+      );
+    `);
+
     // Add constraint: If jenis_field='Koding', kutipan must NOT be NULL
     // PostgreSQL CHECK constraint validation
     try {

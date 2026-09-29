@@ -244,6 +244,37 @@ function bacaTemuanTindakan(halaman) {
 }
 
 /**
+ * Kumpulkan kalimat di kolom Tindakan yang TIDAK dikenali kamus bawaan.
+ *
+ * Dipakai untuk meminta kode pada tindakan baru. Hanya diambil dari resume
+ * dan triase — resep tidak pernah dipakai, karena obat yang diresepkan belum
+ * tentu diberikan.
+ */
+function kalimatTindakanTakDikenal(halaman) {
+  const keluar = [];
+  for (const hal of halaman || []) {
+    const teks = hal && (hal.ocr_text || hal.text);
+    if (!teks) continue;
+    const jenis = classifyPageDocumentType(teks);
+    const baris = teks.split(/\r?\n/);
+    for (const pola of LABEL_PER_JENIS[jenis] || []) {
+      for (let i = 0; i < baris.length; i++) {
+        if (!pola.test(baris[i])) continue;
+        for (let j = i; j < baris.length; j++) {
+          const b = String(baris[j]).replace(pola, ' ').trim();
+          if (j > i && BATAS_BAGIAN.test(String(baris[j]).trim())) break;
+          // Baris terlalu pendek hampir selalu sisa tata letak, bukan tindakan.
+          if (b.length < 4) continue;
+          if (cocokkanKamus(b).length > 0) continue; // sudah dikenali kamus bawaan
+          keluar.push(b.slice(0, 120));
+        }
+      }
+    }
+  }
+  return [...new Set(keluar)];
+}
+
+/**
  * Pengecekan silang: resep atau triase menyebut sebuah tindakan, tapi kolom
  * tindakan di resume tidak memuatnya.
  *
@@ -275,6 +306,7 @@ function periksaSilangTindakan(temuan) {
 }
 
 module.exports = {
+  kalimatTindakanTakDikenal,
   bacaTemuanTindakan,
   periksaSilangTindakan,
   KAMUS_TINDAKAN,
