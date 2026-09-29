@@ -66,6 +66,28 @@ const KAMUS_TINDAKAN = [
     kode_usulan: '90.59',
     pola: /\b(darah\s*(lengkap|rutin)|hematologi|dl\b)/i,
   },
+  // Injeksi obat. ICD-9-CM membedakan antibiotik (99.21) dari zat terapeutik
+  // lain (99.29), jadi keduanya dipisah — bukan disatukan demi kemudahan.
+  //
+  // hanya_dari_tindakan: obat yang TERTULIS DI RESEP belum tentu disuntikkan.
+  // Resep adalah rencana; kolom Tindakan adalah catatan bahwa itu benar
+  // dilakukan. Mengambil dari resep berarti mengklaim tindakan atas dasar
+  // niat, bukan atas dasar yang tercatat dikerjakan.
+  {
+    id: 'injeksi_antibiotik',
+    nama: 'Injeksi antibiotik',
+    kode_usulan: '99.21',
+    hanya_dari_tindakan: true,
+    pola: /\binj(eksi)?\b[^\n]{0,30}\b(ceftriaxon|cefotaxim|ceftazidim|cefazolin|ampicillin|amoxicillin|gentamicin|metronidazol|levofloxacin|ciprofloxacin|meropenem|azithromycin)/i,
+  },
+  {
+    id: 'injeksi_obat',
+    nama: 'Injeksi obat',
+    kode_usulan: '99.29',
+    hanya_dari_tindakan: true,
+    pola: /\binj(eksi)?\b\s*[a-z]/i,
+    catatan_kode: 'ICD-9-CM 99.29 untuk zat terapeutik selain antibiotik. Injeksi antibiotik dikode terpisah sebagai 99.21.',
+  },
 ];
 
 /**
@@ -86,7 +108,10 @@ const LABEL_PER_JENIS = {
  * "Tindakan Keperawatan" dibaca. Tanpa batas, pemindaian akan menelan isi tabel
  * berikutnya dan menautkan tindakan ke bagian yang salah.
  */
-const BATAS_BAGIAN = /^(evaluasi|discharge|planning|edukasi|tanda\s*tangan|catatan\s*perkembangan|pemeriksaan\s*penunjang|diagnosa\s*keperawatan|magelang,)/i;
+// Awal bagian berikutnya — dipakai membatasi sampai mana daftar tindakan
+// dibaca, baik pada triase maupun resume. Tanpa batas, pemindaian menelan
+// isi bagian berikutnya dan menautkan tindakan ke tempat yang salah.
+const BATAS_BAGIAN = /^(evaluasi|discharge|planning|edukasi|tanda\s*tangan|catatan\s*perkembangan|pemeriksaan\s*penunjang|diagnosa\s*keperawatan|rencana|anjuran|kelanjutan|diagnosa|penyebab|magelang,)/i;
 
 /** Baris yang isinya hanya label tanpa nilai — jebakan "Tindakan" kosong. */
 function hanyaLabel(baris, pola) {
@@ -112,7 +137,16 @@ function ambilNilaiLabel(baris, indeks, pola) {
 }
 
 function cocokkanKamus(teks) {
-  return KAMUS_TINDAKAN.filter(t => t.pola.test(teks));
+  const cocok = KAMUS_TINDAKAN.filter(t => t.pola.test(teks));
+
+  // Injeksi antibiotik juga cocok dengan pola injeksi umum, dan kalau keduanya
+  // dibiarkan lolos satu suntikan menghasilkan DUA kode (99.21 dan 99.29).
+  // Itu koding ganda, dan justru jenis kesalahan yang dicari verifikator.
+  // Yang lebih khusus menang.
+  if (cocok.some(t => t.id === 'injeksi_antibiotik')) {
+    return cocok.filter(t => t.id !== 'injeksi_obat');
+  }
+  return cocok;
 }
 
 /**
@@ -152,33 +186,36 @@ function bacaTemuanTindakan(halaman) {
       for (let i = 0; i < baris.length; i++) {
         if (!pola.test(baris[i])) continue;
 
-        // Di resume, tindakan ditulis pada baris labelnya. Di triase, header
-        // "Tindakan Keperawatan" adalah judul KOLOM tabel dan isinya berupa
-        // daftar baris di bawahnya — jadi bloknya yang dipindai, bukan satu
-        // baris. Batasnya bagian berikutnya, supaya tidak menelan isi tabel lain.
-        if (jenis === 'triase_igd') {
-          for (let j = i + 1; j < baris.length; j++) {
-            const b = String(baris[j]).trim();
-            if (BATAS_BAGIAN.test(b)) break;
-            for (const t of cocokkanKamus(b)) {
-              catat(t, {
-                page_number: hal.page_number || null,
-                sumber: jenis,
-                kutipan: b.slice(0, 160),
-              });
-            }
+        // Tindakan bisa berada di DUA tempat, dan keduanya harus dibaca:
+        //
+        //   pada baris labelnya     "Tindakan Nebulisasi Ventasal"
+        //   sebagai daftar di bawah "Tindakan" / "inj omeprazole 1A" / dst
+        //
+        // Membaca satu saja membuat separuh berkas terlewat: berkas MUNAWIR
+        // memakai bentuk pertama, SUMIDAH bentuk kedua dengan tiga injeksi
+        // berurutan. Pemindaian berhenti di bagian berikutnya supaya tidak
+        // menelan isi bagian lain.
+        const { teks: nilai, baris: kutipan } = ambilNilaiLabel(baris, i, pola);
+        if (nilai) {
+          for (const t of cocokkanKamus(nilai)) {
+            catat(t, {
+              page_number: hal.page_number || null,
+              sumber: jenis,
+              kutipan: kutipan.trim().slice(0, 160),
+            });
           }
-          continue;
         }
 
-        const { teks: nilai, baris: kutipan } = ambilNilaiLabel(baris, i, pola);
-        if (!nilai) continue; // label kosong — dilewati, bukan dianggap temuan
-        for (const t of cocokkanKamus(nilai)) {
-          catat(t, {
-            page_number: hal.page_number || null,
-            sumber: jenis,
-            kutipan: kutipan.trim().slice(0, 160),
-          });
+        for (let j = i + 1; j < baris.length; j++) {
+          const b = String(baris[j]).trim();
+          if (BATAS_BAGIAN.test(b)) break;
+          for (const t of cocokkanKamus(b)) {
+            catat(t, {
+              page_number: hal.page_number || null,
+              sumber: jenis,
+              kutipan: b.slice(0, 160),
+            });
+          }
         }
       }
     }
@@ -190,6 +227,9 @@ function bacaTemuanTindakan(halaman) {
       for (const b of baris) {
         if (!/R\s*\/|\bnebul/i.test(b)) continue;
         for (const t of cocokkanKamus(b)) {
+          // Injeksi obat sengaja tidak diambil dari resep: obat yang
+          // diresepkan belum tentu disuntikkan.
+          if (t.hanya_dari_tindakan) continue;
           catat(t, {
             page_number: hal.page_number || null,
             sumber: 'resep',

@@ -110,3 +110,51 @@ describe('halaman resep dikenali', () => {
     expect(classifyPageDocumentType('RESUME MEDIS\nDiagnosa: J18')).toBe('resume_medis');
   });
 });
+
+describe('injeksi obat — kasus SUMIDAH', () => {
+  const RESUME_INJ = hal(2, 'RESUME MEDIS\nA Diagnosa kolik abdomen\nP\nTindakan\ninj omeprazole 1A\ninj ondansentron 1A\ninj ketorolac 1A\nRencana blpl');
+
+  // Kolom Tindakan memuat tiga injeksi berurutan. Membaca satu baris saja
+  // membuat dua di antaranya hilang.
+  test('injeksi di daftar bawah label terbaca', () => {
+    const t = bacaTemuanTindakan([RESUME_INJ]);
+    expect(t.map(x => x.kode_usulan)).toEqual(['99.29']);
+  });
+
+  // ICD-9-CM membedakan antibiotik dari zat terapeutik lain, jadi keduanya
+  // tidak boleh disatukan demi kemudahan.
+  test('antibiotik dikode 99.21, bukan 99.29', () => {
+    const t = bacaTemuanTindakan([hal(2, 'RESUME MEDIS\nTindakan\ninj ceftriaxone 1gr\nRencana')]);
+    expect(t.map(x => x.kode_usulan)).toEqual(['99.21']);
+  });
+
+  // Satu suntikan antibiotik cocok dengan pola antibiotik DAN pola injeksi
+  // umum. Kalau keduanya lolos, satu tindakan menghasilkan dua kode — koding
+  // ganda, dan justru jenis kesalahan yang dicari verifikator.
+  test('antibiotik tidak menghasilkan kode ganda', () => {
+    const t = bacaTemuanTindakan([hal(2, 'RESUME MEDIS\nTindakan\ninj ceftriaxone 1gr\nRencana')]);
+    expect(t.map(x => x.kode_usulan)).not.toContain('99.29');
+  });
+
+  test('antibiotik dan obat lain pada klaim yang sama menghasilkan keduanya', () => {
+    const t = bacaTemuanTindakan([hal(2, 'RESUME MEDIS\nTindakan\ninj ceftriaxone 1gr\ninj omeprazole 1A\nRencana')]);
+    expect(t.map(x => x.kode_usulan).sort()).toEqual(['99.21', '99.29']);
+  });
+
+  // Obat yang diresepkan belum tentu disuntikkan. Resep adalah rencana;
+  // kolom Tindakan adalah catatan bahwa itu benar dikerjakan.
+  test('injeksi di resep TIDAK diambil sebagai tindakan', () => {
+    expect(bacaTemuanTindakan([hal(3, 'R/ Omeprazole inj 1 amp\nR/ Paracetamol tab')])).toEqual([]);
+  });
+
+  // Nilai bisa berada di baris labelnya sendiri, bukan hanya di bawahnya.
+  test('bentuk sebaris tetap terbaca', () => {
+    const t = bacaTemuanTindakan([hal(2, 'RESUME MEDIS\nTindakan Nebulisasi Ventasal\nRencana Rawat jalan')]);
+    expect(t.map(x => x.kode_usulan)).toEqual(['93.94']);
+  });
+
+  test('pemindaian berhenti di bagian berikutnya', () => {
+    const t = bacaTemuanTindakan([hal(2, 'RESUME MEDIS\nTindakan\nRencana\ninj omeprazole 1A')]);
+    expect(t).toEqual([]);
+  });
+});
