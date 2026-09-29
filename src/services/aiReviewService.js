@@ -299,6 +299,56 @@ async function lookupCodesInTable(table, codes) {
 }
 
 /**
+ * Periksa kode yang SUDAH ADA di kolom klaim terhadap kamus resmi.
+ *
+ * Berbeda dari annotateKamusValid, yang memeriksa SARAN kode. Saran yang
+ * tidak lolos kamus memang sudah ditahan dan tidak pernah mengisi kolom —
+ * tetapi kode yang masuk lewat tahap EKSTRAKSI tidak pernah diperiksa sama
+ * sekali, padahal justru kolom itulah yang dikirim ke BPJS.
+ *
+ * Ditemukan pada klaim SUMIDAH (SEP 0170R0110826V003045): DIAGLIST berisi
+ * "r10.84", kode ICD-10-CM Amerika untuk nyeri perut menyeluruh. Kode itu
+ * TIDAK ADA di ICD-10 WHO yang dipakai BPJS — padanannya R10.4. Di layar ia
+ * tampil sebagai "Valid" karena tidak ada satu pun pemeriksaan yang
+ * membandingkannya dengan kamus.
+ *
+ * Kode yang tidak ditemukan TIDAK dihapus dari kolomnya: kamus bisa saja
+ * belum lengkap, dan menghapus isian koder diam-diam lebih berbahaya
+ * daripada menandainya. Yang dihasilkan temuan, bukan perubahan data.
+ *
+ * @returns {Promise<Array>} temuan untuk kode yang tidak ada di kamus
+ */
+async function periksaKodeKlaimTerhadapKamus(record) {
+  const pisah = (v) => String(v || '').split(/[;,]/).map(s => s.trim()).filter(Boolean);
+  const diagnosis = pisah(record.DIAGLIST || record.diagnosa_list);
+  const prosedur = pisah(record.PROCLIST || record.prosedur_list);
+  if (diagnosis.length === 0 && prosedur.length === 0) return [];
+
+  const [adaDiag, adaProc] = await Promise.all([
+    lookupCodesInTable('icd10_who_codes', diagnosis.map(normalizeIcdCode)),
+    lookupCodesInTable('icd9_cm_procedures', prosedur.map(normalizeIcdCode)),
+  ]);
+
+  const temuan = [];
+  const kumpulkan = (daftar, ditemukan, jenis, kamus) => {
+    // null berarti query gagal — tidak bisa dicek, dan itu BUKAN berarti salah.
+    if (!ditemukan) return;
+    for (const kode of daftar) {
+      if (ditemukan.has(normalizeIcdCode(kode))) continue;
+      temuan.push({
+        kode,
+        jenis,
+        keparahan: 'tinggi',
+        pesan: `Kode ${jenis} "${kode}" tidak ada di ${kamus}. Kode yang tidak dikenal BPJS hampir pasti membuat klaim dipending. Periksa apakah ini kode versi Amerika (ICD-10-CM) yang padanannya berbeda.`,
+      });
+    }
+  };
+  kumpulkan(diagnosis, adaDiag, 'diagnosis', 'kamus ICD-10 WHO');
+  kumpulkan(prosedur, adaProc, 'prosedur', 'kamus ICD-9-CM');
+  return temuan;
+}
+
+/**
  * LAPISAN VALIDASI TAMBAHAN (17 Sep 2026, diperluas 18 Sep 2026) -- cek apakah
  * kode yang diusulkan AI di suggested_codes benar-benar ADA di kamus resmi:
  * type "diagnosis" dicek ke tabel icd10_who_codes (kamus ICD-10 WHO, diisi
@@ -2053,6 +2103,16 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
         result.konsistensi_data = [];
       }
 
+      // Kode yang sudah ada di kolom klaim diperiksa terhadap kamus resmi.
+      // Jalur ekstraksi sebelumnya tidak pernah diperiksa sama sekali, dan
+      // kolom itulah yang dikirim ke BPJS.
+      try {
+        result.kode_luar_kamus = await periksaKodeKlaimTerhadapKamus(record);
+      } catch (kamusErr) {
+        console.warn(`[AI-REVIEW] periksaKodeKlaimTerhadapKamus error: ${kamusErr.message}`);
+        result.kode_luar_kamus = [];
+      }
+
       // Putusan pending — satu jawaban untuk pertanyaan yang sebenarnya
       // ditanyakan koder: "pending atau tidak, dan kalau iya karena apa?"
       // Dijalankan PALING AKHIR karena merangkum seluruh pemeriksaan di atas.
@@ -2305,6 +2365,9 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
 
 module.exports = {
   generateAiReview,
+  // Diekspor supaya pemeriksaan kamus bisa diuji tanpa menjalankan
+  // seluruh alur review.
+  periksaKodeKlaimTerhadapKamus,
   validateQuotation,
   normalizeText,
   hasFinancialTerms,

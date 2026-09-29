@@ -78,6 +78,22 @@ function susunPutusan(aiReviewMasuk = {}, validationErrorsMasuk = []) {
     });
   }
 
+  // Kode di luar kamus resmi. Ditaruh lebih dulu karena ini bukan dugaan
+  // melainkan fakta yang bisa diperiksa: kodenya ada atau tidak ada di kamus.
+  for (const k of aiReview.kode_luar_kamus || []) {
+    tambah(alasan, {
+      sumber_pemeriksaan: 'Kamus kode resmi',
+      kode: k.kode,
+      ringkas: `Kode ${k.jenis} "${k.kode}" tidak ada di kamus resmi`,
+      penjelasan: k.pesan,
+      keparahan: 'tinggi',
+      bukti: null,
+      tindakan: 'Ganti dengan kode yang ada di kamus, atau hapus kalau keliru',
+      diverifikasi: true,
+      dari_rekap_pending: false,
+    });
+  }
+
   // 2. Konsistensi antar data — data yang diklaim tanpa pendukungnya.
   for (const k of aiReview.konsistensi_data || []) {
     tambah(alasan, {
