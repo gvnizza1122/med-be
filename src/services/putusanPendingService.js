@@ -200,7 +200,7 @@ function susunPutusan(aiReviewMasuk = {}, validationErrorsMasuk = []) {
     ringkasan,
     // Dinyatakan terbuka supaya putusan ini tidak dibaca sebagai keputusan BPJS.
     catatan_keandalan:
-      'Ini dugaan berdasarkan pola, bukan keputusan BPJS. Ketepatannya belum pernah terukur karena belum ada klaim di sistem ini yang hasil akhirnya dari BPJS sudah diketahui.',
+      'Catatan: ini perkiraan aplikasi, bukan keputusan BPJS. Ketepatannya belum pernah terukur karena belum ada klaim di sistem ini yang hasil BPJS-nya sudah diketahui.',
     alasan,
     jumlah: {
       total: alasan.length,
