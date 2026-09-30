@@ -815,6 +815,23 @@ async function migrateSchema(db) {
       console.error('[init] Seed kamus penunjang gagal:', e.message);
     }
 
+    // Fondasi dua model + rule berversi + aturan koding per RS. Masing-masing
+    // dibungkus sendiri: kegagalan satu tabel tidak boleh menghentikan backend
+    // dan layanan terkait sudah tahan terhadap tabel yang belum ada.
+    for (const nama of [
+      'routerModelService',
+      'catatanPanggilanModelService',
+      'ruleVersiService',
+      'kotakRegulasiService',
+      'aturanKodingRsService',
+    ]) {
+      try {
+        await require(`../services/${nama}`).ensureSchema(dbHelper);
+      } catch (e) {
+        console.error(`[init] Skema ${nama} gagal:`, e.message);
+      }
+    }
+
     // Add constraint: If jenis_field='Koding', kutipan must NOT be NULL
     // PostgreSQL CHECK constraint validation
     try {
