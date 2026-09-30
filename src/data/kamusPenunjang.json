@@ -1,0 +1,130 @@
+{
+  "_catatan": "Kamus penunjang & prosedur: tulisan apa adanya -> istilah baku. Kode ICD-9-CM di sini hanyalah USULAN (kode_terverifikasi=false) sampai disahkan koder RS. Singkatan bertabrakan ada di bagian 'ambigu' dan tidak boleh diputuskan aplikasi bila konteksnya tidak jelas.",
+  "istilah": [
+    { "id": "darah_lengkap", "baku": "Darah lengkap", "kategori": "hematologi", "kode": "90.59", "varian": ["DL", "DR", "darah rutin", "DPL", "darah perifer lengkap", "hematologi lengkap", "HL", "CBC", "complete blood count", "cek darah", "lab darah", "laboratorium darah", "periksa darah"] },
+    { "id": "hemoglobin", "baku": "Hemoglobin", "kategori": "hematologi", "satuan": "g/dL", "bagian_dari": "darah_lengkap", "varian": ["Hb", "Hgb", "haemoglobin", "hemoglobine"] },
+    { "id": "hematokrit", "baku": "Hematokrit", "kategori": "hematologi", "satuan": "%", "bagian_dari": "darah_lengkap", "syarat": true, "varian": ["Hct", "PCV", "hematocrit", "hematokrit"] },
+    { "id": "trombosit", "baku": "Trombosit", "kategori": "hematologi", "satuan": "/uL", "bagian_dari": "darah_lengkap", "varian": ["Trombo", "PLT", "platelet", "AT", "angka trombosit", "thrombocyte"] },
+    { "id": "leukosit", "baku": "Leukosit", "kategori": "hematologi", "satuan": "/uL", "bagian_dari": "darah_lengkap", "varian": ["Leuko", "WBC", "angka leukosit", "lekosit"] },
+    { "id": "eritrosit", "baku": "Eritrosit", "kategori": "hematologi", "satuan": "juta/uL", "bagian_dari": "darah_lengkap", "varian": ["RBC", "AE", "angka eritrosit", "eritrocyt", "eritrosit"] },
+    { "id": "hitung_jenis", "baku": "Hitung jenis leukosit", "kategori": "hematologi", "bagian_dari": "darah_lengkap", "varian": ["diff count", "hitung jenis", "hitjen", "differential count", "diffcount"] },
+    { "id": "led", "baku": "Laju endap darah", "kategori": "hematologi", "kode": "90.59", "satuan": "mm/jam", "belanda": true, "varian": ["LED", "ESR", "BBS", "laju endap darah"] },
+    { "id": "golongan_darah", "baku": "Golongan darah", "kategori": "hematologi", "kode": "90.59", "varian": ["gol darah", "golda", "blood type", "ABO/Rh"] },
+    { "id": "masa_perdarahan", "baku": "Masa perdarahan / pembekuan", "kategori": "hematologi", "varian": ["BT/CT", "bleeding time", "clotting time", "masa perdarahan", "masa pembekuan"] },
+    { "id": "faal_hemostasis", "baku": "Faal hemostasis", "kategori": "hematologi", "varian": ["PT/APTT", "APTT", "INR", "protrombin time", "faal koagulasi", "D-dimer", "fibrinogen"] },
+
+    { "id": "gds", "baku": "Gula darah sewaktu", "kategori": "kimia_klinik", "kode": "90.59", "satuan": "mg/dL", "belanda": true, "varian": ["GDS", "GDA", "gula darah acak", "glukosa sewaktu", "BSS", "random blood sugar"] },
+    { "id": "gdp", "baku": "Gula darah puasa", "kategori": "kimia_klinik", "kode": "90.59", "satuan": "mg/dL", "belanda": true, "varian": ["GDP", "BSN", "fasting blood sugar", "FBS"] },
+    { "id": "gd2pp", "baku": "Gula darah 2 jam PP", "kategori": "kimia_klinik", "kode": "90.59", "satuan": "mg/dL", "varian": ["GD2PP", "GD 2 jam PP", "2 jam post prandial", "G2PP", "post prandial"] },
+    { "id": "hba1c", "baku": "HbA1c", "kategori": "kimia_klinik", "satuan": "%", "varian": ["HbA1c", "A1c", "hemoglobin glikat"] },
+    { "id": "fungsi_ginjal", "baku": "Fungsi ginjal", "kategori": "kimia_klinik", "kode": "90.59", "satuan": "mg/dL", "varian": ["ureum", "kreatinin", "creatinin", "UR/CR", "BUN", "faal ginjal", "RFT", "serum creatinine"] },
+    { "id": "asam_urat", "baku": "Asam urat", "kategori": "kimia_klinik", "kode": "90.59", "satuan": "mg/dL", "varian": ["AU", "uric acid", "asam urat"] },
+    { "id": "fungsi_hati", "baku": "Fungsi hati", "kategori": "kimia_klinik", "kode": "90.59", "satuan": "U/L", "varian": ["SGOT/SGPT", "AST/ALT", "OT/PT", "faal hati", "LFT", "transaminase"] },
+    { "id": "bilirubin", "baku": "Bilirubin", "kategori": "kimia_klinik", "kode": "90.59", "satuan": "mg/dL", "varian": ["bil total", "bil direk", "bil indirek", "BIL T/D/I", "bilirubin total/direct"] },
+    { "id": "albumin", "baku": "Albumin / protein", "kategori": "kimia_klinik", "kode": "90.59", "satuan": "g/dL", "varian": ["alb", "albumin", "protein total", "TP", "globulin", "A/G ratio"] },
+    { "id": "profil_lipid", "baku": "Profil lipid", "kategori": "kimia_klinik", "kode": "90.59", "satuan": "mg/dL", "varian": ["kolesterol total", "HDL", "LDL", "TG", "trigliserida", "profil lemak", "lipid profile"] },
+    { "id": "elektrolit", "baku": "Elektrolit", "kategori": "kimia_klinik", "kode": "90.59", "satuan": "mmol/L", "varian": ["Na/K/Cl", "elektrolit", "natrium", "kalium", "klorida", "Ca", "Mg", "serum elektrolit"] },
+    { "id": "enzim_jantung", "baku": "Enzim jantung", "kategori": "kimia_klinik", "varian": ["troponin", "Trop I", "CKMB", "CK-MB", "hs-troponin", "enzim jantung", "cardiac marker"] },
+    { "id": "agd", "baku": "Analisa gas darah", "kategori": "kimia_klinik", "kode": "89.65", "belanda": true, "varian": ["AGD", "BGA", "analisa gas darah", "Astrup", "blood gas", "pH/pCO2/pO2"] },
+
+    { "id": "widal", "baku": "Widal", "kategori": "serologi", "syarat": true, "varian": ["widal", "tes widal", "S. typhi O", "S. typhi H", "paratyphi AO/BO", "ST-O", "ST-H", "titer widal"] },
+    { "id": "serologi_dengue", "baku": "Serologi dengue", "kategori": "serologi", "syarat": true, "varian": ["IgG/IgM dengue", "anti dengue", "dengue blot", "NS1", "NS-1 antigen", "rapid dengue", "IgG anti-dengue"] },
+    { "id": "penanda_radang", "baku": "Penanda radang", "kategori": "serologi", "varian": ["CRP", "C-reactive protein", "PCT", "procalcitonin", "prokalsitonin"] },
+    { "id": "hepatitis", "baku": "Hepatitis", "kategori": "serologi", "varian": ["HBsAg", "anti-HCV", "anti HBs", "HBV", "serologi hepatitis"] },
+    { "id": "hiv", "baku": "HIV", "kategori": "serologi", "varian": ["anti-HIV", "rapid HIV", "VCT", "R1/R2/R3", "tes HIV"] },
+    { "id": "fungsi_tiroid", "baku": "Fungsi tiroid", "kategori": "serologi", "varian": ["TSH", "FT4", "FT3", "T3/T4", "TSHs", "faal tiroid"] },
+    { "id": "penanda_reumatik", "baku": "Penanda reumatik", "kategori": "serologi", "varian": ["ASTO", "RF", "rheumatoid factor", "faktor reumatoid", "ANA"] },
+    { "id": "tes_kehamilan", "baku": "Tes kehamilan", "kategori": "serologi", "varian": ["PP test", "HCG", "beta HCG", "plano test", "tes kehamilan", "TPHT"] },
+
+    { "id": "urin_lengkap", "baku": "Urin lengkap", "kategori": "urin_feses", "varian": ["UL", "urin lengkap", "urine lengkap", "urinalisa", "urinalisis", "urin rutin", "sedimen urin"] },
+    { "id": "feses_lengkap", "baku": "Feses lengkap", "kategori": "urin_feses", "varian": ["FL", "feses lengkap", "faeces", "tinja rutin", "FOBT", "darah samar"] },
+    { "id": "kultur_resistensi", "baku": "Kultur & resistensi", "kategori": "mikrobiologi", "varian": ["kultur", "KR", "kultur resistensi", "biakan", "C/S", "culture sensitivity", "kultur darah", "kultur urin", "kultur sputum", "kultur pus"] },
+    { "id": "bta_sputum", "baku": "BTA sputum", "kategori": "mikrobiologi", "varian": ["BTA", "basil tahan asam", "sputum BTA", "BTA SPS", "dahak SPS", "AFB", "S-P-S"] },
+    { "id": "tcm", "baku": "Tes cepat molekuler", "kategori": "mikrobiologi", "syarat": true, "varian": ["TCM", "tes cepat molekuler", "GeneXpert", "Xpert MTB/RIF", "NAAT"] },
+    { "id": "gram", "baku": "Pewarnaan Gram", "kategori": "mikrobiologi", "varian": ["gram", "pewarnaan gram", "gram stain", "pengecatan gram"] },
+
+    { "id": "rontgen_toraks", "baku": "Rontgen toraks", "kategori": "radiologi", "kode": "87.44", "varian": ["Ro thorax", "rontgen thorax", "rontgen", "foto thorax", "X-foto thorax", "thorax PA", "thorax AP", "CXR", "chest X-ray", "foto polos dada", "rontgen dada", "Ro Th", "ronsen thorax", "rontgent thorax"] },
+    { "id": "foto_polos_abdomen", "baku": "Foto polos abdomen", "kategori": "radiologi", "kode": "88.19", "belanda": true, "varian": ["BNO", "FPA", "foto polos abdomen", "abdomen 3 posisi", "LLD", "left lateral decubitus", "BOF", "plain abdomen"] },
+    { "id": "bno_ivp", "baku": "BNO-IVP", "kategori": "radiologi", "kode": "87.73", "varian": ["BNO-IVP", "IVP", "pielografi intravena", "intravenous pyelogram"] },
+    { "id": "rontgen_ekstremitas", "baku": "Rontgen ekstremitas", "kategori": "radiologi", "varian": ["Ro cruris", "Ro femur", "foto genu", "Ro antebrachii", "foto manus", "foto pedis", "Ro vertebra"] },
+    { "id": "ct_kepala", "baku": "CT Scan kepala", "kategori": "radiologi", "kode": "87.03", "syarat": true, "varian": ["CT Scan", "CT scan kepala", "MSCT kepala", "brain CT", "head CT", "CT kepala non kontras", "CT kepala NK", "sken tomografi"] },
+    { "id": "ct_toraks", "baku": "CT Scan toraks", "kategori": "radiologi", "kode": "87.41", "varian": ["CT thorax", "MSCT thorax", "CT scan thorax", "HRCT", "CT dada"] },
+    { "id": "ct_abdomen", "baku": "CT Scan abdomen", "kategori": "radiologi", "kode": "88.01", "varian": ["CT abdomen", "MSCT abdomen", "CT scan perut", "CT whole abdomen"] },
+    { "id": "usg_abdomen", "baku": "USG abdomen", "kategori": "radiologi", "kode": "88.76", "varian": ["USG", "USG abdomen", "ultrasonografi", "USG abd", "USG abdomen atas", "USG abdomen bawah", "USG whole abdomen", "ultrasound"] },
+    { "id": "usg_obstetri", "baku": "USG obstetri", "kategori": "radiologi", "kode": "88.78", "varian": ["USG obstetri", "USG kandungan", "USG kehamilan", "EFW", "biometri janin", "USG TAS", "USG TVS", "DJJ USG"] },
+    { "id": "usg_lainnya", "baku": "USG lainnya", "kategori": "radiologi", "varian": ["USG ginjal", "USG tiroid", "USG mammae", "USG doppler", "USG KGB", "USG testis"] },
+    { "id": "mri", "baku": "MRI", "kategori": "radiologi", "varian": ["MRI", "MRA", "magnetic resonance", "MRI kepala", "MRI vertebra"] },
+
+    { "id": "ekg", "baku": "Elektrokardiografi", "kategori": "kardiologi", "kode": "89.52", "varian": ["EKG", "ECG", "elektrokardiografi", "rekam jantung", "EKG 12 lead", "EKG 12L", "cardiogram"] },
+    { "id": "ekokardiografi", "baku": "Ekokardiografi", "kategori": "kardiologi", "kode": "88.72", "syarat": true, "varian": ["echo", "ekokardiografi", "echocardiography", "echo jantung", "TTE", "TEE", "USG jantung"] },
+    { "id": "treadmill", "baku": "Uji latih jantung", "kategori": "kardiologi", "varian": ["treadmill", "TMT", "treadmill test", "uji latih jantung beban", "stress test", "ULJB"] },
+    { "id": "spirometri", "baku": "Spirometri", "kategori": "kardiologi", "kode": "89.37", "syarat": true, "varian": ["spirometri", "spirometry", "uji faal paru", "faal paru", "tes fungsi paru", "PFT"] },
+    { "id": "endoskopi_atas", "baku": "Endoskopi saluran cerna atas", "kategori": "lain", "kode": "45.13", "syarat": true, "varian": ["endoskopi", "EGD", "gastroskopi", "OGD", "esofagogastroduodenoskopi", "teropong lambung"] },
+    { "id": "kolonoskopi", "baku": "Kolonoskopi", "kategori": "lain", "varian": ["kolonoskopi", "colonoscopy", "teropong usus", "sigmoidoskopi"] },
+    { "id": "eeg", "baku": "Elektroensefalografi", "kategori": "lain", "varian": ["EEG", "elektroensefalografi", "rekam otak", "brain mapping"] },
+    { "id": "audiometri", "baku": "Audiometri", "kategori": "lain", "varian": ["audiometri", "tes pendengaran", "OAE", "timpanometri", "BERA"] },
+    { "id": "skrining_serviks", "baku": "Skrining serviks", "kategori": "lain", "varian": ["papsmear", "pap smear", "IVA", "IVA test", "inspeksi visual asetat"] },
+
+    { "id": "nebulisasi", "baku": "Nebulisasi", "kategori": "tindakan", "kode": "93.94", "varian": ["nebu", "nebulizer", "nebulisasi", "inhalasi", "uap", "nebul", "terapi inhalasi", "NB"] },
+    { "id": "terapi_oksigen", "baku": "Terapi oksigen", "kategori": "tindakan", "kode": "93.96", "varian": ["O2", "oksigen", "nasal kanul", "NK", "NRM", "non rebreathing mask", "simple mask", "bantuan oksigen"] },
+    { "id": "pemasangan_infus", "baku": "Pemasangan infus", "kategori": "tindakan", "varian": ["infus", "pasang infus", "IV line", "IVFD", "iv fd", "venflon", "abocath", "akses vena", "loading cairan"] },
+    { "id": "kateter_urin", "baku": "Kateter urin menetap", "kategori": "tindakan", "kode": "57.94", "varian": ["dower catheter", "kateter", "pasang kateter", "folley catheter", "foley", "kateter urin", "CTT"] },
+    { "id": "pemasangan_ngt", "baku": "Pemasangan NGT", "kategori": "tindakan", "kode": "96.07", "belanda": true, "varian": ["NGT", "naso gastric tube", "pasang NGT", "sonde", "selang lambung", "maag slang", "maagslang"] },
+    { "id": "penjahitan_luka", "baku": "Penjahitan luka", "kategori": "tindakan", "kode": "86.59", "varian": ["hecting", "heating", "jahit luka", "hecting situasi", "suturing", "jahit", "hetting"] },
+    { "id": "perawatan_luka", "baku": "Perawatan luka", "kategori": "tindakan", "belanda": true, "varian": ["GV", "ganti verban", "ganti balut", "rawat luka", "wound care", "debridement", "nekrotomi"] },
+    { "id": "transfusi", "baku": "Transfusi darah", "kategori": "tindakan", "kode": "99.04", "varian": ["transfusi", "PRC", "packed red cell", "WB", "whole blood", "thrombocyte concentrate", "FFP", "tranfusi"] },
+    { "id": "injeksi", "baku": "Injeksi", "kategori": "tindakan", "varian": ["inj", "injeksi", "IM", "SC", "drip", "bolus", "suntik", "skin test"] },
+    { "id": "observasi", "baku": "Observasi", "kategori": "tindakan", "varian": ["obs", "observasi", "lembar observasi", "monitoring", "pantau TTV"] }
+  ],
+
+  "ambigu": {
+    "DC": [
+      { "istilah": "hitung_jenis", "bagian": ["lab"], "pola": "leuko|lekosit|hematologi|darah|neutrofil|limfosit|eosinofil|basofil|monosit" },
+      { "istilah": "kateter_urin", "bagian": ["tindakan"], "pola": "kateter|urin|foley|folley|produksi|bak" }
+    ],
+    "CT": [
+      { "istilah": "ct_kepala", "bagian": ["radiologi"], "pola": "scan|kepala|thorax|abdomen|kontras|msct" },
+      { "istilah": "masa_perdarahan", "bagian": ["lab"], "pola": "bt ct|bt/ct|clotting|bleeding|perdarahan|pembekuan" }
+    ],
+    "HT": [
+      { "istilah": "hematokrit", "bagian": ["lab"], "pola": "[0-9]+ ?%|hb|leuko|trombo|darah lengkap" },
+      { "istilah": "hipertensi", "bagian": ["diagnosis"], "pola": "diagnosis|dx|dd|hipertensi|riwayat" }
+    ],
+    "UR": [
+      { "istilah": "fungsi_ginjal", "bagian": [], "pola": "ur/cr|ur cr|ureum|kreatinin" },
+      { "istilah": "urin_lengkap", "bagian": [], "pola": "sedimen|urin rutin|urinalisa" }
+    ],
+    "UA": [
+      { "istilah": "asam_urat", "bagian": [], "pola": "mg/dl|asam urat|uric" },
+      { "istilah": "urin_lengkap", "bagian": [], "pola": "sedimen|urinalisa|urinalisis|urin" }
+    ],
+    "PT": [
+      { "istilah": "faal_hemostasis", "bagian": ["lab"], "pola": "pt/aptt|pt aptt|aptt|inr|protrombin" },
+      { "istilah": "fisioterapi", "bagian": ["tindakan"], "pola": "fisioterapi|rehabilitasi|terapi latihan" }
+    ],
+    "BT": [
+      { "istilah": "masa_perdarahan", "bagian": ["lab"], "pola": "bt/ct|bt ct|clotting|perdarahan" },
+      { "istilah": "suhu_tubuh", "bagian": ["ttv"], "pola": "[0-9]+ ?°?c|celcius|suhu|ttv" }
+    ],
+    "AL": [
+      { "istilah": "leukosit", "bagian": ["lab"], "pola": "[0-9]{4,6}|ribu|/ul|leuko|hb|trombo" },
+      { "istilah": "alergi", "bagian": ["riwayat"], "pola": "alergi|riwayat|obat|makanan" }
+    ],
+    "RM": [
+      { "istilah": "terapi_oksigen", "bagian": ["tindakan"], "pola": "lpm|oksigen|o2|masker|rebreathing" },
+      { "istilah": "rekam_medis", "bagian": ["identitas"], "pola": "no rm|no. rm|nomor|norm|[0-9]{5,}" }
+    ],
+    "TC": [
+      { "istilah": "transfusi", "bagian": ["transfusi"], "pola": "thrombocyte|trombosit|konsentrat|transfusi|kantong" },
+      { "istilah": "profil_lipid", "bagian": ["lab"], "pola": "kolesterol|hdl|ldl|tg|lipid|mg/dl" }
+    ]
+  },
+
+  "istilah_tambahan": [
+    { "id": "fisioterapi", "baku": "Fisioterapi", "kategori": "tindakan", "varian": [] },
+    { "id": "hipertensi", "baku": "Hipertensi (diagnosis)", "kategori": "lain", "varian": [] },
+    { "id": "suhu_tubuh", "baku": "Suhu tubuh (TTV)", "kategori": "lain", "varian": [] },
+    { "id": "alergi", "baku": "Alergi (riwayat)", "kategori": "lain", "varian": [] },
+    { "id": "rekam_medis", "baku": "Rekam medis (identitas)", "kategori": "lain", "varian": [] }
+  ]
+}

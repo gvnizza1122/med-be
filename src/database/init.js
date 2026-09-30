@@ -772,6 +772,49 @@ async function migrateSchema(db) {
       );
     `);
 
+    // Kamus penunjang & prosedur (lihat kamusPenunjangService.js). Kode ICD-9
+    // di sini usulan: kode_terverifikasi=FALSE berarti tidak pernah terisi
+    // otomatis ke klaim. Singkatan bertabrakan wajib menyertakan konteks
+    // pembeda — dijaga di tingkat basis data.
+    await dbHelper.query(`
+      CREATE TABLE IF NOT EXISTS kamus_penunjang (
+        id                 TEXT PRIMARY KEY,
+        istilah_baku       VARCHAR(80) NOT NULL,
+        kategori           VARCHAR(20) NOT NULL CHECK (kategori IN
+          ('hematologi','kimia_klinik','serologi','urin_feses','mikrobiologi','radiologi','kardiologi','lain','tindakan')),
+        kode_icd9          VARCHAR(10),
+        kode_terverifikasi BOOLEAN NOT NULL DEFAULT FALSE,
+        satuan             VARCHAR(16),
+        menjadi_syarat     BOOLEAN NOT NULL DEFAULT FALSE
+      );
+    `);
+    await dbHelper.query(`
+      CREATE TABLE IF NOT EXISTS kamus_variasi (
+        istilah_id      TEXT NOT NULL REFERENCES kamus_penunjang(id),
+        varian          VARCHAR(80) NOT NULL,
+        varian_rapi     VARCHAR(80) NOT NULL,
+        ambigu          BOOLEAN NOT NULL DEFAULT FALSE,
+        konteks_pembeda VARCHAR(120),
+        UNIQUE (varian_rapi, istilah_id),
+        CONSTRAINT ck_ambigu_wajib_konteks CHECK (NOT (ambigu AND konteks_pembeda IS NULL))
+      );
+    `);
+    await dbHelper.query(`
+      CREATE TABLE IF NOT EXISTS varian_belum_dikenali (
+        varian_rapi     VARCHAR(80) PRIMARY KEY,
+        jumlah_muncul   INT NOT NULL DEFAULT 1,
+        contoh_klaim_id TEXT,
+        terakhir_muncul TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        status          VARCHAR(12) NOT NULL DEFAULT 'baru'
+          CHECK (status IN ('baru','ditinjau','ditambahkan','diabaikan'))
+      );
+    `);
+    try {
+      await require('../services/kamusPenunjangService').seedKamusPenunjang(dbHelper);
+    } catch (e) {
+      console.error('[init] Seed kamus penunjang gagal:', e.message);
+    }
+
     // Add constraint: If jenis_field='Koding', kutipan must NOT be NULL
     // PostgreSQL CHECK constraint validation
     try {
