@@ -15,12 +15,30 @@ Aplikasi: pra-validasi klaim BPJS RS Lestari Raharja. Stack: Node/Express + Post
 - Frontend: wajib `npm run build` sebelum push (gate JSX pakai literal `false` pernah merusak build produksi; `key` React yang sama di dua call site pernah membekukan render).
 - Repo Windows/CRLF: edit berbasis baris, jaga EOL; hindari heredoc panjang dan regex dengan backslash lewat shell.
 - Jest sesi Codex 2026-09-30: baseline sebelum perubahan awal 56 suite lulus / 11 gagal; sesudah item A 1089 tes lulus / 48 gagal; sesudah perbaikan label `A Diagnosa` 1091 tes lulus / 48 gagal (56 suite lulus / 11 gagal). Tidak muncul tes gagal baru. Tes terarah pagar + bagian: 134/134 lulus. OCR flaky tidak gagal pada eksekusi penuh yang tercatat.
+- Lanjutan sesi Claude 2026-10-01 (backend `04d9626`, frontend `d527d8d`): baseline 56 suite lulus / 11 gagal, 1091 lulus. Sesudah 3 commit perbaikan (lihat bagian di bawah): 56 suite lulus / 11 gagal, **1098 tes lulus / 48 gagal**. Tidak ada kegagalan baru di kedua repo. Frontend: baseline `tests/` 5 suite lulus / 2 gagal (pre-existing, fixture lama); sesudah perbaikan tetap 5/2, `npm run build` lolos.
 
-## Status (main terakhir: `7f857b5`, sudah di-push; perbaikan pagar `A Diagnosa` sedang lokal)
-Backend main berisi: pengelompokan `/claim-files/kelompok`, kamus penunjang, pemetaan WHO, pagar pasca-AI, tindakan berbasis posisi, fondasi dua model, alur pending. Frontend `aa3667e`: Riwayat Upload dikelompokkan (BELUM dilihat di browser).
-Item A selesai pada commit lokal `f1b118b` (bentuk `kode_luar_kamus` dirapikan di `7f857b5`): `pastikanDiagnosisWhoService` memeriksa setiap kode DIAGLIST terhadap `icd10_who_codes` sebelum jalur keluar awal.
-Perbaikan insiden SUMIDAH: `bagianTemuanService` mengenali prefiks assessment SOAP `A ` pada label diagnosis dan diagnosis banding. Tes halaman sintetis membuktikan saran `R10.4` lolos pagar dan masuk DIAGLIST; tes anamnesis tetap menolak diagnosis yang hanya disebut sebagai riwayat. Belum di-commit atau di-deploy.
-**Belum tentu sudah di-deploy** — cek dulu.
+## Status (backend terakhir: `04d9626`, frontend terakhir: `d527d8d`, keduanya SUDAH di-push)
+Backend main berisi: pengelompokan `/claim-files/kelompok`, kamus penunjang, pemetaan WHO, pagar pasca-AI, tindakan berbasis posisi, fondasi dua model, alur pending, PLUS 3 commit baru di bawah. Frontend `d527d8d`: Riwayat Upload dikelompokkan + 2 perbaikan tampilan baru.
+Item A (diagnosis selalu WHO) selesai sejak `f1b118b`/`7f857b5`. Insiden SUMIDAH (`A Diagnosa` salah bagian) selesai sejak `3986089`, **sudah diverifikasi langsung di database produksi** (bukan cuma tes sintetis) setelah user deploy: DIAGLIST record baru = `R10.4`, `pagar_temuan.ditolak` kosong.
+**Belum tentu sudah di-deploy** sejak `3986089` — cek dulu sebelum asumsi apa pun aktif.
+
+### Baru (sesi Claude 2026-10-01, ditemukan dari 4 screenshot user + 1 pertanyaan arsitektur, SEMUA BELUM DI-DEPLOY)
+Ditemukan sambil memverifikasi SUMIDAH di database produksi setelah user deploy `3986089` — bukan dari tes, dari `ai_review` record asli.
+
+1. **`3bf10c2`** — dua bug di `isiKodeDariSaranTervalidasi` (`claimFiles.js`):
+   - Ringkasan "Hasil Validasi" (`claim_files.valid_count/error_count/pending_count`, dibaca panel atas & Riwayat Upload) dihitung SEBELUM DIAGLIST diisi otomatis dan tidak pernah dihitung ulang sesudahnya → kartu klaim tampil VALID tapi ringkasan atas tampil "100% PENDING". Sekarang `recomputeFileCounts` dipanggil ulang di akhir fungsi.
+   - `ai_review.field_notes` (kunci NAMA KOLOM: `diagnosa_list`/`prosedur_list`, BUKAN `DIAGLIST`/`PROCLIST` — lihat `field_name` di rule RV-05/RV-06) tidak pernah dibersihkan setelah kolom yang dikeluhkannya terisi → kotak AI "DIAGLIST kosong, isi dengan ICD-10" tetap tampil walau DIAGLIST sudah `R10.4`. Sekarang dibuang otomatis.
+2. **`fa732ed`** — teks `catatan_keandalan` di `putusanPendingService.js` disederhanakan (casemix bilang sulit dipahami). Dua frasa yang dikunci tes (`bukan keputusan BPJS`, `belum pernah terukur`) tetap sama persis.
+3. **`04d9626`** — **temuan arsitektur paling penting**: status pending/valid SEHARUSNYA ditentukan AI (`putusan_pending`), bukan rule engine, tapi kenyataannya:
+   - Hanya alur "Baca Ulang" (`reprocessExistingRecord`) yang pernah menaikkan `validation_status` ke `pending` dari temuan AI. Upload pertama (`processSinglePdfUpload`) dan DUA rute audit massal (baris ~423, ~1129) **tidak pernah** melakukan ini — klaim baru yang AI sendiri nilai berisiko tetap tampil VALID kalau format field-nya bersih.
+   - Bahkan di "Baca Ulang", status pending yang baru ditulis AI langsung DITIMPA BALIK ke valid oleh "hitung ulang validasi" di `isiKodeDariSaranTervalidasi`, karena langkah itu HANYA menjalankan rule engine (`validateRecord`) yang buta terhadap kegawatdaruratan/kode-luar-kamus/konsistensi-data.
+   - Diperbaiki di SATU titik (`isiKodeDariSaranTervalidasi`, dipanggil dari keempat alur): `aiReview.putusan_pending.status === 'berisiko_pending'` (superset dari cek lama yang cuma kegawatdaruratan — mencakup semua alasan berkeparahan tinggi/critical) menaikkan `validation_status` ke `pending`, dijalankan SELALU (sebelum cek "tidak ada kolom yang perlu diisi otomatis" — penting untuk kasus paling umum: mengunggah ulang klaim lama yang DIAGLIST/PROCLIST-nya sudah lengkap, tidak ada yang perlu diisi). Hitung-ulang rule engine di akhir sekarang mengambil status yang LEBIH PARAH, bukan menimpa.
+   - **Dampak langsung ke rencana backtest**: sebelum perbaikan ini, mengunggah ulang klaim lama yang dulu pending BPJS bisa salah tampil "lolos" hanya karena AI-nya tidak pernah sempat menaikkan status. Backtest sebelum `04d9626` di-deploy akan menghasilkan angka yang salah.
+4. **`d527d8d`** (frontend) — dua perbaikan tampilan:
+   - `generateCodingExplanation.ts`: kode yang statusnya sudah "Valid" (lolos verifikasi backend) tidak lagi menampilkan "Kode ini tidak ada di kamus offline — konfirmasi" (kamus lokal frontend cuma objek JS kecil, beda dari tabel resmi backend; kalimat lama menyiratkan keraguan yang salah). Diganti kalimat netral.
+   - `RingkasanTemuanCard.tsx`: font `catatan_keandalan` dinaikkan 10px→11px, opacity 70%→penuh (casemix bilang sulit dibaca).
+
+**Belum dikerjakan dari 4 screenshot user**: poin ke-3 — INA-CBG & Tarif tampil "Pending verifikasi" terus walau diagnosis+prosedur valid, karena grouping (`aiReviewService.js` ~baris 2290, `groupCodesToInaCBG`) dihitung dari `codes.diagnosis`/`codes.procedure` SEBELUM DIAGLIST/PROCLIST diisi otomatis, dan tidak pernah dihitung ulang. Perbaikan butuh ekstraksi ~150 baris logika grouping+tarif (PMK 3/2023, menyangkut angka rupiah) jadi fungsi yang bisa dipanggil ulang setelah auto-fill — sengaja ditunda, jangan terburu-buru menyentuh logika tarif finansial.
 
 ### Sudah aktif di alur live (setelah deploy)
 - Pemetaan kode diagnosis non-WHO → WHO (`kodeDiagnosisWhoService`, `annotateKamusValid`).
@@ -37,21 +55,23 @@ Perbaikan insiden SUMIDAH: `bagianTemuanService` mengenali prefiks assessment SO
 - `aturan_koding_rs`: tidak ada UI untuk mengisi.
 
 ## Pekerjaan berikutnya (urut saran)
-1. **Diagnosis selalu WHO — item A selesai.** Validasi per kode ada di `src/services/pastikanDiagnosisWhoService.js`; kode asing tak terpetakan tetap ditandai di `ai_review`.
-2. **Insiden SUMIDAH: klasifikasi `A Diagnosa` — perbaikan lokal selesai, belum deploy.** Sesudah deploy minta pemilik membaca ulang SEP `0170R0110826V003045`: DIAGLIST harus `R10.4`, dan `ai_review.pagar_temuan.ditolak` tidak memuat kutipan `A Diagnosa kolik abdomen` dengan alasan `hanya_riwayat_anamnesis_bukan_diagnosis`. Pastikan tes riwayat anamnesis tetap tertolak.
+1. **Deploy backend `04d9626` + frontend `d527d8d`, lalu verifikasi (lihat di bawah) — INI DULU.** Backtest apa pun sebelum ini ter-deploy akan menghasilkan angka salah (lihat temuan #3 di atas: sebelumnya klaim lama yang diunggah ulang bisa salah tampil "lolos").
+2. **INA-CBG & Tarif tidak muncul (poin 3 dari 4 screenshot, BELUM dikerjakan).** Root cause dan lokasi persis sudah ditulis di bagian "Baru" di atas. Kerjakan dengan hati-hati karena menyangkut tarif rupiah resmi PMK 3/2023 — jangan ubah logika lookup tarif itu sendiri, cuma pindahkan TITIK PEMANGGILANnya supaya jalan lagi setelah DIAGLIST/PROCLIST final.
 3. **Prosedur "jangan pernah kosong".** Tidak bisa dijamin harfiah (prosedur fiktif = risiko temuan fraud). Yang bisa: kosong tidak pernah diam-diam — tampilkan alasan eksplisit + kandidat (tindakan/penunjang terdeteksi tanpa kode pasti, mis. infus; penunjang lab/radiologi usulan) agar koder isi satu klik. Mengisi otomatis dari kode usulan belum disahkan = keputusan pemilik produk (belum diputuskan).
-4. Deploy backend + frontend, lalu verifikasi (lihat di bawah).
-5. Sambungkan `kamusPenunjangService` + `bacaLabService` ke pembacaan; aktifkan pembaca lab setelah dicoba pada PDF asli.
-6. Frontend alur pending (kontrak API di bawah).
-7. Aktifkan 4 rule Tipe 3 (KMB-01/06/09/11) setelah kode ICD diputuskan (GTCS G40.3 vs R56.8; trombositopenia D69.6 vs D69.5; pasangan angina; subkode O42).
-8. Hapus kata "dokter/casemix/koder" dari artifact laporan klien (https://claude.ai/code/artifact/c78dbda4-7d0d-440e-add5-1657a276e76e) — permintaan lama, belum dikerjakan.
-9. Ada ~3.218 berkas / 3,9 GB di uploads vs 45 klaim (PDF yatim). Selidiki read-only dulu; tanyakan kebijakan retensi PDF.
+4. Sambungkan `kamusPenunjangService` + `bacaLabService` ke pembacaan; aktifkan pembaca lab setelah dicoba pada PDF asli.
+5. Sambungkan router model (`gatewayModelService.panggilModel`) ke caller lama, mulai dari yang paling rendah risiko.
+6. Frontend alur pending (kontrak API di bawah) — backend sudah selesai, tapi rekap pending masih kosong jadi belum bisa dicoba dengan data asli.
+7. Set kunci jawaban 30 klaim dari koder untuk `scripts/evaluasiKunciJawaban.js` — tanpa ini tidak ada angka akurasi yang bisa dipercaya.
+8. Aktifkan 4 rule Tipe 3 (KMB-01/06/09/11) setelah kode ICD diputuskan (GTCS G40.3 vs R56.8; trombositopenia D69.6 vs D69.5; pasangan angina; subkode O42).
+9. Hapus kata "dokter/casemix/koder" dari artifact laporan klien (https://claude.ai/code/artifact/c78dbda4-7d0d-440e-add5-1657a276e76e) — permintaan lama, belum dikerjakan.
+10. Ada ~3.218 berkas / 3,9 GB di uploads vs 45 klaim (PDF yatim). Selidiki read-only dulu; tanyakan kebijakan retensi PDF.
 
 ## Verifikasi setelah deploy
-- SUMIDAH (SEP 0170R0110826V003045): Baca Ulang harus menghasilkan DIAGLIST `R10.4` (bukan `r10.84`), PROCLIST `99.29`, dan tidak boleh menolak kutipan `A Diagnosa kolik abdomen` sebagai anamnesis.
-- MUNAWIR (SEP 0170R0110926V001943): unggah ulang → Tindakan terbaca "Nebulisasi Ventasal", `temuan_tindakan` nebulisasi 93.94 dengan kutipan hal 2/3/5, prosedur tidak kosong. Bandingkan koordinat mupdf vs `pdftotext -bbox` (label "Tindakan" y≈489.6, isi y≈481.5).
+- SUMIDAH (SEP 0170R0110826V003045): sudah diverifikasi di produksi untuk WHO mapping + pagar bagian (`3986089`). Setelah `04d9626` di-deploy, baca ulang lagi dan cek: kalau `putusan_pending.status` klaim ini `berisiko_pending`, `validation_status` harus `pending`, bukan `valid` — sebelumnya (bug yang baru diperbaiki) bisa saja tampil valid.
+- MUNAWIR (SEP 0170R0110926V001943): **belum pernah diunggah ulang sungguhan** sejak `3986089` di-deploy. Ini verifikasi yang paling penting dan belum dilakukan — unggah ulang, cek Tindakan terbaca "Nebulisasi Ventasal", `temuan_tindakan` nebulisasi 93.94 dengan kutipan hal 2/3/5, prosedur tidak kosong. Bandingkan koordinat mupdf vs `pdftotext -bbox` (label "Tindakan" y≈489.6, isi y≈481.5).
 - Klaim dengan "Riwayat" di anamnesis: harus tetap muncul di `pagar_temuan.ditolak` dengan alasan `hanya_riwayat_anamnesis_bukan_diagnosis`. Diagnosis sah pada baris `A Diagnosa` harus lolos; bila gagal, periksa klasifikasi bagian dan jangan mematikan `PAGAR_PERAN_AKTIF`.
 - Riwayat Upload: header kelompok (bulan terbaru terbuka), angka header = jumlah baris saat dibuka (Agustus rajal 25/25, ranap 9/9 di produksi), pencarian memaksa daftar datar, mode arsip.
+- **Baru dari `3bf10c2`/`04d9626`, belum pernah dicoba live**: (a) ringkasan "Hasil Validasi" harus sinkron dengan status per-kartu setelah pengisian otomatis — coba unggah klaim yang DIAGLIST-nya kosong dan pastikan angka atas ikut berubah begitu terisi; (b) unggah ulang klaim lama yang SUDAH lengkap dikoding (bukan yang kosong) dan yang AI nilai berisiko (mis. ada kegawatan) — pastikan statusnya `pending`, bukan `valid`, walau tidak ada satu kolom pun yang perlu diisi otomatis.
 
 ## Uji coba akurasi (backtest) — rencana yang disepakati
 Tujuan: casemix mengunggah ulang klaim lama yang hasil BPJS-nya sudah diketahui, lalu membandingkan aplikasi dengan kenyataan.
