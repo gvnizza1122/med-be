@@ -824,6 +824,7 @@ async function migrateSchema(db) {
       'ruleVersiService',
       'kotakRegulasiService',
       'aturanKodingRsService',
+      'alurJawabPendingSchema',
     ]) {
       try {
         await require(`../services/${nama}`).ensureSchema(dbHelper);
