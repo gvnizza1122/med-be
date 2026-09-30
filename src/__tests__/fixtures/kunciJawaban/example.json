@@ -1,0 +1,44 @@
+{
+  "_catatan": "CONTOH format, bukan kunci jawaban asli. Data tiruan; kode ICD nyata (J45.9 asma, I10 hipertensi esensial, K29.1/K29.7 gastritis, 87.44 rontgen dada rutin). J45.909 sengaja dikarang untuk menguji deteksi tipe 4 (bukan kode ICD-10 WHO).",
+  "kunci": [
+    {
+      "klaim_id": "CONTOH-001",
+      "diagnosis_benar": ["J45.9", "I10"],
+      "prosedur_benar": ["87.44"],
+      "nilai_lab_benar": [
+        { "parameter": "Hemoglobin", "nilai": 10.2, "satuan": "g/dL", "tanggal": "2026-03-10" },
+        { "parameter": "Trombosit", "nilai": 150000, "satuan": "/uL", "tanggal": "2026-03-10" },
+        { "parameter": "Trombosit", "nilai": 90000, "satuan": "/uL", "tanggal": "2026-03-12" }
+      ]
+    },
+    {
+      "klaim_id": "CONTOH-002",
+      "diagnosis_benar": ["K29.7"],
+      "prosedur_benar": [],
+      "nilai_lab_benar": []
+    }
+  ],
+  "keluaran": [
+    {
+      "klaim_id": "CONTOH-001",
+      "diagnosis": [
+        { "kode": "J45.9", "teks": "asma bronkial", "halaman": 1, "kutipan": "Diagnosa Utama : Asma bronkial" },
+        { "kode": "J45.909", "teks": "asma akut", "halaman": 1, "kutipan": "Asma akut berat" }
+      ],
+      "prosedur": ["87.44"],
+      "nilai_lab": [
+        { "parameter": "Hb", "nilai": 10.2, "satuan": "g/dL", "tanggal": "2026-03-10" },
+        { "parameter": "Trombosit", "nilai": 150000, "satuan": "/uL", "tanggal": "2026-03-10" },
+        { "parameter": "Trombosit", "nilai": 150000, "satuan": "/uL", "tanggal": "2026-03-12" }
+      ],
+      "halaman": [
+        { "page_number": 1, "ocr_text": "RESUME MEDIS\nDiagnosa Utama : Asma bronkial (J45.9)\nProsedur: 87.44 Rontgen thorax\nRh -/-" }
+      ]
+    },
+    {
+      "klaim_id": "CONTOH-002",
+      "diagnosis": ["K29.1"],
+      "prosedur": []
+    }
+  ]
+}
