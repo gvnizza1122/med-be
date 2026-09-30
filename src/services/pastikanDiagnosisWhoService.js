@@ -33,7 +33,12 @@ async function pastikanDiagnosisWho(db, diaglist, teksDiagnosis = '') {
       hasil.push(String(pemetaan.kode).toUpperCase());
     } else {
       hasil.push(kode);
-      kodeLuarKamus.push({ kode, status: 'kode_luar_kamus' });
+      kodeLuarKamus.push({
+        kode,
+        jenis: 'diagnosis',
+        status: 'kode_luar_kamus',
+        pesan: `Kode diagnosis "${kode}" tidak ada di ICD-10 WHO dan belum punya padanan pasti. BPJS hanya mengenal ICD-10 WHO, bukan ICD-10-CM.`,
+      });
     }
   }
 

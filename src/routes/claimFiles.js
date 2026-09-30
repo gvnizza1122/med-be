@@ -1936,8 +1936,12 @@ async function isiKodeDariSaranTervalidasi(db, recordId, record, aiReview) {
       console.warn(`[AutoIsi] Gagal memperbarui raw_data record ${recordId}: ${errRaw.message}`);
     }
   }
-  if (hasilWho.kodeLuarKamus.length > 0) aiReview.kode_luar_kamus = hasilWho.kodeLuarKamus;
-  else delete aiReview.kode_luar_kamus;
+  // kode_luar_kamus juga diisi aiReviewService untuk PROSEDUR dan dibaca
+  // putusanPendingService (jenis, pesan). Yang diganti di sini hanya entri
+  // diagnosis; entri prosedur dibiarkan, dan bentuk entrinya sama dengan aslinya.
+  const luarKamusLain = (Array.isArray(aiReview.kode_luar_kamus) ? aiReview.kode_luar_kamus : [])
+    .filter(k => k && k.jenis !== 'diagnosis');
+  aiReview.kode_luar_kamus = [...hasilWho.kodeLuarKamus, ...luarKamusLain];
   await db.prepare('UPDATE claim_records SET ai_review = ? WHERE id = ?')
     .run(JSON.stringify(aiReview), recordId);
   if (koreksiWho.size > 0 && diaglistSaatIni.trim() !== '') {

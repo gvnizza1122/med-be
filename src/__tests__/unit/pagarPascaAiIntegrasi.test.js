@@ -192,8 +192,22 @@ describe('isiKodeDariSaranTervalidasi (regresi)', () => {
     const record = { DIAGLIST: 'r10.84' };
     const ai = {};
     await isiKodeDariSaranTervalidasi(db, 'rec1', record, ai);
-    expect(ai.kode_luar_kamus).toEqual([{ kode: 'R10.84', status: 'kode_luar_kamus' }]);
+    expect(ai.kode_luar_kamus).toHaveLength(1);
+    expect(ai.kode_luar_kamus[0]).toMatchObject({ kode: 'R10.84', jenis: 'diagnosis' });
+    expect(ai.kode_luar_kamus[0].pesan).toMatch(/ICD-10 WHO/);
     expect(db.tulis.some(t => /SET raw_data/.test(t.sql) && JSON.parse(t.a[0]).DIAGLIST === 'R10.84')).toBe(true);
+  });
+
+  // putusanPendingService membaca jenis dan pesan dari tiap entri; entri prosedur
+  // dari aiReviewService tidak boleh hilang.
+  test('entri kode_luar_kamus prosedur dipertahankan, entri diagnosis basi diganti', async () => {
+    const db = dbPalsu();
+    const ai = { kode_luar_kamus: [
+      { kode: '99.99', jenis: 'prosedur', pesan: 'x' },
+      { kode: 'R10.84', jenis: 'diagnosis', pesan: 'lama' },
+    ] };
+    await isiKodeDariSaranTervalidasi(db, 'rec1', { DIAGLIST: 'J18.9' }, ai);
+    expect(ai.kode_luar_kamus).toEqual([{ kode: '99.99', jenis: 'prosedur', pesan: 'x' }]);
   });
 
   test('kode WHO dinormalisasi ke huruf besar tanpa saran AI', async () => {
