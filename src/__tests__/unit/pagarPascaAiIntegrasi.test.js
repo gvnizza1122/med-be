@@ -151,6 +151,7 @@ function dbPalsu() {
   const tulis = [];
   return {
     tulis,
+    all: async (_sql, params = []) => params.filter(k => ['J18.9', 'J45.9', 'R10.4'].includes(String(k).toUpperCase())).map(code => ({ code })),
     prepare: (sql) => ({
       run: async (...a) => { tulis.push({ sql, a }); },
       get: async () => undefined,
@@ -184,6 +185,23 @@ describe('isiKodeDariSaranTervalidasi (regresi)', () => {
     const db = dbPalsu();
     await isiKodeDariSaranTervalidasi(db, 'rec1', { DIAGLIST: 'J18.9' }, { suggested_codes: [{ code: 'J45.9', type: 'diagnosis', kamus_valid: true }] });
     expect(db.tulis.find(t => /SET diagnosa_list/.test(t.sql))).toBeUndefined();
+  });
+
+  test('DIAGLIST non-WHO tanpa saran AI tetap ditandai dan raw_data diperbarui', async () => {
+    const db = dbPalsu();
+    const record = { DIAGLIST: 'r10.84' };
+    const ai = {};
+    await isiKodeDariSaranTervalidasi(db, 'rec1', record, ai);
+    expect(ai.kode_luar_kamus).toEqual([{ kode: 'R10.84', status: 'kode_luar_kamus' }]);
+    expect(db.tulis.some(t => /SET raw_data/.test(t.sql) && JSON.parse(t.a[0]).DIAGLIST === 'R10.84')).toBe(true);
+  });
+
+  test('kode WHO dinormalisasi ke huruf besar tanpa saran AI', async () => {
+    const db = dbPalsu();
+    const record = { DIAGLIST: 'j18.9' };
+    await isiKodeDariSaranTervalidasi(db, 'rec1', record, {});
+    expect(record.DIAGLIST).toBe('J18.9');
+    expect(db.tulis.some(t => /SET diagnosa_list/.test(t.sql) && t.a[0] === 'J18.9')).toBe(true);
   });
 
   test('saran disangkal atau saran_diagnosis (boleh_isi_otomatis:false) tidak pernah mengisi kolom', async () => {

@@ -14,10 +14,11 @@ Aplikasi: pra-validasi klaim BPJS RS Lestari Raharja. Stack: Node/Express + Post
 - Verifikasi deploy dengan `grep` di image hasil build, bukan timestamp/exit code (build Docker pernah hang di SSH).
 - Frontend: wajib `npm run build` sebelum push (gate JSX pakai literal `false` pernah merusak build produksi; `key` React yang sama di dua call site pernah membekukan render).
 - Repo Windows/CRLF: edit berbasis baris, jaga EOL; hindari heredoc panjang dan regex dengan backslash lewat shell.
-- Jest: `npx jest --testPathIgnorePatterns='.claude'`. Baseline: ~11 suite gagal lama (butuh API key/server; ~46–48 tes) + 1 tes OCR flaky (`ocrService`). Hasil terakhir: 1086 lulus / 49 gagal.
+- Jest saat sesi Codex 2026-09-30: baseline sebelum perubahan 56 suite lulus / 11 gagal; 1087 tes lulus / 48 gagal. Sesudah item A: angka suite sama, 1089 tes lulus / 48 gagal. Tidak muncul suite gagal baru. Tes terarah `pagarPascaAiIntegrasi.test.js`: 24/24 lulus. OCR flaky tidak gagal pada dua eksekusi penuh sesi ini.
 
-## Status (main terakhir: `5949420`, sudah di-push)
+## Status (main terakhir di awal sesi: `9f24325`, sudah di-push; item A ditambahkan pada sesi Codex 2026-09-30)
 Backend main berisi: pengelompokan `/claim-files/kelompok`, kamus penunjang, pemetaan WHO, pagar pasca-AI, tindakan berbasis posisi, fondasi dua model, alur pending. Frontend `aa3667e`: Riwayat Upload dikelompokkan (BELUM dilihat di browser).
+Item A dikerjakan: `pastikanDiagnosisWhoService` memeriksa setiap kode DIAGLIST terhadap `icd10_who_codes` sebelum jalur keluar awal, menormalisasi huruf besar, meminta pemetaan WHO untuk kode yang tidak ada di kamus, mempertahankan yang tak terpetakan dengan tanda `ai_review.kode_luar_kamus`, dan memperbarui `raw_data.DIAGLIST`. Tes tanpa saran AI ditambahkan. Perubahan belum di-commit saat catatan ini dibuat.
 **Belum tentu sudah di-deploy** — cek dulu.
 
 ### Sudah aktif di alur live (setelah deploy)
@@ -35,7 +36,7 @@ Backend main berisi: pengelompokan `/claim-files/kelompok`, kamus penunjang, pem
 - `aturan_koding_rs`: tidak ada UI untuk mengisi.
 
 ## Pekerjaan berikutnya (urut saran)
-1. **Diagnosis selalu WHO (celah terbukti).** `isiKodeDariSaranTervalidasi` (`src/routes/claimFiles.js` ~baris 1888) hanya mengoreksi kode DIAGLIST bila saran AI membawa `kode_asal`, dan berhenti lebih awal bila tidak ada saran AI & tidak ada tindakan terbaca → kode non-WHO di DIAGLIST tanpa saran AI (mis. `r10.84`) tak tersentuh. Rencana: modul deterministik baru (mis. `pastikanDiagnosisWhoService`): pecah DIAGLIST, huruf besar, cek tiap kode ke `icd10_who_codes`; yang tak ada → `petakanKeKodeWho(kode, teksDiagnosis)` (`kodeDiagnosisWhoService`, teks diagnosis bisa dari `s.quotation` saran); yang tak terpetakan → tetap ditandai `kode_luar_kamus`. Panggil sebelum early return; perbarui `raw_data.DIAGLIST` juga. Tambah tes.
+1. **Diagnosis selalu WHO (celah terbukti) — implementasi item A sesi 2026-09-30 selesai, commit lokal menyusul.** Validasi per kode sekarang ada di `src/services/pastikanDiagnosisWhoService.js` dan dipanggil dari `isiKodeDariSaranTervalidasi`; kode asing yang tak punya padanan tetap di DIAGLIST dengan tanda `kode_luar_kamus` di `ai_review`. Tes regresi termasuk tanpa saran AI.
 2. **Prosedur "jangan pernah kosong".** Tidak bisa dijamin harfiah (prosedur fiktif = risiko temuan fraud). Yang bisa: kosong tidak pernah diam-diam — tampilkan alasan eksplisit + kandidat (tindakan/penunjang terdeteksi tanpa kode pasti, mis. infus; penunjang lab/radiologi usulan) agar koder isi satu klik. Mengisi otomatis dari kode usulan belum disahkan = keputusan pemilik produk (belum diputuskan).
 3. Deploy backend + frontend, lalu verifikasi (lihat di bawah).
 4. Sambungkan `kamusPenunjangService` + `bacaLabService` ke pembacaan; aktifkan pembaca lab setelah dicoba pada PDF asli.

@@ -19,6 +19,7 @@ const { isiPeriodeUntukFile } = require('../services/periodeKlaimService');
 const { tentukanProsedurDariTemuan } = require('../services/aturanKodingRsService');
 const { ekstrakKotakKata } = require('../services/pdfWordBoxService');
 const { bacaLabelHalaman } = require('../services/pasanganLabelPosisiService');
+const { pastikanDiagnosisWho } = require('../services/pastikanDiagnosisWhoService');
 
 const router = express.Router();
 
@@ -1886,12 +1887,13 @@ const JENIS_KLAIM_OPTIONS = ['RAWAT_JALAN', 'RAWAT_INAP'];
  * wajib diisi" tetap menempel padahal kolomnya sudah terisi.
  */
 async function isiKodeDariSaranTervalidasi(db, recordId, record, aiReview) {
+  aiReview = aiReview && typeof aiReview === 'object' ? aiReview : {};
   const saran = Array.isArray(aiReview && aiReview.suggested_codes) ? aiReview.suggested_codes : [];
   const tindakanTerbaca = Array.isArray(aiReview && aiReview.temuan_tindakan) ? aiReview.temuan_tindakan : [];
   // Berhenti hanya kalau KEDUA sumbernya kosong. Sebelumnya cukup saran kode
   // yang kosong untuk membuat fungsi ini berhenti — dan tindakan yang jelas
   // tertulis di berkas tidak akan pernah sampai ke daftar prosedur.
-  if (saran.length === 0 && tindakanTerbaca.length === 0) return;
+  // Diagnosis divalidasi WHO sebelum kemungkinan keluar lebih awal.
 
   const ambil = (tipe) => [...new Set(
     // boleh_isi_otomatis === false dipasang pagarPascaAiService pada saran yang
@@ -1918,6 +1920,26 @@ async function isiKodeDariSaranTervalidasi(db, recordId, record, aiReview) {
       .map(s => [String(s.kode_asal).trim().toUpperCase(), String(s.code).trim().toUpperCase()])
   );
   const diaglistSaatIni = String(record.DIAGLIST || record.diagnosa_list || '');
+  const teksDiagnosis = saran.filter(s => s && s.type === 'diagnosis')
+    .map(s => s.quotation || s.text || '').filter(Boolean).join(' ');
+  const hasilWho = await pastikanDiagnosisWho(db, diaglistSaatIni, teksDiagnosis);
+  if (hasilWho.diaglist && hasilWho.diaglist !== diaglistSaatIni) {
+    perubahan.diagnosa_list = hasilWho.diaglist;
+    record.DIAGLIST = hasilWho.diaglist;
+    record.diagnosa_list = hasilWho.diaglist;
+    try {
+      const baris = await db.prepare('SELECT raw_data FROM claim_records WHERE id = ?').get(recordId);
+      const raw = baris && baris.raw_data ? JSON.parse(baris.raw_data) : {};
+      raw.DIAGLIST = hasilWho.diaglist;
+      await db.prepare('UPDATE claim_records SET raw_data = ? WHERE id = ?').run(JSON.stringify(raw), recordId);
+    } catch (errRaw) {
+      console.warn(`[AutoIsi] Gagal memperbarui raw_data record ${recordId}: ${errRaw.message}`);
+    }
+  }
+  if (hasilWho.kodeLuarKamus.length > 0) aiReview.kode_luar_kamus = hasilWho.kodeLuarKamus;
+  else delete aiReview.kode_luar_kamus;
+  await db.prepare('UPDATE claim_records SET ai_review = ? WHERE id = ?')
+    .run(JSON.stringify(aiReview), recordId);
   if (koreksiWho.size > 0 && diaglistSaatIni.trim() !== '') {
     const pecah = diaglistSaatIni.split(/[;,]/).map(s => s.trim()).filter(Boolean);
     const dikoreksi = [];
