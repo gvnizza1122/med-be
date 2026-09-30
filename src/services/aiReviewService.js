@@ -34,6 +34,7 @@ const { verifikasiIdentitas } = require('./identitasLintasHalamanService');
 const { evaluasiSyaratPenunjang } = require('./syaratPenunjangService');
 const { bacaTemuanTindakan, periksaSilangTindakan, kalimatTindakanTakDikenal } = require('./temuanTindakanService');
 const { kodekanTindakanBaru } = require('./kodeTindakanBaruService');
+const { petakanKeKodeWho } = require('./kodeDiagnosisWhoService');
 const { evaluasiKonsistensi } = require('./konsistensiAntarDataService');
 const { susunPutusan } = require('./putusanPendingService');
 const { aggregateKriteria, KRITERIA_LABELS } = require('./kegawatdaruratanAggregation');
@@ -391,7 +392,7 @@ async function annotateKamusValid(suggestedCodes) {
     lookupCodesInTable('icd9_cm_procedures', procCodes),
   ]);
 
-  return suggestedCodes.map(entry => {
+  const beranotasi = suggestedCodes.map(entry => {
     if (!entry.code) return { ...entry, kamus_valid: null };
     if (entry.type === 'diagnosis') {
       return { ...entry, kamus_valid: diagFoundSet ? diagFoundSet.has(normalizeIcdCode(entry.code)) : null };
@@ -401,6 +402,23 @@ async function annotateKamusValid(suggestedCodes) {
     }
     return { ...entry, kamus_valid: null };
   });
+
+  // Kode diagnosis yang tidak ada di ICD-10 WHO dipetakan ke padanannya.
+  // AI cenderung mengeluarkan ICD-10-CM (Amerika): R10.84 tidak ada di WHO,
+  // padanannya R10.4. Kode asli disimpan di kode_asal supaya penggantian bisa
+  // ditelusuri, dan supaya kode yang sudah terlanjur tertulis di DIAGLIST
+  // (dari ekstraksi atau ketikan) bisa dicocokkan ke pengganti yang sama.
+  return Promise.all(beranotasi.map(async (entry) => {
+    if (entry.type !== 'diagnosis' || entry.kamus_valid !== false || !entry.code) return entry;
+    try {
+      const pengganti = await petakanKeKodeWho(entry.code, entry.quotation);
+      if (!pengganti) return entry;
+      return { ...entry, code: pengganti.kode, kamus_valid: true, kode_asal: normalizeIcdCode(entry.code) };
+    } catch (errKoreksi) {
+      console.warn(`[AI-REVIEW] Gagal memetakan ${entry.code} ke ICD-10 WHO: ${errKoreksi.message}`);
+      return entry;
+    }
+  }));
 }
 
 /**
@@ -597,12 +615,16 @@ kode ICD-10 WHO / ICD-9-CM yang paling sesuai.
 
 FOKUS KHUSUS KELOMPOK J (Pernapasan / Respiratory):
 - Pneumonia / Bronchopneumonia: J18.9 (unspecified), J18.0 (Bronchopneumonia), J15.9 (Bacterial)
-- Asthma / Asma Bronkial: J45.9 (unspecified), J45.901 (Eksaserbasi Akut), J46 (Status Asthmaticus)
+- Asthma / Asma Bronkial: J45.9 (tidak spesifik), J45.0 (Asma predominan alergi), J46 (Status Asthmaticus)
 - PPOK / COPD: J44.9 (COPD), J44.1 (COPD dengan eksaserbasi akut)
 - TB Paru / Tuberculosis: A16.2 (TB Paru klinis), A15.0 (TB Paru terkonfirmasi)
-- Prosedur Terkait: Nebulisasi/Inhalasi (96.04 / 93.94), Oksigenasi (93.96), Foto Thorax (87.44 / 87.49)
+- Prosedur Terkait: Nebulisasi/Inhalasi (93.94), Oksigenasi (93.96), Foto Thorax (87.44 / 87.49)
 
 ATURAN KETAT (anti-upcoding & bukti verbatim):
+- KODE DIAGNOSIS WAJIB ICD-10 WHO, BUKAN ICD-10-CM (Amerika). BPJS hanya mengenal ICD-10 WHO. ICD-10-CM
+  memecah kategori lebih halus sehingga menghasilkan kode yang TIDAK ADA di WHO — contoh: "R10.84" tidak
+  ada, padanan WHO-nya "R10.4"; "J45.901" tidak ada, padanan WHO-nya "J45.9". Kalau kamu ragu apakah
+  sebuah kode ada di WHO, pakai kode kategori/subkategori yang lebih umum.
 - PRINCIPLE: "Bukti Dulu, Tarif Menyusul" — Usulkan kandidat kode murni berdasarkan bukti medis verbatim, BUTA terhadap tarif/biaya.
 - HANYA dari istilah yang benar-benar tertulis eksplisit SEBAGAI diagnosis/prosedur dokter. BUKAN "Keluhan" (gejala
   subjektif pasien sendiri, mis. "nyeri perut"), BUKAN "Diagnosis Keperawatan" (istilah asuhan keperawatan,

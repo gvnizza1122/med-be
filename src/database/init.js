@@ -758,6 +758,20 @@ async function migrateSchema(db) {
       );
     `);
 
+    // Pemetaan kode diagnosis di luar ICD-10 WHO ke padanan WHO-nya
+    // (mis. R10.84 ICD-10-CM -> R10.4). kode_asal dan teks_asal disimpan supaya
+    // pemetaan yang keliru bisa diperbaiki sekaligus untuk semua klaim.
+    await dbHelper.query(`
+      CREATE TABLE IF NOT EXISTS kamus_diagnosis_dipelajari (
+        kunci            TEXT PRIMARY KEY,
+        kode             TEXT NOT NULL,
+        nama             TEXT,
+        kode_asal        TEXT,
+        teks_asal        TEXT,
+        dipelajari_pada  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     // Add constraint: If jenis_field='Koding', kutipan must NOT be NULL
     // PostgreSQL CHECK constraint validation
     try {

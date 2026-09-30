@@ -1795,6 +1795,49 @@ async function isiKodeDariSaranTervalidasi(db, recordId, record, aiReview) {
 
   const kosong = (v) => !v || String(v).trim() === '';
   const perubahan = {};
+  // Kode di DIAGLIST yang tidak ada di ICD-10 WHO diganti dengan padanannya.
+  //
+  // Ditemukan pada klaim SEP 0170R0110826V003045: DIAGLIST berisi "r10.84"
+  // (ICD-10-CM Amerika) dan tampil "Valid". BPJS hanya mengenal ICD-10 WHO,
+  // padanannya R10.4. Penggantinya sudah dihitung saat saran kode dianotasi
+  // (aiReviewService.annotateKamusValid) dan tercatat di kode_asal — di sini
+  // tinggal dicocokkan dengan kode yang sudah tertulis.
+  //
+  // Yang diganti HANYA kode yang tidak ada di kamus dan punya padanan pasti;
+  // kode sah dan isian lain di kolom yang sama tidak disentuh.
+  const koreksiWho = new Map(
+    saran
+      .filter(s => s && s.type === 'diagnosis' && s.kode_asal && s.kamus_valid === true && s.code)
+      .map(s => [String(s.kode_asal).trim().toUpperCase(), String(s.code).trim().toUpperCase()])
+  );
+  const diaglistSaatIni = String(record.DIAGLIST || record.diagnosa_list || '');
+  if (koreksiWho.size > 0 && diaglistSaatIni.trim() !== '') {
+    const pecah = diaglistSaatIni.split(/[;,]/).map(s => s.trim()).filter(Boolean);
+    const dikoreksi = [];
+    const hasilKode = pecah.map(k => {
+      const ganti = koreksiWho.get(k.toUpperCase());
+      if (!ganti) return k;
+      dikoreksi.push(`${k} -> ${ganti}`);
+      return ganti;
+    });
+    if (dikoreksi.length > 0) {
+      const baru = [...new Set(hasilKode)].join(';');
+      perubahan.diagnosa_list = baru;
+      // raw_data ikut diperbarui: tampilan membaca dari sana, dan tanpa ini
+      // kolom basis data sudah benar tetapi layar masih menunjukkan kode lama.
+      try {
+        const baris = await db.prepare('SELECT raw_data FROM claim_records WHERE id = ?').get(recordId);
+        const raw = baris && baris.raw_data ? JSON.parse(baris.raw_data) : null;
+        if (raw && typeof raw === 'object') {
+          raw.DIAGLIST = baru;
+          await db.prepare('UPDATE claim_records SET raw_data = ? WHERE id = ?').run(JSON.stringify(raw), recordId);
+        }
+      } catch (errRaw) {
+        console.warn(`[AutoIsi] Gagal memperbarui raw_data record ${recordId}: ${errRaw.message}`);
+      }
+      console.log(`[AutoIsi] record ${recordId}: kode di luar ICD-10 WHO diganti ${dikoreksi.join(', ')}`);
+    }
+  }
   if (kosong(record.DIAGLIST || record.diagnosa_list)) {
     const d = ambil('diagnosis');
     if (d.length > 0) perubahan.diagnosa_list = d.join(';');
