@@ -16,6 +16,9 @@ const { getRelevantKnowledge, recordKnowledge, getRelevantBpjsExamples } = requi
 const { matchPrbCategory } = require('../services/prbRules');
 const { linkPendingBpjsForSep } = require('../services/bpjsPendingLink');
 const { isiPeriodeUntukFile } = require('../services/periodeKlaimService');
+const { tentukanProsedurDariTemuan } = require('../services/aturanKodingRsService');
+const { ekstrakKotakKata } = require('../services/pdfWordBoxService');
+const { bacaLabelHalaman } = require('../services/pasanganLabelPosisiService');
 
 const router = express.Router();
 
@@ -99,6 +102,28 @@ function runDedupedOcr(db, recordId, filePath, pageNumbers, ocrPdfPages) {
  * (dipicu manual oleh tombol UI yang sudah dihapus); sekarang dipanggil
  * langsung dari server sebagai bagian dari alur upload/validasi otomatis.
  */
+/**
+ * Halaman RESUME dari PDF digital diberi `nilai_label` (isi kolom Tindakan,
+ * Diagnosa, dst) yang dipasangkan dari POSISI kata, karena urutan baca gagal
+ * pada tabel resume SIMRS (label terpusat vertikal, isi di atas sel).
+ * Best-effort: PDF scan (tanpa lapisan teks), mupdf gagal, atau tidak ada
+ * pasangan -> halaman dibiarkan apa adanya dan jalur teks lama yang dipakai.
+ */
+async function lampirkanNilaiLabelPosisi(filePath, halamanNative) {
+  try {
+    const { classifyPageDocumentType } = require('../services/pdfPageClassifier');
+    const resume = halamanNative.filter(h => classifyPageDocumentType(h.ocr_text) === 'resume_medis');
+    if (resume.length === 0) return;
+    const kotak = await ekstrakKotakKata(fs.readFileSync(filePath), resume.map(h => h.page_number));
+    for (const h of resume) {
+      const nilai = bacaLabelHalaman(kotak.get(h.page_number), 'resume_medis');
+      if (Object.keys(nilai).length > 0) h.nilai_label = nilai;
+    }
+  } catch (err) {
+    console.warn(`[gatherEvidencePool] pasangan label posisi dilewati: ${err.message}`);
+  }
+}
+
 async function gatherEvidencePool(db, recordId, filePath) {
   if (!filePath || !fs.existsSync(filePath)) return [];
 
@@ -164,6 +189,7 @@ async function gatherEvidencePool(db, recordId, filePath) {
         .filter(p => p.type === 'NATIVE' && !p.is_primary_source && !scanPageNumbers.has(p.page_num) && p.text_length > 0)
         .map(p => ({ page_number: p.page_num, ocr_text: p.text_full, confidence: 100 }));
       evidencePool = [...evidencePool, ...nativePages];
+      await lampirkanNilaiLabelPosisi(filePath, nativePages);
 
       // Halaman teks asli ikut DISIMPAN, bukan cuma dipakai sekali lalu dibuang.
       // Sebelumnya halaman ini dibaca ulang dari PDF tiap kali dibutuhkan dan
@@ -1920,6 +1946,23 @@ async function isiKodeDariSaranTervalidasi(db, recordId, record, aiReview) {
     const d = ambil('diagnosis');
     if (d.length > 0) perubahan.diagnosa_list = d.join(';');
   }
+  // Tahap KODING (aturanKodingRsService): temuan tindakan + aturan RS opsional
+  // -> usulan daftar prosedur. Tanpa aturan RS perilakunya SAMA dengan
+  // sebelumnya (tidak ada gerbang baru); yang bertambah hanya penanda
+  // belum_ada_aturan_rs. Dihitung walau PROCLIST sudah terisi, supaya usulan
+  // dan alasannya tetap tercatat di ai_review.
+  let usulanProsedur = null;
+  if (tindakanTerbaca.length > 0) {
+    try {
+      usulanProsedur = await tentukanProsedurDariTemuan(db, recordId, tindakanTerbaca);
+      aiReview.usulan_prosedur = usulanProsedur.usulan;
+      await db.prepare('UPDATE claim_records SET ai_review = ? WHERE id = ?')
+        .run(JSON.stringify(aiReview), recordId);
+    } catch (errUsulan) {
+      console.warn(`[AutoIsi] usulan prosedur gagal untuk record ${recordId}: ${errUsulan.message || errUsulan}`);
+    }
+  }
+
   if (kosong(record.PROCLIST || record.prosedur_list)) {
     const p = ambil('procedure');
 
@@ -1938,10 +1981,14 @@ async function isiKodeDariSaranTervalidasi(db, recordId, record, aiReview) {
     //   2. Hanya yang terbaca dari resume medis atau triase. Resep saja tidak
     //      cukup: obat nebul di resep belum tentu berarti tindakannya dilakukan.
     //   3. Tidak pernah menimpa isian koder (dijaga kosong() di atas).
-    const dariTindakan = (Array.isArray(aiReview && aiReview.temuan_tindakan) ? aiReview.temuan_tindakan : [])
-      .filter(t => t && t.kode_usulan
-        && (t.bukti || []).some(b => b.sumber === 'resume_medis' || b.sumber === 'triase_igd'))
-      .map(t => String(t.kode_usulan).trim());
+    // Aturan RS (kalau ada) boleh menahan sebuah tindakan; tanpa aturan, ketiga
+    // pembatas di atas berlaku persis seperti sebelumnya.
+    const dariTindakan = usulanProsedur
+      ? usulanProsedur.kode
+      : (Array.isArray(aiReview && aiReview.temuan_tindakan) ? aiReview.temuan_tindakan : [])
+        .filter(t => t && t.kode_usulan
+          && (t.bukti || []).some(b => b.sumber === 'resume_medis' || b.sumber === 'triase_igd'))
+        .map(t => String(t.kode_usulan).trim());
 
     const gabungan = [...new Set([...p, ...dariTindakan])];
     if (gabungan.length > 0) perubahan.prosedur_list = gabungan.join(';');

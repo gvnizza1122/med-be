@@ -36,6 +36,7 @@ const { bacaTemuanTindakan, periksaSilangTindakan, kalimatTindakanTakDikenal } =
 const { kodekanTindakanBaru } = require('./kodeTindakanBaruService');
 const { petakanKeKodeWho } = require('./kodeDiagnosisWhoService');
 const { evaluasiKonsistensi } = require('./konsistensiAntarDataService');
+const { periksaWaktuTriase } = require('./konsistensiWaktuService');
 const { susunPutusan } = require('./putusanPendingService');
 const { aggregateKriteria, KRITERIA_LABELS } = require('./kegawatdaruratanAggregation');
 const { getDb } = require('../database/init');
@@ -2147,7 +2148,10 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
       // dan triase, antara prosedur dan resep, antara klaim dan SEP. Aturannya
       // data, bukan kode, jadi koder bisa menambah pasangan tanpa deploy.
       try {
-        result.konsistensi_data = evaluasiKonsistensi(record, evidencePool, result.temuan_tindakan || []);
+        result.konsistensi_data = [
+          ...evaluasiKonsistensi(record, evidencePool, result.temuan_tindakan || []),
+          ...periksaWaktuTriase(evidencePool),
+        ];
       } catch (konsErr) {
         console.warn(`[AI-REVIEW] evaluasiKonsistensi error: ${konsErr.message}`);
         result.konsistensi_data = [];
