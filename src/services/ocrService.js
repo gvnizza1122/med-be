@@ -382,6 +382,9 @@ async function ocrPdfPages(pdfPath, pageNumbers = 'auto-scan', language = OCR_CO
     // teks + tabel gambar, dan tabel itulah yang memuat tanda vital -- yang
     // begitu tetap di-OCR.
     const NATIVE_TEXT_MIN_CHARS = 500;
+    // Keputusan "teks asli PDF atau OCR" dipusatkan di keputusanSumberHalamanService
+    // (ambang sama: 50 / 500; tambahan: lapisan teks rusak/sampah tetap di-OCR).
+    const { punyaLapisanTeksNyata } = require('./keputusanSumberHalamanService');
     const nativeTextByPage = new Map();
     if (pageNumbers === 'auto-scan') {
       // 'auto-scan' (default): pakai klasifikasi halaman yang sudah ada —
@@ -391,7 +394,9 @@ async function ocrPdfPages(pdfPath, pageNumbers = 'auto-scan', language = OCR_CO
       if (!classified.success) {
         throw new Error('Gagal klasifikasi halaman: ' + (classified.errors[0]?.message || 'unknown'));
       }
-      targetPages = classified.pages.filter(p => p.type === 'SCAN').map(p => p.page_num);
+      targetPages = classified.pages
+        .filter(p => p.type === 'SCAN' || !punyaLapisanTeksNyata(p.text_full, { mode: 'auto-scan' }))
+        .map(p => p.page_num);
       classified.pages.filter(p => p.is_critical).forEach(p => criticalPageNums.add(p.page_num));
     } else {
       targetPages = Array.isArray(pageNumbers)
@@ -406,7 +411,7 @@ async function ocrPdfPages(pdfPath, pageNumbers = 'auto-scan', language = OCR_CO
             .filter(p => p.type === 'NATIVE' && !p.is_critical && isSepPage(p.text_full))
             .forEach(p => sepNativePages.add(p.page_num));
           classified.pages
-            .filter(p => p.type === 'NATIVE' && (p.text_full || '').trim().length >= NATIVE_TEXT_MIN_CHARS)
+            .filter(p => p.type === 'NATIVE' && punyaLapisanTeksNyata(p.text_full))
             .forEach(p => nativeTextByPage.set(p.page_num, p.text_full));
         }
       } catch (classifyErr) {
