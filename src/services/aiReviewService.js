@@ -50,6 +50,9 @@ const { evaluasiKombinasiKode } = require('./ketentuanKlaimService');
 const { groupCodesToInaCBG } = require('./inacbgGroupingService');
 const { getTarifResmi, lookupTarifInacbg } = require('./tarifInacbgLookup');
 const { jalankanPagarAman, catatDitolakAwal, ALASAN_PAGAR } = require('./pagarPascaAiService');
+const { bacaTemuanPenunjang } = require('./temuanPenunjangService');
+const { bacaLabDariHalaman } = require('./bacaLabService');
+const { catatVarianBelumDikenali } = require('./kamusPenunjangService');
 
 const AI_REVIEW_SYSTEM_PROMPT = `Kamu asisten audit klaim BPJS E-Claim untuk perawat/verifikator rumah sakit.
 Kamu diberi data lengkap satu rekam klaim (hasil ekstraksi), daftar field yang gagal validasi otomatis,
@@ -2243,6 +2246,64 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
       } catch (syaratErr) {
         console.warn(`[AI-REVIEW] evaluasiSyaratPenunjang error: ${syaratErr.message}`);
         result.syarat_penunjang = [];
+      }
+
+      // Kamus penunjang — normalisasi istilah pemeriksaan penunjang (lab,
+      // radiologi, dll.) yang tertulis di berkas: nama baku + kode ICD-9
+      // USULAN (kode_terverifikasi=false, TIDAK PERNAH mengisi PROCLIST/
+      // DIAGLIST — lihat kamusPenunjangService.js). Aditif murni: field baru
+      // ai_review.temuan_penunjang, tidak mengubah field lain yang sudah ada.
+      // Gate: KAMUS_PENUNJANG_PEMBACAAN_AKTIF (default ON — cuma anotasi;
+      // beda dari SYARAT_PAKAI_BACA_LAB di bawah yang memutuskan status
+      // syarat klaim dan defaultnya tetap MATI, lihat HANDOFF.md item 4).
+      let penunjangTidakDikenali = [];
+      try {
+        if (process.env.KAMUS_PENUNJANG_PEMBACAAN_AKTIF !== 'false') {
+          const bacaanPenunjang = bacaTemuanPenunjang(evidencePool);
+          result.temuan_penunjang = bacaanPenunjang.temuan;
+          penunjangTidakDikenali = bacaanPenunjang.tidak_dikenali;
+        } else {
+          result.temuan_penunjang = [];
+        }
+      } catch (penunjangErr) {
+        console.warn(`[AI-REVIEW] bacaTemuanPenunjang error: ${penunjangErr.message}`);
+        result.temuan_penunjang = [];
+      }
+
+      // Temuan lab — baris tabel laboratorium dibaca per baris + diperiksa
+      // kewajarannya (bacaLabService.js). SELALU dihitung & disimpan (murni
+      // baca, tanpa efek samping) di ai_review.temuan_lab, TERLEPAS dari
+      // SYARAT_PAKAI_BACA_LAB — flag itu HANYA mengendalikan apakah
+      // syaratPenunjangService memakai nilai ini untuk memutuskan syarat
+      // klaim terpenuhi/tidak (defaultnya tetap MATI; lihat
+      // syaratPenunjangService.js dan HANDOFF.md item 4: "aktifkan pembaca
+      // lab setelah dicoba pada PDF asli").
+      let labTidakDikenali = [];
+      try {
+        const bacaanLab = bacaLabDariHalaman(evidencePool);
+        result.temuan_lab = bacaanLab;
+        labTidakDikenali = bacaanLab.tidak_dikenali || [];
+      } catch (labErr) {
+        console.warn(`[AI-REVIEW] bacaLabDariHalaman error: ${labErr.message}`);
+        result.temuan_lab = { baris: [], tidak_dikenali: [] };
+      }
+
+      // Antrean varian belum dikenali — istilah penunjang/parameter lab yang
+      // tidak cocok kamus manapun, dicatat dengan klaim_id supaya koder tahu
+      // dari klaim mana ia muncul (kamusPenunjangService.catatVarianBelumDikenali,
+      // tabel varian_belum_dikenali). Best-effort: DB belum siap/gagal tidak
+      // pernah menggagalkan hasil AI review.
+      try {
+        const semuaTidakDikenali = [...penunjangTidakDikenali, ...labTidakDikenali];
+        if (semuaTidakDikenali.length) {
+          const db = getDb();
+          const klaimId = record.id != null ? String(record.id) : null;
+          for (const t of semuaTidakDikenali) {
+            await catatVarianBelumDikenali(db, t.ditulis || t.nama, klaimId);
+          }
+        }
+      } catch (varianErr) {
+        console.warn(`[AI-REVIEW] catatVarianBelumDikenali error: ${varianErr.message}`);
       }
 
       // Temuan tindakan — membaca APA yang dilakukan ke pasien, terpisah dari
