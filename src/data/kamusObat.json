@@ -1,0 +1,51 @@
+{
+  "_catatan": [
+    "Kamus obat: merek -> generik -> golongan. HANYA data; dipakai resepPetunjukService untuk PETUNJUK ('apakah ada gangguan ... yang belum dicatat?'), tidak pernah menambah diagnosis.",
+    "terverifikasi:true = padanan merek/generik/golongan yang umum dan jelas. terverifikasi:false = belum dipastikan apoteker/koder RS; petunjuknya tetap tampil tetapi berlabel belum terverifikasi.",
+    "Tidak ada kode ICD di berkas ini, dengan sengaja.",
+    "kelompok petunjuk: lambung | napas | hipertensi | diabetes | jantung_cairan | infeksi | nyeri_demam | mual_muntah | alergi. 'nyeri_demam' TIDAK memberi petunjuk penyakit (obat simtomatik)."
+  ],
+  "kelompok": {
+    "lambung": "Apakah ada gangguan lambung (gastritis/dispepsia/GERD) yang belum dicatat?",
+    "napas": "Apakah ada gangguan saluran napas (asma/PPOK/bronkitis) yang belum dicatat?",
+    "hipertensi": "Apakah ada hipertensi yang belum dicatat?",
+    "diabetes": "Apakah ada diabetes melitus yang belum dicatat?",
+    "jantung_cairan": "Apakah ada gagal jantung, edema, atau hipertensi yang belum dicatat?",
+    "infeksi": "Apakah ada infeksi (dan sumbernya) yang belum dicatat? Antibiotik perlu diagnosis infeksi yang mendukung.",
+    "mual_muntah": "Apakah ada mual/muntah atau gangguan pencernaan yang belum dicatat?",
+    "alergi": "Apakah ada reaksi alergi yang belum dicatat?",
+    "nyeri_demam": null
+  },
+  "obat": [
+    { "id": "ibuprofen", "generik": "ibuprofen", "merek": ["Proris", "Bufect", "Brufen"], "golongan": "AINS (antiinflamasi nonsteroid), analgesik-antipiretik", "kelompok": "nyeri_demam", "terverifikasi": true },
+    { "id": "paracetamol", "generik": "parasetamol", "merek": ["Sanmol", "Panadol", "Tempra", "Paracetamol"], "golongan": "analgesik-antipiretik", "kelompok": "nyeri_demam", "terverifikasi": true },
+    { "id": "asam_mefenamat", "generik": "asam mefenamat", "merek": ["Ponstan", "Ponstan Forte"], "golongan": "AINS, analgesik", "kelompok": "nyeri_demam", "terverifikasi": true },
+    { "id": "ketorolac", "generik": "ketorolac", "merek": ["Toradol", "Ketorolac"], "golongan": "AINS, analgesik", "kelompok": "nyeri_demam", "terverifikasi": true },
+    { "id": "salbutamol", "generik": "salbutamol", "merek": ["Ventasal", "Ventolin", "Salbutamol"], "golongan": "bronkodilator beta-2 agonis kerja pendek", "kelompok": "napas", "terverifikasi": true },
+    { "id": "budesonide", "generik": "budesonide", "merek": ["Pulmicort", "Budesonide"], "golongan": "kortikosteroid inhalasi", "kelompok": "napas", "terverifikasi": true },
+    { "id": "ipratropium", "generik": "ipratropium bromida", "merek": ["Atrovent", "Combivent"], "golongan": "antikolinergik inhalasi (bronkodilator)", "kelompok": "napas", "terverifikasi": true },
+    { "id": "ambroxol", "generik": "ambroksol", "merek": ["Mucopect", "Ambroxol"], "golongan": "mukolitik (pengencer dahak)", "kelompok": "napas", "terverifikasi": true },
+    { "id": "sukralfat", "generik": "sukralfat", "merek": ["Sucralfate", "Inpepsa", "Ulsafate"], "golongan": "protektor mukosa lambung", "kelompok": "lambung", "terverifikasi": true },
+    { "id": "omeprazol", "generik": "omeprazol", "merek": ["Omeprazole", "Losec", "Omeprazol"], "golongan": "penghambat pompa proton (PPI)", "kelompok": "lambung", "terverifikasi": true },
+    { "id": "lansoprazol", "generik": "lansoprazol", "merek": ["Lansoprazole", "Prosogan"], "golongan": "penghambat pompa proton (PPI)", "kelompok": "lambung", "terverifikasi": true },
+    { "id": "ranitidin", "generik": "ranitidin", "merek": ["Ranitidine", "Zantac"], "golongan": "antagonis reseptor H2", "kelompok": "lambung", "terverifikasi": true },
+    { "id": "antasida", "generik": "antasida (aluminium/magnesium hidroksida)", "merek": ["Antasida Doen", "Mylanta", "Promag", "Polysilane"], "golongan": "antasida", "kelompok": "lambung", "terverifikasi": true },
+    { "id": "amlodipin", "generik": "amlodipin", "merek": ["Norvask", "Amlodipine", "Tensivask"], "golongan": "penghambat kanal kalsium (antihipertensi)", "kelompok": "hipertensi", "terverifikasi": true },
+    { "id": "kaptopril", "generik": "kaptopril", "merek": ["Captopril", "Capoten"], "golongan": "penghambat ACE (antihipertensi)", "kelompok": "hipertensi", "terverifikasi": true },
+    { "id": "candesartan", "generik": "kandesartan", "merek": ["Candesartan", "Blopress"], "golongan": "penghambat reseptor angiotensin (antihipertensi)", "kelompok": "hipertensi", "terverifikasi": true },
+    { "id": "furosemid", "generik": "furosemid", "merek": ["Lasix", "Furosemide"], "golongan": "diuretik kuat", "kelompok": "jantung_cairan", "terverifikasi": true },
+    { "id": "metformin", "generik": "metformin", "merek": ["Glucophage", "Metformin"], "golongan": "antidiabetes oral (biguanid)", "kelompok": "diabetes", "terverifikasi": true },
+    { "id": "glimepirid", "generik": "glimepirid", "merek": ["Amaryl", "Glimepiride"], "golongan": "antidiabetes oral (sulfonilurea)", "kelompok": "diabetes", "terverifikasi": true },
+    { "id": "insulin", "generik": "insulin", "merek": ["Novorapid", "Lantus", "Levemir", "Humulin", "Insulin"], "golongan": "insulin", "kelompok": "diabetes", "terverifikasi": true },
+    { "id": "amoksisilin", "generik": "amoksisilin", "merek": ["Amoxicillin", "Amoxsan"], "golongan": "antibiotik (penisilin)", "kelompok": "infeksi", "terverifikasi": true },
+    { "id": "seftriakson", "generik": "seftriakson", "merek": ["Ceftriaxone", "Ceftriaxon"], "golongan": "antibiotik (sefalosporin generasi 3)", "kelompok": "infeksi", "terverifikasi": true },
+    { "id": "sefiksim", "generik": "sefiksim", "merek": ["Cefixime", "Sporetik"], "golongan": "antibiotik (sefalosporin generasi 3 oral)", "kelompok": "infeksi", "terverifikasi": true },
+    { "id": "ciprofloksasin", "generik": "siprofloksasin", "merek": ["Ciprofloxacin", "Ciprofloxacine"], "golongan": "antibiotik (fluorokuinolon)", "kelompok": "infeksi", "terverifikasi": true },
+    { "id": "ondansetron", "generik": "ondansetron", "merek": ["Ondansetron", "Zofran"], "golongan": "antiemetik (antagonis 5-HT3)", "kelompok": "mual_muntah", "terverifikasi": true },
+    { "id": "domperidon", "generik": "domperidon", "merek": ["Domperidone", "Motilium"], "golongan": "antiemetik / prokinetik", "kelompok": "mual_muntah", "terverifikasi": true },
+    { "id": "cetirizin", "generik": "setirizin", "merek": ["Cetirizine", "Incidal"], "golongan": "antihistamin", "kelompok": "alergi", "terverifikasi": true },
+    { "id": "narfoz", "generik": "ondansetron", "merek": ["Narfoz"], "golongan": "antiemetik (antagonis 5-HT3)", "kelompok": "mual_muntah", "terverifikasi": false, "catatan": "Padanan merek belum dipastikan apoteker RS." },
+    { "id": "vometa", "generik": "domperidon", "merek": ["Vometa"], "golongan": "antiemetik / prokinetik", "kelompok": "mual_muntah", "terverifikasi": false, "catatan": "Padanan merek belum dipastikan apoteker RS." },
+    { "id": "lokal_belum_pasti_1", "generik": null, "merek": ["Gastrolan"], "golongan": "diduga obat lambung", "kelompok": "lambung", "terverifikasi": false, "catatan": "Nama dagang lokal; isi belum dipastikan. Jangan dipakai sebagai bukti apa pun." }
+  ]
+}

@@ -139,7 +139,7 @@ function bandingkan(nilai, operator, ambang) {
 }
 
 /** Satu syarat dinilai terhadap PROCLIST dan isi dokumen. */
-function nilaiSyarat(syarat, kodeProsedur, halaman) {
+function nilaiSyarat(syarat, kodeProsedur, halaman, opsi = {}) {
   const kodeAda = (syarat.kode_prosedur || []).filter(
     k => (kodeProsedur || []).some(p => normalisasi(p).replace(/\s/g, '') === normalisasi(k).replace(/\s/g, ''))
   );
@@ -168,6 +168,32 @@ function nilaiSyarat(syarat, kodeProsedur, halaman) {
 
   // Tingkat 2a — nilai lab berupa angka.
   if (syarat.parameter_lab) {
+    // Jalur baris (opsional, default mati): nilai dibaca per baris tabel dan
+    // diperiksa kewajarannya. Nilai yang terbaca tetapi tidak masuk akal
+    // (mis. Hb 120) tidak dipakai memutuskan; syaratnya jadi cek manual.
+    if (opsi.pakaiBacaLab || process.env.SYARAT_PAKAI_BACA_LAB === 'true') {
+      const baris = require('./bacaLabService').nilaiLabDariBaris(halaman, syarat.parameter_lab);
+      if (baris && baris.tidak_dapat_dipakai) {
+        hasil.status = STATUS.PERLU_CEK_MANUAL;
+        hasil.kutipan = baris.kutipan;
+        hasil.page_number = baris.page_number;
+        hasil.catatan_batasan = baris.alasan;
+        return hasil;
+      }
+      if (baris) {
+        hasil.nilai = baris.nilai;
+        hasil.kutipan = baris.kutipan;
+        hasil.page_number = baris.page_number;
+        const memenuhi = syarat.operator ? bandingkan(baris.nilai, syarat.operator, syarat.nilai_ambang) : true;
+        hasil.status = memenuhi ? STATUS.TERPENUHI : STATUS.TIDAK_ADA;
+        hasil.memenuhi_ambang = memenuhi;
+        if (syarat.operator) {
+          hasil.ambang = `${syarat.operator} ${syarat.nilai_ambang}${syarat.satuan ? ' ' + syarat.satuan : ''}`;
+        }
+        return hasil;
+      }
+      // Tidak ada baris terbaca: jatuh ke pembacaan lama di bawah.
+    }
     const temuan = bacaNilaiLab(halaman, syarat.parameter_lab);
     if (temuan) {
       hasil.nilai = temuan.nilai;
@@ -212,9 +238,10 @@ function nilaiSyarat(syarat, kodeProsedur, halaman) {
  * @param {string|string[]} diagnosisList DIAGLIST, dipisah ';'
  * @param {string|string[]} prosedurList PROCLIST, dipisah ';'
  * @param {Array<{page_number:number, ocr_text:string}>} halaman
+ * @param {{pakaiBacaLab?: boolean}} [opsi] pakaiBacaLab: baca nilai lab per baris + kewajaran (bacaLabService)
  * @returns {Array}
  */
-function evaluasiSyaratPenunjang(diagnosisList, prosedurList, halaman = []) {
+function evaluasiSyaratPenunjang(diagnosisList, prosedurList, halaman = [], opsi = {}) {
   const pisah = v => (Array.isArray(v) ? v : String(v || '').split(/[;,]/))
     .map(s => String(s).trim()).filter(Boolean);
 
@@ -227,7 +254,7 @@ function evaluasiSyaratPenunjang(diagnosisList, prosedurList, halaman = []) {
     const kodeKena = diagnosis.filter(d => kodeCocok(d, aturan.kode_diagnosis));
     if (!kodeKena.length) continue;
 
-    const syarat = (aturan.syarat || []).map(s => nilaiSyarat(s, prosedur, halaman));
+    const syarat = (aturan.syarat || []).map(s => nilaiSyarat(s, prosedur, halaman, opsi));
 
     temuan.push({
       id: aturan.id,
