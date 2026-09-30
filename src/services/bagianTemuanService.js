@@ -24,8 +24,8 @@ const BAGIAN = {
 // baris dan wajib diakhiri titik dua/tanda hubung atau akhir baris, supaya
 // kalimat biasa yang kebetulan berawalan "terapi" tidak dianggap judul.
 const JUDUL = [
-  [BAGIAN.DIAGNOSIS_BANDING, /^\s*(diagnosa|diagnosis|dx)\s+(banding|diferensial|differential)\b/i],
-  [BAGIAN.DIAGNOSIS, /^\s*(diagnosa|diagnosis|dx)(\s+(utama|kerja|sekunder|tambahan|akhir|masuk|keluar|primer))?\b|^\s*(assessment|asesmen|kesan)\b|^\s*a\s*[:/]/i],
+  [BAGIAN.DIAGNOSIS_BANDING, /^\s*(?:a\s+)?(diagnosa|diagnosis|dx)\s+(banding|diferensial|differential)\b/i],
+  [BAGIAN.DIAGNOSIS, /^\s*(?:a\s+)?(diagnosa|diagnosis|dx)(\s+(utama|kerja|sekunder|tambahan|akhir|masuk|keluar|primer))?\b|^\s*(assessment|asesmen|kesan)\b|^\s*a\s*[:/]/i],
   [BAGIAN.FISIK, /^\s*(pemeriksaan\s+fisik|status\s+generalis|status\s+lokalis|objektif|objective|thorax|paru|cor|abdomen)\b|^\s*o\s*[:/]/i],
   [BAGIAN.TERAPI, /^\s*(terapi|therapy|pengobatan|resep|rencana|planning|penatalaksanaan|instruksi)\b|^\s*p\s*[:/]/i],
   [BAGIAN.ANAMNESIS, /^\s*(anamnesa|anamnesis|keluhan(\s+utama|\s+tambahan)?|riwayat(\s+penyakit)?(\s+sekarang|\s+dahulu|\s+dulu|\s+keluarga)?|rpd|rps|rpk|subjektif|subjective)\b|^\s*s\s*[:/]/i],

@@ -105,6 +105,28 @@ describe('generateAiReview + pagar', () => {
     expect(r.pagar_temuan.disangkal).toHaveLength(1);
   });
 
+  test('SUMIDAH: A Diagnosa kolik abdomen setelah bagian pemeriksaan fisik lolos ke DIAGLIST', async () => {
+    const resume = [{
+      page_number: 2,
+      ocr_text: 'Anamnesis: nyeri ulu hati\nO Pemeriksaan Fisik: abdomen supel\nA Diagnosa kolik abdomen',
+      confidence: 100,
+    }];
+    mockAi({ suggested_codes: [{
+      code: 'R10.4', type: 'diagnosis', page_number: 2,
+      quotation: 'A Diagnosa kolik abdomen', reasoning: 'Diagnosis tertulis di resume.',
+    }] });
+
+    const hasil = await generateAiReview(REKAM, [], resume);
+    const saran = hasil.suggested_codes.find(s => s.code === 'R10.4');
+    expect(saran).toMatchObject({ kamus_valid: true, peran: 'diagnosis' });
+    expect(hasil.pagar_temuan.ditolak.some(d => d.kode === 'R10.4'
+      && d.alasan === 'hanya_riwayat_anamnesis_bukan_diagnosis')).toBe(false);
+
+    const db = dbPalsu();
+    await isiKodeDariSaranTervalidasi(db, 'sumidah-record', { DIAGLIST: '' }, hasil);
+    expect(db.tulis.find(t => /SET diagnosa_list/.test(t.sql)).a[0]).toBe('R10.4');
+  });
+
   test('saklar induk mati: tidak ada pagar_temuan dan saran berperilaku seperti sebelumnya', async () => {
     process.env.PAGAR_TEMUAN_AKTIF = '0';
     mockAi({

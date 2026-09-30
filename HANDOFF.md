@@ -14,11 +14,12 @@ Aplikasi: pra-validasi klaim BPJS RS Lestari Raharja. Stack: Node/Express + Post
 - Verifikasi deploy dengan `grep` di image hasil build, bukan timestamp/exit code (build Docker pernah hang di SSH).
 - Frontend: wajib `npm run build` sebelum push (gate JSX pakai literal `false` pernah merusak build produksi; `key` React yang sama di dua call site pernah membekukan render).
 - Repo Windows/CRLF: edit berbasis baris, jaga EOL; hindari heredoc panjang dan regex dengan backslash lewat shell.
-- Jest saat sesi Codex 2026-09-30: baseline sebelum perubahan 56 suite lulus / 11 gagal; 1087 tes lulus / 48 gagal. Sesudah item A: angka suite sama, 1089 tes lulus / 48 gagal. Tidak muncul suite gagal baru. Tes terarah `pagarPascaAiIntegrasi.test.js`: 24/24 lulus. OCR flaky tidak gagal pada dua eksekusi penuh sesi ini.
+- Jest sesi Codex 2026-09-30: baseline sebelum perubahan awal 56 suite lulus / 11 gagal; sesudah item A 1089 tes lulus / 48 gagal; sesudah perbaikan label `A Diagnosa` 1091 tes lulus / 48 gagal (56 suite lulus / 11 gagal). Tidak muncul tes gagal baru. Tes terarah pagar + bagian: 134/134 lulus. OCR flaky tidak gagal pada eksekusi penuh yang tercatat.
 
-## Status (main terakhir di awal sesi: `9f24325`, sudah di-push; item A ditambahkan pada sesi Codex 2026-09-30)
+## Status (main terakhir: `7f857b5`, sudah di-push; perbaikan pagar `A Diagnosa` sedang lokal)
 Backend main berisi: pengelompokan `/claim-files/kelompok`, kamus penunjang, pemetaan WHO, pagar pasca-AI, tindakan berbasis posisi, fondasi dua model, alur pending. Frontend `aa3667e`: Riwayat Upload dikelompokkan (BELUM dilihat di browser).
-Item A dikerjakan: `pastikanDiagnosisWhoService` memeriksa setiap kode DIAGLIST terhadap `icd10_who_codes` sebelum jalur keluar awal, menormalisasi huruf besar, meminta pemetaan WHO untuk kode yang tidak ada di kamus, mempertahankan yang tak terpetakan dengan tanda `ai_review.kode_luar_kamus`, dan memperbarui `raw_data.DIAGLIST`. Tes tanpa saran AI ditambahkan. Perubahan belum di-commit saat catatan ini dibuat.
+Item A selesai pada commit lokal `f1b118b` (bentuk `kode_luar_kamus` dirapikan di `7f857b5`): `pastikanDiagnosisWhoService` memeriksa setiap kode DIAGLIST terhadap `icd10_who_codes` sebelum jalur keluar awal.
+Perbaikan insiden SUMIDAH: `bagianTemuanService` mengenali prefiks assessment SOAP `A ` pada label diagnosis dan diagnosis banding. Tes halaman sintetis membuktikan saran `R10.4` lolos pagar dan masuk DIAGLIST; tes anamnesis tetap menolak diagnosis yang hanya disebut sebagai riwayat. Belum di-commit atau di-deploy.
 **Belum tentu sudah di-deploy** — cek dulu.
 
 ### Sudah aktif di alur live (setelah deploy)
@@ -36,19 +37,20 @@ Item A dikerjakan: `pastikanDiagnosisWhoService` memeriksa setiap kode DIAGLIST 
 - `aturan_koding_rs`: tidak ada UI untuk mengisi.
 
 ## Pekerjaan berikutnya (urut saran)
-1. **Diagnosis selalu WHO (celah terbukti) — implementasi item A sesi 2026-09-30 selesai, commit lokal menyusul.** Validasi per kode sekarang ada di `src/services/pastikanDiagnosisWhoService.js` dan dipanggil dari `isiKodeDariSaranTervalidasi`; kode asing yang tak punya padanan tetap di DIAGLIST dengan tanda `kode_luar_kamus` di `ai_review`. Tes regresi termasuk tanpa saran AI.
-2. **Prosedur "jangan pernah kosong".** Tidak bisa dijamin harfiah (prosedur fiktif = risiko temuan fraud). Yang bisa: kosong tidak pernah diam-diam — tampilkan alasan eksplisit + kandidat (tindakan/penunjang terdeteksi tanpa kode pasti, mis. infus; penunjang lab/radiologi usulan) agar koder isi satu klik. Mengisi otomatis dari kode usulan belum disahkan = keputusan pemilik produk (belum diputuskan).
-3. Deploy backend + frontend, lalu verifikasi (lihat di bawah).
-4. Sambungkan `kamusPenunjangService` + `bacaLabService` ke pembacaan; aktifkan pembaca lab setelah dicoba pada PDF asli.
-5. Frontend alur pending (kontrak API di bawah).
-6. Aktifkan 4 rule Tipe 3 (KMB-01/06/09/11) setelah kode ICD diputuskan (GTCS G40.3 vs R56.8; trombositopenia D69.6 vs D69.5; pasangan angina; subkode O42).
-7. Hapus kata "dokter/casemix/koder" dari artifact laporan klien (https://claude.ai/code/artifact/c78dbda4-7d0d-440e-add5-1657a276e76e) — permintaan lama, belum dikerjakan.
-8. Ada ~3.218 berkas / 3,9 GB di uploads vs 45 klaim (PDF yatim). Selidiki read-only dulu; tanyakan kebijakan retensi PDF.
+1. **Diagnosis selalu WHO — item A selesai.** Validasi per kode ada di `src/services/pastikanDiagnosisWhoService.js`; kode asing tak terpetakan tetap ditandai di `ai_review`.
+2. **Insiden SUMIDAH: klasifikasi `A Diagnosa` — perbaikan lokal selesai, belum deploy.** Sesudah deploy minta pemilik membaca ulang SEP `0170R0110826V003045`: DIAGLIST harus `R10.4`, dan `ai_review.pagar_temuan.ditolak` tidak memuat kutipan `A Diagnosa kolik abdomen` dengan alasan `hanya_riwayat_anamnesis_bukan_diagnosis`. Pastikan tes riwayat anamnesis tetap tertolak.
+3. **Prosedur "jangan pernah kosong".** Tidak bisa dijamin harfiah (prosedur fiktif = risiko temuan fraud). Yang bisa: kosong tidak pernah diam-diam — tampilkan alasan eksplisit + kandidat (tindakan/penunjang terdeteksi tanpa kode pasti, mis. infus; penunjang lab/radiologi usulan) agar koder isi satu klik. Mengisi otomatis dari kode usulan belum disahkan = keputusan pemilik produk (belum diputuskan).
+4. Deploy backend + frontend, lalu verifikasi (lihat di bawah).
+5. Sambungkan `kamusPenunjangService` + `bacaLabService` ke pembacaan; aktifkan pembaca lab setelah dicoba pada PDF asli.
+6. Frontend alur pending (kontrak API di bawah).
+7. Aktifkan 4 rule Tipe 3 (KMB-01/06/09/11) setelah kode ICD diputuskan (GTCS G40.3 vs R56.8; trombositopenia D69.6 vs D69.5; pasangan angina; subkode O42).
+8. Hapus kata "dokter/casemix/koder" dari artifact laporan klien (https://claude.ai/code/artifact/c78dbda4-7d0d-440e-add5-1657a276e76e) — permintaan lama, belum dikerjakan.
+9. Ada ~3.218 berkas / 3,9 GB di uploads vs 45 klaim (PDF yatim). Selidiki read-only dulu; tanyakan kebijakan retensi PDF.
 
 ## Verifikasi setelah deploy
-- SUMIDAH (SEP 0170R0110826V003045): Baca Ulang → DIAGLIST `R10.4` (bukan `r10.84`), PROCLIST `99.29`, `pagar_temuan` ada di `ai_review`.
+- SUMIDAH (SEP 0170R0110826V003045): Baca Ulang harus menghasilkan DIAGLIST `R10.4` (bukan `r10.84`), PROCLIST `99.29`, dan tidak boleh menolak kutipan `A Diagnosa kolik abdomen` sebagai anamnesis.
 - MUNAWIR (SEP 0170R0110926V001943): unggah ulang → Tindakan terbaca "Nebulisasi Ventasal", `temuan_tindakan` nebulisasi 93.94 dengan kutipan hal 2/3/5, prosedur tidak kosong. Bandingkan koordinat mupdf vs `pdftotext -bbox` (label "Tindakan" y≈489.6, isi y≈481.5).
-- Klaim dengan "Riwayat" di anamnesis: harus muncul di `pagar_temuan.ditolak` dengan alasan `hanya_riwayat_anamnesis_bukan_diagnosis`, bukan di DIAGLIST. Kalau diagnosis sah di blok Diagnosa ikut hilang → `PAGAR_PERAN_AKTIF=0`.
+- Klaim dengan "Riwayat" di anamnesis: harus tetap muncul di `pagar_temuan.ditolak` dengan alasan `hanya_riwayat_anamnesis_bukan_diagnosis`. Diagnosis sah pada baris `A Diagnosa` harus lolos; bila gagal, periksa klasifikasi bagian dan jangan mematikan `PAGAR_PERAN_AKTIF`.
 - Riwayat Upload: header kelompok (bulan terbaru terbuka), angka header = jumlah baris saat dibuka (Agustus rajal 25/25, ranap 9/9 di produksi), pencarian memaksa daftar datar, mode arsip.
 
 ## Uji coba akurasi (backtest) — rencana yang disepakati
