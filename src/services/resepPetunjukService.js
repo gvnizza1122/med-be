@@ -13,9 +13,11 @@
  * Pengurai aturan pakai: 3dd1, 3x1, 3 dd 1/2, prn, k/p, s.n., a.c., p.c., h.s.,
  * "sebelum/sesudah makan", "5 hari".
  *
- * STATUS: modul murni, teruji dengan teks tiruan. Belum tersambung ke alur
- * live; daftar obat pada berkas RS berupa tabel berkolom yang sulit dibaca OCR,
- * jadi kualitas masukan teksnya harus diuji dulu pada PDF asli.
+ * STATUS: modul murni, teruji dengan teks tiruan. Tersambung ke alur AI review
+ * lewat pagarPascaAiService (field ai_review.petunjuk_resep, saklar
+ * PETUNJUK_RESEP_AKTIF) HANYA pada baris di bagian terapi/resep. Daftar obat
+ * pada berkas RS berupa tabel berkolom yang sulit dibaca OCR, jadi kualitas
+ * masukan teksnya masih harus diuji pada PDF asli.
  */
 
 const KAMUS = require('../data/kamusObat.json');
@@ -177,4 +179,4 @@ function petunjukDariResep(teksResep, { teksDiagnosis = '' } = {}) {
   return { petunjuk, obat_tidak_dikenali: tidakDikenali, baris: barisHasil };
 }
 
-module.exports = { parseAturanPakai, cariObat, petunjukDariResep, KAMUS_OBAT: KAMUS };
+module.exports = { parseAturanPakai, cariObat, petunjukDariResep, KAMUS_OBAT: KAMUS, KATA_DIAGNOSIS };

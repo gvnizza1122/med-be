@@ -1894,7 +1894,10 @@ async function isiKodeDariSaranTervalidasi(db, recordId, record, aiReview) {
   if (saran.length === 0 && tindakanTerbaca.length === 0) return;
 
   const ambil = (tipe) => [...new Set(
-    saran.filter(s => s && s.type === tipe && s.code && s.kamus_valid === true).map(s => String(s.code).trim())
+    // boleh_isi_otomatis === false dipasang pagarPascaAiService pada saran yang
+    // disangkal berkas atau hanya berupa saran_diagnosis dari anamnesis; saran
+    // lama tanpa penanda itu berperilaku persis seperti sebelumnya.
+    saran.filter(s => s && s.type === tipe && s.code && s.kamus_valid === true && s.boleh_isi_otomatis !== false).map(s => String(s.code).trim())
   )];
 
   const kosong = (v) => !v || String(v).trim() === '';
@@ -2732,6 +2735,8 @@ router.get('/:file_id/extracted', authenticate, async (req, res) => {
       data.tariff_result = aiData.tariff_result;
       data.pending_risk_notes = aiData.pending_risk_notes;
       data.suggested_codes = aiData.suggested_codes;
+      data.pagar_temuan = aiData.pagar_temuan;
+      data.petunjuk_resep = aiData.petunjuk_resep;
     }
 
     // Hide SEP field dari response
@@ -3235,3 +3240,4 @@ module.exports.vclaimToDbFormat = vclaimToDbFormat;
 module.exports.vclaimDateToISO = vclaimDateToISO;
 module.exports.resolvePdfPath = resolvePdfPath;
 module.exports.RESOLVED_UPLOAD_DIR = RESOLVED_UPLOAD_DIR;
+module.exports.isiKodeDariSaranTervalidasi = isiKodeDariSaranTervalidasi;

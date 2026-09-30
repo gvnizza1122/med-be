@@ -6,8 +6,8 @@
  * ia dipertahankan dengan `disangkal: true` supaya pemeriksa manusia tahu
  * berkas memang menyebutnya, dan menyebutnya tidak ada.
  *
- * Modul murni (tanpa DB, tanpa AI). Belum tersambung ke alur live; dipakai oleh
- * pagarTemuanService.saringTemuan dan dapat dipanggil dari mana pun.
+ * Modul murni (tanpa DB, tanpa AI). Dipakai alur live lewat pagarPascaAiService
+ * (saklar PAGAR_NEGASI_AKTIF) dan oleh pagarTemuanService.saringTemuan.
  *
  * Aturan:
  *  - "-/-" atau "(-)" setelah istilah  => disangkal

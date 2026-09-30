@@ -49,6 +49,7 @@ const { classifyPageDocumentType, hasIgdVisitSignal } = require('./pdfPageClassi
 const { evaluasiKombinasiKode } = require('./ketentuanKlaimService');
 const { groupCodesToInaCBG } = require('./inacbgGroupingService');
 const { getTarifResmi, lookupTarifInacbg } = require('./tarifInacbgLookup');
+const { jalankanPagarAman, catatDitolakAwal, ALASAN_PAGAR } = require('./pagarPascaAiService');
 
 const AI_REVIEW_SYSTEM_PROMPT = `Kamu asisten audit klaim BPJS E-Claim untuk perawat/verifikator rumah sakit.
 Kamu diberi data lengkap satu rekam klaim (hasil ekstraksi), daftar field yang gagal validasi otomatis,
@@ -648,7 +649,7 @@ Output HANYA JSON, tanpa markdown/penjelasan:
  * @param {Array} evidencePool - [{page_number, ocr_text, confidence}]
  * @returns {Promise<Array>} suggested_codes (bisa kosong)
  */
-async function suggestDiagnosisCodesFallback(evidencePool) {
+async function suggestDiagnosisCodesFallback(evidencePool, ditolakOut = null) {
   const apiKey = process.env.AI_PROVIDER_API_KEY;
   if (!apiKey || evidencePool.length === 0) return [];
 
@@ -707,12 +708,19 @@ async function suggestDiagnosisCodesFallback(evidencePool) {
     const out = [];
     for (const entry of raw) {
       const { page_number: pageNum, quotation } = entry || {};
-      if (!quotation || !pageNum) continue;
-      if (!validateQuotation(quotation, pageNum, evidencePool)) {
-        console.warn(`[AI-REVIEW] Fallback saran diagnosis: kutipan tidak cocok di halaman ${pageNum}, dibuang.`);
+      if (!quotation || !pageNum) {
+        if (ditolakOut) catatDitolakAwal(ditolakOut, { ...entry, type: 'diagnosis' }, !quotation ? 'kutipan_kosong' : 'halaman_kosong');
         continue;
       }
-      if (hasFinancialTerms(quotation) || hasFinancialTerms(entry.reasoning)) continue;
+      if (!validateQuotation(quotation, pageNum, evidencePool)) {
+        console.warn(`[AI-REVIEW] Fallback saran diagnosis: kutipan tidak cocok di halaman ${pageNum}, dibuang.`);
+        if (ditolakOut) catatDitolakAwal(ditolakOut, { ...entry, type: 'diagnosis' }, 'kutipan_tidak_ada_di_halaman');
+        continue;
+      }
+      if (hasFinancialTerms(quotation) || hasFinancialTerms(entry.reasoning)) {
+        if (ditolakOut) catatDitolakAwal(ditolakOut, { ...entry, type: 'diagnosis' }, ALASAN_PAGAR.ISTILAH_FINANSIAL);
+        continue;
+      }
       out.push({
         code: entry.code, type: 'diagnosis', page_number: pageNum,
         quotation: quotation.substring(0, 200),
@@ -1861,6 +1869,8 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
         tariff_result: null
       };
       const jenisKlaimRecord = record.JENIS_KLAIM || record.jenis_klaim;
+      // Saran yang gugur di tahap lama; dimuat ke ai_review.pagar_temuan.
+      const ditolakAwal = [];
 
       // field_notes: hanya field yang benar-benar ada di validationErrors yang dipertahankan.
       // Untuk RAWAT_JALAN, catatan yang masih menyinggung konsep rawat inap
@@ -1987,15 +1997,25 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
       // adalah opini AI, difilter sama seperti field_notes untuk RAWAT_JALAN.
       if (Array.isArray(aiResult.suggested_codes)) {
         for (const entry of aiResult.suggested_codes) {
-          const { page_number: pageNum, quotation } = entry;
-          if (!quotation || !pageNum) continue;
-          if (!validateQuotation(quotation, pageNum, evidencePool)) {
-            console.warn(`[AI-REVIEW] suggested_code "${entry.code}" dibuang: kutipan tidak cocok di halaman ${pageNum} (AI halusinasi?).`);
+          const { page_number: pageNum, quotation } = entry || {};
+          // Setiap saran yang gugur di sini dicatat di ditolakAwal (dulu hanya
+          // console.warn) supaya tampil di ai_review.pagar_temuan.
+          if (!quotation || !pageNum) {
+            catatDitolakAwal(ditolakAwal, entry, !quotation ? 'kutipan_kosong' : 'halaman_kosong');
             continue;
           }
-          if (hasFinancialTerms(quotation) || hasFinancialTerms(entry.reasoning)) continue;
+          if (!validateQuotation(quotation, pageNum, evidencePool)) {
+            console.warn(`[AI-REVIEW] suggested_code "${entry.code}" dibuang: kutipan tidak cocok di halaman ${pageNum} (AI halusinasi?).`);
+            catatDitolakAwal(ditolakAwal, entry, 'kutipan_tidak_ada_di_halaman');
+            continue;
+          }
+          if (hasFinancialTerms(quotation) || hasFinancialTerms(entry.reasoning)) {
+            catatDitolakAwal(ditolakAwal, entry, ALASAN_PAGAR.ISTILAH_FINANSIAL);
+            continue;
+          }
           if (jenisKlaimRecord === 'RAWAT_JALAN' && hasInpatientOnlyTerms(entry.reasoning)) {
             console.warn(`[AI-REVIEW] Saran kode "${entry.code}" dibuang (reasoning menyinggung rawat inap untuk klaim RAWAT_JALAN).`);
+            catatDitolakAwal(ditolakAwal, entry, ALASAN_PAGAR.ISTILAH_RAWAT_INAP);
             continue;
           }
           result.suggested_codes.push({
@@ -2204,7 +2224,7 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
       if (codes.diagnosis.length === 0 && result.suggested_codes.length === 0 && resumeMedisOnlyPool.length > 0) {
         try {
           const fallbackSuggestions = await Promise.race([
-            suggestDiagnosisCodesFallback(resumeMedisOnlyPool),
+            suggestDiagnosisCodesFallback(resumeMedisOnlyPool, ditolakAwal),
             new Promise((_, reject) => setTimeout(() => reject(new Error('fallback hard-timeout 70s')), 70000)),
           ]);
           if (fallbackSuggestions.length > 0) {
@@ -2226,6 +2246,20 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
         console.warn(`[AI-REVIEW] annotateKamusValid gagal total: ${kamusErr.message}`);
       }
 
+      // Pagar pasca-AI (lihat pagarPascaAiService.js): kutipan harus ada di
+      // halaman, temuan yang disangkal tidak dibaca positif, anamnesis bukan
+      // diagnosis, tulisan tangan ditandai, resep hanya jadi petunjuk. Hanya
+      // MENGURANGI klaim yang tidak didukung dan MENAMBAH penanda; setiap yang
+      // gugur tercatat di result.pagar_temuan. Dijalankan sebelum evaluasi
+      // kombinasi kode supaya saran yang tidak boleh terisi ikut tersingkir.
+      // Gagal -> hasil lama utuh (jalankanPagarAman tidak pernah melempar).
+      {
+        const pagar = jalankanPagarAman({ saran: result.suggested_codes, ditolakAwal, evidencePool });
+        if (pagar.suggested_codes) result.suggested_codes = pagar.suggested_codes;
+        if (pagar.pagar_temuan) result.pagar_temuan = pagar.pagar_temuan;
+        if (pagar.petunjuk_resep) result.petunjuk_resep = pagar.petunjuk_resep;
+      }
+
       // --- Ketentuan Klaim Tipe 3: aturan kombinasi kode (22 Sep 2026) ---
       // Dievaluasi terhadap kode FINAL, yaitu DIAGLIST yang ada DITAMBAH
       // saran yang sudah terverifikasi kamus -- karena saran itulah yang
@@ -2236,7 +2270,7 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
         const kodeFinal = [
           ...String(record.DIAGLIST || record.diagnosa_list || '').split(/[;,]/),
           ...(result.suggested_codes || [])
-            .filter(s => s && s.type === 'diagnosis' && s.kamus_valid === true && s.code)
+            .filter(s => s && s.type === 'diagnosis' && s.kamus_valid === true && s.code && s.boleh_isi_otomatis !== false)
             .map(s => s.code),
         ].map(k => String(k).trim()).filter(Boolean);
 

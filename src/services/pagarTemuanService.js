@@ -21,9 +21,12 @@
  *
  * Tulisan tangan (sumber 'tulisan_tangan') SELALU ditandai perlu_cek_manusia.
  *
- * STATUS: belum tersambung ke alur AI review live. aiReviewService masih
- * memakai skema code_evidence/validateQuotation sendiri (yang sudah memeriksa
- * kutipan per halaman). Modul ini disiapkan untuk skema temuan baru.
+ * STATUS: verifikasiKutipan dipakai alur AI review live lewat
+ * pagarPascaAiService (post-processing suggested_codes, saklar
+ * PAGAR_KUTIPAN_AKTIF). aiReviewService tetap memakai validateQuotation pada
+ * tahap lamanya; keduanya setara untuk kutipan yang sah, dan verifikasiKutipan
+ * menambah penolakan kutipan "tidak ditemukan"/terlalu pendek. saringTemuan dan
+ * skema temuan penuh belum dipakai live.
  */
 
 const { tandaiNegasi } = require('./negasiTemuanService');

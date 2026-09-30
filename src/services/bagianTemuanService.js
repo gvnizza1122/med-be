@@ -7,7 +7,8 @@
  * berlabel jelas, dan itu hanya bila ada bukti terapi. Resep hanya memberi
  * petunjuk (lihat resepPetunjukService), tidak pernah menambah diagnosis.
  *
- * Modul murni. Belum tersambung ke alur live.
+ * Modul murni. Dipakai alur live lewat pagarPascaAiService (saklar
+ * PAGAR_PERAN_AKTIF): hanya bagian yang jelas dikenali yang bertindak.
  */
 
 const BAGIAN = {
