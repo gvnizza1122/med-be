@@ -235,6 +235,73 @@ describe('isiKodeDariSaranTervalidasi (regresi)', () => {
     expect(sqlRecompute[0].a[3]).toBe('file-1');
   });
 
+  /** DB tiruan yang punya STATE: validation_status/DIAGLIST bisa berubah lewat
+   * UPDATE dan terbaca lagi lewat SELECT berikutnya -- perlu untuk menguji
+   * urutan tulis-baca yang sesungguhnya, bukan cuma satu snapshot statis. */
+  function dbBerstatus(awal) {
+    const state = { ...awal };
+    const recompute = [];
+    return {
+      state, recompute,
+      prepare(sql) {
+        if (/SELECT validation_status, file_id FROM claim_records/.test(sql)) {
+          return { get: async () => ({ validation_status: state.validation_status, file_id: state.file_id }) };
+        }
+        if (/SELECT \* FROM claim_records WHERE id = \?/.test(sql)) {
+          return { get: async () => ({ ...state }) };
+        }
+        if (/SELECT \* FROM validation_rules/.test(sql)) return { all: async () => [] };
+        if (/UPDATE claim_records SET validation_status = \?/.test(sql)) {
+          return { run: async (v) => { state.validation_status = v; } };
+        }
+        if (/UPDATE claim_files SET valid_count/.test(sql)) {
+          return { run: async (...a) => { recompute.push(a); } };
+        }
+        return { run: async () => {}, get: async () => undefined, all: async () => [] };
+      },
+    };
+  }
+
+  // Kasus persis yang dikhawatirkan: casemix mengunggah ulang klaim LAMA yang
+  // sudah lengkap dikoding (DIAGLIST/PROCLIST sudah terisi sejak awal, tidak
+  // ada yang perlu diisi otomatis -- perubahan tetap {}). Rule engine bersih
+  // (format field valid), tapi AI menilai berisiko_pending (mis. kegawatan
+  // klinis). Status akhir HARUS pending, bukan diam-diam lolos.
+  test('AI menaikkan status ke pending walau tidak ada kolom yang diisi otomatis', async () => {
+    const db = dbBerstatus({ validation_status: 'valid', file_id: 'file-9', DIAGLIST: 'J45.9', PROCLIST: '93.94' });
+    const ai = { putusan_pending: { status: 'berisiko_pending' } };
+    await isiKodeDariSaranTervalidasi(db, 'rec1', { DIAGLIST: 'J45.9', PROCLIST: '93.94' }, ai);
+    expect(db.state.validation_status).toBe('pending');
+    expect(db.recompute.length).toBeGreaterThanOrEqual(1);
+  });
+
+  // Alur "Baca Ulang": AI menaikkan ke pending, LALU DIAGLIST diisi otomatis
+  // dan rule engine dijalankan ulang bersih -- status pending dari AI TIDAK
+  // BOLEH ditimpa balik ke valid oleh hitung-ulang rule-engine-only.
+  test('status pending dari AI tidak ditimpa balik ke valid oleh hitung ulang rule engine', async () => {
+    const db = dbBerstatus({ validation_status: 'valid', file_id: 'file-9', DIAGLIST: '' });
+    const ai = {
+      putusan_pending: { status: 'berisiko_pending' },
+      suggested_codes: [{ code: 'R10.4', type: 'diagnosis', kamus_valid: true }],
+    };
+    await isiKodeDariSaranTervalidasi(db, 'rec1', { DIAGLIST: '' }, ai);
+    expect(db.state.validation_status).toBe('pending');
+  });
+
+  test('AI tidak menurunkan status yang sudah error', async () => {
+    const db = dbBerstatus({ validation_status: 'error', file_id: 'file-9', DIAGLIST: 'J45.9' });
+    const ai = { putusan_pending: { status: 'berisiko_pending' } };
+    await isiKodeDariSaranTervalidasi(db, 'rec1', { DIAGLIST: 'J45.9' }, ai);
+    expect(db.state.validation_status).toBe('error');
+  });
+
+  test('putusan_pending bersih tidak memaksa status jadi pending', async () => {
+    const db = dbBerstatus({ validation_status: 'valid', file_id: 'file-9', DIAGLIST: 'J45.9' });
+    const ai = { putusan_pending: { status: 'tidak_ditemukan_alasan' } };
+    await isiKodeDariSaranTervalidasi(db, 'rec1', { DIAGLIST: 'J45.9' }, ai);
+    expect(db.state.validation_status).toBe('valid');
+  });
+
   // Sama-sama dari kasus SUMIDAH: kotak AI "DIAGLIST kosong, ... isi DIAGLIST
   // dengan kode ICD-10" tetap tampil walau DIAGLIST SUDAH terisi R10.4, karena
   // catatan itu ditulis AI sebelum pengisian otomatis dan tidak pernah

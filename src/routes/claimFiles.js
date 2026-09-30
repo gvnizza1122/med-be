@@ -2047,6 +2047,34 @@ async function isiKodeDariSaranTervalidasi(db, recordId, record, aiReview) {
       .run(JSON.stringify(aiReview), recordId);
   }
 
+  // AI yang MEMUTUSKAN pending, bukan rule engine. Rule engine (validateRecord)
+  // cuma memeriksa format field (SEP, DIAGLIST berformat ICD-10, dst) -- ia
+  // buta terhadap kegawatdaruratan klinis, kode di luar kamus, dan
+  // konsistensi data, yang semuanya cuma dinilai lewat putusan_pending.
+  // Tanpa langkah ini, klaim yang AI sendiri sudah tandai "berisiko dipending"
+  // bisa tetap tampil VALID kalau format fieldnya bersih -- casemix mengunggah
+  // klaim yang sudah pernah dipending BPJS, dan aplikasi bilang "lolos".
+  // Dijalankan SELALU, sebelum "if (Object.keys(perubahan)...) return" di
+  // bawah, supaya berlaku juga untuk klaim yang DIAGLIST/PROCLIST-nya sudah
+  // terisi sejak awal (tidak ada yang perlu diisi otomatis) -- justru itu
+  // kasus paling umum saat casemix mengunggah ulang klaim lama untuk diuji.
+  //
+  // Hanya menaikkan, tidak pernah menurunkan: kalau status saat ini sudah
+  // 'pending' atau 'error', dibiarkan.
+  const aiBilangPending = aiReview && aiReview.putusan_pending
+    && aiReview.putusan_pending.status === 'berisiko_pending';
+  if (aiBilangPending) {
+    try {
+      const barisSaatIni = await db.prepare('SELECT validation_status, file_id FROM claim_records WHERE id = ?').get(recordId);
+      if (barisSaatIni && barisSaatIni.validation_status !== 'error' && barisSaatIni.validation_status !== 'pending') {
+        await db.prepare('UPDATE claim_records SET validation_status = ? WHERE id = ?').run('pending', recordId);
+        if (barisSaatIni.file_id) await recomputeFileCounts(db, barisSaatIni.file_id);
+      }
+    } catch (errStatusAi) {
+      console.warn(`[AutoIsi] Gagal menaikkan status pending dari putusan AI record ${recordId}: ${errStatusAi.message}`);
+    }
+  }
+
   if (Object.keys(perubahan).length === 0) return;
 
   for (const [kolom, nilai] of Object.entries(perubahan)) {
@@ -2070,7 +2098,18 @@ async function isiKodeDariSaranTervalidasi(db, recordId, record, aiReview) {
         await insert.run(uuidv4(), recordId, e.rule_id, e.field_name, e.error_message, e.expected_value || '', e.actual_value || '', e.severity);
       }
     }
-    await db.prepare('UPDATE claim_records SET validation_status = ? WHERE id = ?').run(determineStatus(errorBaru), recordId);
+    // Jangan pernah MENURUNKAN status balik ke 'valid' hanya karena rule
+    // engine (format field) sekarang bersih -- AI bisa saja sudah menaikkan
+    // status ke 'pending' di atas (aiBilangPending) karena alasan yang rule
+    // engine buta terhadapnya (kegawatdaruratan, kode di luar kamus, dst).
+    // Ambil yang lebih parah dari keduanya, bukan menimpa begitu saja.
+    const statusRuleEngine = determineStatus(errorBaru);
+    const URUTAN_STATUS = { valid: 0, pending: 1, error: 2 };
+    const statusSaatIni = barisTerbaru.validation_status;
+    const statusAkhir = (URUTAN_STATUS[statusSaatIni] || 0) > (URUTAN_STATUS[statusRuleEngine] || 0)
+      ? statusSaatIni
+      : statusRuleEngine;
+    await db.prepare('UPDATE claim_records SET validation_status = ? WHERE id = ?').run(statusAkhir, recordId);
 
     // Cache ringkasan di claim_files (dibaca panel "Hasil Validasi" & Riwayat
     // Upload) dihitung SEBELUM fungsi ini mengisi DIAGLIST/PROCLIST otomatis
