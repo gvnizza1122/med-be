@@ -18,6 +18,7 @@ const { getDb } = require('../database/init');
 const { authenticate, authorize } = require('../middleware/auth');
 const { callKimi } = require('../services/kimiClient');
 const { muatIndeksKlaim, cocokkanSatu } = require('../services/sepCocokService');
+const { panggilModel } = require('../services/gatewayModelService');
 
 const router = express.Router();
 
@@ -216,45 +217,64 @@ ${ex.poin_kunci ? `Catatan koder: ${ex.poin_kunci}` : ''}`).join('\n\n')
   return `ALASAN_PENDING (teks mentah dari dokumen BPJS):\n${alasanRaw}\n\nDATA_KLAIM_ASLI:\n${claimSummary}\n\nCONTOH_BERHASIL:\n${examplesText}`;
 }
 
-async function callAi(prompt) {
-  const apiKey = process.env.AI_PROVIDER_API_KEY;
-  if (!apiKey) return null;
-  const baseUrl = process.env.AI_PROVIDER_BASE_URL || 'https://api.openai.com/v1';
-  const model = process.env.AI_MODEL || 'gpt-4o-mini';
-  const timeoutMs = Number(process.env.AI_TIMEOUT_MS || 60000);
+/**
+ * Identitas dikenal dari klaim asli (claim_records) dan/atau baris rekap
+ * pending (bpjs_pending_responses) untuk disamarkan (penyamaranService)
+ * SEBELUM prompt keluar lewat gatewayModelService. Digabung dari dua sumber
+ * karena tergantung titik panggilan: pending-upload dan generate-draft-untuk-
+ * klaim-tertaut punya `claimRecord` (data klaim asli, lebih lengkap), sedangkan
+ * baris rekap XLSX yang BELUM tertaut ke klaim (claim_record_id null) hanya
+ * punya field administratif dari Excel (nama_peserta/nokartu/mrn/sep).
+ * BELUM TERCAKUP: NIK, alamat, nomor telepon — kolom itu TIDAK ADA di
+ * claim_records maupun bpjs_pending_responses (lihat database/init.js), jadi
+ * tidak bisa diambil dari sini. Tanggal lahir sengaja tidak disamarkan (lihat
+ * penyamaranService).
+ */
+function dikenalDariClaim(claimRecord, existingRow) {
+  return {
+    nama: (claimRecord && claimRecord.nama_pasien) || (existingRow && existingRow.nama_peserta) || undefined,
+    nomor_kartu: (claimRecord && claimRecord.nokartu) || (existingRow && existingRow.nokartu) || undefined,
+    no_rm: (claimRecord && claimRecord.mrn) || (existingRow && existingRow.mrn) || undefined,
+    sep: (claimRecord && claimRecord.sep) || (existingRow && existingRow.sep) || undefined,
+  };
+}
 
-  const ac = new AbortController();
-  const timer = setTimeout(() => ac.abort(), timeoutMs);
-  try {
-    const response = await fetch(`${baseUrl}/chat/completions`, {
-      method: 'POST',
-      signal: ac.signal,
-      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: prompt },
-        ],
-        max_completion_tokens: 3000,
-        response_format: { type: 'json_object' },
-      }),
-    });
-    const respText = await response.text();
-    if (!response.ok) throw new Error(`HTTP ${response.status}: ${respText.slice(0, 160)}`);
-    const data = JSON.parse(respText);
-    const content = data.choices?.[0]?.message?.content || '';
-    if (!content) throw new Error('Model membalas kosong');
-    try {
-      return JSON.parse(content);
-    } catch {
-      const m = content.match(/\{[\s\S]*\}/);
-      if (!m) throw new Error('Model tidak mengembalikan JSON');
-      return JSON.parse(m[0]);
-    }
-  } finally {
-    clearTimeout(timer);
+/**
+ * Draft jawaban pending BPJS lewat gatewayModelService (tugas
+ * 'rancang_jawaban_pending') — router_model kosong di produksi sekarang,
+ * jadi routerModelService.resolve() jatuh ke fallback env dan gateway
+ * memanggil provider 'openai_compat' dengan AI_PROVIDER_API_KEY/
+ * AI_PROVIDER_BASE_URL/AI_MODEL persis seperti fetch() langsung yang dipakai
+ * di sini sebelumnya (lihat gatewayModelService.js: adapter openai_compat
+ * membaca env yang SAMA, dan body request dasarnya sama: model, messages
+ * [system,user], max_completion_tokens, response_format json_object).
+ * Identitas pasien (dikenal) disamarkan SEBELUM prompt keluar, dan dipulihkan
+ * di jawaban — ini yang BARU dibanding fetch() langsung sebelumnya (memang
+ * disengaja, lihat penyamaranService).
+ *
+ * Perilaku luar dijaga SAMA dengan callAi() lama:
+ *  - Tanpa AI_PROVIDER_API_KEY -> null (bukan melempar), supaya pesan
+ *    "AI_PROVIDER_API_KEY belum disetel" di pemanggil tetap tampil.
+ *  - Gagal lainnya (HTTP error, balasan kosong, bukan JSON) -> melempar Error
+ *    seperti sebelumnya, supaya penanganan try/catch pemanggil tidak berubah.
+ *  - Berhasil -> mengembalikan objek JSON hasil parse (sama seperti sebelumnya),
+ *    bukan bungkusan {ok, teks, ...} dari gateway.
+ */
+async function callAi(prompt, { db, dikenal, fetchImpl } = {}) {
+  const r = await panggilModel('rancang_jawaban_pending', {
+    system: SYSTEM_PROMPT,
+    prompt,
+    dikenal: dikenal || {},
+    json: true,
+    maxTokens: 3000,
+    versi: 'bpjs-pending-callai-v1',
+    fetchImpl,
+  }, { db });
+  if (!r.ok) {
+    if (r.kode === 'tanpa_kunci') return null;
+    throw new Error(r.error || 'Model gagal membalas.');
   }
+  return r.hasil;
 }
 
 /**
@@ -295,7 +315,7 @@ router.post('/:recordId/pending-upload', authenticate, upload.single('file'), as
     const db = getDb();
 
     const claimRecord = await db.prepare(`
-      SELECT id, sep, nama_pasien, mrn, admission_date, diagnosa_list, prosedur_list, dpjp_name
+      SELECT id, sep, nokartu, nama_pasien, mrn, admission_date, diagnosa_list, prosedur_list, dpjp_name
       FROM claim_records WHERE id = ?
     `).get(req.params.recordId);
     if (!claimRecord) return res.status(404).json({ error: 'Record klaim tidak ditemukan.' });
@@ -322,7 +342,7 @@ router.post('/:recordId/pending-upload', authenticate, upload.single('file'), as
       `).all();
 
       const prompt = buildPrompt({ alasanRaw, claimRecord, examples: priorExamples });
-      aiResult = await callAi(prompt);
+      aiResult = await callAi(prompt, { db, dikenal: dikenalDariClaim(claimRecord) });
     } catch (err) {
       aiError = err.message;
       console.error('[bpjsPending] AI error:', err.message);
@@ -590,7 +610,7 @@ async function generateDraftForRow(db, existing) {
   let claimRecord = null;
   if (existing.claim_record_id) {
     claimRecord = await db.prepare(`
-      SELECT id, sep, nama_pasien, mrn, admission_date, diagnosa_list, prosedur_list, dpjp_name
+      SELECT id, sep, nokartu, nama_pasien, mrn, admission_date, diagnosa_list, prosedur_list, dpjp_name
       FROM claim_records WHERE id = ?
     `).get(existing.claim_record_id);
   }
@@ -614,7 +634,7 @@ async function generateDraftForRow(db, existing) {
   const prompt = buildPrompt({ alasanRaw: existing.alasan_raw, claimRecord, examples: priorExamples });
   let aiResult = null, aiError = null;
   try {
-    aiResult = await callAi(prompt);
+    aiResult = await callAi(prompt, { db, dikenal: dikenalDariClaim(claimRecord, existing) });
   } catch (err) {
     aiError = err.message;
     console.error('[bpjsPending] generate-draft AI error:', err.message);
@@ -820,3 +840,11 @@ router.delete('/pending-files/bulk-delete-by-user/:userId', authenticate, author
 });
 
 module.exports = router;
+// Diekspos untuk diuji langsung (equivalence request AI, penyamaran identitas)
+// tanpa perlu menembus middleware/multer/pdf-parse — lihat pola yang sama di
+// routes/claimFiles.js (module.exports.isiKodeDariSaranTervalidasi dkk).
+module.exports.callAi = callAi;
+module.exports.dikenalDariClaim = dikenalDariClaim;
+module.exports.buildPrompt = buildPrompt;
+module.exports.generateDraftForRow = generateDraftForRow;
+module.exports.VALID_VCLAIM_COLUMNS = VALID_VCLAIM_COLUMNS;
