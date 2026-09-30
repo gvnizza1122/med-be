@@ -2022,6 +2022,31 @@ async function isiKodeDariSaranTervalidasi(db, recordId, record, aiReview) {
     const gabungan = [...new Set([...p, ...dariTindakan])];
     if (gabungan.length > 0) perubahan.prosedur_list = gabungan.join(';');
   }
+
+  // Catatan AI ("DIAGLIST kosong, ...") ditulis SEBELUM kolom ini diisi
+  // otomatis di atas, jadi begitu terisi catatan itu jadi basi dan
+  // membingungkan (kartu klaim sudah menampilkan kode valid, tapi masih ada
+  // kotak AI menyuruh mengisi DIAGLIST). Ditemukan pada SEP 0170R0110826V003045
+  // (SUMIDAH). Dibuang di sini, sesudah nilai akhir perubahan diketahui.
+  let catatanBasiDibuang = false;
+  if (aiReview && aiReview.field_notes && typeof aiReview.field_notes === 'object') {
+    // field_notes memakai NAMA KOLOM basis data sebagai kunci ("diagnosa_list",
+    // bukan "DIAGLIST") -- lihat field_name di rule RV-05/RV-06 (seed.js) dan
+    // errorFieldNames di aiReviewService.js yang menyaringnya dari situ.
+    if (perubahan.diagnosa_list && aiReview.field_notes.diagnosa_list) {
+      delete aiReview.field_notes.diagnosa_list;
+      catatanBasiDibuang = true;
+    }
+    if (perubahan.prosedur_list && aiReview.field_notes.prosedur_list) {
+      delete aiReview.field_notes.prosedur_list;
+      catatanBasiDibuang = true;
+    }
+  }
+  if (catatanBasiDibuang) {
+    await db.prepare('UPDATE claim_records SET ai_review = ? WHERE id = ?')
+      .run(JSON.stringify(aiReview), recordId);
+  }
+
   if (Object.keys(perubahan).length === 0) return;
 
   for (const [kolom, nilai] of Object.entries(perubahan)) {
@@ -2046,6 +2071,15 @@ async function isiKodeDariSaranTervalidasi(db, recordId, record, aiReview) {
       }
     }
     await db.prepare('UPDATE claim_records SET validation_status = ? WHERE id = ?').run(determineStatus(errorBaru), recordId);
+
+    // Cache ringkasan di claim_files (dibaca panel "Hasil Validasi" & Riwayat
+    // Upload) dihitung SEBELUM fungsi ini mengisi DIAGLIST/PROCLIST otomatis
+    // dan mengubah validation_status record ini -- tanpa baris ini, klaim yang
+    // baru saja jadi valid tetap terhitung pending/error di ringkasan atas
+    // walau badge per-baris sudah benar. Ditemukan pada SEP 0170R0110826V003045
+    // (SUMIDAH): kartu klaim menampilkan "VALID" tapi ringkasan atas
+    // menampilkan "100% PENDING".
+    if (barisTerbaru.file_id) await recomputeFileCounts(db, barisTerbaru.file_id);
   } catch (errValidasi) {
     console.warn(`[AutoIsi] Gagal hitung ulang validasi record ${recordId}: ${errValidasi.message || errValidasi}`);
   }

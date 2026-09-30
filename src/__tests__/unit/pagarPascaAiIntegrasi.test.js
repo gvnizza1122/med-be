@@ -209,6 +209,55 @@ describe('isiKodeDariSaranTervalidasi (regresi)', () => {
     expect(db.tulis.find(t => /SET diagnosa_list/.test(t.sql))).toBeUndefined();
   });
 
+  // Ditemukan pada SEP 0170R0110826V003045 (SUMIDAH): kartu klaim menampilkan
+  // "VALID" tapi ringkasan "Hasil Validasi" di atas menampilkan "100% PENDING".
+  // Sebabnya recomputeFileCounts (pengisi cache claim_files.valid_count/
+  // error_count/pending_count yang dibaca ringkasan itu) dipanggil SEBELUM
+  // DIAGLIST diisi otomatis, dan tidak pernah dipanggil ulang sesudahnya --
+  // record sendiri sudah 'valid' tapi cache file-nya masih hitungan lama.
+  test('cache hitungan claim_files dihitung ulang setelah validation_status record berubah', async () => {
+    const db = dbPalsu();
+    const sqlRecompute = [];
+    db.prepare = (sql) => {
+      if (/SELECT \* FROM claim_records WHERE id = \?/.test(sql)) {
+        return { get: async () => ({ id: 'rec1', file_id: 'file-1', DIAGLIST: 'R10.4', diagnosa_list: 'R10.4' }) };
+      }
+      if (/SELECT \* FROM validation_rules/.test(sql)) return { all: async () => [] };
+      if (/UPDATE claim_files SET valid_count/.test(sql)) {
+        return { run: async (...a) => { sqlRecompute.push({ sql, a }); } };
+      }
+      return { run: async (...a) => { db.tulis.push({ sql, a }); }, get: async () => undefined, all: async () => [] };
+    };
+    await isiKodeDariSaranTervalidasi(db, 'rec1', { DIAGLIST: '' }, {
+      suggested_codes: [{ code: 'R10.4', type: 'diagnosis', kamus_valid: true }],
+    });
+    expect(sqlRecompute).toHaveLength(1);
+    expect(sqlRecompute[0].a[3]).toBe('file-1');
+  });
+
+  // Sama-sama dari kasus SUMIDAH: kotak AI "DIAGLIST kosong, ... isi DIAGLIST
+  // dengan kode ICD-10" tetap tampil walau DIAGLIST SUDAH terisi R10.4, karena
+  // catatan itu ditulis AI sebelum pengisian otomatis dan tidak pernah
+  // dibuang. field_notes memakai nama KOLOM ("diagnosa_list"), bukan "DIAGLIST".
+  test('catatan AI yang basi dibuang begitu DIAGLIST terisi otomatis', async () => {
+    const db = dbPalsu();
+    const ai = {
+      field_notes: { diagnosa_list: 'DIAGLIST kosong, isi dengan kode ICD-10 yang sesuai.' },
+      suggested_codes: [{ code: 'R10.4', type: 'diagnosis', kamus_valid: true }],
+    };
+    await isiKodeDariSaranTervalidasi(db, 'rec1', { DIAGLIST: '' }, ai);
+    expect(ai.field_notes.diagnosa_list).toBeUndefined();
+    const tulisAiReview = db.tulis.filter(t => /SET ai_review/.test(t.sql));
+    expect(tulisAiReview.some(t => !JSON.parse(t.a[0]).field_notes.diagnosa_list)).toBe(true);
+  });
+
+  test('catatan AI TIDAK dibuang kalau kolomnya masih kosong (tidak ada saran valid)', async () => {
+    const db = dbPalsu();
+    const ai = { field_notes: { diagnosa_list: 'DIAGLIST kosong, isi dengan kode ICD-10.' }, suggested_codes: [] };
+    await isiKodeDariSaranTervalidasi(db, 'rec1', { DIAGLIST: '' }, ai);
+    expect(ai.field_notes.diagnosa_list).toBe('DIAGLIST kosong, isi dengan kode ICD-10.');
+  });
+
   test('DIAGLIST non-WHO tanpa saran AI tetap ditandai dan raw_data diperbarui', async () => {
     const db = dbPalsu();
     const record = { DIAGLIST: 'r10.84' };
