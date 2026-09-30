@@ -27,6 +27,7 @@ const bridgingRoutes = require('./routes/bridging');
 const hospitalSettingsRoutes = require('./routes/hospitalSettings');
 const prbExemptRoutes = require('./routes/prbExempt');
 const bpjsPendingRoutes = require('./routes/bpjsPending');
+const jawabPendingRoutes = require('./routes/jawabPending');
 const auditLogRoutes = require('./routes/auditLogs');
 
 const app = express();
@@ -146,6 +147,8 @@ app.use('/api/v1/audit-logs', auditLogRoutes);
 // plus router baru untuk fitur Jawaban Pending BPJS (item 9).
 app.use('/api/v1/records', validationRuleRoutes.recordsRouter);
 app.use('/api/v1/records', bpjsPendingRoutes);
+// Alur Menjawab Pending BPJS (SEP, pemetaan alasan, triase 4 kotak, draf berbukti).
+app.use('/api/v1/pending-jawaban', jawabPendingRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

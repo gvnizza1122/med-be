@@ -17,6 +17,7 @@ const { v4: uuidv4 } = require('uuid');
 const { getDb } = require('../database/init');
 const { authenticate, authorize } = require('../middleware/auth');
 const { callKimi } = require('../services/kimiClient');
+const { muatIndeksKlaim, cocokkanSatu } = require('../services/sepCocokService');
 
 const router = express.Router();
 
@@ -451,15 +452,19 @@ router.post('/pending-import-xlsx', authenticate, xlsxUpload.single('file'), asy
 
     const fileId = uuidv4();
     let imported = 0, skippedDuplicate = 0, matchedClaim = 0;
+    // Pencocokan SEP dinormalisasi (spasi, karakter tersembunyi, huruf mirip)
+    // dan hasilnya dipecah supaya "cocok = 0" bisa dijelaskan penyebabnya.
+    const indeksKlaim = await muatIndeksKlaim(db);
+    const rincianCocok = { cocok: 0, klaim_tidak_ada: 0, format: 0 };
     for (const row of parsedRows) {
       const dup = await db.prepare(`
         SELECT id FROM bpjs_pending_responses WHERE sep = ? AND alasan_raw = ? AND source = 'xlsx_import'
       `).get(row.sep, row.alasan_pending);
       if (dup) { skippedDuplicate++; continue; }
 
-      const claimRecord = await db.prepare(`
-        SELECT id FROM claim_records WHERE sep = ? ORDER BY row_number LIMIT 1
-      `).get(row.sep);
+      const hasilCocok = cocokkanSatu(row.sep, indeksKlaim);
+      rincianCocok[hasilCocok.status]++;
+      const claimRecord = hasilCocok.status === 'cocok' ? { id: hasilCocok.klaimId } : null;
       if (claimRecord) matchedClaim++;
 
       await db.prepare(`
@@ -488,6 +493,8 @@ router.post('/pending-import-xlsx', authenticate, xlsxUpload.single('file'), asy
     res.json({
       file_id: imported > 0 ? fileId : null,
       total_rows: parsedRows.length, imported, skipped_duplicate: skippedDuplicate, matched_claim: matchedClaim,
+      // Rincian penyebab: cocok / klaim_tidak_ada / format (lihat sepCocokService).
+      rincian_cocok: rincianCocok,
     });
   } catch (err) {
     console.error('[bpjsPending] xlsx import error:', err);
