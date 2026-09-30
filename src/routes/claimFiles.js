@@ -475,12 +475,64 @@ router.post('/upload', authenticate, upload.single('file'), async (req, res) => 
 });
 
 /**
+ * GET /api/v1/claim-files/kelompok
+ *
+ * Ringkasan pengelompokan Periode & Kategori untuk Riwayat Upload: satu baris
+ * per (periode, kategori) beserta jumlah klaim, yang perlu dikerjakan, dan
+ * yang siap. Baris klaimnya sendiri dimuat terpisah saat kelompok dibuka,
+ * lewat GET / dengan filter periode — daftar tidak pernah dimuat seluruhnya.
+ *
+ * Periode diambil dari nomor SEP (lihat periodeKlaimService), BUKAN tanggal
+ * unggah: berkas Agustus yang baru diunggah September tetap masuk Agustus.
+ *
+ * Ini rute satu segmen, jadi HARUS didaftarkan sebelum GET /:id — kalau
+ * tidak, kata "kelompok" ditelan sebagai id berkas.
+ */
+router.get('/kelompok', authenticate, async (req, res) => {
+  try {
+    const db = getDb();
+    const { arsip, jenis_klaim } = req.query;
+
+    let where = arsip === '1' ? 'WHERE cf.diarsipkan_pada IS NOT NULL' : 'WHERE cf.diarsipkan_pada IS NULL';
+    const params = [];
+    if (jenis_klaim) { where += ' AND cf.jenis_klaim = ?'; params.push(jenis_klaim); }
+
+    const rows = await db.prepare(`
+      SELECT r.periode AS periode, cf.jenis_klaim AS jenis_klaim,
+             COUNT(*) AS total,
+             COUNT(*) FILTER (WHERE (cf.pending_count + cf.error_count) > 0) AS perlu,
+             COUNT(*) FILTER (WHERE (cf.pending_count + cf.error_count) = 0) AS siap
+      FROM claim_files cf
+      LEFT JOIN LATERAL (
+        SELECT periode FROM claim_records WHERE file_id = cf.id ORDER BY row_number LIMIT 1
+      ) r ON TRUE
+      ${where}
+      GROUP BY r.periode, cf.jenis_klaim
+      ORDER BY r.periode DESC NULLS LAST, cf.jenis_klaim
+    `).all(...params);
+
+    res.json({
+      kelompok: rows.map(r => ({
+        periode: r.periode || null,
+        jenis_klaim: r.jenis_klaim || null,
+        total: Number(r.total),
+        perlu: Number(r.perlu),
+        siap: Number(r.siap),
+      })),
+    });
+  } catch (err) {
+    console.error('[claimFiles] kelompok error:', err);
+    res.status(500).json({ error: 'Terjadi gangguan pada sistem. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' });
+  }
+});
+
+/**
  * GET /api/v1/claim-files
  */
 router.get('/', authenticate, async (req, res) => {
   try {
     const db = getDb();
-    const { page = 1, limit = 20, status, jenis_klaim, from_date, to_date, search, arsip } = req.query;
+    const { page = 1, limit = 20, status, jenis_klaim, from_date, to_date, search, arsip, periode, tampilan } = req.query;
     const offset = (parseInt(page) - 1) * parseInt(limit);
 
     let where = 'WHERE 1=1';
@@ -491,6 +543,32 @@ router.get('/', authenticate, async (req, res) => {
     // sehingga ada tempat untuk melihat dan mengembalikannya. Tanpa tampilan
     // itu, arsip tidak berbeda dari penghapusan.
     where += arsip === '1' ? ' AND cf.diarsipkan_pada IS NOT NULL' : ' AND cf.diarsipkan_pada IS NULL';
+
+    // Pengelompokan per periode. Periode sebuah berkas = periode record
+    // pertamanya — definisi yang SAMA dengan /kelompok, supaya jumlah di header
+    // kelompok selalu sama dengan jumlah baris yang tampil saat dibuka.
+    // 'tanpa' = berkas yang periodenya belum bisa ditentukan.
+    const SQL_PERIODE_BERKAS = "(SELECT periode FROM claim_records WHERE file_id = cf.id ORDER BY row_number LIMIT 1)";
+    if (periode) {
+      if (periode === 'tanpa') {
+        where += ` AND ${SQL_PERIODE_BERKAS} IS NULL`;
+      } else {
+        where += ` AND ${SQL_PERIODE_BERKAS} = ?`;
+        params.push(String(periode));
+      }
+    }
+
+    // Tampilan tersimpan. "Perlu dikerjakan" = masih ada masalah atau pending;
+    // "Siap submit" = bersih. Diturunkan dari hitungan yang sudah ada, bukan
+    // dari kolom status baru, supaya tidak ada dua sumber kebenaran.
+    if (tampilan === 'perlu') where += ' AND (cf.pending_count + cf.error_count) > 0';
+    else if (tampilan === 'siap') where += ' AND (cf.pending_count + cf.error_count) = 0';
+    else if (tampilan === 'bulan_ini') {
+      const sekarang = new Date();
+      const bulanIni = `${sekarang.getFullYear()}-${String(sekarang.getMonth() + 1).padStart(2, '0')}`;
+      where += ` AND ${SQL_PERIODE_BERKAS} = ?`;
+      params.push(bulanIni);
+    }
 
     if (status) {
       where += ' AND cf.status = ?';
