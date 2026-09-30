@@ -2042,6 +2042,38 @@ async function isiKodeDariSaranTervalidasi(db, recordId, record, aiReview) {
       catatanBasiDibuang = true;
     }
   }
+
+  // Prosedur "jangan pernah kosong DIAM-DIAM": kalau PROCLIST masih kosong
+  // setelah semua sumber di atas, catat ALASANNYA secara eksplisit beserta
+  // kandidat yang terdeteksi tapi kodenya belum pasti atau tertahan aturan RS
+  // (mis. pemasangan infus) -- supaya koder tinggal klik, bukan menebak dari
+  // nol kenapa kosong. TIDAK PERNAH mengisi kode yang belum pasti ke PROCLIST
+  // -- prosedur yang tidak pernah dilakukan adalah temuan fraud, bukan
+  // sekadar kesalahan koding. Kandidatnya diambil dari usulan_prosedur yang
+  // sudah dihitung di atas (tahap KODING); tidak menghitung ulang apa pun.
+  if (aiReview) {
+    const proclistAkhir = perubahan.prosedur_list || record.PROCLIST || record.prosedur_list;
+    if (kosong(proclistAkhir)) {
+      const kandidat = Array.isArray(aiReview.usulan_prosedur)
+        ? aiReview.usulan_prosedur.filter(u => u && !u.masuk_proclist)
+        : [];
+      aiReview.proclist_kosong = {
+        alasan: kandidat.length > 0
+          ? `${kandidat.length} tindakan terdeteksi di berkas, tapi kodenya belum pasti atau tertahan aturan RS.`
+          : 'Tidak ada tindakan yang terbaca dari berkas ini.',
+        kandidat: kandidat.map(k => ({
+          nama: k.nama, kode_usulan: k.kode_usulan, alasan: k.alasan,
+          sumber_bukti: k.sumber_bukti, halaman_bukti: k.halaman_bukti,
+        })),
+      };
+      catatanBasiDibuang = true;
+    } else if (aiReview.proclist_kosong) {
+      // Terisi (di sini atau sebelumnya) -- catatan lama jadi basi.
+      delete aiReview.proclist_kosong;
+      catatanBasiDibuang = true;
+    }
+  }
+
   if (catatanBasiDibuang) {
     await db.prepare('UPDATE claim_records SET ai_review = ? WHERE id = ?')
       .run(JSON.stringify(aiReview), recordId);

@@ -336,6 +336,53 @@ describe('isiKodeDariSaranTervalidasi (regresi)', () => {
     expect(ai.inacbg_result).toBeNull();
   });
 
+  describe('proclist_kosong — prosedur tidak pernah kosong diam-diam', () => {
+    test('PROCLIST tetap kosong: alasan + kandidat dari usulan_prosedur tercatat', async () => {
+      const db = dbPalsu();
+      const ai = {
+        suggested_codes: [],
+        usulan_prosedur: [
+          { id: 'infus', nama: 'Pemasangan infus', kode_usulan: null, alasan: 'Kode belum pasti — tidak pernah ditebak, jadi tidak masuk daftar prosedur.', masuk_proclist: false, sumber_bukti: ['resume_medis'], halaman_bukti: [2] },
+          { id: 'nebulisasi', nama: 'Nebulisasi', kode_usulan: '93.94', alasan: 'Kebijakan RS: dikodekan.', masuk_proclist: true, sumber_bukti: ['resume_medis'], halaman_bukti: [2] },
+        ],
+      };
+      await isiKodeDariSaranTervalidasi(db, 'rec1', { PROCLIST: '' }, ai);
+      // Kode belum pasti TIDAK PERNAH diisi ke PROCLIST walau ada kandidat.
+      expect(db.tulis.find(t => /SET prosedur_list/.test(t.sql))).toBeUndefined();
+      expect(ai.proclist_kosong.kandidat).toHaveLength(1);
+      expect(ai.proclist_kosong.kandidat[0].nama).toBe('Pemasangan infus');
+      expect(ai.proclist_kosong.alasan).toMatch(/1 tindakan/);
+      const tulisAiReview = db.tulis.filter(t => /SET ai_review/.test(t.sql));
+      expect(tulisAiReview.some(t => JSON.parse(t.a[0]).proclist_kosong)).toBe(true);
+    });
+
+    test('tidak ada tindakan terbaca sama sekali: alasan generik, kandidat kosong', async () => {
+      const db = dbPalsu();
+      const ai = { suggested_codes: [] };
+      await isiKodeDariSaranTervalidasi(db, 'rec1', { PROCLIST: '' }, ai);
+      expect(ai.proclist_kosong.kandidat).toEqual([]);
+      expect(ai.proclist_kosong.alasan).toMatch(/Tidak ada tindakan/);
+    });
+
+    test('PROCLIST terisi: tidak ada proclist_kosong', async () => {
+      const db = dbPalsu();
+      const ai = { suggested_codes: [], usulan_prosedur: [{ nama: 'x', masuk_proclist: false, alasan: 'y' }] };
+      await isiKodeDariSaranTervalidasi(db, 'rec1', { PROCLIST: '93.94' }, ai);
+      expect(ai.proclist_kosong).toBeUndefined();
+    });
+
+    test('catatan proclist_kosong lama dibuang begitu PROCLIST akhirnya terisi', async () => {
+      const db = dbPalsu();
+      const ai = {
+        proclist_kosong: { alasan: 'lama', kandidat: [] },
+        suggested_codes: [],
+        temuan_tindakan: [{ id: 'nebulisasi', kode_usulan: '93.94', bukti: [{ sumber: 'resume_medis' }] }],
+      };
+      await isiKodeDariSaranTervalidasi(db, 'rec1', { PROCLIST: '' }, ai);
+      expect(ai.proclist_kosong).toBeUndefined();
+    });
+  });
+
   // Sama-sama dari kasus SUMIDAH: kotak AI "DIAGLIST kosong, ... isi DIAGLIST
   // dengan kode ICD-10" tetap tampil walau DIAGLIST SUDAH terisi R10.4, karena
   // catatan itu ditulis AI sebelum pengisian otomatis dan tidak pernah
