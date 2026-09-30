@@ -11,7 +11,7 @@ const { generateExcel } = require('../services/exportService');
 const { buatDaftarKerja, namaBerkasDaftarKerja } = require('../services/daftarKerjaExportService');
 const { logAudit } = require('../services/auditService');
 const { estimatePromptTokens, estimateCompletionTokens } = require('../services/aiValidationService');
-const { generateAiReview } = require('../services/aiReviewService');
+const { generateAiReview, hitungInacbgDanTarif } = require('../services/aiReviewService');
 const { getRelevantKnowledge, recordKnowledge, getRelevantBpjsExamples } = require('../services/errorKnowledgeService');
 const { matchPrbCategory } = require('../services/prbRules');
 const { linkPendingBpjsForSep } = require('../services/bpjsPendingLink');
@@ -2072,6 +2072,46 @@ async function isiKodeDariSaranTervalidasi(db, recordId, record, aiReview) {
       }
     } catch (errStatusAi) {
       console.warn(`[AutoIsi] Gagal menaikkan status pending dari putusan AI record ${recordId}: ${errStatusAi.message}`);
+    }
+  }
+
+  // Grouping INA-CBG & tarif (di dalam generateAiReview) dihitung dari kode
+  // yang ada SAAT AI review dijalankan -- sering masih kosong kalau DIAGLIST
+  // baru terisi di FUNGSI INI. Akibatnya panel FE menampilkan "Pending
+  // verifikasi" terus walau DIAGLIST/PROCLIST akhirnya valid (ditemukan pada
+  // SEP 0170R0110826V003045 / SUMIDAH). Dihitung ulang di sini dengan kode
+  // FINAL (setelah perubahan di atas), hanya kalau belum pernah berhasil
+  // (aiReview.inacbg_result masih null) -- tidak pernah menimpa hasil yang
+  // sudah ada, dan tidak pernah mengarang tarif (hitungInacbgDanTarif hanya
+  // membaca tabel referensi PMK 3/2023, sama seperti generateAiReview).
+  // Dijalankan SELALU (sebelum "if (Object.keys(perubahan)...) return" di
+  // bawah), supaya berlaku juga saat DIAGLIST/PROCLIST sudah lengkap sejak
+  // awal dan tidak ada yang perlu diisi otomatis.
+  if (aiReview && !aiReview.inacbg_result) {
+    try {
+      const diaglistAkhir = perubahan.diagnosa_list || record.DIAGLIST || record.diagnosa_list || '';
+      const proclistAkhir = perubahan.prosedur_list || record.PROCLIST || record.prosedur_list || '';
+      const diagnosisAkhir = String(diaglistAkhir).split(/[;,]/).map(k => k.trim()).filter(Boolean);
+      if (diagnosisAkhir.length > 0) {
+        const prosedurAkhir = String(proclistAkhir).split(/[;,]/).map(k => k.trim()).filter(Boolean);
+        const jenisKlaimAkhir = record.JENIS_KLAIM || record.jenis_klaim;
+        const kelasRawatAkhir = record.KELAS_RAWAT || record.kelas_rawat;
+        const { inacbgCodeForLookup, inacbgResult, tarifResult } = hitungInacbgDanTarif(
+          diagnosisAkhir, prosedurAkhir, jenisKlaimAkhir, kelasRawatAkhir, aiReview.suggested_inacbg,
+        );
+        if (inacbgResult) {
+          aiReview.inacbg_result = inacbgResult;
+          aiReview.tariff_result = tarifResult;
+          if (inacbgCodeForLookup) {
+            aiReview.suggested_inacbg = inacbgCodeForLookup;
+            aiReview.suggested_tarif = tarifResult ? tarifResult.amount : null;
+          }
+          await db.prepare('UPDATE claim_records SET ai_review = ? WHERE id = ?')
+            .run(JSON.stringify(aiReview), recordId);
+        }
+      }
+    } catch (errInacbg) {
+      console.warn(`[AutoIsi] Gagal menghitung ulang INA-CBG/tarif record ${recordId}: ${errInacbg.message}`);
     }
   }
 

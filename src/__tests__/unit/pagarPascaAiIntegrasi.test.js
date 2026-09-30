@@ -302,6 +302,40 @@ describe('isiKodeDariSaranTervalidasi (regresi)', () => {
     expect(db.state.validation_status).toBe('valid');
   });
 
+  // Kasus SUMIDAH: INA-CBG & Tarif tampil "Pending verifikasi" terus walau
+  // DIAGLIST/PROCLIST sudah valid, karena grouping di dalam generateAiReview
+  // dihitung dari kode yang ada SAAT itu (masih kosong). Di sini DIAGLIST/
+  // PROCLIST SUDAH lengkap sejak awal (tidak ada yang perlu diisi otomatis,
+  // perubahan={}) -- kasus paling umum saat mengunggah ulang klaim lama.
+  test('INA-CBG dan tarif dihitung ulang dengan kode final walau tidak ada yang diisi otomatis', async () => {
+    const db = dbPalsu();
+    const ai = { inacbg_result: null, tariff_result: null, suggested_codes: [] };
+    await isiKodeDariSaranTervalidasi(
+      db, 'rec1',
+      { DIAGLIST: 'J45.9', PROCLIST: '93.94', JENIS_KLAIM: 'RAWAT_JALAN' },
+      ai,
+    );
+    expect(ai.inacbg_result).not.toBeNull();
+    expect(ai.inacbg_result.code).toMatch(/^J-/);
+    const tulisAiReview = db.tulis.filter(t => /SET ai_review/.test(t.sql));
+    expect(tulisAiReview.some(t => JSON.parse(t.a[0]).inacbg_result)).toBe(true);
+  });
+
+  test('INA-CBG tidak dihitung ulang kalau sudah pernah berhasil (tidak menimpa hasil ada)', async () => {
+    const db = dbPalsu();
+    const hasilLama = { code: 'X-1-1-I', description: 'lama' };
+    const ai = { inacbg_result: hasilLama, tariff_result: { amount: 1000 }, suggested_codes: [] };
+    await isiKodeDariSaranTervalidasi(db, 'rec1', { DIAGLIST: 'J45.9', PROCLIST: '93.94' }, ai);
+    expect(ai.inacbg_result).toBe(hasilLama);
+  });
+
+  test('INA-CBG tidak dihitung kalau DIAGLIST akhir tetap kosong', async () => {
+    const db = dbPalsu();
+    const ai = { inacbg_result: null, suggested_codes: [] };
+    await isiKodeDariSaranTervalidasi(db, 'rec1', { DIAGLIST: '' }, ai);
+    expect(ai.inacbg_result).toBeNull();
+  });
+
   // Sama-sama dari kasus SUMIDAH: kotak AI "DIAGLIST kosong, ... isi DIAGLIST
   // dengan kode ICD-10" tetap tampil walau DIAGLIST SUDAH terisi R10.4, karena
   // catatan itu ditulis AI sebelum pengisian otomatis dan tidak pernah

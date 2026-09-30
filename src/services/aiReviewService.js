@@ -1773,6 +1773,131 @@ async function assessPendingRiskPatterns(record, evidencePool) {
 }
 
 /**
+ * Hitung kode INA-CBG (grouping heuristik, BUKAN grouper resmi Permenkes --
+ * lihat JSDoc di inacbgGroupingService.js) dan tarifnya dari PMK No. 3 Tahun
+ * 2023 (Regional 1 Kelas D Swasta). Fungsi murni, sinkron, tidak memanggil AI
+ * -- semua sumbernya tabel referensi lokal.
+ *
+ * SENGAJA DIPISAH dari generateAiReview (yang punya salinan logika identik
+ * inline, TIDAK diubah/disentuh oleh fungsi ini) supaya bisa dipanggil ULANG
+ * dengan kode diagnosis/prosedur FINAL, setelah DIAGLIST/PROCLIST diisi
+ * otomatis oleh claimFiles.js (isiKodeDariSaranTervalidasi). Tanpa ini,
+ * grouping di dalam generateAiReview selalu memakai kode yang ada SAAT AI
+ * review dijalankan -- sering masih kosong kalau DIAGLIST baru terisi
+ * belakangan -- jadi inacbg_result/tariff_result tetap null walau DIAGLIST
+ * akhirnya valid, dan panel FE menampilkan "Pending verifikasi" terus
+ * (ditemukan pada SEP 0170R0110826V003045 / SUMIDAH).
+ *
+ * Duplikasi (bukan ekstraksi dari generateAiReview) sengaja dipilih supaya
+ * alur generateAiReview yang sudah teruji untuk perhitungan tarif TIDAK
+ * disentuh sama sekali oleh perbaikan ini.
+ *
+ * @param {string[]} diagnosisCodes kode ICD-10 WHO final
+ * @param {string[]} procedureCodes kode ICD-9-CM final
+ * @param {string} jenisKlaim 'RAWAT_JALAN'|'RAWAT_INAP'
+ * @param {string|null} kelasRawat
+ * @param {string|null} [aiSuggestedInacbg] kode INA-CBG usulan AI (opsional; dicek dulu ke tabel resmi, degradasi ke grouping kalau tidak ada)
+ * @returns {{inacbgCodeForLookup: string|null, inacbgResult: object|null, tarifResult: object|null}}
+ */
+function hitungInacbgDanTarif(diagnosisCodes, procedureCodes, jenisKlaim, kelasRawat, aiSuggestedInacbg) {
+  const inacbgGrouping = groupCodesToInaCBG(diagnosisCodes || [], procedureCodes || [], jenisKlaim);
+  let inacbgCodeForLookup = null;
+  let inacbgResult = null;
+
+  if (aiSuggestedInacbg && typeof aiSuggestedInacbg === 'string') {
+    const aiSuggestedCode = aiSuggestedInacbg.trim().toUpperCase();
+    if (lookupTarifInacbg(aiSuggestedCode)) {
+      inacbgCodeForLookup = aiSuggestedCode;
+    } else {
+      console.warn(`[AI-REVIEW] AI suggested_inacbg "${aiSuggestedCode}" tidak ditemukan di tabel PMK 3/2023 (Regional 1 Kelas D Swasta) -- diabaikan, fallback ke grouping service.`);
+      if (inacbgGrouping) inacbgCodeForLookup = inacbgGrouping.code;
+    }
+  } else if (inacbgGrouping) {
+    inacbgCodeForLookup = inacbgGrouping.code;
+  }
+
+  let tarifResult = null;
+  if (inacbgCodeForLookup) {
+    try {
+      const tarifData = lookupTarifInacbg(inacbgCodeForLookup);
+      if (tarifData) {
+        const tarifInfo = getTarifResmi(inacbgCodeForLookup, kelasRawat);
+        if (tarifInfo && tarifInfo.tarif !== null) {
+          tarifResult = {
+            amount: Number(tarifInfo.tarif),
+            region: tarifData.regional || '1',
+            class: tarifData.tipe_rs || 'D_SWASTA',
+            jenis_layanan: tarifData.jenis_layanan || jenisKlaim,
+            source: 'PMK_3_2023',
+            kelas_rawat: kelasRawat ?? null,
+            note: 'Tarif resmi dari PMK No. 3 Tahun 2023',
+          };
+        } else if (tarifInfo) {
+          tarifResult = {
+            amount: null,
+            region: tarifData.regional || '1',
+            class: tarifData.tipe_rs || 'D_SWASTA',
+            jenis_layanan: tarifData.jenis_layanan || jenisKlaim,
+            source: 'PMK_3_2023',
+            kelas_rawat: kelasRawat ?? null,
+            note: tarifInfo.alasanTarifKosong || 'Kode ada di PMK No. 3 Tahun 2023 tapi tarif tidak berlaku untuk kelas rawat ini',
+          };
+        }
+        inacbgResult = {
+          code: inacbgCodeForLookup,
+          description: tarifData.description || tarifData.deskripsi || null,
+          confidence: inacbgGrouping ? inacbgGrouping.confidence : 0.8,
+          reasoning: inacbgGrouping ? inacbgGrouping.reasoning : `Dari diagnosis utama ${diagnosisCodes[0] || 'unknown'}.`,
+          severity_level: inacbgCodeForLookup.split('-').pop() || null,
+          source: 'PMK_3_2023',
+        };
+      } else {
+        // Kode TIDAK DITEMUKAN di tabel resmi PMK 3/2023 -> kamus fallback
+        // kecil. Kalau kode benar-benar tidak ada di manapun, tarifResult
+        // tetap null (bukan angka fiktif) -- lihat catatan yang sama di
+        // salinan inline generateAiReview soal kenapa tidak ada "estimasi".
+        const estimasi = getInacbgEstimasi(inacbgCodeForLookup);
+        if (estimasi && estimasi.source === 'DICTIONARY' && estimasi.tarif) {
+          tarifResult = {
+            amount: Number(estimasi.tarif),
+            region: '1',
+            class: 'D_SWASTA',
+            jenis_layanan: jenisKlaim,
+            source: 'DICTIONARY_FALLBACK',
+            kelas_rawat: kelasRawat,
+            note: `Tarif dari kamus fallback (data sampel). Kode "${inacbgCodeForLookup}" belum ada di tabel PMK No. 3 Tahun 2023 Regional 1 Kelas D Swasta.`,
+          };
+        }
+        inacbgResult = {
+          code: inacbgCodeForLookup,
+          description: null,
+          confidence: inacbgGrouping ? inacbgGrouping.confidence : 0.8,
+          reasoning: inacbgGrouping ? inacbgGrouping.reasoning : `Dari diagnosis utama ${diagnosisCodes[0] || 'unknown'}.`,
+          severity_level: inacbgCodeForLookup.split('-').pop() || null,
+          source: 'GENERATED',
+          note: tarifResult
+            ? `Kode dihasilkan dari diagnosis & prosedur (fallback heuristik, bukan grouper resmi). Belum ada di PMK No. 3 Tahun 2023, tarif dari kamus fallback.`
+            : `Kode dihasilkan dari diagnosis & prosedur (fallback heuristik, bukan grouper resmi). Belum ada di PMK No. 3 Tahun 2023 -- tarif tidak tersedia.`,
+        };
+      }
+    } catch (tarifErr) {
+      console.warn(`[AI-REVIEW] Gagal lookup tarif untuk ${inacbgCodeForLookup}: ${tarifErr.message}`);
+      if (inacbgGrouping) {
+        inacbgResult = {
+          code: inacbgGrouping.code,
+          description: null,
+          confidence: inacbgGrouping.confidence,
+          reasoning: inacbgGrouping.reasoning,
+          severity_level: inacbgGrouping.code.split('-').pop() || null,
+          source: 'FALLBACK',
+        };
+      }
+    }
+  }
+  return { inacbgCodeForLookup, inacbgResult, tarifResult };
+}
+
+/**
  * @param {Object} record - Field values rekam klaim saat ini (memory) — bisa
  *   format vClaim (DIAGLIST, SEP, ...) atau format DB (diagnosa_list, sep, ...).
  * @param {Array} evidencePool - [{page_number, ocr_text, confidence}] — OCR + teks native, boleh kosong.
@@ -2453,6 +2578,7 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
 
 module.exports = {
   generateAiReview,
+  hitungInacbgDanTarif,
   // Diekspor supaya pemeriksaan kamus bisa diuji tanpa menjalankan
   // seluruh alur review.
   periksaKodeKlaimTerhadapKamus,
