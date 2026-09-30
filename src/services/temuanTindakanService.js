@@ -40,12 +40,22 @@ const KAMUS_TINDAKAN = [
     nama: 'Nebulisasi',
     kode_usulan: '93.94',
     pola: /\bnebu?l(isasi)?\b|\bnebules\b/i,
+    // Petunjuk di RESEP bahwa tindakannya dilakukan. Yang dihitung alat, atau
+    // obat dalam bentuk nebul; salbutamol tablet bukan nebulisasi, jadi obat
+    // selalu dipasangkan dengan bentuk sediaannya.
+    sinyal_resep: [
+      /\bmasker\s*nebul|\bnebuli[sz]er\b|\bnebul\s*chamber\b/i,
+      /\b(ventasal|salbutamol|combivent|ipratropium|ventolin|budesonide|pulmicort)\b[^\n]{0,40}\b(nebul\w*|respul|inhalasi)\b/i,
+    ],
   },
   {
     id: 'terapi_oksigen',
     nama: 'Terapi oksigen',
     kode_usulan: '93.96',
     pola: /\boksigen(asi)?\b|\bo2\s*(nasal|kanul|masker|nrm)\b/i,
+    // Alat oksigen di resep. Saturasi rendah SAJA tidak pernah menjadi dasar
+    // tindakan: yang tidak tertulis diberikan tidak boleh dikodekan.
+    sinyal_resep: [/\bnasal\s*(kanul|canul|cannula)\b|\bmasker\s*(oksigen|o2|nrm)\b|\bnon[\s-]?rebreathing\b|\bselang\s*oksigen\b/i],
   },
   {
     id: 'pemasangan_infus',
@@ -53,6 +63,7 @@ const KAMUS_TINDAKAN = [
     kode_usulan: null,
     catatan_kode: 'Kode belum dipastikan koder — sengaja tidak ditebak.',
     pola: /\b(pasang|memasang|terpasang)\s*(inf|infus|ivfd)\b|\binfus\s*(asering|rl|nacl)/i,
+    sinyal_resep: [/\b(abocath|iv\s*cath(eter)?|infus\s*set|venflon|wing\s*needle)\b/i],
   },
   {
     id: 'rontgen_toraks',
@@ -113,6 +124,17 @@ const LABEL_PER_JENIS = {
 // isi bagian berikutnya dan menautkan tindakan ke tempat yang salah.
 const BATAS_BAGIAN = /^(evaluasi|discharge|planning|edukasi|tanda\s*tangan|catatan\s*perkembangan|pemeriksaan\s*penunjang|diagnosa\s*keperawatan|rencana|anjuran|kelanjutan|diagnosa|penyebab|magelang,)/i;
 
+/**
+ * Isi kolom Tindakan resume menurut POSISI kata, bila halaman membawanya.
+ * `nilai_label` diisi di claimFiles.gatherEvidencePool dari kotak kata PDF
+ * digital; halaman scan/OCR tidak memilikinya dan hasilnya string kosong.
+ */
+function nilaiTindakanDariPosisi(hal) {
+  const nilai = hal && hal.nilai_label && hal.nilai_label.Tindakan;
+  const teks = typeof nilai === 'string' ? nilai.replace(/\s+/g, ' ').trim() : '';
+  return /^[-\s.:]*$/.test(teks) ? '' : teks;
+}
+
 /** Baris yang isinya hanya label tanpa nilai — jebakan "Tindakan" kosong. */
 function hanyaLabel(baris, pola) {
   const sisa = String(baris).replace(pola, '').replace(/[:\s.-]/g, '');
@@ -136,8 +158,23 @@ function ambilNilaiLabel(baris, indeks, pola) {
   return { teks: '', baris: sekarang };
 }
 
+/**
+ * Apakah kemunculan di indeks itu dinegasikan ("tanpa oksigen", "belum
+ * dinebulisasi"). Tindakan yang disangkal tidak boleh terbaca sebagai
+ * dilakukan — yang tidak tertulis dikerjakan tidak boleh dikodekan.
+ */
+function dinegasi(teks, indeks) {
+  const sebelum = String(teks).slice(Math.max(0, indeks - 24), indeks);
+  return /\b(tanpa|tidak|tdk|tak|belum|bukan)\s+(perlu\s+|ada\s+|di\s*beri\s+|diberi\s+|pakai\s+|dilakukan\s+|di\s*lakukan\s+)?$/i.test(sebelum);
+}
+
+function cocokPola(pola, teks) {
+  const m = pola.exec(teks);
+  return Boolean(m) && !dinegasi(teks, m.index);
+}
+
 function cocokkanKamus(teks) {
-  const cocok = KAMUS_TINDAKAN.filter(t => t.pola.test(teks));
+  const cocok = KAMUS_TINDAKAN.filter(t => cocokPola(t.pola, teks));
 
   // Injeksi antibiotik juga cocok dengan pola injeksi umum, dan kalau keduanya
   // dibiarkan lolos satu suntikan menghasilkan DUA kode (99.21 dan 99.29).
@@ -181,8 +218,25 @@ function bacaTemuanTindakan(halaman) {
     const jenis = classifyPageDocumentType(teks);
     const baris = teks.split(/\r?\n/);
 
+    // 0. Isi label dari POSISI kata (pasanganLabelPosisiService). Pada resume
+    //    SIMRS label sel terpusat vertikal sedangkan isinya di atas sel, jadi
+    //    urutan baca memberi "Tindakan" kosong. Bila posisi memberi isi, itu
+    //    yang dipakai dan jalur teks di bawah dilewati untuk halaman ini;
+    //    bila kosong/tidak ada koordinat, jalur teks lama berjalan seperti biasa.
+    const nilaiPosisi = jenis === 'resume_medis' ? nilaiTindakanDariPosisi(hal) : '';
+    if (nilaiPosisi) {
+      for (const t of cocokkanKamus(nilaiPosisi)) {
+        catat(t, {
+          page_number: hal.page_number || null,
+          sumber: jenis,
+          kutipan: ('Tindakan: ' + nilaiPosisi).slice(0, 160),
+          cara_baca: 'posisi',
+        });
+      }
+    }
+
     // 1. Dari label tindakan, hanya pada jenis halaman yang memang memuatnya.
-    for (const pola of LABEL_PER_JENIS[jenis] || []) {
+    for (const pola of (nilaiPosisi ? [] : (LABEL_PER_JENIS[jenis] || []))) {
       for (let i = 0; i < baris.length; i++) {
         if (!pola.test(baris[i])) continue;
 
@@ -225,8 +279,16 @@ function bacaTemuanTindakan(halaman) {
     //    supaya bisa dibedakan saat dinilai.
     if (jenis === 'resep') {
       for (const b of baris) {
-        if (!/R\s*\/|\bnebul/i.test(b)) continue;
-        for (const t of cocokkanKamus(b)) {
+        const kandidat = new Map();
+        if (/R\s*\/|\bnebul/i.test(b)) {
+          for (const t of cocokkanKamus(b)) kandidat.set(t.id, t);
+        }
+        // Alat/obat khas sebuah tindakan (Masker Nebul, nasal kanul, abocath...)
+        // dikenali walau barisnya tidak memakai penanda R/.
+        for (const t of KAMUS_TINDAKAN) {
+          if ((t.sinyal_resep || []).some(p => cocokPola(p, b))) kandidat.set(t.id, t);
+        }
+        for (const t of kandidat.values()) {
           // Injeksi obat sengaja tidak diambil dari resep: obat yang
           // diresepkan belum tentu disuntikkan.
           if (t.hanya_dari_tindakan) continue;
@@ -257,6 +319,11 @@ function kalimatTindakanTakDikenal(halaman) {
     if (!teks) continue;
     const jenis = classifyPageDocumentType(teks);
     const baris = teks.split(/\r?\n/);
+    const nilaiPosisi = jenis === 'resume_medis' ? nilaiTindakanDariPosisi(hal) : '';
+    if (nilaiPosisi) {
+      if (nilaiPosisi.length >= 4 && cocokkanKamus(nilaiPosisi).length === 0) keluar.push(nilaiPosisi.slice(0, 120));
+      continue; // isi kolom sudah diketahui dari posisi; jalur teks tidak perlu menebak
+    }
     for (const pola of LABEL_PER_JENIS[jenis] || []) {
       for (let i = 0; i < baris.length; i++) {
         if (!pola.test(baris[i])) continue;
@@ -298,7 +365,8 @@ function periksaSilangTindakan(temuan) {
       nama: t.nama,
       jenis: 'tindakan_tidak_ada_di_resume',
       keparahan: 'sedang',
-      pesan: `${t.nama} tercatat di ${sumberLain.join(' dan ')}, tetapi tidak terbaca pada kolom Tindakan di resume medis. Periksa apakah tindakan ini memang dilakukan tetapi belum tercatat di resume.`,
+      kemungkinan_belum_terbaca: true,
+      pesan: `Kemungkinan tindakan ${t.nama.toLowerCase()} belum terbaca. ${t.nama} tercatat di ${sumberLain.join(' dan ')}, tetapi tidak terbaca pada kolom Tindakan di resume medis. Periksa apakah tindakan ini memang dilakukan tetapi belum tercatat di resume.`,
       bukti: t.bukti,
     });
   }

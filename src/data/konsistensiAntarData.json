@@ -195,7 +195,7 @@
         "kata_di_halaman": {
           "salah_satu": [
             "oksigen",
-            "o2",
+            " o2",
             "nebul",
             "nasal kanul",
             "nrm"
@@ -203,6 +203,7 @@
         }
       },
       "yang_dicari": "Catatan pemberian oksigen atau nebulisasi",
+      "_catatan_rancangan": "Kata 'o2' diberi spasi di depan (' o2'): tanpa itu 'SpO2' pada baris saturasi sendiri ikut mencocokkan 'o2' dan aturan ini tidak pernah bisa terpicu.",
       "pesan": "Saturasi tercatat rendah tetapi tidak ada catatan pemberian oksigen maupun nebulisasi. Kalau penanganannya memang dilakukan tetapi belum tercatat, bukti kegawatan klaim ini jadi lemah di mata verifikator.",
       "sumber_aturan": "84% pending Mei 2026 beralasan 'harap cek kembali penagihan kondisi kegawatan'."
     },
@@ -230,6 +231,72 @@
       "yang_dicari": "Hasil laboratorium atau radiologi",
       "pesan": "Pneumonia dikoding tetapi berkas tidak memuat hasil laboratorium maupun radiologi sama sekali. Diagnosis berat tanpa satu pun penunjang adalah risiko pending tertinggi.",
       "sumber_aturan": "Ditemukan pada berkas 0170R0110926V001943: 'Penunjang lain: -' padahal diagnosisnya Pneumonia dan PPOK."
+    },
+    {
+      "id": "KD-12",
+      "nama": "PPOK dikoding tanpa penunjang apa pun",
+      "keparahan": "tinggi",
+      "diverifikasi": true,
+      "jika": {
+        "diagnosis_awalan": "J44"
+      },
+      "maka": {
+        "kata_di_halaman": {
+          "salah_satu": [
+            "hasil laboratorium",
+            "hematologi",
+            "leukosit",
+            "rontgen",
+            "radiologi",
+            "foto thorax",
+            "foto toraks",
+            "spirometri",
+            "analisa gas darah"
+          ]
+        }
+      },
+      "yang_dicari": "Hasil laboratorium, radiologi, atau spirometri",
+      "pesan": "PPOK (J44) dikoding tetapi berkas tidak memuat hasil laboratorium, radiologi, maupun spirometri. Diagnosis kronis-eksaserbasi tanpa satu pun penunjang adalah risiko pending yang tinggi.",
+      "sumber_aturan": "Ditemukan pada berkas 0170R0110926V001943: 'Penunjang lain: -' padahal diagnosisnya PPOK dan Pneumonia. KD-09 hanya menjangkau J18."
+    },
+    {
+      "id": "KD-13",
+      "nama": "Pneumonia/PPOK tertulis di resume, penunjang tidak ada",
+      "keparahan": "tinggi",
+      "diverifikasi": true,
+      "jika": {
+        "field_kosong": [
+          "diagnosa_list",
+          "DIAGLIST"
+        ],
+        "kata_di_halaman": {
+          "jenis": "resume_medis",
+          "salah_satu": [
+            "pneumonia",
+            "ppok",
+            "penyakit paru obstruktif"
+          ]
+        }
+      },
+      "maka": {
+        "kata_di_halaman": {
+          "salah_satu": [
+            "hasil laboratorium",
+            "hematologi",
+            "leukosit",
+            "rontgen",
+            "radiologi",
+            "foto thorax",
+            "foto toraks",
+            "spirometri",
+            "analisa gas darah"
+          ]
+        }
+      },
+      "yang_dicari": "Hasil laboratorium atau radiologi",
+      "pesan": "Resume menuliskan pneumonia/PPOK tetapi berkas tidak memuat penunjang sama sekali. Aturan ini hanya berlaku selagi kolom diagnosis klaim masih kosong; begitu kodenya terisi, KD-09 (J18) dan KD-12 (J44) yang menilai.",
+      "sumber_aturan": "Ditemukan pada berkas 0170R0110926V001943: diagnosis tertulis di resume, 'Penunjang lain: -'.",
+      "_catatan_rancangan": "Pelengkap KD-09/KD-12 yang membaca kode. Dibatasi pada DIAGLIST kosong supaya satu masalah tidak melaporkan dua temuan."
     },
     {
       "id": "KD-10",
