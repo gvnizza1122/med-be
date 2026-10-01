@@ -150,3 +150,6 @@ Suite penuh backend terakhir: **59 suite lulus, 12 gagal; 1.137 tes lulus, 49 ga
 - Setelah pemilik produk deploy commit yang dipilihnya: uji ulang klaim SUMIDAH dan MUNAWIR sesuai daftar “Verifikasi setelah deploy” di atas. Belum ada deploy dari sesi ini.
 - Coba dua workbook export dengan data asli; pastikan filter layar dan arsip yang dipilih cocok, serta koder/manajemen menerima cakupan Ringkasan dan aturan akses.
 - Jangan aktifkan syarat berbasis hasil lab sampai tersedia PDF asli lokal dan hasil baca diverifikasi.
+
+## Perubahan sesi 2026-10-01 lanjutan: ringkasan valid
+Frontend commit lokal d4be105 (belum push/deploy): RingkasanTemuanCard kini menerima validation_status dan menyembunyikan status hijau tidak_ditemukan_alasan bila rekam berstatus valid. Status berisiko/perlu dicek tetap ditampilkan. npm run build lulus setelah perubahan. Baseline backend sebelum perubahan frontend pada sesi ini: 60 suite lulus, 11 gagal; 1.138 tes lulus, 48 gagal. Kegagalan yang tampak mencakup mismatch ekspektasi versi fixture/API, kredensial integrasi, dan worker manual; tidak ada tes backend sesudahnya karena backend tidak diubah.
