@@ -48,6 +48,7 @@ const { evaluateDiagnosisConsistency } = require('./diagnosisConsistencyService'
 const { classifyPageDocumentType, hasIgdVisitSignal } = require('./pdfPageClassifier');
 const { evaluasiKombinasiKode } = require('./ketentuanKlaimService');
 const { groupCodesToInaCBG } = require('./inacbgGroupingService');
+const gatewayModelService = require('./gatewayModelService');
 const { getTarifResmi, lookupTarifInacbg } = require('./tarifInacbgLookup');
 const { jalankanPagarAman, catatDitolakAwal, ALASAN_PAGAR } = require('./pagarPascaAiService');
 const { bacaTemuanPenunjang } = require('./temuanPenunjangService');
@@ -1924,11 +1925,7 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
     return null; // tidak ada yang perlu direview
   }
 
-  const apiKey = process.env.AI_PROVIDER_API_KEY;
-  if (!apiKey) return null; // fallback ke rule-engine saja, seperti sebelumnya
-
-  const baseUrl = process.env.AI_PROVIDER_BASE_URL || 'https://api.openai.com/v1';
-  const model = process.env.AI_MODEL || 'gpt-4o-mini';
+  if (!process.env.AI_PROVIDER_API_KEY && !process.env.KIMI_API_KEY) return null;
   const maxAttempts = Number(process.env.AI_MAX_ATTEMPTS || 3);
   const timeoutMs = Number(process.env.AI_TIMEOUT_MS || 60000);
 
@@ -1936,51 +1933,26 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      const ac = new AbortController();
-      const timer = setTimeout(() => ac.abort(), timeoutMs);
-      let respText;
-      try {
-        const response = await fetch(`${baseUrl}/chat/completions`, {
-          method: 'POST',
-          signal: ac.signal,
-          headers: {
-            'Authorization': `Bearer ${apiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model,
-            messages: [
-              { role: 'system', content: AI_REVIEW_SYSTEM_PROMPT },
-              { role: 'user', content: userPrompt },
-            ],
-            // max_completion_tokens (bukan max_tokens) & tanpa temperature custom
-            // — sebagian model (mis. GPT-5.6 Luna) menolak keduanya dengan HTTP 400
-            // "Unsupported parameter: 'max_tokens'". max_completion_tokens aman
-            // dipakai untuk model lama (gpt-4o-mini dkk) juga, jadi tidak perlu
-            // deteksi model.
-            max_completion_tokens: 4000,
-            response_format: { type: 'json_object' },
-          }),
-        });
-        respText = await response.text();
-        if (!response.ok) throw new Error(`HTTP ${response.status}: ${respText.slice(0, 160)}`);
-      } finally {
-        clearTimeout(timer);
-      }
-
-      const data = JSON.parse(respText);
-      const content = data.choices?.[0]?.message?.content || '';
-      const tokensUsed = data.usage?.total_tokens || 0;
-      if (!content) throw new Error('Model membalas kosong');
-
-      let aiResult;
-      try {
-        aiResult = JSON.parse(content);
-      } catch {
-        const m = content.match(/\{[\s\S]*\}/);
-        if (!m) throw new Error('Model tidak mengembalikan JSON');
-        aiResult = JSON.parse(m[0]);
-      }
+      const db = getDb();
+      const hasilGateway = await gatewayModelService.panggilModel('baca_berkas', {
+        system: AI_REVIEW_SYSTEM_PROMPT,
+        prompt: userPrompt,
+        json: true,
+        maxTokens: 4000,
+        dikenal: {
+          nama: record.nama_pasien || record.NAMA_PASIEN,
+          nomor_kartu: record.nokartu || record.NOKARTU,
+          nik: record.nik || record.NIK,
+          no_rm: record.mrn || record.MRN,
+          sep: record.sep || record.SEP,
+          alamat: record.alamat || record.ALAMAT,
+          telepon: record.telepon || record.TELEPON || record.no_hp || record.NO_HP,
+        },
+      }, { db });
+      if (!hasilGateway.ok) throw new Error(hasilGateway.error || 'Panggilan gateway model gagal');
+      const aiResult = hasilGateway.hasil;
+      const tokensUsed = 0; // Gateway hanya mencatat metadata; pemakaian token tak tersedia di kontraknya.
+      if (!aiResult || typeof aiResult !== 'object') throw new Error('Model tidak mengembalikan JSON');
 
       const result = {
         field_notes: {},

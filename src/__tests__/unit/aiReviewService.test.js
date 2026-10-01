@@ -130,6 +130,29 @@ describe('generateAiReview — dengan AI dikonfigurasi (fetch dimock)', () => {
     expect(userMessage).toContain('JENIS_KLAIM: RAWAT_JALAN');
   });
 
+  test('caller utama menyamarkan identitas dari record dan kutipan sebelum panggilan model', async () => {
+    mockFetchOk({ field_notes: {}, code_evidence: [], suggested_codes: [] });
+
+    await generateAiReview(
+      {
+        sep: '0170R0110826V003045', nokartu: '0003604746071', nama_pasien: 'SUMIDAH', mrn: '104853',
+        DIAGLIST: 'R10.4',
+      },
+      [{ field_name: 'sep', error_message: 'contoh', actual_value: '0170R0110826V003045' }],
+      [{ page_number: 2, ocr_text: 'Nama Pasien SUMIDAH; Kartu 0003604746071; RM 104853; SEP 0170R0110826V003045' }],
+    );
+
+    const body = JSON.parse(global.fetch.mock.calls[0][1].body);
+    const prompt = body.messages.map(m => m.content).join('\n');
+    for (const identitas of ['SUMIDAH', '0003604746071', '104853', '0170R0110826V003045']) {
+      expect(prompt).not.toContain(identitas);
+    }
+    expect(prompt).toContain('[NAMA_1]');
+    expect(prompt).toContain('[KARTU_1]');
+    expect(prompt).toContain('[RM_1]');
+    expect(prompt).toContain('[SEP_1]');
+  });
+
   test('inacbg_result dan tariff_result diisi dari grouping service + tariff lookup', async () => {
     mockFetchOk({
       field_notes: {},
