@@ -39,7 +39,9 @@ const KAMUS_TINDAKAN = [
     id: 'nebulisasi',
     nama: 'Nebulisasi',
     kode_usulan: '93.94',
-    pola: /\bnebu?l(isasi)?\b|\bnebules\b/i,
+    // "Nebulizer"/"Nebuliser" ditulis dokter di kolom Tindakan resume IGD
+    // (berkas 0170R0110826V000083: "Nebulizer Ventasal : Budesma = 1 : 1").
+    pola: /\bnebu?l(isasi)?\b|\bnebules\b|\bnebuli[sz]er\b/i,
     // Petunjuk di RESEP bahwa tindakannya dilakukan. Yang dihitung alat, atau
     // obat dalam bentuk nebul; salbutamol tablet bukan nebulisasi, jadi obat
     // selalu dipasangkan dengan bentuk sediaannya.
@@ -259,7 +261,21 @@ function bacaTemuanTindakan(halaman) {
         // memakai bentuk pertama, SUMIDAH bentuk kedua dengan tiga injeksi
         // berurutan. Pemindaian berhenti di bagian berikutnya supaya tidak
         // menelan isi bagian lain.
-        const { teks: nilai, baris: kutipan } = ambilNilaiLabel(baris, i, pola);
+        let { teks: nilai, baris: kutipan } = ambilNilaiLabel(baris, i, pola);
+
+        // Resume SIMRS: label sel terpusat vertikal, sehingga pada teks OCR
+        // (tanpa koordinat kata) isinya muncul SATU BARIS DI ATAS label --
+        // "Nebulizer Ventasal : Budesma = 1 : 1" lalu "Tindakan". Dipakai
+        // hanya bila label berdiri sendiri, dan tidak pernah baris kode
+        // diagnosis ("J45.3 - ...") supaya isi kolom Diagnosa tidak terbaca
+        // sebagai tindakan.
+        if (!nilai && jenis === 'resume_medis' && hanyaLabel(String(baris[i]), pola) && i > 0) {
+          const atas = String(baris[i - 1]).trim();
+          if (atas && !/^[A-Z]\d{2}(\.\d+)?\s*-/.test(atas) && !BATAS_BAGIAN.test(atas)) {
+            nilai = atas;
+            kutipan = `${atas} / ${String(baris[i]).trim()}`;
+          }
+        }
         if (nilai) {
           for (const t of cocokkanKamus(nilai)) {
             catat(t, {

@@ -177,3 +177,19 @@ describe('ekstraksi serumen', () => {
     expect(bacaTemuanTindakan([hal(2, 'RESUME MEDIS\nDiagnosa impacted serumen\nTindakan\n-')])).toEqual([]);
   });
 });
+
+// Salinan scan berkas 0170R0110826V000083: teks OCR resume menaruh isi kolom
+// Tindakan SATU BARIS DI ATAS labelnya, dan dokter menulis "Nebulizer".
+describe('isi kolom Tindakan di atas label (teks OCR resume)', () => {
+  const resume = (isiAtas) => hal(2, `RESUME MEDIS IGD\nDiagnosa\nR06.0 - Dyspnoea\nJ45.3 - Asthma with Exacerbation (IM)\n${isiAtas}Tindakan\nP Rencana Boleh pulang\nAnjuran kontrol FKTP`);
+
+  test('"Nebulizer Ventasal" di atas label -> nebulisasi 93.94', () => {
+    const t = bacaTemuanTindakan([resume('Nebulizer Ventasal : Budesma = 1 : 1\n')]);
+    expect(t.map(x => [x.id, x.kode_usulan])).toEqual([['nebulisasi', '93.94']]);
+    expect(t[0].bukti[0]).toMatchObject({ page_number: 2, sumber: 'resume_medis' });
+  });
+
+  test('kolom Tindakan kosong: baris diagnosis di atasnya tidak terbaca sebagai tindakan', () => {
+    expect(bacaTemuanTindakan([hal(2, 'RESUME MEDIS IGD\nDiagnosa\nJ45.3 - Asthma, rencana nebulizer\nTindakan\nP Rencana -')])).toEqual([]);
+  });
+});
