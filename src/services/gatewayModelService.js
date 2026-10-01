@@ -79,7 +79,7 @@ async function panggilChatCompletions({ apiKey, baseUrl, timeoutMs, label, model
     const data = JSON.parse(respText);
     const content = data.choices?.[0]?.message?.content || '';
     if (!content) throw new Error(`${label} membalas kosong`);
-    return content;
+    return { content, usage: data.usage || {} };
   } finally {
     clearTimeout(timer);
   }
@@ -124,10 +124,13 @@ async function panggilModel(tugas, payload, opsi = {}) {
     const system = payload.system ? penyamar.samarkan(payload.system) : undefined;
     const prompt = penyamar.samarkan(payload.prompt);
 
-    const content = await fn({
+    const jawaban = await fn({
       model: rute.model, system, prompt, json: !!payload.json,
       maxTokens: payload.maxTokens, fetchImpl: payload.fetchImpl,
     });
+    const content = typeof jawaban === 'string' ? jawaban : jawaban && jawaban.content;
+    const usage = typeof jawaban === 'string' ? {} : (jawaban && jawaban.usage) || {};
+    if (typeof content !== 'string' || !content) throw new Error('Model membalas kosong');
     const teks = penyamar.pulihkan(content);
     let hasil;
     if (payload.json) {
@@ -136,7 +139,15 @@ async function panggilModel(tugas, payload, opsi = {}) {
       hasil = penyamar.pulihkanObjek(mentah);
     }
     ok = true;
-    return { ok: true, teks, hasil, ...dasar, durasi_ms: Date.now() - mulai };
+    return {
+      ok: true, teks, hasil,
+      penggunaan: {
+        prompt_tokens: Number(usage.prompt_tokens) || 0,
+        completion_tokens: Number(usage.completion_tokens) || 0,
+        total_tokens: Number(usage.total_tokens) || 0,
+      },
+      ...dasar, durasi_ms: Date.now() - mulai,
+    };
   } catch (err) {
     return {
       ok: false, error: String(err.message || err).slice(0, 200), kode: err.kode, ...dasar,

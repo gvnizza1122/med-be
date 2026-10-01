@@ -1959,7 +1959,7 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
       }, { db });
       if (!hasilGateway.ok) throw new Error(hasilGateway.error || 'Panggilan gateway model gagal');
       const aiResult = hasilGateway.hasil;
-      const tokensUsed = 0; // Gateway hanya mencatat metadata; pemakaian token tak tersedia di kontraknya.
+      const tokensUsed = hasilGateway.penggunaan?.total_tokens || 0;
       if (!aiResult || typeof aiResult !== 'object') throw new Error('Model tidak mengembalikan JSON');
 
       const result = {
