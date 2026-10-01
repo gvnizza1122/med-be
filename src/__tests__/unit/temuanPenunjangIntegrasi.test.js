@@ -25,6 +25,7 @@ jest.mock('../../database/init', () => ({
     all: async (sql, params) => {
       if (/LIKE/i.test(sql)) return [];
       const tabel = /icd10_who_codes/.test(sql) ? 'icd10_who_codes' : 'icd9_cm_procedures';
+      if (/COUNT\(\*\)/i.test(sql)) return [{ jumlah: mockKamus[tabel].size }];
       return (params || []).filter(k => mockKamus[tabel].has(k)).map(code => ({ code }));
     },
     run: async (sql, params) => { runSql.push({ sql, params }); return {}; },

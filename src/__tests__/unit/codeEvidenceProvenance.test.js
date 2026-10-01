@@ -6,6 +6,15 @@
  * BERBEDA tergantung system prompt (3 panggilan AI terpisah dijalankan oleh
  * generateAiReview: audit utama, pending-risk, kegawatdaruratan).
  */
+jest.mock('../../database/init', () => ({ getDb: () => ({
+  all: async (sql, params = []) => {
+    const codes = /icd10_who_codes/.test(sql) ? ['O21.0', 'O21.1'] : ['88.78', '90.59'];
+    if (/COUNT\(\*\)/i.test(sql)) return [{ jumlah: codes.length }];
+    if (/icd10_who_codes|icd9_cm_procedures/.test(sql)) return params.filter(c => codes.includes(c)).map(code => ({ code }));
+    return [];
+  },
+  run: async () => {},
+}) }));
 const { generateAiReview } = require('../../services/aiReviewService');
 const { evidencePool } = require('../../testFixtures/hyperemesisRedacted');
 

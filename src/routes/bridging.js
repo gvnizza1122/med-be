@@ -4,7 +4,8 @@ const path = require('path');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
 const { getDb } = require('../database/init');
-const { validateRecord, determineStatus } = require('../services/ruleEngine');
+const { determineStatus } = require('../services/ruleEngine');
+const { validasiRecordDenganKamus } = require('../services/validasiRecordKamusService');
 const { validateRecordWithAI } = require('../services/aiValidationService');
 const { parseClaimFile } = require('../services/fileParser');
 const { isiPeriodeUntukFile } = require('../services/periodeKlaimService');
@@ -60,7 +61,7 @@ router.post('/validate', authenticateApiKey, async (req, res) => {
     const db = getDb();
     const activeRules = await db.prepare('SELECT * FROM validation_rules WHERE is_active = 1').all();
 
-    const ruleErrors = validateRecord(record, activeRules);
+    const ruleErrors = await validasiRecordDenganKamus(db, record, activeRules);
     const validationStatus = determineStatus(ruleErrors);
 
     const runAi = req.query.ai === 'true' || req.body.run_ai === true;
@@ -129,7 +130,7 @@ router.post('/validate-file', authenticateApiKey, upload.single('file'), async (
 
     for (let idx = 0; idx < parseResult.records.length; idx++) {
       const record = parseResult.records[idx];
-      const errors = validateRecord(record, activeRules);
+      const errors = await validasiRecordDenganKamus(db, record, activeRules);
       const status = determineStatus(errors);
 
       let aiResult = null;
@@ -229,7 +230,7 @@ async function processSinglePdf(filePath, originalFilename, hospitalCode, public
 
   const dbRecord = vclaimToDbFormat(extractedData);
   const activeRules = await db.prepare('SELECT * FROM validation_rules WHERE is_active = 1').all();
-  const validationErrors = validateRecord(dbRecord, activeRules);
+  const validationErrors = await validasiRecordDenganKamus(db, dbRecord, activeRules);
   const validationStatus = determineStatus(validationErrors);
 
   await db.prepare(`

@@ -135,7 +135,7 @@ async function petakanKeKodeWho(kodeAsing, teksDiagnosis, dikenal = {}) {
 
   const kunci = `${kategori}|${kunciTeks}`;
   const tersimpan = await bacaDipelajari(db, kunci);
-  if (tersimpan && tersimpan.kode) {
+  if (tersimpan && tersimpan.kode && kandidat.some(k => normal(k.code) === normal(tersimpan.kode))) {
     return { kode: tersimpan.kode, nama: tersimpan.nama, dari: 'kamus_dipelajari' };
   }
 
