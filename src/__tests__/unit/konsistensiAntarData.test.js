@@ -1,4 +1,4 @@
-const { evaluasiKonsistensi, diagnosisCocok, terisi } = require('../../services/konsistensiAntarDataService');
+const { evaluasiKonsistensi, diagnosisCocok, terisi, periksaSilangDiagnosisPrimer } = require('../../services/konsistensiAntarDataService');
 
 const hal = (page_number, ocr_text) => ({ page_number, ocr_text });
 const cari = (temuan, id) => temuan.find(t => t.id === id);
@@ -150,5 +150,65 @@ describe('kehati-hatian', () => {
     expect(diagnosisCocok('J18.9', 'J18')).toBe(true);
     expect(diagnosisCocok('J180', 'J18')).toBe(false);
     expect(diagnosisCocok('I67.9', 'I67.8')).toBe(false);
+  });
+});
+
+describe('KD-14 — DIAGLIST tidak cocok dengan resume medis (verifikasi silang)', () => {
+  // Kasus NUR ASIAH sungguhan (SEP 0170R0110126V001476, backtest 2026-10-01):
+  // DIAGLIST dari halaman Berkas Klaim Individual = I51.7;I48. Resume medis
+  // (hal. 3) menulis "susp syok kardiogenik", "dyspneu susp ec ALO",
+  // "hemiparese sinistra ec post snh" -- R57.0/J81.0/I69.3, kategori lain
+  // sama sekali. Alasan pending BPJS sungguhan untuk klaim ini justru soal
+  // diagnosis utama -- inilah yang seharusnya tertangkap.
+  test('kasus NUR ASIAH: tidak ada irisan kategori -> KD-14 muncul', () => {
+    const suggested = [
+      { type: 'diagnosis', code: 'R57.0', page_number: 3, quotation: 'susp syok kardiogenik', kamus_valid: true },
+      { type: 'diagnosis', code: 'J81.0', page_number: 3, quotation: 'dyspneu susp ec ALO', kamus_valid: false }, // tidak dihitung
+      { type: 'diagnosis', code: 'I69.3', page_number: 3, quotation: 'hemiparese sinistra ec post snh', kamus_valid: true },
+    ];
+    const t = periksaSilangDiagnosisPrimer({ DIAGLIST: 'I51.7;I48' }, suggested);
+    expect(t).toHaveLength(1);
+    expect(t[0].id).toBe('KD-14');
+    expect(t[0].keparahan).toBe('sedang');
+    expect(t[0].diverifikasi).toBe(false);
+    expect(t[0].yang_ditemukan.kutipan).toBe('susp syok kardiogenik');
+  });
+
+  // Kasus DWI ARIYANI sungguhan (SEP 0170R0110126V000287): DIAGLIST
+  // I11.9;H81.4;K30, AI cuma menemukan I25.9 ("3. IHD") dari resume --
+  // kategori I25 vs I11/H81/K30, tidak beririsan juga.
+  test('kasus DWI ARIYANI: satu-satunya temuan resume beda kategori -> KD-14 muncul', () => {
+    const suggested = [{ type: 'diagnosis', code: 'I25.9', page_number: 3, quotation: '3. IHD', kamus_valid: true }];
+    const t = periksaSilangDiagnosisPrimer({ DIAGLIST: 'I11.9;H81.4;K30' }, suggested);
+    expect(t).toHaveLength(1);
+    expect(t[0].id).toBe('KD-14');
+  });
+
+  test('ada irisan kategori -> tidak ada temuan', () => {
+    const suggested = [{ type: 'diagnosis', code: 'I48.0', page_number: 2, quotation: 'atrial fibrilasi', kamus_valid: true }];
+    expect(periksaSilangDiagnosisPrimer({ DIAGLIST: 'I51.7;I48' }, suggested)).toEqual([]);
+  });
+
+  test('DIAGLIST kosong -> diam, ditangani pemeriksaan lain', () => {
+    expect(periksaSilangDiagnosisPrimer({ DIAGLIST: '' }, [{ type: 'diagnosis', code: 'R57.0', kamus_valid: true }])).toEqual([]);
+  });
+
+  test('tidak ada temuan resume sama sekali -> diam, tidak menuduh tanpa bahan', () => {
+    expect(periksaSilangDiagnosisPrimer({ DIAGLIST: 'I51.7;I48' }, [])).toEqual([]);
+  });
+
+  test('saran yang disangkal tidak dihitung sebagai bukti', () => {
+    const suggested = [{ type: 'diagnosis', code: 'R57.0', kamus_valid: true, disangkal: true }];
+    expect(periksaSilangDiagnosisPrimer({ DIAGLIST: 'I51.7' }, suggested)).toEqual([]);
+  });
+
+  test('saran yang belum tervalidasi kamus (kamus_valid bukan true) tidak dihitung', () => {
+    const suggested = [{ type: 'diagnosis', code: 'R57.0', kamus_valid: false }];
+    expect(periksaSilangDiagnosisPrimer({ DIAGLIST: 'I51.7' }, suggested)).toEqual([]);
+  });
+
+  test('tidak melempar untuk record null/undefined', () => {
+    expect(periksaSilangDiagnosisPrimer(null, [])).toEqual([]);
+    expect(periksaSilangDiagnosisPrimer(undefined, [])).toEqual([]);
   });
 });

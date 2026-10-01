@@ -35,7 +35,7 @@ const { evaluasiSyaratPenunjang } = require('./syaratPenunjangService');
 const { bacaTemuanTindakan, periksaSilangTindakan, kalimatTindakanTakDikenal } = require('./temuanTindakanService');
 const { kodekanTindakanBaru } = require('./kodeTindakanBaruService');
 const { petakanKeKodeWho } = require('./kodeDiagnosisWhoService');
-const { evaluasiKonsistensi } = require('./konsistensiAntarDataService');
+const { evaluasiKonsistensi, periksaSilangDiagnosisPrimer } = require('./konsistensiAntarDataService');
 const { periksaWaktuTriase } = require('./konsistensiWaktuService');
 const { susunPutusan } = require('./putusanPendingService');
 const putusanPendingAiService = require('./putusanPendingAiService');
@@ -2351,6 +2351,28 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
         if (pagar.suggested_codes) result.suggested_codes = pagar.suggested_codes;
         if (pagar.pagar_temuan) result.pagar_temuan = pagar.pagar_temuan;
         if (pagar.petunjuk_resep) result.petunjuk_resep = pagar.petunjuk_resep;
+      }
+
+      // KD-14 — DIAGLIST (dari halaman "Berkas Klaim Individual", SENGAJA
+      // dikecualikan dari evidencePool supaya tidak membuktikan dirinya
+      // sendiri) dicocokkan SILANG terhadap diagnosis yang terbaca independen
+      // dari resume medis (suggested_codes, sudah lolos pagar kutipan+negasi
+      // di atas). Ditambahkan 2026-10-01 setelah backtest DWI ARIYANI dan NUR
+      // ASIAH -- pada klaim NUR ASIAH, DIAGLIST "I51.7;I48" sama sekali tidak
+      // sekategori dengan R57.0/J81.0/I69.3 yang tertulis di resume, dan
+      // alasan pending BPJS sungguhan untuk klaim itu justru soal diagnosis
+      // utama -- sesuatu yang sebelumnya TIDAK PERNAH bisa ditangkap karena
+      // kedua sumber ini tidak pernah dibandingkan. Dijalankan SETELAH pagar
+      // (bukan di blok evaluasiKonsistensi di atas) karena butuh
+      // suggested_codes yang SUDAH final (kamus_valid, disangkal terisi).
+      try {
+        const diagnosisDariSuggested = (result.suggested_codes || []).filter((s) => s && s.type === 'diagnosis');
+        result.konsistensi_data = [
+          ...(result.konsistensi_data || []),
+          ...periksaSilangDiagnosisPrimer(record, diagnosisDariSuggested),
+        ];
+      } catch (silangErr) {
+        console.warn(`[AI-REVIEW] periksaSilangDiagnosisPrimer gagal: ${silangErr.message}`);
       }
 
       // --- Ketentuan Klaim Tipe 3: aturan kombinasi kode (22 Sep 2026) ---
