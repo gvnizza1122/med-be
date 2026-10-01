@@ -341,8 +341,11 @@ async function callAiApi(records, errorFieldsByRecord = null, db = null) {
   const dikenal = {
     nama: records.map(r => r.nama_pasien || r.nama_peserta).filter(Boolean),
     nomor_kartu: records.map(r => r.nokartu).filter(Boolean),
+    nik: records.map(r => r.nik).filter(Boolean),
     no_rm: records.map(r => r.mrn || r.no_rm).filter(Boolean),
     sep: records.map(r => r.sep).filter(Boolean),
+    alamat: records.map(r => r.alamat).filter(Boolean),
+    telepon: records.map(r => r.telepon || r.no_hp).filter(Boolean),
   };
   const data = await postChatCompletion({
     messages: [
@@ -579,8 +582,11 @@ async function auditRecordField(record, fieldName, style = 'ponytail', validatio
   }, {
     nama: record.nama_pasien || record.nama_peserta,
     nomor_kartu: record.nokartu,
+    nik: record.nik,
     no_rm: record.mrn || record.no_rm,
     sep: record.sep,
+    alamat: record.alamat,
+    telepon: record.telepon || record.no_hp,
   }, opsi.db || null);
   const usage = data?.usage || {};
   const content = data?.choices?.[0]?.message?.content || '';
