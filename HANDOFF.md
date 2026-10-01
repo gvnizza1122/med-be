@@ -124,3 +124,29 @@ Aturan draf: tiap poin membawa halaman+kutipan terverifikasi; tanpa bukti = teks
 
 ## Peta modul baru (src/services/)
 `kamusPenunjangService`, `pagarTemuanService`, `pagarPascaAiService`, `negasiTemuanService`, `bagianTemuanService`, `bacaLabService`, `resepPetunjukService`, `keputusanSumberHalamanService`, `evaluasiAkurasiService`, `pdfWordBoxService`, `pasanganLabelPosisiService`, `aturanKodingRsService`, `konsistensiWaktuService`, `penyamaranService`, `routerModelService`, `gatewayModelService`, `catatanPanggilanModelService`, `ruleVersiService`, `kotakRegulasiService`, `bacaKeduaService`, `pemantauPergeseranPendingService`, `sepCocokService`, `petaAlasanPendingService`, `triasePendingService`, `buktiBerkasPendingService`, `draftJawabanPendingService`, `alurJawabPendingSchema`. Data: `src/data/kamusPenunjang.json`, `kamusObat.json`, `konsistensiAntarData.json` (KD-01..13), `syaratPenunjangDiagnosis.json`. Rute: `src/routes/jawabPending.js`, `claimFiles.js` (`/kelompok`, isi otomatis kode).
+
+## Perkembangan sesi Codex 2026-10-01 (repo lokal, BELUM di-push/deploy)
+Backend branch `main` kini memiliki commit lokal `f14e73c` di atas `3ede235`; frontend `main` memiliki `2af569b` di atas `9c59176`. Tidak ada push atau deploy.
+
+1. `79c355e` — kode ICD-9-CM kamus yang belum disahkan tidak lagi mengisi PROCLIST, termasuk bila `aturan_koding_rs` lama menyatakan `masuk_proclist=true`. Temuan tindakan, kode usulan, kutipan, dan alasan tetap disimpan sebagai kandidat. Keputusan ini menjaga kebijakan pemilik produk sebelumnya: jangan aktifkan pengisian otomatis. Tes: 284/284 lulus pada tiga file/suite terarah.
+2. `28412a1` — rentang autofilter Daftar Kerja sekarang mencakup seluruh baris data. Tes ekspor terkait: 133/133 lulus.
+3. `240e44d` dan `672d428` — `aiReviewService` (caller utama), pemetaan WHO, dan pemetaan tindakan menggunakan `gatewayModelService.panggilModel`; identitas dari record dikirim di `dikenal`. `routerModelService.TUGAS` kini memuat `petakan_diagnosis_who` dan `kodekan_tindakan_baru`. Tes HTTP hanya memakai fetch tiruan; belum memanggil penyedia AI sungguhan.
+4. `f14e73c` — gateway tetap membawa metadata jumlah token agar telemetri caller utama tidak hilang.
+5. `a273145` backend + `2af569b` frontend — menambah ekspor `Siap Submit` (Ringkasan + Data Klaim, urutan vClaim, format teks/tanggal/angka, log audit) dan memperluas cakupan kedua ekspor Riwayat dengan filter pencarian, tanggal, kategori, periode yang diminta, dan arsip. Verifikasi: 135/135 tes ekspor; `npm run build` frontend lulus. Belum diverifikasi memakai hasil export dari data produksi.
+
+Suite penuh backend terakhir: **59 suite lulus, 12 gagal; 1.137 tes lulus, 49 gagal**. Baseline yang tercatat sebelum sesi ini di atas: 56 suite lulus/11 gagal, 1.098 lulus/48 gagal. Selisih satu suite dan satu tes pada run terkini adalah `ocrService.test.js` yang timeout; OCR ini sebelumnya memang dicatat kadang gagal sendiri. Tes terarah untuk kode usulan, pemetaan model, gateway, dan ekspor lulus. Karena baseline historis bukan rekaman run yang sama dan daftar kegagalan lama tidak disimpan lengkap, jangan klaim suite penuh bersih atau memastikan kesetaraan kegagalan hanya dari angka agregat.
+
+### Catatan revisi yang masih belum selesai
+- Ekspor ketiga `hasil-bpjs` / pembanding per klaim-per rule belum dibuat. Data rekap lengkap yang berisi kelompok positif DAN negatif serta alasan BPJS masih diperlukan; tabel pending saja tidak cukup menghitung alarm palsu.
+- Ekspor Daftar Kerja belum memiliki pilihan samarkan nama berbasis peran. Bukti masalah masih memakai `validation_errors.actual_value`, belum semua rule menyediakan kutipan halaman yang bisa dikerjakan mandiri di Excel. Matriks peran ekspor juga belum ditetapkan di kode.
+- Pembaca lab tetap tersambung hanya sebagai temuan; `SYARAT_PAKAI_BACA_LAB` tetap mati. Belum ada validasi PDF asli lokal, khususnya untuk hematokrit, IgG/IgM dengue, dan titer Widal.
+- Penyimpanan hasil enam tahap pembacaan belum dibangun. `ocr_results` menyimpan teks per halaman dan `ai_review` menyimpan sebagian hasil akhir, tetapi belum ada hasil tahap jenis halaman, bagian, temuan, pembakuan, dan silang kode sebagai satu alur yang bisa ditelusuri.
+- Caller `aiValidationService` masih memakai jalur HTTP lama dan belum dipindah ke gateway. Jalur pelatihan `kimiClient.callKimi` juga masih perlu ditinjau. Belum mengklaim seluruh panggilan model sudah lewat gateway.
+- Skrip ekspor keluaran nyata dari `ai_review` untuk `evaluasiKunciJawaban.js` belum dibuat. Set 30 kunci jawaban tetap menunggu pengesahan koder; tidak dibuat data kunci tiruan seolah-olah asli.
+- Aturan Tipe 3 KMB-01/06/09/11 tetap tidak diaktifkan sebelum pemilik produk memutuskan kode ICD. Ambang baca-kedua/pergeseran pending/jam triase juga belum diubah.
+- Artifact Claude klien belum diakses atau diedit. Audit PDF orphan sebelumnya read-only; tidak ada berkas dihapus, dan kebijakan retensi tetap menunggu pemilik produk.
+
+### Verifikasi lanjutan
+- Setelah pemilik produk deploy commit yang dipilihnya: uji ulang klaim SUMIDAH dan MUNAWIR sesuai daftar “Verifikasi setelah deploy” di atas. Belum ada deploy dari sesi ini.
+- Coba dua workbook export dengan data asli; pastikan filter layar dan arsip yang dipilih cocok, serta koder/manajemen menerima cakupan Ringkasan dan aturan akses.
+- Jangan aktifkan syarat berbasis hasil lab sampai tersedia PDF asli lokal dan hasil baca diverifikasi.
