@@ -844,6 +844,7 @@ async function migrateSchema(db) {
     for (const nama of [
       'routerModelService',
       'catatanPanggilanModelService',
+      'testingPendingService',
       'ruleVersiService',
       'kotakRegulasiService',
       'aturanKodingRsService',

@@ -10,13 +10,16 @@ const SYSTEM = [
   'Anda menilai apakah klaim berisiko dipending BPJS berdasarkan kandidat alasan yang diberikan.',
   'Anda hanya boleh memilih alasan dari daftar kandidat. Jangan membuat alasan, bukti, kutipan, kode, atau aturan baru.',
   'Jangan mengubah teks alasan. Alasan yang dipilih akan ditampilkan persis dari data aplikasi.',
+  'Satu pasien dapat memiliki beberapa diagnosis yang sah. Jumlah diagnosis saja bukan alasan pending.',
+  'Jika diberikan tinjauan diagnosis, gunakan diagnosis dokter, anamnesis, pemeriksaan fisik, dan penunjang sebagai konteks untuk menilai relevansi setiap kandidat alasan. Tinjauan tersebut adalah bantuan AI, bukan keputusan dokter atau BPJS.',
+  'Bedakan bukti tidak ditemukan dengan penyakit tidak ada. Klarifikasi urutan diagnosis tidak otomatis berarti pending. Jangan menggugurkan alasan wajib atau aturan kombinasi pada data klaim yang belum direvisi hanya karena ada usulan diagnosis berbeda.',
   'Pilih status berisiko_pending jika ada kandidat yang secara langsung berisiko menyebabkan pending.',
   'Pilih perlu_dicek jika ada kandidat relevan tetapi belum cukup untuk menyimpulkan risiko pending.',
   'Pilih tidak_ditemukan_alasan hanya jika tidak ada kandidat yang relevan.',
   'Kembalikan JSON saja: {"status":"berisiko_pending|perlu_dicek|tidak_ditemukan_alasan","alasan_ids":["kandidat-1"]}.',
 ].join(' ');
 
-function buatPrompt(alasan) {
+function buatPrompt(alasan, tinjauan = null) {
   const kandidat = alasan.map((a, i) => ({
     id: `kandidat-${i + 1}`,
     sumber_pemeriksaan: a.sumber_pemeriksaan,
@@ -28,7 +31,11 @@ function buatPrompt(alasan) {
     tindakan: a.tindakan,
     dari_rekap_pending: a.dari_rekap_pending === true,
   }));
-  return `Nilai kandidat alasan berikut. Keluaran harus memakai id kandidat yang persis ada.\n${JSON.stringify(kandidat)}`;
+  const konteks = tinjauan?.versi === 1 && ['ada_saran', 'perlu_klarifikasi'].includes(tinjauan.status)
+    ? { status: tinjauan.status, ringkasan: tinjauan.ringkasan, kandidat: tinjauan.kandidat, klarifikasi: tinjauan.klarifikasi }
+    : null;
+  return `Nilai kandidat alasan berikut. Keluaran harus memakai id kandidat yang persis ada.\n${JSON.stringify(kandidat)}`
+    + (konteks ? `\nTINJAUAN_DIAGNOSIS_TERVERIFIKASI (konteks pendukung, bukan alasan pending baru):\n${JSON.stringify(konteks)}` : '');
 }
 
 function bentukPutusan(putusanKandidat, keputusan, metadata = {}) {
@@ -84,17 +91,18 @@ function bentukPutusan(putusanKandidat, keputusan, metadata = {}) {
   };
 }
 
-async function putuskanDenganAi(putusanKandidat, { dikenal = {}, db = null, gateway = gatewayModelService } = {}) {
+async function putuskanDenganAi(putusanKandidat, { dikenal = {}, db = null, gateway = gatewayModelService, tinjauanDiagnosis = null, jenisKlaim } = {}) {
   if (!putusanKandidat || !Array.isArray(putusanKandidat.alasan)) {
     return { ok: false, error: 'Kandidat alasan tidak sah' };
   }
 
   const hasil = await gateway.panggilModel('putuskan_pending', {
     system: SYSTEM,
-    prompt: buatPrompt(putusanKandidat.alasan),
+    prompt: buatPrompt(putusanKandidat.alasan, tinjauanDiagnosis),
     json: true,
     maxTokens: 900,
     dikenal,
+    jenisKlaim,
   }, { db });
 
   if (!hasil || !hasil.ok) return { ok: false, error: hasil && hasil.error ? hasil.error : 'Gateway keputusan AI gagal' };
@@ -102,4 +110,4 @@ async function putuskanDenganAi(putusanKandidat, { dikenal = {}, db = null, gate
   return terbentuk.ok ? { ...terbentuk, penggunaan: hasil.penggunaan || {} } : terbentuk;
 }
 
-module.exports = { putuskanDenganAi, bentukPutusan, buatPrompt };
+module.exports = { putuskanDenganAi, bentukPutusan, buatPrompt, SYSTEM };

@@ -153,7 +153,7 @@ describe('catatanPanggilanModelService', () => {
     });
     expect(ok).toBe(true);
     expect(JSON.stringify(db.log)).not.toContain('RAHASIA');
-    expect(db.log[0]).toEqual(['baca_berkas', 'kimi', 'kimi-k3', 'v1', 123, true]);
+    expect(db.log[0].slice(0, 6)).toEqual(['baca_berkas', 'kimi', 'kimi-k3', 'v1', 123, true]);
   });
 
   test('gagal mencatat tidak melempar', async () => {
@@ -183,7 +183,8 @@ describe('gatewayModelService.panggilModel', () => {
     const body = JSON.parse(init.body);
     expect(body.model).toBe('gpt-6-luna');
     expect(body.response_format).toEqual({ type: 'json_object' });
-    expect(body.max_completion_tokens).toBe(3000);
+    expect(body.max_completion_tokens).toBe(8000);
+    expect(body.reasoning_effort).toBe('medium');
     expect(body.messages.map((m) => m.role)).toEqual(['system', 'user']);
   });
 
@@ -242,5 +243,37 @@ describe('gatewayModelService.panggilModel', () => {
     const r = await gateway.panggilModel('baca_berkas', { prompt: 'a' });
     lepas();
     expect(r.teks).toBe('dari adapter');
+  });
+
+  test('pemeriksaan lanjutan memakai Sol high dan batas token mencakup penalaran', async () => {
+    const f = fetchTiruan('{"diagnosis":null}');
+    const hasil = await gateway.panggilModel('tinjau_kasus_lanjutan', { prompt: 'bukti kasus', json: true, maxTokens: 3000, fetchImpl: f });
+    expect(hasil).toMatchObject({ ok: true, model: 'gpt-6.1-sol', effort: 'high' });
+    expect(JSON.parse(f.mock.calls[0][1].body)).toMatchObject({ model: 'gpt-6.1-sol', reasoning_effort: 'high', max_completion_tokens: 16000 });
+  });
+  test('ekstraksi memakai Luna low; model selain yang didukung tidak dikirimi effort', async () => {
+    const f = fetchTiruan('{}');
+    await gateway.panggilModel('ekstrak_pdf', { prompt: 'dokumen', fetchImpl: f });
+    expect(JSON.parse(f.mock.calls[0][1].body).reasoning_effort).toBe('low');
+    process.env.AI_MODEL = 'gpt-4o-mini';
+    router.hapusCache();
+    await gateway.panggilModel('baca_berkas', { prompt: 'dokumen', fetchImpl: f });
+    expect(JSON.parse(f.mock.calls[1][1].body).reasoning_effort).toBeUndefined();
+  });
+  test('usage/cached/reasoning dan biaya kurs 18000 tercatat sekalipun JSON gagal', async () => {
+    process.env.AI_USD_IDR = '18000';
+    const db = dbTiruan();
+    const f = jest.fn(async () => ({ ok: true, text: async () => JSON.stringify({
+      choices: [{ message: { content: 'bukan json' } }],
+      usage: { prompt_tokens: 25000, completion_tokens: 5000, total_tokens: 30000,
+        prompt_tokens_details: { cached_tokens: 1000 }, completion_tokens_details: { reasoning_tokens: 4000 } },
+    }) }));
+    const hasil = await gateway.panggilModel('tinjau_kasus_lanjutan', { prompt: 'dokumen', json: true, fetchImpl: f, jenisKlaim: 'RAWAT_INAP' }, { db });
+    expect(hasil.ok).toBe(false);
+    expect(hasil.penggunaan).toMatchObject({ total_tokens: 30000, reasoning_tokens: 4000, cached_tokens: 1000 });
+    expect(hasil.biaya.usd).toBeCloseTo(0.0981);
+    expect(db.log[0].slice(6, 12)).toEqual(['high', 'RAWAT_INAP', 25000, 5000, 1000, 4000]);
+    expect(db.log[0][12]).toBeCloseTo(0.0981);
+    expect(db.log[0][13]).toBeCloseTo(1765.8);
   });
 });

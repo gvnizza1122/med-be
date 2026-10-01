@@ -77,7 +77,8 @@ describe('bpjsPending.callAi — equivalence request dengan router_model kosong'
 
     const body = JSON.parse(init.body);
     expect(body.model).toBe('gpt-6-luna'); // = process.env.AI_MODEL, sama seperti callAi() lama
-    expect(body.max_completion_tokens).toBe(3000);
+    expect(body.max_completion_tokens).toBe(8000);
+    expect(body.reasoning_effort).toBe('medium');
     expect(body.response_format).toEqual({ type: 'json_object' });
     expect(body.messages).toHaveLength(2);
     expect(body.messages[0].role).toBe('system');

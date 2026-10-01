@@ -38,17 +38,11 @@ describe('KD-01 — tindakan tanpa obat pendukung', () => {
   });
 });
 
-describe('KD-02 — cara bayar bertentangan dengan SEP', () => {
-  // Ditemukan pada berkas MUNAWIR: resume tertulis UMUM, SEP-nya BPJS PBI.
-  test('resume UMUM sementara klaim punya SEP -> temuan tinggi', () => {
-    const t = evaluasiKonsistensi({ sep: '0170R0110926V001943' }, [RESUME_UMUM], []);
-    const f = cari(t, 'KD-02');
-    expect(f).toBeDefined();
-    expect(f.keparahan).toBe('tinggi');
-    expect(f.yang_ditemukan.kutipan).toMatch(/UMUM/i);
+describe('KD-02 — SEP menjadi dasar penjamin BPJS', () => {
+  test.each([{ sep: '0170R0110926V001943' }, { SEP: '0170R0110926V001943' }])('resume UMUM dengan SEP tidak menjadi alasan pending (%j)', record => {
+    expect(cari(evaluasiKonsistensi(record, [RESUME_UMUM], []), 'KD-02')).toBeUndefined();
   });
-
-  test('pasien memang umum tanpa SEP -> tidak ada temuan', () => {
+  test('pasien umum tanpa SEP tetap tidak mendapat temuan pertentangan penjamin', () => {
     expect(cari(evaluasiKonsistensi({ sep: '' }, [RESUME_UMUM], []), 'KD-02')).toBeUndefined();
   });
 });
@@ -211,4 +205,43 @@ describe('KD-14 — DIAGLIST tidak cocok dengan resume medis (verifikasi silang)
     expect(periksaSilangDiagnosisPrimer(null, [])).toEqual([]);
     expect(periksaSilangDiagnosisPrimer(undefined, [])).toEqual([]);
   });
+});
+
+describe('kutipan bukti tidak memotong kata', () => {
+  const { kutipanBaris } = require('../../services/konsistensiAntarDataService');
+
+  test('mengambil baris utuh tempat kata ditemukan', () => {
+    const teks = 'Pemeriksaan Fisik\nkepala: ca -/-, si -/-,\nthorax: sdv +/+, rh +/+, wh +/+';
+    expect(kutipanBaris(teks, teks.indexOf('rh +/+'))).toBe('thorax: sdv +/+, rh +/+, wh +/+');
+  });
+
+  test('baris pendek digabung dengan baris berikutnya', () => {
+    const teks = 'Diagnosa\nPPOK,\nPneumonia\nPenyebab Cedera: -';
+    expect(kutipanBaris(teks, teks.indexOf('PPOK'))).toBe('PPOK, Pneumonia');
+  });
+
+  test('baris sangat panjang dipotong di batas kata, bukan di tengah kata', () => {
+    const teks = `${'kata '.repeat(60)}rh +/+ ${'lain '.repeat(60)}`;
+    const k = kutipanBaris(teks, teks.indexOf('rh +/+'));
+    expect(k).toContain('rh +/+');
+    expect(k.length).toBeLessThanOrEqual(166);
+    expect(k.replace(/…/g, '').trim().split(/\s+/).every(w => ['kata', 'lain', 'rh', '+/+'].includes(w))).toBe(true);
+  });
+});
+
+describe('KD-03/KD-04/KD-11 pada record alur sungguhan (nama kolom huruf besar)', () => {
+  test('rawat inap tanpa DISCHARGE_DATE -> KD-03', () => {
+    expect(cari(evaluasiKonsistensi({ JENIS_KLAIM: 'RAWAT_INAP', DISCHARGE_DATE: '' }, [], []), 'KD-03')).toBeDefined();
+    expect(cari(evaluasiKonsistensi({ JENIS_KLAIM: 'RAWAT_INAP', DISCHARGE_DATE: '05/08/2026' }, [], []), 'KD-03')).toBeUndefined();
+  });
+
+  test('ICU_INDIKATOR terisi tanpa ICU_LOS -> KD-04', () => {
+    expect(cari(evaluasiKonsistensi({ ICU_INDIKATOR: '1', ICU_LOS: '0' }, [], []), 'KD-04')).toBeDefined();
+  });
+});
+
+test('baris utuh yang tidak bersambung tidak ditempeli label berikutnya', () => {
+  const { kutipanBaris } = require('../../services/konsistensiAntarDataService');
+  const teks = 'Cara Bayar : UMUM\nAlergi Obat\n-';
+  expect(kutipanBaris(teks, teks.indexOf('Cara Bayar'))).toBe('Cara Bayar : UMUM');
 });

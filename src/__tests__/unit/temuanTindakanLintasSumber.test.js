@@ -107,36 +107,61 @@ describe('waktu triase tidak wajar (KW-01)', () => {
   });
 });
 
-describe('ketentuan penunjang untuk Pneumonia/PPOK (KD-12, KD-13)', () => {
+describe('ketentuan penunjang untuk Pneumonia/PPOK (KD-09, KD-12, KD-13, KD-15)', () => {
   const tanpaPenunjang = [hal(2, 'RESUME MEDIS IGD\nDiagnosa PPOK, Pneumonia\nPenunjang lain: -')];
+  const RI = { jenis_klaim: 'RAWAT_INAP' };
+  const RJ = { jenis_klaim: 'RAWAT_JALAN' };
 
-  test('J44 di DIAGLIST tanpa penunjang -> KD-12', () => {
-    const f = evaluasiKonsistensi({ diagnosa_list: 'J44.1' }, tanpaPenunjang, []);
+  test('rawat inap: J44 di DIAGLIST tanpa penunjang -> KD-12', () => {
+    const f = evaluasiKonsistensi({ ...RI, diagnosa_list: 'J44.1' }, tanpaPenunjang, []);
     expect(f.map(x => x.id)).toContain('KD-12');
     expect(f.find(x => x.id === 'KD-12').keparahan).toBe('tinggi');
   });
 
-  test('J44 dengan hasil laboratorium di berkas -> tidak ada temuan', () => {
-    const f = evaluasiKonsistensi({ diagnosa_list: 'J44.1' }, [...tanpaPenunjang, hal(4, 'HASIL PEMERIKSAAN LABORATORIUM\nHematologi\nLeukosit 12.000')], []);
+  test('rawat inap: J44 dengan hasil laboratorium di berkas -> tidak ada temuan', () => {
+    const f = evaluasiKonsistensi({ ...RI, diagnosa_list: 'J44.1' }, [...tanpaPenunjang, hal(4, 'HASIL PEMERIKSAAN LABORATORIUM\nHematologi\nLeukosit 12.000')], []);
     expect(f.map(x => x.id)).not.toContain('KD-12');
   });
 
-  test('DIAGLIST kosong tetapi resume menulis pneumonia/PPOK -> KD-13', () => {
-    const f = evaluasiKonsistensi({ diagnosa_list: '' }, tanpaPenunjang, []);
+  test('rawat inap: DIAGLIST kosong tetapi resume menulis pneumonia/PPOK -> KD-13', () => {
+    const f = evaluasiKonsistensi({ ...RI, diagnosa_list: '' }, tanpaPenunjang, []);
     expect(f.map(x => x.id)).toContain('KD-13');
   });
 
-  test('DIAGLIST sudah terisi J18 -> KD-09 yang menilai, KD-13 tidak dobel', () => {
-    const f = evaluasiKonsistensi({ diagnosa_list: 'J18.9' }, tanpaPenunjang, []);
+  test('rawat inap: DIAGLIST sudah terisi J18 -> KD-09 yang menilai, KD-13 tidak dobel', () => {
+    const f = evaluasiKonsistensi({ ...RI, diagnosa_list: 'J18.9' }, tanpaPenunjang, []);
     expect(f.map(x => x.id)).toContain('KD-09');
     expect(f.map(x => x.id)).not.toContain('KD-13');
   });
 
-  test('temuan paru resume (rh +/+) vs triase Thorax Normal tetap terdeteksi (KD-10)', () => {
+  // MUNAWIR (0170R0110926V001943): PPOK eksaserbasi + nebulisasi di IGD, dipulangkan.
+  test('rawat jalan: PPOK tanpa penunjang tidak dipersoalkan (KD-12/KD-13 tidak menyala)', () => {
+    for (const diagnosa_list of ['', 'J44.1']) {
+      const id = evaluasiKonsistensi({ ...RJ, diagnosa_list }, tanpaPenunjang, []).map(x => x.id);
+      expect(id).not.toContain('KD-12');
+      expect(id).not.toContain('KD-13');
+    }
+  });
+
+  test('rawat jalan: pneumonia J18 tanpa penunjang -> KD-15 rendah (perlu dicek), bukan KD-09', () => {
+    const f = evaluasiKonsistensi({ ...RJ, diagnosa_list: 'J44.1;J18.9' }, tanpaPenunjang, []);
+    expect(f.map(x => x.id)).toContain('KD-15');
+    expect(f.map(x => x.id)).not.toContain('KD-09');
+    expect(f.find(x => x.id === 'KD-15').keparahan).toBe('rendah');
+  });
+
+  test('record alur sungguhan (huruf besar JENIS_KLAIM/DIAGLIST) dibaca sama', () => {
+    expect(evaluasiKonsistensi({ JENIS_KLAIM: 'RAWAT_INAP', DIAGLIST: 'J44.1' }, tanpaPenunjang, []).map(x => x.id)).toContain('KD-12');
+    expect(evaluasiKonsistensi({ JENIS_KLAIM: 'RAWAT_JALAN', DIAGLIST: 'J44.1' }, tanpaPenunjang, []).map(x => x.id)).not.toContain('KD-12');
+  });
+
+  test('temuan paru resume (rh +/+) vs triase Thorax Normal: KD-10 rendah, kutipan baris utuh', () => {
     const f = evaluasiKonsistensi({}, [
-      hal(2, 'RESUME MEDIS IGD\nthorax: sdv +/+, rh +/+, wh +/+'),
+      hal(2, 'RESUME MEDIS IGD\nkepala: ca -/-, si -/-,\nthorax: sdv +/+, rh +/+, wh +/+\nabdomen: soepl+'),
       hal(5, 'TRIAGE IGD\nThorak Normal'),
     ], []);
-    expect(f.map(x => x.id)).toContain('KD-10');
+    const kd10 = f.find(x => x.id === 'KD-10');
+    expect(kd10.keparahan).toBe('rendah');
+    expect(kd10.yang_ditemukan.kutipan).toBe('thorax: sdv +/+, rh +/+, wh +/+');
   });
 });

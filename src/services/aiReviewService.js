@@ -38,6 +38,7 @@ const { petakanKeKodeWho } = require('./kodeDiagnosisWhoService');
 const { evaluasiKonsistensi, periksaSilangDiagnosisPrimer } = require('./konsistensiAntarDataService');
 const { periksaWaktuTriase } = require('./konsistensiWaktuService');
 const { susunPutusan } = require('./putusanPendingService');
+const { tinjauLanjutan } = require('./tinjauanLanjutanService');
 const putusanPendingAiService = require('./putusanPendingAiService');
 const { aggregateKriteria, KRITERIA_LABELS } = require('./kegawatdaruratanAggregation');
 const { getDb } = require('../database/init');
@@ -50,6 +51,8 @@ const { classifyPageDocumentType, hasIgdVisitSignal } = require('./pdfPageClassi
 const { evaluasiKombinasiKode } = require('./ketentuanKlaimService');
 const { groupCodesToInaCBG } = require('./inacbgGroupingService');
 const gatewayModelService = require('./gatewayModelService');
+const { denganHumanizer } = require('./humanizerPromptService');
+const { tinjauDiagnosis } = require('./tinjauanDiagnosisService');
 const { getTarifResmi, lookupTarifInacbg, cocokJenisKlaim } = require('./tarifInacbgLookup');
 const { jalankanPagarAman, catatDitolakAwal, ALASAN_PAGAR } = require('./pagarPascaAiService');
 const { bacaTemuanPenunjang } = require('./temuanPenunjangService');
@@ -722,7 +725,8 @@ async function suggestDiagnosisCodesFallback(evidencePool, ditolakOut = null, re
 
   try {
     const gateway = await gatewayModelService.panggilModel('baca_berkas', {
-      system: DIAGNOSIS_SUGGESTION_SYSTEM_PROMPT,
+      system: denganHumanizer(DIAGNOSIS_SUGGESTION_SYSTEM_PROMPT),
+      jenisKlaim: record.jenis_klaim || record.JENIS_KLAIM,
       prompt: userPrompt,
       json: true,
       maxTokens: 1500,
@@ -1101,7 +1105,7 @@ async function assessKegawatdaruratan(evidencePool, triagePageNumbers, umurTahun
 
   try {
     const hasilGateway = await gatewayModelService.panggilModel('baca_berkas', {
-      system: KEGAWATDARURATAN_SYSTEM_PROMPT,
+      system: denganHumanizer(KEGAWATDARURATAN_SYSTEM_PROMPT),
       prompt: userPrompt,
       json: true,
       maxTokens: 4200,
@@ -1387,6 +1391,11 @@ kutipan pasti, JANGAN laporkan apa pun untuk pola itu — lebih baik diam daripa
 PENTING — jenis klaim: field "JENIS_KLAIM"/"jenis_klaim" pada data rekam menunjukkan kategori pelayanan
 (RAWAT_JALAN atau RAWAT_INAP), dipilih sendiri oleh perawat saat upload — selalu akurat,
 jangan diragukan. Pola-pola yang menyinggung rawat inap/ICU/LOS TIDAK relevan untuk RAWAT_JALAN.
+Satu pasien dapat memiliki dua atau lebih diagnosis yang sah. Nilai dukungan setiap diagnosis dokter
+bersama anamnesis, pemeriksaan fisik, tanda vital, penunjang dan tindakan pada episode pelayanan yang sama.
+Jumlah diagnosis, gejala yang tumpang tindih, atau ketiadaan satu pemeriksaan saja tidak otomatis
+membuktikan diagnosis salah atau risiko pending. Cari bukti yang mendukung maupun bertentangan;
+jika bukti belum cukup, jelaskan kebutuhan klarifikasi tanpa mengarang penyakit atau kepastian pending.
    a. [kegawatan_lemah] — Khusus kunjungan IGD/UGD: keluhan/subjektif pasien HANYA
       menyebut nyeri/tidak nyaman tanpa tanda objektif pendukung, DAN tanda vital (TTV) yang tercatat
       normal semua. Kombinasi ini sering ditolak BPJS dengan alasan "tidak memenuhi kriteria gawat
@@ -1720,7 +1729,8 @@ async function assessPendingRiskPatterns(record, evidencePool, dikenal = identit
 
   try {
     const hasilGateway = await gatewayModelService.panggilModel('baca_berkas', {
-      system: PENDING_RISK_SYSTEM_PROMPT,
+      system: denganHumanizer(PENDING_RISK_SYSTEM_PROMPT),
+      jenisKlaim: record.jenis_klaim || record.JENIS_KLAIM,
       prompt: userPrompt,
       json: true,
       maxTokens: 3000,
@@ -1926,7 +1936,8 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
     try {
       const db = getDb();
       const hasilGateway = await gatewayModelService.panggilModel('baca_berkas', {
-        system: AI_REVIEW_SYSTEM_PROMPT,
+        system: denganHumanizer(AI_REVIEW_SYSTEM_PROMPT),
+        jenisKlaim: record.jenis_klaim || record.JENIS_KLAIM,
         prompt: userPrompt,
         json: true,
         maxTokens: 4000,
@@ -2644,12 +2655,25 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
       result.inacbg_result = inacbgResult;
       result.tariff_result = tarifResult;
 
+      // Tinjauan kasus tersedia sebelum pemilihan alasan pending; saran kode
+      // tetap terpisah dari diagnosis yang diklaim dan tidak menggugurkan aturan wajib.
+      try {
+        result.tinjauan_diagnosis = await tinjauDiagnosis(record, result, evidencePool, getAnyResumeMedisPageNumbers(evidencePool), {
+          db: getDb(), dikenal: identitasUntukGateway(record),
+        });
+        result.tokens_used += result.tinjauan_diagnosis.tokens_used || 0;
+      } catch (_) {
+        result.tinjauan_diagnosis = { status: 'belum_dinilai', ringkasan: 'Tinjauan diagnosis belum tersedia. Periksa pilihan kode bersama koder.', kode_rekomendasi: [], kandidat: [], klarifikasi: [] };
+      }
+
       // Putusan pending dijalankan paling akhir agar semua temuan, termasuk
       // hasil pembacaan penunjang, pneumonia, dan kode, sudah menjadi kandidat.
       try {
         const kandidatPutusan = susunPutusan(result, validationErrors);
         const keputusan = await putusanPendingAiService.putuskanDenganAi(kandidatPutusan, {
           db: getDb(), dikenal: identitasUntukGateway(record),
+          tinjauanDiagnosis: result.tinjauan_diagnosis,
+          jenisKlaim: record.jenis_klaim || record.JENIS_KLAIM,
         });
         if (keputusan.ok) {
           result.putusan_pending = keputusan.putusan;
@@ -2671,6 +2695,22 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
         result.putusan_pending = null;
       }
 
+      // Satu pemeriksaan Sol selektif untuk rawat jalan/rawat inap. Hasil
+      // awal tidak dihapus bila Sol gagal atau dua model berbeda pendapat.
+      try {
+        const lanjutan = await tinjauLanjutan(record, result, evidencePool,
+          getAnyResumeMedisPageNumbers(evidencePool), susunPutusan(result, validationErrors), {
+            db: getDb(), dikenal: identitasUntukGateway(record),
+          });
+        result.pemeriksaan_lanjutan = lanjutan.metadata;
+        result.tokens_used += lanjutan.metadata.tokens_used || 0;
+        if (lanjutan.tinjauan) result.tinjauan_diagnosis = lanjutan.tinjauan;
+        else if (result.tinjauan_diagnosis) result.tinjauan_diagnosis.pemeriksaan_lanjutan = lanjutan.metadata;
+        if (lanjutan.putusan) result.putusan_pending = lanjutan.putusan;
+      } catch (_) {
+        result.pemeriksaan_lanjutan = { status: 'gagal', pesan: 'Pemeriksaan lanjutan belum tersedia; hasil awal tetap berlaku.' };
+      }
+
       result.generated_at = new Date().toISOString();
       await simpanJejakEnamTahap(record, evidencePool, result, codes);
       return result;
@@ -2685,7 +2725,8 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
 }
 
 module.exports = {
-  generateAiReview,
+  generateAiReview: (record, ...args) => require('./konteksPenggunaanAiService')
+    .untukRecord(getDb(), record, () => generateAiReview(record, ...args)),
   hitungInacbgDanTarif,
   // Diekspor supaya pemeriksaan kamus bisa diuji tanpa menjalankan
   // seluruh alur review.
@@ -2701,6 +2742,7 @@ module.exports = {
   assessKegawatdaruratan,
   getIgdTriagePageNumbers,
   getResumeMedisPageNumbers,
+  getAnyResumeMedisPageNumbers,
   // Fallback document page getters (19 Sep 2026)
   getLaporanOperasiPageNumbers,
   getLabResultsPageNumbers,

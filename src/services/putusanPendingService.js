@@ -123,6 +123,9 @@ function susunPutusan(aiReviewMasuk = {}, validationErrorsMasuk = []) {
 
   // 2. Konsistensi antar data — data yang diklaim tanpa pendukungnya.
   for (const k of aiReview.konsistensi_data || []) {
+    // Label UMUM pada resume tidak menggugurkan penjaminan oleh SEP BPJS.
+    // Filter juga temuan tersimpan yang dibuat sebelum aturan ini diperbaiki.
+    if (k.id === 'KD-02') continue;
     tambah(alasan, {
       sumber_pemeriksaan: 'Konsistensi antar data',
       kode: k.id,
@@ -237,4 +240,50 @@ function susunPutusan(aiReviewMasuk = {}, validationErrorsMasuk = []) {
   };
 }
 
-module.exports = { susunPutusan, STATUS };
+/**
+ * Buang alasan "Aturan validasi" yang sudah tidak berlaku setelah validasi
+ * dihitung ulang. Putusan disusun SAAT AI review, sering ketika DIAGLIST/
+ * PROCLIST masih kosong; begitu kolom itu diisi otomatis, error validasinya
+ * hilang tetapi alasannya (mis. RV-05 "DIAGLIST wajib diisi ... (kosong)")
+ * tetap tampil di Analisis Risiko dan tetap menahan klaim di status pending.
+ * Ditemukan pada MUNAWIR (0170R0110926V001943, 1 Okt 2026).
+ *
+ * Alasan dari pemeriksaan lain tidak disentuh. Status diturunkan hanya bila
+ * alasan berat yang tersisa sudah tidak ada.
+ *
+ * @param {Object} putusan ai_review.putusan_pending
+ * @param {Array} errorBaru hasil validasi terbaru (berisi rule_id)
+ * @returns {Object|null} putusan baru, atau null kalau tidak ada yang berubah
+ */
+function segarkanAlasanValidasi(putusan, errorBaru = []) {
+  if (!putusan || !Array.isArray(putusan.alasan)) return null;
+  const masihBerlaku = new Set((errorBaru || []).map(e => e && e.rule_id).filter(Boolean));
+  const sisa = putusan.alasan.filter(a => !a || a.sumber_pemeriksaan !== 'Aturan validasi' || masihBerlaku.has(a.kode));
+  if (sisa.length === putusan.alasan.length) return null;
+
+  const berat = sisa.filter(a => bobot(a.keparahan) === 0 || a.wajib_pending === true);
+  let status = putusan.status;
+  let ringkasan = putusan.ringkasan;
+  if (sisa.length === 0) {
+    status = STATUS.BERSIH;
+    ringkasan = 'Tidak ditemukan alasan yang biasa membuat klaim dipending.';
+  } else if (status === STATUS.BERISIKO && berat.length === 0) {
+    status = STATUS.PERLU_DICEK;
+    ringkasan = `Ada ${sisa.length} hal yang sebaiknya dicek sebelum submit.`;
+  } else if (status === STATUS.BERISIKO) {
+    ringkasan = `Ada ${sisa.length} alasan yang berisiko membuat klaim ini dipending.`;
+  }
+  return {
+    ...putusan,
+    status,
+    ringkasan,
+    alasan: sisa,
+    jumlah: {
+      total: sisa.length,
+      berat: berat.length,
+      dari_rekap_pending: sisa.filter(a => a.dari_rekap_pending).length,
+    },
+  };
+}
+
+module.exports = { susunPutusan, segarkanAlasanValidasi, STATUS };

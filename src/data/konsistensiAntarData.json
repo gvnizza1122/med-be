@@ -32,6 +32,8 @@
     },
     {
       "id": "KD-02",
+      "aktif": false,
+      "alasan_nonaktif": "SEP BPJS menjadi dasar penjaminan BPJS meskipun resume masih mencetak cara bayar UMUM. Label UMUM saja bukan alasan risiko pending (arahan pemilik, 1 Okt 2026).",
       "nama": "Cara bayar di resume tidak sesuai penjamin SEP",
       "keparahan": "tinggi",
       "diverifikasi": true,
@@ -50,7 +52,7 @@
           "sep"
         ]
       },
-      "yang_dicari": "Resume menyebut pasien UMUM padahal klaim ini punya SEP BPJS",
+      "yang_dicari": "Cara bayar BPJS/JKN di resume, sesuai SEP",
       "pesan": "Resume medis mencatat cara bayar UMUM, sementara klaim ini diajukan dengan SEP BPJS. Pertentangan ini terlihat langsung oleh verifikator dan mempertanyakan keabsahan penjaminan.",
       "sumber_aturan": "Ditemukan pada berkas 0170R0110926V001943 (MUNAWIR): resume tertulis UMUM, SEP-nya BPJS PBI (APBN)."
     },
@@ -209,10 +211,14 @@
     },
     {
       "id": "KD-09",
-      "nama": "Diagnosis paru berat tanpa penunjang apa pun",
+      "nama": "Diagnosis paru berat tanpa penunjang apa pun (rawat inap)",
       "keparahan": "tinggi",
       "diverifikasi": true,
       "jika": {
+        "field_cocok": {
+          "field": "jenis_klaim",
+          "pola": "^RAWAT_INAP$"
+        },
         "diagnosis_awalan": "J18"
       },
       "maka": {
@@ -230,14 +236,19 @@
       },
       "yang_dicari": "Hasil laboratorium atau radiologi",
       "pesan": "Pneumonia dikoding tetapi berkas tidak memuat hasil laboratorium maupun radiologi sama sekali. Diagnosis berat tanpa satu pun penunjang adalah risiko pending tertinggi.",
-      "sumber_aturan": "Ditemukan pada berkas 0170R0110926V001943: 'Penunjang lain: -' padahal diagnosisnya Pneumonia dan PPOK."
+      "sumber_aturan": "Ditemukan pada berkas 0170R0110926V001943: 'Penunjang lain: -' padahal diagnosisnya Pneumonia dan PPOK.",
+      "_catatan_jenis_klaim": "Dibatasi ke RAWAT_INAP (1 Okt 2026): pada rawat jalan/IGD yang dipulangkan, diagnosis ditegakkan klinis dan tarif INA-CBG rawat jalan tidak bergantung pada penunjang -- klaim PPOK eksaserbasi + nebulisasi di IGD (MUNAWIR) sah tanpa lab/rontgen, dan kegawatannya dibuktikan lewat kriteria K1-K5, bukan penunjang."
     },
     {
       "id": "KD-12",
-      "nama": "PPOK dikoding tanpa penunjang apa pun",
+      "nama": "PPOK dikoding tanpa penunjang apa pun (rawat inap)",
       "keparahan": "tinggi",
       "diverifikasi": true,
       "jika": {
+        "field_cocok": {
+          "field": "jenis_klaim",
+          "pola": "^RAWAT_INAP$"
+        },
         "diagnosis_awalan": "J44"
       },
       "maka": {
@@ -257,14 +268,19 @@
       },
       "yang_dicari": "Hasil laboratorium, radiologi, atau spirometri",
       "pesan": "PPOK (J44) dikoding tetapi berkas tidak memuat hasil laboratorium, radiologi, maupun spirometri. Diagnosis kronis-eksaserbasi tanpa satu pun penunjang adalah risiko pending yang tinggi.",
-      "sumber_aturan": "Ditemukan pada berkas 0170R0110926V001943: 'Penunjang lain: -' padahal diagnosisnya PPOK dan Pneumonia. KD-09 hanya menjangkau J18."
+      "sumber_aturan": "Ditemukan pada berkas 0170R0110926V001943: 'Penunjang lain: -' padahal diagnosisnya PPOK dan Pneumonia. KD-09 hanya menjangkau J18.",
+      "_catatan_jenis_klaim": "Dibatasi ke RAWAT_INAP (1 Okt 2026): pada rawat jalan/IGD yang dipulangkan, diagnosis ditegakkan klinis dan tarif INA-CBG rawat jalan tidak bergantung pada penunjang -- klaim PPOK eksaserbasi + nebulisasi di IGD (MUNAWIR) sah tanpa lab/rontgen, dan kegawatannya dibuktikan lewat kriteria K1-K5, bukan penunjang."
     },
     {
       "id": "KD-13",
-      "nama": "Pneumonia/PPOK tertulis di resume, penunjang tidak ada",
+      "nama": "Pneumonia/PPOK tertulis di resume, penunjang tidak ada (rawat inap)",
       "keparahan": "tinggi",
       "diverifikasi": true,
       "jika": {
+        "field_cocok": {
+          "field": "jenis_klaim",
+          "pola": "^RAWAT_INAP$"
+        },
         "field_kosong": [
           "diagnosa_list",
           "DIAGLIST"
@@ -296,12 +312,42 @@
       "yang_dicari": "Hasil laboratorium atau radiologi",
       "pesan": "Resume menuliskan pneumonia/PPOK tetapi berkas tidak memuat penunjang sama sekali. Aturan ini hanya berlaku selagi kolom diagnosis klaim masih kosong; begitu kodenya terisi, KD-09 (J18) dan KD-12 (J44) yang menilai.",
       "sumber_aturan": "Ditemukan pada berkas 0170R0110926V001943: diagnosis tertulis di resume, 'Penunjang lain: -'.",
-      "_catatan_rancangan": "Pelengkap KD-09/KD-12 yang membaca kode. Dibatasi pada DIAGLIST kosong supaya satu masalah tidak melaporkan dua temuan."
+      "_catatan_rancangan": "Pelengkap KD-09/KD-12 yang membaca kode. Dibatasi pada DIAGLIST kosong supaya satu masalah tidak melaporkan dua temuan.",
+      "_catatan_jenis_klaim": "Dibatasi ke RAWAT_INAP (1 Okt 2026): pada rawat jalan/IGD yang dipulangkan, diagnosis ditegakkan klinis dan tarif INA-CBG rawat jalan tidak bergantung pada penunjang -- klaim PPOK eksaserbasi + nebulisasi di IGD (MUNAWIR) sah tanpa lab/rontgen, dan kegawatannya dibuktikan lewat kriteria K1-K5, bukan penunjang."
+    },
+    {
+      "id": "KD-15",
+      "nama": "Pneumonia rawat jalan tanpa penunjang",
+      "keparahan": "rendah",
+      "diverifikasi": true,
+      "jika": {
+        "field_cocok": {
+          "field": "jenis_klaim",
+          "pola": "^RAWAT_JALAN$"
+        },
+        "diagnosis_awalan": "J18"
+      },
+      "maka": {
+        "kata_di_halaman": {
+          "salah_satu": [
+            "hasil laboratorium",
+            "hematologi",
+            "leukosit",
+            "rontgen",
+            "radiologi",
+            "foto thorax",
+            "foto toraks"
+          ]
+        }
+      },
+      "yang_dicari": "Hasil laboratorium atau radiologi (bila ada)",
+      "pesan": "Pneumonia (J18) pada klaim rawat jalan tanpa hasil laboratorium maupun radiologi. Klaim tetap dapat diajukan karena diagnosis rawat jalan ditegakkan klinis; pastikan gejala dan pemeriksaan fisik yang mendukung pneumonia tercatat di resume. Catatan untuk dicek, bukan alasan pending.",
+      "sumber_aturan": "Pasangan rawat jalan untuk KD-09 (1 Okt 2026), setelah KD-09/KD-12/KD-13 dibatasi ke rawat inap."
     },
     {
       "id": "KD-10",
       "nama": "Temuan paru resume bertentangan dengan triase",
-      "keparahan": "sedang",
+      "keparahan": "rendah",
       "diverifikasi": true,
       "jika": {
         "kata_di_halaman": {
@@ -325,8 +371,9 @@
         }
       },
       "yang_dicari": "Temuan paru abnormal di triase",
-      "pesan": "Resume mencatat ronki pada kedua paru, sementara triase mencatat pemeriksaan thorak normal. Dua dokumen dalam satu klaim yang saling bertentangan mudah ditemukan verifikator.",
-      "sumber_aturan": "Ditemukan pada berkas 0170R0110926V001943: resume 'rh +/+, wh +/+', triase 'Thorak Normal'."
+      "pesan": "Resume mencatat ronki pada kedua paru, sementara triase mencatat thorak normal. Pemeriksaan dokter di resume menjadi acuan; selaraskan catatan triase bila perlu. Ini catatan untuk dicek, bukan alasan pending tersendiri.",
+      "sumber_aturan": "Ditemukan pada berkas 0170R0110926V001943: resume 'rh +/+, wh +/+', triase 'Thorak Normal'.",
+      "_catatan_keparahan": "Diturunkan dari 'sedang' ke 'rendah' (1 Okt 2026): kolom KEADAAN triase adalah centang templat perawat ('Thorak Normal'), sedangkan resume memuat pemeriksaan dokter yang lebih rinci. Belum ada data pending BPJS yang menunjukkan perbedaan ini sendiri menyebabkan pending."
     },
     {
       "id": "KD-11",

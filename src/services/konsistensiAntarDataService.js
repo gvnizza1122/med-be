@@ -75,6 +75,38 @@ function kelompokkanHalaman(halaman) {
 }
 
 /**
+ * Kutipan bukti = BARIS tempat kata itu ditemukan (ditambah baris berikutnya
+ * kalau isinya bersambung, mis. "PPOK," lalu "Pneumonia"), dipotong di
+ * batas kata. Sebelumnya teks dipotong persis 40 karakter sebelum dan 70
+ * sesudah kata kunci, sehingga kata terbelah ("epala: ca -/-" dari "kepala",
+ * "Rencana Ra" dari "Rawat jalan") dan kutipan melompati beberapa kolom.
+ */
+function kutipanBaris(teks, idx, maks = 160) {
+  const t = String(teks || '');
+  const awal = t.lastIndexOf('\n', Math.max(0, idx - 1)) + 1;
+  let akhir = t.indexOf('\n', idx);
+  if (akhir === -1) akhir = t.length;
+  let baris = t.slice(awal, akhir).replace(/\s+/g, ' ').trim();
+  // Digabung hanya kalau isinya jelas bersambung (diakhiri koma, mis. "PPOK,"
+  // lalu "Pneumonia") atau barisnya nyaris kosong -- bukan "Cara Bayar : UMUM"
+  // yang akan tertempel label kolom berikutnya.
+  if ((/,$/.test(baris) || baris.length < 8) && akhir < t.length) {
+    let akhir2 = t.indexOf('\n', akhir + 1);
+    if (akhir2 === -1) akhir2 = t.length;
+    baris = `${baris} ${t.slice(akhir + 1, akhir2).replace(/\s+/g, ' ').trim()}`.trim();
+  }
+  if (baris.length <= maks) return baris;
+  // Baris sangat panjang (teks OCR tanpa pemisah baris): jendela di sekitar
+  // kata kunci, dipotong di spasi supaya tidak ada kata terbelah.
+  const posisi = Math.max(0, idx - awal);
+  let mulai = Math.max(0, posisi - 50);
+  let selesai = Math.min(baris.length, mulai + maks);
+  if (mulai > 0) { const sp = baris.indexOf(' ', mulai); if (sp !== -1 && sp < posisi) mulai = sp + 1; }
+  if (selesai < baris.length) { const sp = baris.lastIndexOf(' ', selesai); if (sp > posisi) selesai = sp; }
+  return `${mulai > 0 ? '… ' : ''}${baris.slice(mulai, selesai).trim()}${selesai < baris.length ? ' …' : ''}`;
+}
+
+/**
  * Cari kata kunci, kembalikan buktinya (kutipan + halaman) supaya temuan bisa
  * dipertanggungjawabkan — bukan sekadar "ada" atau "tidak ada".
  */
@@ -91,7 +123,7 @@ function cariKata(petaHalaman, jenis, daftarKata) {
       return {
         kata,
         page_number: hal.page_number,
-        kutipan: hal.teks.substring(Math.max(0, idx - 40), idx + 70).replace(/\s+/g, ' ').trim(),
+        kutipan: kutipanBaris(hal.teks, idx),
       };
     }
   }
@@ -102,20 +134,36 @@ function cariKata(petaHalaman, jenis, daftarKata) {
  * Nilai satu kondisi. Mengembalikan {benar, bukti} — buktinya dipakai untuk
  * menjelaskan temuan, bukan cuma menyimpulkannya.
  */
+/**
+ * Nilai kolom klaim tanpa peduli huruf besar/kecil. Record dari alur upload
+ * dan Baca Ulang memakai nama kolom vClaim huruf besar (JENIS_KLAIM,
+ * DISCHARGE_DATE, KELAS_RAWAT, ICU_INDIKATOR), sedangkan aturan ditulis dengan
+ * nama kolom basis data huruf kecil. Tanpa ini KD-03, KD-04, dan KD-11 tidak
+ * pernah menyala di alur sungguhan (hanya di tes yang memakai huruf kecil).
+ */
+const KOLOM_VCLAIM = { diagnosa_list: 'DIAGLIST', prosedur_list: 'PROCLIST' };
+function nilaiKolom(record, field) {
+  if (!record) return undefined;
+  for (const k of [field, String(field).toUpperCase(), String(field).toLowerCase(), KOLOM_VCLAIM[field]]) {
+    if (k && record[k] !== undefined && record[k] !== null && record[k] !== '') return record[k];
+  }
+  return record[field];
+}
+
 function cekKondisi(kond, konteks) {
   if (!kond) return { benar: true, bukti: null };
   const { record, petaHalaman, tindakan } = konteks;
   let bukti = null;
 
   if (Array.isArray(kond.field_terisi)) {
-    for (const f of kond.field_terisi) if (!terisi(record[f])) return { benar: false, bukti };
+    for (const f of kond.field_terisi) if (!terisi(nilaiKolom(record, f))) return { benar: false, bukti };
   }
   if (Array.isArray(kond.field_kosong)) {
-    for (const f of kond.field_kosong) if (terisi(record[f])) return { benar: false, bukti };
+    for (const f of kond.field_kosong) if (terisi(nilaiKolom(record, f))) return { benar: false, bukti };
   }
   if (kond.field_cocok) {
     const { field, pola } = kond.field_cocok;
-    if (!new RegExp(pola, 'i').test(String(record[field] ?? ''))) return { benar: false, bukti };
+    if (!new RegExp(pola, 'i').test(String(nilaiKolom(record, field) ?? ''))) return { benar: false, bukti };
   }
   if (kond.kode_prosedur) {
     const ada = pisahKode(record.prosedur_list || record.PROCLIST)
@@ -159,6 +207,7 @@ function evaluasiKonsistensi(record, halaman = [], tindakan = []) {
   const temuan = [];
 
   for (const aturan of ATURAN.aturan || []) {
+    if (aturan.aktif === false) continue;
     const jika = cekKondisi(aturan.jika, konteks);
     if (!jika.benar) continue; // aturan ini tidak berlaku untuk klaim ini
 
@@ -263,4 +312,6 @@ module.exports = {
   diagnosisCocok,
   kategoriIcd10,
   terisi,
+  kutipanBaris,
+  nilaiKolom,
 };

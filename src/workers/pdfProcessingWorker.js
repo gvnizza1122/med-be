@@ -6,6 +6,7 @@ const { validateRecord, determineStatus } = require('../services/ruleEngine');
 const { updateBatchProgress, logQueueEvent, getBatchStatus } = require('../services/queueService');
 const { v4: uuidv4 } = require('uuid');
 const { isiPeriodeUntukFile } = require('../services/periodeKlaimService');
+const konteksAi = require('../services/konteksPenggunaanAiService');
 
 const redisOptions = {
   host: process.env.REDIS_HOST || 'localhost',
@@ -31,7 +32,8 @@ const worker = new Worker('pdf-processing', async (job) => {
       throw new Error(`File not found: ${filePath}`);
     }
 
-    const parseResult = await parsePDF(filePath);
+    const asal = await db.get('SELECT hospital_code, jenis_klaim FROM claim_files WHERE id = ?', [fileId]);
+    const parseResult = await konteksAi.jalankan(asal || {}, () => parsePDF(filePath));
 
     if (!parseResult.success) {
       throw new Error(`PDF parsing failed: ${parseResult.errors?.join(', ')}`);

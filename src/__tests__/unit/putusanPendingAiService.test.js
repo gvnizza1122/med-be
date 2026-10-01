@@ -54,4 +54,22 @@ describe('putusanPendingAiService', () => {
       dikenal: { nama: 'SUMIDAH', sep: 'SEP-UJI' },
     }), { db: { id: 'db' } });
   });
+  test('bukti tinjauan multi diagnosis menjadi konteks putusan tanpa membuat atau menulis ulang alasan', async () => {
+    const tinjauanDiagnosis = { versi: 1, status: 'perlu_klarifikasi', ringkasan: 'Dua diagnosis didukung; urutan utama perlu klarifikasi.',
+      kandidat: [{ kode: 'J44.9', status: 'didukung', alasan: 'Diagnosis pada resume dan riwayat sesak.', bukti: [{ halaman: 2, kutipan: 'PPOK' }] },
+        { kode: 'J18.9', status: 'didukung', alasan: 'Diagnosis pada resume.', bukti: [{ halaman: 2, kutipan: 'Pneumonia' }] }], klarifikasi: ['Periksa diagnosis utama.'] };
+    const panggilModel = jest.fn(async () => ({ ok: true, hasil: { status: 'perlu_dicek', alasan_ids: ['kandidat-2'] } }));
+    const hasil = await putuskanDenganAi(kandidat, { tinjauanDiagnosis, gateway: { panggilModel } });
+    const payload = panggilModel.mock.calls[0][1];
+    expect(payload.prompt).toContain('TINJAUAN_DIAGNOSIS_TERVERIFIKASI');
+    expect(payload.prompt).toContain('PPOK');
+    expect(payload.prompt).toContain('Pneumonia');
+    expect(payload.system).toContain('Jumlah diagnosis saja bukan alasan pending');
+    expect(hasil.putusan.alasan).toEqual([kandidat.alasan[1]]);
+  });
+  test('kegagalan tinjauan tidak dijadikan bukti keputusan pending', async () => {
+    const panggilModel = jest.fn(async () => ({ ok: true, hasil: { status: 'perlu_dicek', alasan_ids: ['kandidat-2'] } }));
+    await putuskanDenganAi(kandidat, { tinjauanDiagnosis: { versi: 1, status: 'belum_dinilai', ringkasan: 'Bukti rekaan' }, gateway: { panggilModel } });
+    expect(panggilModel.mock.calls[0][1].prompt).not.toContain('Bukti rekaan');
+  });
 });

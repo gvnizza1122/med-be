@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const { getDb } = require('../database/init');
+const konteksAi = require('../services/konteksPenggunaanAiService');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'eclaim-secret';
 
@@ -22,7 +23,7 @@ async function authenticate(req, res, next) {
     }
 
     req.user = user;
-    next();
+    konteksAi.jalankan({ hospital_code: user.hospital_code, record_id: req.params?.recordId || req.params?.record_id || null }, next);
   } catch (err) {
     if (err.name === 'TokenExpiredError') {
       return res.status(401).json({ error: 'Token expired. Silakan login ulang.' });
