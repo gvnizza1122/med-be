@@ -24,7 +24,7 @@ const worker = new Worker('ai-review', async (job) => {
     const bpjsExamples = await getRelevantBpjsExamples(db);
 
     // Jalankan AI review
-    const aiReview = await generateAiReview(extractedData, validationErrors, evidencePool, knowledgeEntries, bpjsExamples);
+    const aiReview = await generateAiReview({ ...extractedData, id: recordId }, validationErrors, evidencePool, knowledgeEntries, bpjsExamples);
 
     if (aiReview) {
       // Simpan hasil review ke database

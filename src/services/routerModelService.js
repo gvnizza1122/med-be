@@ -41,6 +41,7 @@ const TUGAS = Object.freeze([
   'ringkas_training_pending',
   'putuskan_pending',
   'ekstrak_pdf',
+  'tinjau_kasus_lanjutan',
 ]);
 
 const PENYEDIA = Object.freeze(['openai_compat', 'kimi']);
@@ -54,6 +55,9 @@ function hapusCache() {
 }
 
 function modelDariEnv(tugas, penyedia = 'openai_compat') {
+  if (tugas === 'tinjau_kasus_lanjutan') {
+    return { penyedia: 'openai_compat', model: process.env.AI_REVIEW_MODEL || 'gpt-6.1-sol' };
+  }
   if (tugas === 'ringkas_training_pending') {
     return { penyedia: 'kimi', model: process.env.KIMI_MODEL || 'kimi-k3' };
   }

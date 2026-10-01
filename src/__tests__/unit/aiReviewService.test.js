@@ -91,6 +91,12 @@ describe('generateAiReview — dengan AI dikonfigurasi (fetch dimock)', () => {
 
     expect(result).not.toBeNull();
     expect(result.field_notes).toEqual({ sep: 'SEP harus uppercase semua.' });
+    // Memeriksa request yang benar-benar dikirim, bukan hanya helper prompt.
+    const sent = JSON.parse(global.fetch.mock.calls[0][1].body);
+    const system = sent.messages.find(m => m.role === 'system').content;
+    expect(system).toContain('PANDUAN BAHASA HUMANIZER');
+    expect(system).toContain('skema JSON dalam instruksi tugas selalu didahulukan');
+    expect(sent.response_format).toEqual({ type: 'json_object' });
   });
 
   test('code_evidence dengan kutipan yang lolos normalisasi whitespace tetap found:true', async () => {
@@ -113,6 +119,9 @@ describe('generateAiReview — dengan AI dikonfigurasi (fetch dimock)', () => {
     expect(result).not.toBeNull();
     const entry = result.code_evidence.find(e => e.code === 'E11.9');
     expect(entry.found).toBe(true);
+    expect(entry.code).toBe('E11.9');
+    expect(entry.page_number).toBe(1);
+    expect(entry.quotation).toBe('Diagnosa   diabetes');
   });
 
   test('jenis_klaim (kategori pelayanan pilihan user) disertakan eksplisit di prompt AI', async () => {

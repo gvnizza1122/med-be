@@ -1,4 +1,5 @@
 const { panggilModel } = require('./gatewayModelService');
+const { denganHumanizer } = require('./humanizerPromptService');
 
 // Map the typescript types statuses to Postgres DB check constraints
 function mapStatusToDb(status) {
@@ -319,7 +320,7 @@ function buildUserMessage(records) {
 async function postChatCompletion(bodyObj, dikenal = {}, db = null) {
   const messages = bodyObj.messages || [];
   const gateway = await panggilModel('audit_berkas_field', {
-    system: messages.find(m => m.role === 'system')?.content,
+    system: denganHumanizer(messages.find(m => m.role === 'system')?.content || ''),
     prompt: messages.find(m => m.role === 'user')?.content || '',
     dikenal,
     json: !!bodyObj.response_format,

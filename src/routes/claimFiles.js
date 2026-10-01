@@ -11,8 +11,11 @@ const { generateExcel } = require('../services/exportService');
 const { buatDaftarKerja, namaBerkasDaftarKerja } = require('../services/daftarKerjaExportService');
 const { buatSiapSubmit, namaBerkasSiapSubmit } = require('../services/siapSubmitExportService');
 const { logAudit } = require('../services/auditService');
+const konteksAi = require('../services/konteksPenggunaanAiService');
 const { estimatePromptTokens, estimateCompletionTokens } = require('../services/aiValidationService');
-const { generateAiReview, hitungInacbgDanTarif } = require('../services/aiReviewService');
+const { generateAiReview, hitungInacbgDanTarif, getAnyResumeMedisPageNumbers } = require('../services/aiReviewService');
+const { tinjauDiagnosis } = require('../services/tinjauanDiagnosisService');
+const { tinjauLanjutan } = require('../services/tinjauanLanjutanService');
 const { getRelevantKnowledge, recordKnowledge, getRelevantBpjsExamples } = require('../services/errorKnowledgeService');
 const { matchPrbCategory } = require('../services/prbRules');
 const { linkPendingBpjsForSep } = require('../services/bpjsPendingLink');
@@ -26,6 +29,9 @@ const { validasiRecordDenganKamus } = require('../services/validasiRecordKamusSe
 const { simpanAiReview } = require('../services/simpanAiReviewService');
 
 const { kegawatdaruratanMemicuPending } = require('../services/kegawatdaruratanAggregation');
+const { segarkanAlasanValidasi } = require('../services/putusanPendingService');
+const { susunSaranKoding } = require('../services/saranKodingService');
+const { perbaruiRisikoTampilan } = require('../services/risikoKlaimTampilanService');
 
 const router = express.Router();
 
@@ -822,10 +828,11 @@ router.get('/:id/records', authenticate, async (req, res) => {
       }, {});
     }
 
-    const recordsWithErrors = records.map(rec => ({
-      ...rec,
-      errors: errorsByRecordId[rec.id] || [],
-    }));
+    const recordsWithErrors = records.map(rec => {
+      const errors = errorsByRecordId[rec.id] || [];
+      const review = perbaruiRisikoTampilan(rec, errors);
+      return { ...rec, errors, ai_review: typeof rec.ai_review === 'string' ? JSON.stringify(review) : review };
+    });
 
     res.json({ total, page: parseInt(page), limit: parseInt(limit), records: recordsWithErrors });
   } catch (err) {
@@ -2265,7 +2272,7 @@ async function isiKodeDariSaranDalamTransaksi(db, recordId, record, aiReview) {
   //
   // Hanya menaikkan, tidak pernah menurunkan: kalau status saat ini sudah
   // 'pending' atau 'error', dibiarkan.
-  const aiBilangPending = aiReview && aiReview.putusan_pending
+  let aiBilangPending = aiReview && aiReview.putusan_pending
     && aiReview.putusan_pending.status === 'berisiko_pending';
   if (aiBilangPending) {
     try {
@@ -2345,6 +2352,17 @@ async function isiKodeDariSaranDalamTransaksi(db, recordId, record, aiReview) {
         await insert.run(uuidv4(), recordId, e.rule_id, e.field_name, e.error_message, e.expected_value || '', e.actual_value || '', e.severity);
       }
     }
+    // Putusan pending disusun saat kolom kode mungkin masih kosong. Alasan
+    // validasi yang sudah teratasi oleh pengisian di atas (mis. RV-05 DIAGLIST
+    // kosong) dibuang supaya tidak tetap tampil dan tidak tetap menahan klaim
+    // di status pending -- lihat segarkanAlasanValidasi.
+    const putusanSegar = segarkanAlasanValidasi(aiReview && aiReview.putusan_pending, errorBaru);
+    if (putusanSegar) {
+      aiReview.putusan_pending = putusanSegar;
+      aiBilangPending = putusanSegar.status === 'berisiko_pending';
+      await db.prepare('UPDATE claim_records SET ai_review = ? WHERE id = ?').run(JSON.stringify(aiReview), recordId);
+    }
+
     // Jangan pernah MENURUNKAN status balik ke 'valid' hanya karena rule
     // engine (format field) sekarang bersih -- AI bisa saja sudah menaikkan
     // status ke 'pending' di atas (aiBilangPending) karena alasan yang rule
@@ -2396,7 +2414,12 @@ async function findExistingRecordBySep(db, { hospitalCode, sep }) {
   return existing || null;
 }
 
-async function processSinglePdfUpload(db, { filePath, originalName, jenisKlaim: fixedJenisKlaim, allowedJenisKlaim, userId, hospitalCode }) {
+function processSinglePdfUpload(db, options) {
+  return konteksAi.jalankan(options.hospitalCode ? { hospital_code: options.hospitalCode } : {},
+    () => processSinglePdfUploadDenganKonteks(db, options));
+}
+
+async function processSinglePdfUploadDenganKonteks(db, { filePath, originalName, jenisKlaim: fixedJenisKlaim, allowedJenisKlaim, userId, hospitalCode }) {
   try {
     const { extractFromPDF } = require('../services/pdfExtractionPipeline');
     const result = await extractFromPDF(filePath, { jenisKlaim: fixedJenisKlaim, allowedJenisKlaim, originalName });
@@ -2647,7 +2670,12 @@ async function processSinglePdfUpload(db, { filePath, originalName, jenisKlaim: 
  *
  * @returns {Promise<{success:boolean, error?:string, vclaimFormat?, validation_status?, validation_errors?, ai_review?}>}
  */
-async function reprocessExistingRecord(db, { fileId, recordId, filePath, jenisKlaim, hospitalCode }) {
+function reprocessExistingRecord(db, options) {
+  return konteksAi.jalankan({ ...(options.hospitalCode ? { hospital_code: options.hospitalCode } : {}), record_id: options.recordId },
+    () => reprocessExistingRecordDenganKonteks(db, options));
+}
+
+async function reprocessExistingRecordDenganKonteks(db, { fileId, recordId, filePath, jenisKlaim, hospitalCode }) {
   try {
     const { extractFromPDF } = require('../services/pdfExtractionPipeline');
     const result = await extractFromPDF(filePath, { jenisKlaim, originalName: path.basename(filePath) });
@@ -2805,6 +2833,58 @@ async function reprocessExistingRecord(db, { fileId, recordId, filePath, jenisKl
  * "Baca Ulang" — re-ekstraksi + re-validasi + re-AI-review 1 record yang
  * sudah ada, pakai PDF yang sudah tersimpan. Lihat reprocessExistingRecord().
  */
+/**
+ * GET /records/:recordId/saran-koding -- tab "Saran AI": diagnosis, prosedur,
+ * INA-CBG, dan tarif yang disusun dari isi berkas (lihat saranKodingService).
+ * Dihitung dari data tersimpan tanpa panggilan AI, jadi klaim lama langsung
+ * bisa dilihat tanpa Baca Ulang. Tidak mengubah apa pun di klaim.
+ */
+router.get('/records/:recordId/saran-koding', authenticate, async (req, res) => {
+  try {
+    const db = getDb();
+    const record = await db.prepare(`
+      SELECT id, sep, raw_data, validation_status, diagnosa_list, prosedur_list, jenis_klaim, kelas_rawat, ai_review
+      FROM claim_records WHERE id = ?
+    `).get(req.params.recordId);
+    if (!record) return res.status(404).json({ error: 'Record tidak ditemukan' });
+    let aiReview = record.ai_review;
+    if (typeof aiReview === 'string') {
+      try { aiReview = JSON.parse(aiReview); } catch (_) { aiReview = null; }
+    }
+    const risiko = perbaruiRisikoTampilan(record);
+    res.json({ ...susunSaranKoding(record, aiReview, hitungInacbgDanTarif), kesiapan_koding: risiko.kesiapan_koding });
+  } catch (error) {
+    console.error('[saran-koding] gagal:', error);
+    res.status(500).json({ error: 'Saran koding gagal disusun.' });
+  }
+});
+
+// Pratinjau tinjauan kasus pada berkas lama, tanpa mengubah record/putusan pending.
+router.post('/records/:recordId/tinjauan-diagnosis', authenticate, async (req, res) => {
+  try {
+    const db = getDb();
+    const record = await db.prepare('SELECT * FROM claim_records WHERE id = ?').get(req.params.recordId);
+    if (!record) return res.status(404).json({ error: 'Record tidak ditemukan.' });
+    let ai = record.ai_review;
+    if (typeof ai === 'string') { try { ai = JSON.parse(ai); } catch (_) { ai = {}; } }
+    ai = ai || {};
+    const pages = await db.prepare('SELECT page_number, ocr_text FROM ocr_results WHERE record_id = ? ORDER BY page_number').all(record.id);
+    const resumePages = getAnyResumeMedisPageNumbers(pages);
+    let tinjauan = await tinjauDiagnosis(record, ai, pages, resumePages, {
+      db, dikenal: { nama: record.nama_pasien, nomor_kartu: record.nokartu, nik: record.nik, no_rm: record.mrn, sep: record.sep },
+    });
+    const lanjutan = await tinjauLanjutan(record, { ...ai, tinjauan_diagnosis: tinjauan }, pages, resumePages, null, {
+      db, dikenal: { nama: record.nama_pasien, nomor_kartu: record.nokartu, nik: record.nik, no_rm: record.mrn, sep: record.sep },
+      paksaSol: req.body?.paksa_sol === true,
+    });
+    tinjauan = lanjutan.tinjauan || { ...tinjauan, pemeriksaan_lanjutan: lanjutan.metadata };
+    const risiko = perbaruiRisikoTampilan(record);
+    res.json({ ...susunSaranKoding(record, { ...ai, tinjauan_diagnosis: tinjauan }, hitungInacbgDanTarif), kesiapan_koding: risiko.kesiapan_koding });
+  } catch (_) {
+    res.status(500).json({ error: 'Tinjauan diagnosis belum dapat disusun. Coba lagi.' });
+  }
+});
+
 router.post('/records/:recordId/reread', authenticate, async (req, res) => {
   try {
     const db = getDb();

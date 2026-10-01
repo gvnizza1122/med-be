@@ -29,6 +29,8 @@ const prbExemptRoutes = require('./routes/prbExempt');
 const bpjsPendingRoutes = require('./routes/bpjsPending');
 const jawabPendingRoutes = require('./routes/jawabPending');
 const auditLogRoutes = require('./routes/auditLogs');
+const aiUsageRoutes = require('./routes/aiUsage');
+const testingPendingRoutes = require('./routes/testingPending');
 const codeDescriptionRoutes = require('./routes/codeDescriptions');
 
 const app = express();
@@ -144,6 +146,8 @@ app.use('/api/v1/bridging', bridgingRoutes);
 app.use('/api/v1/hospital-settings', hospitalSettingsRoutes);
 app.use('/api/v1/prb-exempt', prbExemptRoutes);
 app.use('/api/v1/audit-logs', auditLogRoutes);
+app.use('/api/v1/ai-usage', aiUsageRoutes);
+app.use('/api/v1/testing-pending', testingPendingRoutes);
 app.use('/api/v1/code-descriptions', codeDescriptionRoutes);
 // BUG LAMA yang ditemukan & diperbaiki di sesi ini: recordsRouter
 // (rv20-confirm, audit, batch-audit) diexport tapi TIDAK PERNAH di-mount di

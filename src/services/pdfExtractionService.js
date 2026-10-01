@@ -125,6 +125,7 @@ JSON:`;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       const hasilGateway = await panggilModel('ekstrak_pdf', {
+        jenisKlaim,
         system: 'Kamu mengembalikan HANYA satu JSON object. Dilarang menulis penjelasan, penalaran, atau markdown.',
         prompt,
         json: true,

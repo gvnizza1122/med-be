@@ -86,11 +86,13 @@ describe('kasus nebulisasi IGD — dengan pasangan label dari posisi kata', () =
     expect(kalimatTindakanTakDikenal(berkas).some(k => /nebulisasi|ventasal/i.test(k))).toBe(false);
   });
 
-  test('temuan lain di berkas yang sama (cara bayar UMUM vs SEP, tanpa penunjang) tetap terdeteksi', () => {
-    const t = evaluasiKonsistensi({ sep: '0170R0110926V001943', diagnosa_list: '' }, berkas, temuan);
+  test('resume UMUM dengan SEP BPJS tidak menjadi alasan pending', () => {
+    const t = evaluasiKonsistensi({ sep: '0170R0110926V001943', JENIS_KLAIM: 'RAWAT_JALAN', diagnosa_list: '' }, berkas, temuan);
     const id = t.map(x => x.id);
-    expect(id).toContain('KD-02'); // resume UMUM padahal SEP BPJS
-    expect(id).toContain('KD-13'); // pneumonia/PPOK di resume tanpa penunjang
+    expect(id).not.toContain('KD-02'); // SEP menjadi dasar penjamin BPJS
+    // Klaim IGD rawat jalan: pneumonia/PPOK tanpa penunjang tidak lagi jadi
+    // alasan pending (KD-13 khusus rawat inap sejak 1 Okt 2026).
+    expect(id).not.toContain('KD-13');
   });
 });
 
