@@ -981,7 +981,7 @@ router.post('/:id/approve', authenticate, authorize('supervisor', 'admin'), asyn
  * Berisi PENDING INTERNAL saja. Pending BPJS punya arti yang jauh berbeda
  * dan sengaja tidak pernah dicampur ke berkas ini.
  */
-router.get('/export/daftar-kerja', authenticate, async (req, res) => {
+router.get('/export/daftar-kerja', authenticate, authorize('admin', 'verifikator', 'supervisor'), async (req, res) => {
   try {
     const db = getDb();
     const { periode, kategori, from_date, to_date, search, arsip } = req.query;
@@ -1012,6 +1012,7 @@ router.get('/export/daftar-kerja', authenticate, async (req, res) => {
       klaim.push({ ...rec, errors: await getErrors.all(rec.id) });
     }
 
+    const namaDisamarkan = req.user.role === 'supervisor' || ['1', 'true'].includes(String(req.query.samarkan_nama || '').toLowerCase());
     const cakupan = {
       periode: periode || null,
       kategori: kategori || null,
@@ -1022,6 +1023,7 @@ router.get('/export/daftar-kerja', authenticate, async (req, res) => {
         arsip === '1' ? 'arsip' : 'aktif',
       ].filter(Boolean).join('; '),
       diexportOleh: req.user.email,
+      samarkanNama: namaDisamarkan,
     };
     const buffer = await buatDaftarKerja(klaim, cakupan);
 
@@ -1031,7 +1033,7 @@ router.get('/export/daftar-kerja', authenticate, async (req, res) => {
     logAudit({
       userId: req.user.id, userEmail: req.user.email,
       action: 'export', resourceType: 'daftar_kerja', resourceId: null,
-      details: { format: 'excel', periode: periode || 'semua', kategori: kategori || 'semua', jumlah_klaim: klaim.length },
+      details: { format: 'excel', periode: periode || 'semua', kategori: kategori || 'semua', jumlah_klaim: klaim.length, nama_disamarkan: namaDisamarkan },
       ipAddress: req.ip,
     });
 
@@ -1045,7 +1047,7 @@ router.get('/export/daftar-kerja', authenticate, async (req, res) => {
 });
 
 /** Export klaim bersih, satu lembar data dalam urutan field vClaim. */
-router.get('/export/siap-submit', authenticate, async (req, res) => {
+router.get('/export/siap-submit', authenticate, authorize('admin', 'verifikator'), async (req, res) => {
   try {
     const db = getDb();
     const { periode, kategori, from_date, to_date, search, arsip } = req.query;
@@ -1101,7 +1103,7 @@ router.get('/export/siap-submit', authenticate, async (req, res) => {
 /**
  * GET /api/v1/claim-files/:id/export
  */
-router.get('/:id/export', authenticate, async (req, res) => {
+router.get('/:id/export', authenticate, authorize('admin', 'verifikator'), async (req, res) => {
   try {
     const db = getDb();
     const file = await db.prepare('SELECT * FROM claim_files WHERE id = ?').get(req.params.id);

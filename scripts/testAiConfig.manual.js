@@ -3,7 +3,7 @@
  * Manual test script for AI provider configuration
  * Extracts a real PDF to verify configuration is correct
  *
- * Usage: node test-ai-config.js [pdf-path]
+ * Usage: node scripts/testAiConfig.manual.js [pdf-path]
  *
  * Environment variables required:
  * - AI_PROVIDER_API_KEY (your OpenAI API key from platform.openai.com)
@@ -13,9 +13,9 @@
 
 const path = require('path');
 const fs = require('fs');
-require('dotenv').config({ path: path.join(__dirname, '../../.env') });
+require('dotenv').config({ path: path.join(__dirname, '../.env') });
 
-const { extractFromPDF } = require('../../services/pdfExtractionPipeline');
+const { extractFromPDF } = require('../src/services/pdfExtractionPipeline');
 
 // Color output for terminal
 const colors = {
@@ -37,7 +37,7 @@ async function main() {
 
   if (!pdfPath) {
     // Look for first PDF in data-claim/data-dari-simrs
-    const dataDir = path.join(__dirname, '../../../data-claim/data-dari-simrs');
+    const dataDir = path.join(__dirname, '../data-claim/data-dari-simrs');
     if (fs.existsSync(dataDir)) {
       const files = fs.readdirSync(dataDir).filter(f => f.toLowerCase().endsWith('.pdf'));
       if (files.length > 0) {
@@ -48,7 +48,7 @@ async function main() {
 
   if (!pdfPath) {
     print('red', '❌ Error: No PDF file found or provided');
-    print('yellow', 'Usage: node test-ai-config.js [path-to-pdf]');
+    print('yellow', 'Usage: node scripts/testAiConfig.manual.js [path-to-pdf]');
     process.exit(1);
   }
 

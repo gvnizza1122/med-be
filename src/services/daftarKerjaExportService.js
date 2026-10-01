@@ -189,6 +189,10 @@ function susunRincianMasalah(klaim) {
   return rincian;
 }
 
+function samarkanNama(nilai) {
+  return String(nilai || '').replace(/[\p{L}\p{N}]+/gu, bagian => `${bagian.slice(0, 1)}***`);
+}
+
 /**
  * @param {Array} klaim baris klaim beserta errors[]
  * @param {Object} cakupan {namaRs, periode, kategori, filter, diexportOleh}
@@ -198,8 +202,12 @@ async function buatDaftarKerja(klaim, cakupan = {}) {
   const wb = new ExcelJS.Workbook();
   wb.created = new Date();
 
-  const daftar = susunDaftarKlaim(klaim);
-  const rincian = susunRincianMasalah(klaim);
+  const namaDisamarkan = cakupan.samarkanNama === true;
+  const dataKlaim = namaDisamarkan
+    ? (klaim || []).map(k => ({ ...k, nama_pasien: samarkanNama(k.nama_pasien) }))
+    : klaim;
+  const daftar = susunDaftarKlaim(dataKlaim);
+  const rincian = susunRincianMasalah(dataKlaim);
 
   // Lembar Ringkasan sengaja di URUTAN PERTAMA. Berkas ini akan beredar lewat
   // WhatsApp dan berganti nama beberapa kali; satu lembar ini menjawab
@@ -215,14 +223,15 @@ async function buatDaftarKerja(klaim, cakupan = {}) {
     ['Jumlah masalah', rincian.length],
     ['Tanggal export', new Date()],
     ['Di-export oleh', cakupan.diexportOleh || '-'],
+    ['Nama pasien', namaDisamarkan ? 'Disamarkan' : 'Nama lengkap'],
     [],
     ['Catatan', 'Berkas ini berisi PENDING INTERNAL — dugaan medaudit sebelum klaim dikirim, dan bisa saja salah. Ini BUKAN pending dari BPJS. Keduanya tidak boleh dijumlahkan bersama.'],
   ];
   isiRingkas.forEach(b => wsRingkas.addRow(b));
   wsRingkas.getColumn(1).font = { bold: true };
   wsRingkas.getCell('B7').numFmt = FORMAT_TANGGAL + ' hh:mm';
-  wsRingkas.getCell('B10').alignment = { wrapText: true, vertical: 'top' };
-  wsRingkas.getRow(10).height = 48;
+  wsRingkas.getCell('B11').alignment = { wrapText: true, vertical: 'top' };
+  wsRingkas.getRow(11).height = 48;
 
   pasangLembar(wb.addWorksheet('Daftar Klaim'), KOLOM_DAFTAR, daftar);
   pasangLembar(wb.addWorksheet('Rincian Masalah'), KOLOM_RINCIAN, rincian);
@@ -241,6 +250,7 @@ function namaBerkasDaftarKerja(cakupan = {}) {
   if (cakupan.from_date || cakupan.to_date) bagian.push(`${cakupan.from_date || 'awal'}-${cakupan.to_date || 'akhir'}`);
   if (cakupan.search) bagian.push('hasil-pencarian');
   if (cakupan.arsip) bagian.push('arsip');
+  if (cakupan.samarkanNama) bagian.push('nama-disamarkan');
   return bagian.join('_') + '.xlsx';
 }
 
@@ -251,4 +261,5 @@ module.exports = {
   susunRincianMasalah,
   keTanggal,
   keAngka,
+  samarkanNama,
 };

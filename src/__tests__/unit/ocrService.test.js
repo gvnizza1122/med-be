@@ -98,7 +98,8 @@ describe('OCR Service', () => {
           expect(typeof result.success).toBe('boolean');
           expect(typeof result.text).toBe('string');
           expect(typeof result.confidence).toBe('number');
-        }
+        },
+        30000 // tesseract WASM kadang inisialisasinya melewati timeout default 5 detik
       );
     }
   );

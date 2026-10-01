@@ -7,7 +7,7 @@ describe('evaluateDiagnosisConsistency — fix item 9 (O21.x family)', () => {
     expect(flags).toHaveLength(1);
     const flag = flags[0];
     expect(flag.code).toBe('O21.0');
-    expect(flag.status).toBe('perlu_review');
+    expect(flag.status).toBe('PENDING');
     expect(flag.alternative_code).toBe('O21.1');
     expect(flag.action).toBe('Klarifikasi DPJP');
 
@@ -16,7 +16,7 @@ describe('evaluateDiagnosisConsistency — fix item 9 (O21.x family)', () => {
     const sources = new Set(flag.indicators_found.map(i => i.document_type));
     expect(sources.has('spri')).toBe(true);
     expect(sources.has('resume_medis')).toBe(true);
-    expect(sources.has('lab')).toBe(true);
+    expect(sources.has('lab_results')).toBe(true);
 
     // Indikator yang TIDAK didokumentasikan (keton urin) WAJIB disebut, bukan diam-diam dihilangkan.
     expect(flag.indicators_undocumented.some(u => u.id === 'keton_urin')).toBe(true);
