@@ -26,11 +26,25 @@ const OCR_CONFIG = {
   // (label alat EKG/lab seperti "RATE", "QRS", "Electrocardiogram", dst) di
   // tengah teks Indonesia — model bahasa Indonesia-saja sering gagal baca
   // istilah itu, bikin confidence rendah/hasil kacau di halaman seperti
-  // strip EKG. eng.traineddata sudah tersedia lokal, tidak perlu download.
+  // strip EKG.
   language: 'eng+ind',
   confidence_threshold: 50, // Minimum confidence to mark as 'readable' (percent)
   timeout_ms: 60000, // 60s per page max
   log_performance: true
+};
+
+// Data bahasa (eng/ind .traineddata, varian LSTM best_int) disimpan di repo
+// pada eclaim-pro-be/tessdata/ supaya OCR jalan offline setelah clone.
+// Tanpa opsi ini tesseract.js mengunduh dari CDN jsdelivr saat worker pertama
+// dibuat dan menyimpannya di process.cwd() — gagal kalau offline, dan
+// mengunduh ulang kalau server dijalankan dari folder lain. Path absolut
+// (bukan relatif cwd) supaya tidak bergantung dari mana `npm start` dipanggil.
+const TESSDATA_DIR = path.join(__dirname, '..', '..', 'tessdata');
+const TESSERACT_WORKER_OPTIONS = {
+  langPath: TESSDATA_DIR,
+  cachePath: TESSDATA_DIR,
+  gzip: false, // file di tessdata/ sudah tidak terkompresi
+  cacheMethod: 'readOnly' // jangan pernah menulis/mengunduh ulang ke tessdata/
 };
 
 // ===== OCR Phase 1: Critical page prioritization & timeout reduction =====
@@ -196,7 +210,7 @@ async function getWorkerPool() {
       const { createWorker } = Tesseract;
       const workers = [];
       for (let i = 0; i < POOL_SIZE; i++) {
-        const worker = await createWorker(OCR_CONFIG.language);
+        const worker = await createWorker(OCR_CONFIG.language, Tesseract.OEM.LSTM_ONLY, TESSERACT_WORKER_OPTIONS);
         workers.push({ worker, busy: false });
       }
         // Disimpan di properti promise supaya hitungWorkerOcrBebas() bisa
