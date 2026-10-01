@@ -16,7 +16,7 @@ const XLSX = require('xlsx');
 const { v4: uuidv4 } = require('uuid');
 const { getDb } = require('../database/init');
 const { authenticate, authorize } = require('../middleware/auth');
-const { callKimi } = require('../services/kimiClient');
+const { KIMI_SYSTEM_PROMPT } = require('../services/kimiClient');
 const { muatIndeksKlaim, cocokkanSatu } = require('../services/sepCocokService');
 const { panggilModel } = require('../services/gatewayModelService');
 
@@ -285,11 +285,22 @@ async function callAi(prompt, { db, dikenal, fetchImpl } = {}) {
  * dari hasil backfill arsip lama (scripts/importTrainingData.js, generated_by
  * 'kimi-k3-backfill'). Silent no-op kalau KIMI_API_KEY belum disetel.
  */
-async function recordKimiTrainingExample(db, alasanRaw, draftJawaban, kategoriFallback) {
+async function recordKimiTrainingExample(db, alasanRaw, draftJawaban, kategoriFallback, dikenal = {}) {
   if (!alasanRaw || !draftJawaban) return;
   const prompt = `ALASAN_PENDING:\n${alasanRaw}\n\nJAWABAN_KLARIFIKASI_RS:\n${draftJawaban}\n\n(outcome belum diketahui saat ini — isi "tidak_diketahui")`;
-  const result = await callKimi(prompt);
-  if (!result) return; // KIMI_API_KEY belum disetel di server
+  const panggilan = await panggilModel('ringkas_training_pending', {
+    system: KIMI_SYSTEM_PROMPT,
+    prompt,
+    dikenal,
+    json: true,
+    maxTokens: 2000,
+    versi: 'kimi-training-example-v1',
+  }, { db });
+  if (!panggilan.ok) {
+    if (panggilan.kode === 'tanpa_kunci') return;
+    throw new Error(panggilan.error || 'Kimi gagal meringkas contoh training.');
+  }
+  const result = panggilan.hasil;
   await db.prepare(`
     INSERT INTO ai_training_examples
       (id, kategori_pending, alasan_bpjs, draft_berhasil, poin_kunci, outcome, generated_by, confidence_score)
@@ -657,7 +668,8 @@ async function generateDraftForRow(db, existing) {
   // staf menandai status/outcome (lihat catatan di PATCH pending/:id/status
   // di atas). Best-effort, tidak di-await, tidak boleh gagalkan response
   // kalau Kimi lambat/error.
-  recordKimiTrainingExample(db, existing.alasan_raw, aiResult.jawaban || '', alasanParsed.kategori)
+  recordKimiTrainingExample(db, existing.alasan_raw, aiResult.jawaban || '', alasanParsed.kategori,
+    dikenalDariClaim(claimRecord, existing))
     .catch(err => console.error('[bpjsPending] Kimi training error:', err.message));
 
   return { success: true };
@@ -768,7 +780,11 @@ router.post('/pending-files/:id/backfill-training', authenticate, async (req, re
         `).get(row.alasan_raw);
         if (dup) { skippedDuplicate++; return; }
 
-        await recordKimiTrainingExample(db, row.alasan_raw, row.jawaban_rs_manual, null);
+        const claimRecord = await db.prepare(`
+          SELECT sep, nokartu, nama_pasien, mrn FROM claim_records WHERE id = ?
+        `).get(row.claim_record_id);
+        await recordKimiTrainingExample(db, row.alasan_raw, row.jawaban_rs_manual, null,
+          dikenalDariClaim(claimRecord, row));
         done++;
       } catch (err) {
         console.error('[bpjsPending] backfill-training gagal untuk row', row.id, ':', err.message);

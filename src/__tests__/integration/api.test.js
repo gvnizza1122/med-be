@@ -62,7 +62,7 @@ describe('Auth API', () => {
     });
 
     test('returns 400 when password is missing', async () => {
-      const res = await request(app).post('/api/v1/auth/login').send({ email: 'test@example.com' });
+      const res = await request(app).post('/api/v1/auth/login').send({ username: 'test@example.com' });
       expect(res.status).toBe(400);
       expect(res.body.error).toContain('wajib diisi');
     });
@@ -73,7 +73,7 @@ describe('Auth API', () => {
 
       const res = await request(app)
         .post('/api/v1/auth/login')
-        .send({ email: 'nonexistent@example.com', password: 'password123' });
+        .send({ username: 'nonexistent@example.com', password: 'password123' });
       expect(res.status).toBe(401);
       expect(res.body.error).toContain('salah');
     });
@@ -92,7 +92,7 @@ describe('Auth API', () => {
 
       const res = await request(app)
         .post('/api/v1/auth/login')
-        .send({ email: 'inactive@example.com', password: 'password123' });
+        .send({ username: 'inactive@example.com', password: 'password123' });
       expect(res.status).toBe(401);
       expect(res.body.error).toContain('tidak aktif');
     });
@@ -152,7 +152,7 @@ describe('Bridging API', () => {
     test('returns 400 with empty body', async () => {
       const res = await request(app)
         .post('/api/v1/bridging/validate')
-        .set('X-API-Key', 'eclaim-simrs-secret-key-12345')
+        .set('X-API-Key', process.env.SIMRS_API_KEY || 'eclaim-simrs-secret-key-12345')
         .send({});
       expect(res.status).toBe(400);
     });
@@ -160,7 +160,7 @@ describe('Bridging API', () => {
     test('returns validation result with valid request', async () => {
       const res = await request(app)
         .post('/api/v1/bridging/validate')
-        .set('X-API-Key', 'eclaim-simrs-secret-key-12345')
+        .set('X-API-Key', process.env.SIMRS_API_KEY || 'eclaim-simrs-secret-key-12345')
         .send({ sep: 'TEST001', nama_pasien: 'BUDI' });
       expect(res.status).toBe(200);
       expect(res.body.status).toBe('success');
@@ -239,7 +239,7 @@ describe('Claim File Upload API', () => {
         .set('Authorization', `Bearer ${token}`)
         .field('description', 'test upload');
       expect(res.status).toBe(400);
-      expect(res.body.error).toContain('Tidak ada file');
+      expect(res.body.error).toContain('File tidak ditemukan');
     });
 
     test('uploads and validates file successfully', async () => {
@@ -310,7 +310,7 @@ describe('Claim File Upload API', () => {
         .set('Authorization', `Bearer ${token}`)
         .attach('file', Buffer.from('BROKEN DATA WITHOUT HEADER'), 'broken.txt');
 
-      expect(res.status).toBe(500);
+      expect(res.status).toBe(400);
     });
   });
 });

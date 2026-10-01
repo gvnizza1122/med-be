@@ -346,15 +346,16 @@ describe('isiKodeDariSaranTervalidasi (regresi)', () => {
         suggested_codes: [],
         usulan_prosedur: [
           { id: 'infus', nama: 'Pemasangan infus', kode_usulan: null, alasan: 'Kode belum pasti — tidak pernah ditebak, jadi tidak masuk daftar prosedur.', masuk_proclist: false, sumber_bukti: ['resume_medis'], halaman_bukti: [2] },
-          { id: 'nebulisasi', nama: 'Nebulisasi', kode_usulan: '93.94', alasan: 'Kebijakan RS: dikodekan.', masuk_proclist: true, sumber_bukti: ['resume_medis'], halaman_bukti: [2] },
+          { id: 'nebulisasi', nama: 'Nebulisasi', kode_usulan: '93.94', alasan: 'Kode ICD-9-CM masih berstatus usulan dan belum diizinkan untuk pengisian otomatis ke PROCLIST.', masuk_proclist: false, sumber_bukti: ['resume_medis'], halaman_bukti: [2] },
         ],
       };
       await isiKodeDariSaranTervalidasi(db, 'rec1', { PROCLIST: '' }, ai);
       // Kode belum pasti TIDAK PERNAH diisi ke PROCLIST walau ada kandidat.
       expect(db.tulis.find(t => /SET prosedur_list/.test(t.sql))).toBeUndefined();
-      expect(ai.proclist_kosong.kandidat).toHaveLength(1);
+      expect(ai.proclist_kosong.kandidat).toHaveLength(2);
       expect(ai.proclist_kosong.kandidat[0].nama).toBe('Pemasangan infus');
-      expect(ai.proclist_kosong.alasan).toMatch(/1 tindakan/);
+      expect(ai.proclist_kosong.kandidat[1].nama).toBe('Nebulisasi');
+      expect(ai.proclist_kosong.alasan).toMatch(/2 tindakan/);
       const tulisAiReview = db.tulis.filter(t => /SET ai_review/.test(t.sql));
       expect(tulisAiReview.some(t => JSON.parse(t.a[0]).proclist_kosong)).toBe(true);
     });
@@ -381,7 +382,7 @@ describe('isiKodeDariSaranTervalidasi (regresi)', () => {
         suggested_codes: [],
         temuan_tindakan: [{ id: 'nebulisasi', kode_usulan: '93.94', bukti: [{ sumber: 'resume_medis' }] }],
       };
-      await isiKodeDariSaranTervalidasi(db, 'rec1', { PROCLIST: '' }, ai);
+      await isiKodeDariSaranTervalidasi(db, 'rec1', { PROCLIST: '93.94' }, ai);
       expect(ai.proclist_kosong).toBeUndefined();
     });
   });

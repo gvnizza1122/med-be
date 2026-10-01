@@ -24,6 +24,7 @@
  */
 
 const { getDb } = require('../database/init');
+const gatewayModelService = require('./gatewayModelService');
 
 const POLA_KATEGORI = /^[A-Z]\d{2}$/;
 
@@ -75,56 +76,30 @@ async function simpanDipelajari(db, kunci, kode, nama, kodeAsal, teksAsal) {
   }
 }
 
-async function pilihDenganAi(kandidat, teksDiagnosis, kodeAsing) {
-  const apiKey = process.env.AI_PROVIDER_API_KEY;
-  if (!apiKey) return null;
-
-  const baseUrl = process.env.AI_PROVIDER_BASE_URL || 'https://api.openai.com/v1';
-  const model = process.env.AI_MODEL || 'gpt-4o-mini';
-  const timeoutMs = Number(process.env.AI_TIMEOUT_MS || 60000);
+async function pilihDenganAi(kandidat, teksDiagnosis, kodeAsing, dikenal = {}, db = null) {
+  if (!process.env.AI_PROVIDER_API_KEY && !process.env.KIMI_API_KEY) return null;
 
   const daftar = kandidat
     .map(k => `${k.code} — ${k.description_id || k.description_en}`)
     .join('\n');
 
-  const ac = new AbortController();
-  const timer = setTimeout(() => ac.abort(), timeoutMs);
   try {
-    const response = await fetch(`${baseUrl}/chat/completions`, {
-      method: 'POST',
-      signal: ac.signal,
-      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model,
-        messages: [
-          {
-            role: 'system',
-            content:
-              'Kamu pemberi kode ICD-10 WHO untuk klaim BPJS Indonesia. Pilih SATU kode dari DAFTAR yang diberikan ' +
-              'yang paling sesuai dengan diagnosis. Kamu HANYA boleh menjawab dengan kode yang ada di daftar; ' +
-              'jangan membuat kode lain. Kalau tidak ada yang cocok, jawab null. ' +
-              'Jawab JSON: {"kode":"R10.4"} atau {"kode":null}.',
-          },
-          {
-            role: 'user',
-            content: `Diagnosis di dokumen: "${teksDiagnosis}"\nKode yang sebelumnya tertulis (tidak ada di ICD-10 WHO): ${kodeAsing}\n\nDAFTAR:\n${daftar}`,
-          },
-        ],
-        max_completion_tokens: 200,
-        response_format: { type: 'json_object' },
-      }),
-    });
-    const teks = await response.text();
-    if (!response.ok) throw new Error(`HTTP ${response.status}: ${teks.slice(0, 160)}`);
-    const data = JSON.parse(teks);
-    console.warn(`[KodeWho] tokens: ${data.usage?.total_tokens ?? '?'} untuk ${kodeAsing}`);
-    const jawab = JSON.parse(data.choices?.[0]?.message?.content || '{}').kode;
+    const panggilan = await gatewayModelService.panggilModel('petakan_diagnosis_who', {
+      system: 'Kamu pemberi kode ICD-10 WHO untuk klaim BPJS Indonesia. Pilih SATU kode dari DAFTAR yang diberikan ' +
+        'yang paling sesuai dengan diagnosis. Kamu HANYA boleh menjawab dengan kode yang ada di daftar; ' +
+        'jangan membuat kode lain. Kalau tidak ada yang cocok, jawab null. ' +
+        'Jawab JSON: {"kode":"R10.4"} atau {"kode":null}.',
+      prompt: `Diagnosis di dokumen: "${teksDiagnosis}"\nKode yang sebelumnya tertulis (tidak ada di ICD-10 WHO): ${kodeAsing}\n\nDAFTAR:\n${daftar}`,
+      json: true,
+      maxTokens: 200,
+      dikenal,
+    }, { db });
+    if (!panggilan.ok) throw new Error(panggilan.error || 'Panggilan gateway gagal');
+    const jawab = panggilan.hasil && panggilan.hasil.kode;
     return jawab ? normal(jawab) : null;
   } catch (err) {
     console.warn(`[KodeWho] Gagal memilih kode: ${err.message}`);
     return null;
-  } finally {
-    clearTimeout(timer);
   }
 }
 
@@ -133,7 +108,7 @@ async function pilihDenganAi(kandidat, teksDiagnosis, kodeAsing) {
  * @param {string} teksDiagnosis istilah diagnosis di dokumen (mis. "kolik abdomen")
  * @returns {Promise<{kode:string, nama:string, dari:string}|null>}
  */
-async function petakanKeKodeWho(kodeAsing, teksDiagnosis) {
+async function petakanKeKodeWho(kodeAsing, teksDiagnosis, dikenal = {}) {
   const asal = normal(kodeAsing);
   const kategori = asal.slice(0, 3);
   if (!POLA_KATEGORI.test(kategori)) return null;
@@ -164,7 +139,7 @@ async function petakanKeKodeWho(kodeAsing, teksDiagnosis) {
     return { kode: tersimpan.kode, nama: tersimpan.nama, dari: 'kamus_dipelajari' };
   }
 
-  const pilihan = await pilihDenganAi(kandidat, teksDiagnosis, asal);
+  const pilihan = await pilihDenganAi(kandidat, teksDiagnosis, asal, dikenal, db);
   const dipilih = pilihan && kandidat.find(k => normal(k.code) === pilihan);
   // Jawaban di luar daftar ditolak — itulah pagar yang membuat kode karangan
   // mustahil di tahap ini.

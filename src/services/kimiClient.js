@@ -70,4 +70,4 @@ async function callKimi(prompt) {
   }
 }
 
-module.exports = { callKimi };
+module.exports = { callKimi, KIMI_SYSTEM_PROMPT };

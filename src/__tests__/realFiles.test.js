@@ -1,7 +1,7 @@
 const path = require('path');
+const fs = require('fs');
 const { parseClaimFile } = require('../services/fileParser');
 const { validateRecord, determineStatus } = require('../services/ruleEngine');
-const { applyAutoFix } = require('../routes/claimFiles');
 
 const DATA_DIR = path.join(__dirname, '../../../data-claim');
 
@@ -11,7 +11,9 @@ const FILES = [
   { name: '3371084_20260325_MIX unencryp desember.TXT',        expectedRecords: 251, label: 'Desember' },
 ];
 
-describe('Real claim files - parseClaimFile', () => {
+const describeWithRealFiles = FILES.every(file => fs.existsSync(path.join(DATA_DIR, file.name))) ? describe : describe.skip;
+
+describeWithRealFiles('Real claim files - parseClaimFile', () => {
   FILES.forEach(({ name, expectedRecords, label }) => {
     test(`[${label}] mem-parse ${name} dengan benar`, () => {
       const filePath = path.join(DATA_DIR, name);
@@ -46,7 +48,7 @@ describe('Real claim files - parseClaimFile', () => {
   });
 });
 
-describe('Real claim files - field values', () => {
+describeWithRealFiles('Real claim files - field values', () => {
   test('pending file: SEP, nama, diagnosa, tarif terisi dengan benar', () => {
     const filePath = path.join(DATA_DIR, FILES[0].name);
     const result = parseClaimFile(filePath);
@@ -64,7 +66,7 @@ describe('Real claim files - field values', () => {
     expect(rec.discharge_date).toBe('2025-12-01');
   });
 
-  test('pending file: record ke-5 punya SEP lowercase (auto-fix test)', () => {
+  test('pending file: record ke-5 SEP lowercase ditandai tanpa mengubah sumber', () => {
     const filePath = path.join(DATA_DIR, FILES[0].name);
     const result = parseClaimFile(filePath);
     const rec = result.records[4];
@@ -72,13 +74,13 @@ describe('Real claim files - field values', () => {
     expect(rec.sep).toBe('0170R0111225v000499');
     expect(rec.sep).not.toBe(rec.sep.toUpperCase());
 
-    const { record: fixed } = applyAutoFix({ ...rec });
-    expect(fixed.sep).toBe('0170R0111225V000499');
-    expect(fixed.sep).toBe(fixed.sep.toUpperCase());
+    const errors = validateRecord(rec, [{ id: 'RV-01', is_active: true }]);
+    expect(errors.some(error => error.rule_id === 'RV-01')).toBe(true);
+    expect(rec.sep).toBe('0170R0111225v000499');
   });
 });
 
-describe('Real claim files - validation rules engine', () => {
+describeWithRealFiles('Real claim files - validation rules engine', () => {
   function makeRule(id, isActive = true) {
     return { id, rule_code: id, is_active: isActive, rule_type: 'builtin', rule_logic: null, error_message: null };
   }
@@ -152,7 +154,7 @@ describe('Real claim files - validation rules engine', () => {
   });
 });
 
-describe('Real claim files - configurable rules', () => {
+describeWithRealFiles('Real claim files - configurable rules', () => {
   const configRules = [
     {
       id: 'RV-INTEG-TEST', rule_code: 'RV-INTEG-TEST', is_active: 1,

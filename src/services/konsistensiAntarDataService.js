@@ -183,10 +183,84 @@ function evaluasiKonsistensi(record, halaman = [], tindakan = []) {
   return temuan;
 }
 
+/** Kategori ICD-10 (3 karakter pertama) untuk perbandingan longgar antar kode. */
+function kategoriIcd10(kode) {
+  return teksNormal(kode).replace(/[^a-z0-9]/g, '').slice(0, 3).toUpperCase();
+}
+
+/**
+ * KD-14 — Diagnosis dari halaman penagihan (DIAGLIST) tidak cocok dengan
+ * pembacaan independen atas resume medis.
+ *
+ * LATAR BELAKANG (ditemukan 2026-10-01, backtest DWI ARIYANI & NUR ASIAH):
+ * DIAGLIST diisi dari halaman "Berkas Klaim Individual" (slip grouper
+ * e-Klaim) -- halaman itu SENGAJA dikecualikan dari evidence pool
+ * (gatherEvidencePool, claimFiles.js) supaya kode tidak "membuktikan dirinya
+ * sendiri". Efek sampingnya: DIAGLIST tidak PERNAH dicocokkan silang dengan
+ * resume medis sama sekali. Pada klaim NUR ASIAH, DIAGLIST tersimpan
+ * "I51.7;I48", padahal resume medis (hal. 3) menulis "susp syok kardiogenik",
+ * "dyspneu susp ec ALO", "hemiparese sinistra ec post snh" -- R57.0/J81.0/
+ * I69.3, sama sekali kategori berbeda. Alasan pending BPJS sungguhan untuk
+ * klaim itu justru soal diagnosis utama, bukan soal yang selama ini
+ * ditangkap aplikasi (lab/radiologi tanpa hasil).
+ *
+ * PERBAIKANNYA BUKAN "percayai resume, timpa DIAGLIST" -- itu berisiko
+ * mengubah billing tanpa dasar yang pasti benar juga. Perbaikannya: catat
+ * KETIDAKCOCOKANNYA sebagai temuan untuk koder, dengan kutipan dari resume
+ * sebagai bukti apa yang sebenarnya ditemukan (bukan dari halaman penagihan
+ * itu sendiri -- jadi ini VERIFIKASI SILANG, bukan verifikasi diri sendiri).
+ *
+ * Longgar sengaja: hanya menyala kalau TIDAK ADA SATU PUN kategori (3
+ * karakter) yang beririsan. Diagnosis sekunder yang berbeda itu wajar;
+ * kecocokan sebagian (1 dari 3 kode, misalnya) dianggap cukup konsisten.
+ * Kode dari suggested_codes yang disangkal (disangkal:true) atau belum
+ * tervalidasi kamus (kamus_valid tidak true) tidak dihitung sebagai bukti --
+ * kita tidak mau menandai "tidak cocok" berdasarkan bacaan yang sendiri
+ * belum pasti benar.
+ *
+ * @param {Object} record berisi DIAGLIST/diagnosa_list
+ * @param {Array} suggestedCodesDiagnosis aiReview.suggested_codes yang type==='diagnosis'
+ * @returns {Array} 0 atau 1 temuan, bentuknya sama seperti evaluasiKonsistensi()
+ */
+function periksaSilangDiagnosisPrimer(record, suggestedCodesDiagnosis = []) {
+  if (!record) return [];
+  const diaglist = pisahKode(record.DIAGLIST || record.diagnosa_list);
+  if (diaglist.length === 0) return []; // DIAGLIST kosong ditangani pemeriksaan lain
+
+  const dariResume = (suggestedCodesDiagnosis || []).filter(
+    (s) => s && s.kamus_valid === true && s.disangkal !== true && s.code,
+  );
+  // Tidak ada yang bisa dibandingkan -- bukan berarti cocok, cuma tidak ada
+  // bukti independen sama sekali. Diam, jangan menuduh tanpa bahan.
+  if (dariResume.length === 0) return [];
+
+  const kategoriDiaglist = new Set(diaglist.map(kategoriIcd10));
+  const kategoriResume = dariResume.map((s) => ({ kategori: kategoriIcd10(s.code), entry: s }));
+  const adaIrisan = kategoriResume.some((r) => kategoriDiaglist.has(r.kategori));
+  if (adaIrisan) return [];
+
+  const contoh = dariResume.slice(0, 3);
+  return [{
+    id: 'KD-14',
+    nama: 'Diagnosis penagihan tidak cocok dengan resume medis',
+    keparahan: 'sedang',
+    pesan: `DIAGLIST (${diaglist.join(';')}) tidak sekategori pun dengan diagnosis yang terbaca independen di resume medis (${contoh.map((c) => c.code).join(', ')}). Bukan berarti DIAGLIST salah -- resume bisa saja belum mencerminkan diagnosis final koder -- tapi perlu ditinjau.`,
+    yang_ditemukan: contoh[0] && contoh[0].quotation
+      ? { kutipan: contoh[0].quotation, page_number: contoh[0].page_number }
+      : null,
+    yang_dicari: `Konfirmasi DIAGLIST sesuai dengan temuan resume medis, atau catat alasan bila sengaja berbeda`,
+    sumber_aturan: null,
+    // Belum pernah ditelaah koder -- aturan baru, tampil sebagai catatan dulu.
+    diverifikasi: false,
+  }];
+}
+
 module.exports = {
   evaluasiKonsistensi,
+  periksaSilangDiagnosisPrimer,
   cekKondisi,
   kelompokkanHalaman,
   diagnosisCocok,
+  kategoriIcd10,
   terisi,
 };

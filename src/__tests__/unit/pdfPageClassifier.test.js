@@ -46,8 +46,8 @@ describe('classifyPageDocumentType — fix item 7 (provenance dari metadata hala
     expect(classifyPageDocumentType(fixture.TRIASE_IGD_TEXT)).toBe('triase_igd');
   });
 
-  test('Hasil Laboratorium diklasifikasi lab', () => {
-    expect(classifyPageDocumentType(fixture.LAB_TEXT)).toBe('lab');
+  test('Hasil Laboratorium diklasifikasi lab_results', () => {
+    expect(classifyPageDocumentType(fixture.LAB_TEXT)).toBe('lab_results');
   });
 
   test('Berkas Klaim Individual diklasifikasi berkas_eklaim', () => {

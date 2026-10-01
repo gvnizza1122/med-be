@@ -1,6 +1,6 @@
 const {
   bacaSatuBaris, bacaBarisLab, bacaLabDariHalaman, barisPerParameter, nilaiLabDariBaris,
-  periksaKewajaran, normalisasiSatuan, bacaAngka, kunciParameter, PESAN_TIDAK_DAPAT_DIPAKAI,
+  periksaKewajaran, normalisasiSatuan, bacaAngka, kunciParameter, bacaSerologiDariHalaman, PESAN_TIDAK_DAPAT_DIPAKAI,
 } = require('../../services/bacaLabService');
 
 describe('bacaSatuBaris: satu baris = satu parameter lengkap', () => {
@@ -180,6 +180,35 @@ describe('bacaLabDariHalaman dan nilaiLabDariBaris', () => {
   });
 });
 
+describe('bacaSerologiDariHalaman', () => {
+  test('judul dengue tanpa hasil tidak dianggap nilai IgG/IgM pasien', () => {
+    const hasil = bacaSerologiDariHalaman([{ page_number: 2, ocr_text: 'DENGUE IGG/IGM\nTarif DENGUE IGG/IGM 400,000 1.00' }]);
+    expect(hasil).toEqual([]);
+  });
+
+  test('memisahkan hasil Dengue IgG/IgM dari baris yang sama dan menyimpan kutipan', () => {
+    const hasil = bacaSerologiDariHalaman([{ page_number: 6, ocr_text: [
+      'IgG Anti Dengue NEGATIF Non Reaktif immunochromatograpy',
+      'IgM Anti Dengue POSITIF Reactive immunochromatograpy',
+      'Igm Salmonella TUBEX 2 (NEGATIF) * Negatif hemaglunation',
+    ].join('\n') }]);
+    expect(hasil).toHaveLength(2);
+    expect(hasil.map(r => r.parameter)).toEqual(['dengue_igg', 'dengue_igm']);
+    expect(hasil.map(r => r.hasil)).toEqual(['NEGATIF', 'POSITIF']);
+    expect(hasil.every(r => r.page_number === 6 && r.kutipan)).toBe(true);
+  });
+
+  test('membaca titer Widal apa adanya tanpa menganggap flag sebagai hasil positif', () => {
+    const hasil = bacaSerologiDariHalaman([{ page_number: 8, ocr_text: [
+      'Salmonella Typhi O NEGATIF Negatif',
+      'Salmonella Paratyphi AO 1/80 * Negatif',
+    ].join('\n') }]);
+    expect(hasil).toHaveLength(2);
+    expect(hasil[0]).toMatchObject({ parameter: 'widal_typhi_o', hasil: 'NEGATIF' });
+    expect(hasil[1]).toMatchObject({ parameter: 'widal_paratyphi_ao', hasil: 'NEGATIF', titer: '1/80', titer_penyebut: 80 });
+  });
+});
+
 describe('helper', () => {
   test('normalisasiSatuan', () => {
     expect(normalisasiSatuan('10^3/µL')).toBe('ribu/ul');
@@ -225,8 +254,10 @@ describe('syaratPenunjangService dengan opsi pakaiBacaLab', () => {
     expect(cari(r).nilai).toBe(7.2);
   });
 
-  test('opsi hidup tetapi tidak ada baris: jatuh ke pembacaan lama', () => {
+  test('opsi hidup tetapi satuan tidak cocok: tidak memakai regex lama untuk menebak', () => {
     const r = evaluasiSyaratPenunjang(['D63.8'], ['90.59'], [{ page_number: 1, ocr_text: 'Hemoglobin: 7,2 mg' }], { pakaiBacaLab: true });
-    expect(cari(r).nilai).toBe(7.2);
+    expect(cari(r).status).toBe(STATUS.PERLU_CEK_MANUAL);
+    expect(cari(r).nilai).toBeNull();
+    expect(cari(r).catatan_batasan).toMatch(/satuan tidak terbaca/);
   });
 });

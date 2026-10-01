@@ -1,4 +1,4 @@
-const { parsePDF, validateFields, extractField, normalizeDate } = require('./pdfParser');
+const { parsePDF, validateFields, extractField, normalizeDate } = require('../src/services/pdfParser');
 const fs = require('fs');
 const path = require('path');
 

@@ -110,11 +110,11 @@ describe('Daftar Kerja — jebakan Excel', () => {
   });
 
   test('judul kolom menetap saat digulir dan filter aktif', () => {
-    for (const nama of ['Daftar Klaim', 'Rincian Masalah']) {
+    for (const [nama, rentang] of [['Daftar Klaim', 'A1:P3'], ['Rincian Masalah', 'A1:I4']]) {
       const ws = wb.getWorksheet(nama);
       expect(ws.views[0].state).toBe('frozen');
       expect(ws.views[0].ySplit).toBe(1);
-      expect(ws.autoFilter).toBeTruthy();
+      expect(ws.autoFilter).toBe(rentang);
     }
   });
 
@@ -158,6 +158,13 @@ describe('Daftar Kerja — susunan lembar', () => {
 });
 
 describe('Daftar Kerja — isi', () => {
+  test('samarkan nama pada dua lembar data dan catat di Ringkasan', async () => {
+    const wb = await bacaBalik(await buatDaftarKerja(KLAIM, { samarkanNama: true }));
+    expect(wb.getWorksheet('Daftar Klaim').getRow(2).getCell(2).value).toBe('M***, N***');
+    expect(wb.getWorksheet('Rincian Masalah').getRow(2).getCell(2).value).toBe('M***, N***');
+    expect(wb.getWorksheet('Ringkasan').getCell('B9').value).toBe('Disamarkan');
+  });
+
   // Satu klaim dengan dua masalah harus jadi dua baris, supaya koder bisa
   // menyaring per jenis masalah dan mengerjakannya berkelompok.
   test('Rincian Masalah berisi satu baris per masalah, bukan per klaim', () => {
@@ -209,5 +216,10 @@ describe('nama berkas menyebut cakupannya', () => {
 
   test('tanpa cakupan tetap menghasilkan nama yang sah', () => {
     expect(namaBerkasDaftarKerja({})).toBe('daftar-kerja.xlsx');
+  });
+
+  test('nama samaran tercermin pada nama berkas', () => {
+    expect(namaBerkasDaftarKerja({ periode: '2026-09', samarkanNama: true }))
+      .toBe('daftar-kerja_2026-09_nama-disamarkan.xlsx');
   });
 });

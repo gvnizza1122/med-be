@@ -204,6 +204,9 @@ app.use((err, req, res, next) => {
 
 // Start server (wait for DB first)
 const PORT = process.env.PORT || 5000;
+server.requestTimeout = 120 * 60 * 1000;
+server.headersTimeout = 120 * 60 * 1000 + 5000; // harus > requestTimeout (syarat Node)
+if (require.main === module) {
 waitForDb().then(() => {
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`\n🏥 BPJS Claim Validator API Server`);
@@ -216,8 +219,6 @@ server.listen(PORT, '0.0.0.0', () => {
 // Aug 2026, permintaan klien) — estimasi ~90 menit — naikkan ke 2 jam supaya
 // request tidak diputus server sebelum FE-nya sendiri timeout (lib/api.ts
 // uploadPdfBatch pakai 2 jam juga) atau nginx (proxy_*_timeout, juga 2 jam).
-server.requestTimeout = 120 * 60 * 1000;
-server.headersTimeout = 120 * 60 * 1000 + 5000; // harus > requestTimeout (syarat Node)
 }).catch(err => {
   console.error('Failed to start server:', err);
   process.exit(1);
@@ -230,5 +231,6 @@ process.on('SIGINT', () => {
   server.close();
   process.exit(0);
 });
+}
 
 module.exports = app;

@@ -383,6 +383,24 @@ async function initializeSchema() {
         UNIQUE(record_id, page_number)
       );
 
+      -- Jejak enam tahap pembacaan. Teks halaman tetap bersumber dari
+      -- ocr_results; tabel ini hanya menyimpan referensi dan keluaran
+      -- terstruktur agar teks mentah tidak diduplikasi.
+      CREATE TABLE IF NOT EXISTS claim_reading_stages (
+        id TEXT PRIMARY KEY,
+        record_id TEXT NOT NULL REFERENCES claim_records(id) ON DELETE CASCADE,
+        stage_key TEXT NOT NULL CHECK(stage_key IN (
+          'ambil_teks','jenis_halaman','bagian','temuan_kutipan','pembakuan','kode_cocok_silang'
+        )),
+        stage_version TEXT NOT NULL,
+        status TEXT NOT NULL CHECK(status IN ('selesai','gagal','dilewati')),
+        input_ref JSONB NOT NULL DEFAULT '{}'::jsonb,
+        output_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(record_id, stage_key, stage_version)
+      );
+
       -- Profil RS per hospital_code — saat ini cuma kelas_rs (kelas akreditasi
       -- RS, mis. A/B/C/D). KODE_RS TIDAK disimpan di sini karena sudah ada di
       -- users.hospital_code/claim_files.hospital_code (dipakai sejak awal untuk
@@ -586,6 +604,7 @@ async function initializeSchema() {
     await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_ai_audit_style_action ON ai_audit_log(style, nurse_action)`);
     await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_ocr_results_record_id ON ocr_results(record_id)`);
     await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_ocr_results_page ON ocr_results(record_id, page_number)`);
+    await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_claim_reading_stages_record ON claim_reading_stages(record_id, stage_key)`);
     await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_error_kb_rule ON error_knowledge_base(rule_id)`);
     await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_error_kb_rule_hits ON error_knowledge_base(rule_id, hit_count DESC, created_at DESC)`);
     await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_icd10_who_chapter ON icd10_who_codes(chapter_number)`);
@@ -829,6 +848,8 @@ async function migrateSchema(db) {
       'kotakRegulasiService',
       'aturanKodingRsService',
       'alurJawabPendingSchema',
+      'ambangKlinisService',
+      'pencarianKodeService',
     ]) {
       try {
         await require(`../services/${nama}`).ensureSchema(dbHelper);
@@ -836,6 +857,16 @@ async function migrateSchema(db) {
         console.error(`[init] Skema ${nama} gagal:`, e.message);
       }
     }
+
+    // INSIDEN PRODUKSI 2026-10-01: seedDariTabelReferensi menulis ~65.000 baris
+    // (18.549 kode ICD-10 + 4.626 ICD-9 + ~42.000 baris istilah) lewat INSERT
+    // SATU PER SATU yang di-await berurutan -- menahan start server bermenit-
+    // menit SEBELUM app.listen() sempat jalan, sehingga nginx melempar 502 dan
+    // login tidak bisa dipakai. DIMATIKAN SEMENTARA di sini sampai fungsinya
+    // ditulis ulang pakai INSERT bertumpuk (batch), DIUJI kecepatannya
+    // terhadap data asli, baru diaktifkan lagi. Jangan panggil ini dari jalur
+    // start server lagi sebelum itu selesai. Tabel ref_kode/ref_istilah_kode
+    // tetap dibuat (ensureSchema di atas), cuma kosong sampai di-seed manual.
 
     // Add constraint: If jenis_field='Koding', kutipan must NOT be NULL
     // PostgreSQL CHECK constraint validation

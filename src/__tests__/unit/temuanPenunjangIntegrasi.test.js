@@ -114,15 +114,25 @@ describe('generateAiReview + temuan_penunjang (default ON)', () => {
   });
 });
 
-describe('generateAiReview + temuan_lab (selalu dihitung, terlepas dari SYARAT_PAKAI_BACA_LAB)', () => {
-  test('ai_review.temuan_lab berisi baris lab yang terbaca, walau SYARAT_PAKAI_BACA_LAB tetap OFF (default)', async () => {
+describe('generateAiReview + temuan_lab dan evaluasi syarat lab (aktif default)', () => {
+  test('baris tanpa satuan ditahan untuk cek manual; temuan tetap tersimpan dan flag false mempertahankan jalur lama', async () => {
+    const record = { ...REKAM, DIAGLIST: 'D63.8', PROCLIST: '90.59' };
+    const pool = [
+      { page_number: 1, ocr_text: 'Resume Medis' },
+      { page_number: 2, ocr_text: 'Hemoglobin: 7,2 mg' },
+    ];
     mockAi();
-    const r = await generateAiReview(REKAM, [], POOL);
+    const r = await generateAiReview(record, [], pool);
     expect(process.env.SYARAT_PAKAI_BACA_LAB).toBeUndefined();
     expect(r.temuan_lab).toBeDefined();
-    expect(Array.isArray(r.temuan_lab.baris)).toBe(true);
-    const params = r.temuan_lab.baris.map(b => b.parameter);
-    expect(params).toEqual(expect.arrayContaining(['hemoglobin', 'leukosit']));
+    expect(r.syarat_penunjang[0].syarat[0].status).toBe('perlu_cek_manual');
+    expect(r.temuan_lab.baris[0].dapat_dipakai_memutuskan_syarat).toBe(false);
+
+    process.env.SYARAT_PAKAI_BACA_LAB = 'false';
+    mockAi();
+    const rOff = await generateAiReview(record, [], pool);
+    expect(rOff.temuan_lab).toEqual(r.temuan_lab);
+    expect(rOff.syarat_penunjang[0].syarat[0].status).toBe('terpenuhi');
   });
 
   test('parameter lab tak dikenali ("Kadar Aneh Sekali") ikut dicatat ke varian_belum_dikenali', async () => {

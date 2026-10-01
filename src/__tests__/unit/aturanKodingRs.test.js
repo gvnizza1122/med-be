@@ -15,19 +15,20 @@ const NEBUL_RESEP_SAJA = { ...NEBUL, bukti: [NEBUL.bukti[1]] };
 
 const rule = (istilah_id, masuk_proclist, kondisi = 'selalu', extra = {}) => ({ istilah_id, masuk_proclist, kondisi, diputuskan_oleh: 'koder', catatan: null, ...extra });
 
-describe('susunUsulanProsedur — tanpa aturan = perilaku bawaan, BUKAN gerbang', () => {
-  test('tindakan tertulis di resume langsung masuk usulan, tanpa menunggu koder', () => {
+describe('susunUsulanProsedur — kode usulan tidak mengisi PROCLIST otomatis', () => {
+  test('tindakan tetap terbaca tetapi kode usulan tidak masuk PROCLIST', () => {
     const [u] = susunUsulanProsedur([NEBUL], new Map());
-    expect(u.masuk_proclist).toBe(true);
+    expect(u.masuk_proclist).toBe(false);
     expect(u.kode_usulan).toBe('93.94');
     expect(u.kode_terverifikasi).toBe(false);
+    expect(kodeProclistDariUsulan([u])).toEqual([]);
   });
 
   test('membawa penanda bahwa RS belum punya aturan untuk tindakan ini', () => {
     const [u] = susunUsulanProsedur([NEBUL], new Map());
     expect(u.belum_ada_aturan_rs).toBe(true);
     expect(u.aturan_rs).toBeNull();
-    expect(u.alasan).toMatch(/Belum ada aturan RS/);
+    expect(u.alasan).toMatch(/belum diizinkan.*pengisian otomatis/i);
   });
 
   test('bukti (halaman dan sumber) ikut terbawa', () => {
@@ -65,9 +66,11 @@ describe('susunUsulanProsedur — aturan RS sebagai override opsional', () => {
     expect(kodeProclistDariUsulan(usulan)).toEqual([]);
   });
 
-  test('aturan masuk_proclist=true memasukkan tindakan', () => {
+  test('aturan masuk_proclist=true tidak mengaktifkan kode usulan tanpa izin produk', () => {
     const peta = new Map([['nebulisasi', [rule('nebulisasi', true)]]]);
-    expect(kodeProclistDariUsulan(susunUsulanProsedur([NEBUL], peta))).toEqual(['93.94']);
+    const [u] = susunUsulanProsedur([NEBUL], peta);
+    expect(kodeProclistDariUsulan([u])).toEqual([]);
+    expect(u.alasan).toMatch(/belum diizinkan/i);
   });
 
   test('aturan TIDAK bisa memasukkan tindakan yang hanya ada di resep atau tanpa kode', () => {
@@ -79,10 +82,10 @@ describe('susunUsulanProsedur — aturan RS sebagai override opsional', () => {
     expect(usulan.every(u => u.masuk_proclist === false)).toBe(true);
   });
 
-  test('kondisi rawat_inap tidak berlaku pada klaim rawat jalan -> kembali ke bawaan', () => {
+  test('aturan kondisional di luar konteks tidak mengubah status kode usulan', () => {
     const peta = new Map([['nebulisasi', [rule('nebulisasi', false, 'rawat_inap')]]]);
     const [u] = susunUsulanProsedur([NEBUL], peta, { jenisKlaim: 'RAWAT_JALAN' });
-    expect(u.masuk_proclist).toBe(true);
+    expect(u.masuk_proclist).toBe(false);
     expect(u.belum_ada_aturan_rs).toBe(true);
   });
 
@@ -159,9 +162,9 @@ describe('basis data (mock)', () => {
     expect(db.run.mock.calls[0][1]).toEqual(['1', 'nebulisasi', false, 'igd', 'koder', null]);
   });
 
-  test('tentukanProsedurDariTemuan: tanpa aturan di DB hasilnya sama dengan perilaku bawaan', async () => {
+  test('tentukanProsedurDariTemuan: kode usulan tidak terisi tanpa izin produk', async () => {
     const hasil = await tentukanProsedurDariTemuan(dbMock(), 'rec-1', [NEBUL]);
-    expect(hasil.kode).toEqual(['93.94']);
+    expect(hasil.kode).toEqual([]);
     expect(hasil.usulan[0].belum_ada_aturan_rs).toBe(true);
   });
 
@@ -174,9 +177,9 @@ describe('basis data (mock)', () => {
     expect(hasil.usulan[0].aturan_rs.masuk_proclist).toBe(false);
   });
 
-  test('konteks klaim tak terbaca -> tetap perilaku bawaan', async () => {
+  test('konteks klaim tak terbaca -> kode usulan tetap tidak masuk', async () => {
     const db = dbMock({ prepare: jest.fn(() => ({ get: jest.fn().mockRejectedValue(new Error('boom')) })) });
     const hasil = await tentukanProsedurDariTemuan(db, 'rec-1', [NEBUL]);
-    expect(hasil.kode).toEqual(['93.94']);
+    expect(hasil.kode).toEqual([]);
   });
 });

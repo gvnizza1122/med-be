@@ -8,26 +8,16 @@
  *   KODING (modul ini)              : temuan + aturan RS -> usulan daftar
  *                                     prosedur (PROCLIST).
  *
- * RANCANGAN — SENGAJA TIDAK MENJADI GERBANG
- * Keputusan pemilik produk: kode tindakan dari resume_medis / triase_igd
- * LANGSUNG mengisi PROCLIST, tanpa menunggu koder. Itu perilaku bawaan dan
- * tetap. `aturan_koding_rs` hanyalah LAPISAN OVERRIDE opsional per RS di
- * atasnya:
- *
- *   tidak ada aturan  -> perilaku bawaan (masuk bila kode_usulan pasti dan
- *                        sumbernya resume/triase) + penanda
- *                        `belum_ada_aturan_rs: true` supaya RS tahu tindakan
- *                        ini belum punya kebijakan;
- *   ada aturan        -> masuk_proclist true/false menentukan, dibatasi kondisi
- *                        (selalu / rawat_jalan / rawat_inap / igd).
+ * Kode kamus masih berstatus USULAN. Sampai pemilik produk mengizinkan
+ * pengisian otomatis, usulan tidak boleh mengisi PROCLIST, termasuk bila ada
+ * aturan RS lama yang menyatakan masuk. Temuan dan kandidat tetap disimpan.
  *
  * Yang TIDAK bisa dilakukan aturan, karena itu bukan wewenangnya:
  *   - mengarang kode: kode hanya dari `kode_usulan` kamus (USULAN, tidak
  *     terverifikasi). Tindakan tanpa kode pasti tidak pernah masuk.
  *   - memasukkan tindakan yang hanya tertulis di resep: resep = rencana.
  *
- * Kalau tabel belum ada / basis data gagal dibaca, jatuh ke perilaku bawaan
- * (tidak ada gerbang baru, tidak ada kegagalan baru).
+ * Kalau tabel belum ada / basis data gagal dibaca, usulan tetap tidak masuk.
  */
 
 const KONDISI_SAH = ['selalu', 'rawat_jalan', 'rawat_inap', 'igd'];
@@ -170,10 +160,8 @@ function susunUsulanProsedur(temuan, aturan, konteks = {}) {
     } else if (aturanRs && aturanRs.masuk_proclist === false) {
       entri.alasan = `Kebijakan RS: tidak dikodekan (${aturanRs.kondisi}).${aturanRs.catatan ? ' ' + aturanRs.catatan : ''}`;
     } else {
-      entri.masuk_proclist = true;
-      entri.alasan = aturanRs
-        ? `Kebijakan RS: dikodekan (${aturanRs.kondisi}).`
-        : 'Belum ada aturan RS untuk tindakan ini — dikodekan menurut perilaku bawaan (tertulis di resume/triase).';
+      entri.masuk_proclist = false;
+      entri.alasan = 'Kode ICD-9-CM masih berstatus usulan dan belum diizinkan untuk pengisian otomatis ke PROCLIST.';
     }
     return entri;
   });

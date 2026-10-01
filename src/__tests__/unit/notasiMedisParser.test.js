@@ -98,12 +98,13 @@ describe('notasiMedisParser', () => {
     test('should parse single finding with bilateral notation', () => {
       const result = parsePhysicalExam('ronchi +/+');
       expect(result).toHaveProperty('ronchi');
-      expect(result.ronchi).toEqual({
+      expect(result.ronchi).toMatchObject({
         ada: true,
         sisi: 'bilateral',
         kanan: true,
         kiri: true,
-        notasi_asli: '+/+'
+        notasi_asli: '+/+',
+        translasi: 'suara napas tambahan kasar'
       });
     });
 

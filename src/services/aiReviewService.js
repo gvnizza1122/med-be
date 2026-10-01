@@ -35,9 +35,10 @@ const { evaluasiSyaratPenunjang } = require('./syaratPenunjangService');
 const { bacaTemuanTindakan, periksaSilangTindakan, kalimatTindakanTakDikenal } = require('./temuanTindakanService');
 const { kodekanTindakanBaru } = require('./kodeTindakanBaruService');
 const { petakanKeKodeWho } = require('./kodeDiagnosisWhoService');
-const { evaluasiKonsistensi } = require('./konsistensiAntarDataService');
+const { evaluasiKonsistensi, periksaSilangDiagnosisPrimer } = require('./konsistensiAntarDataService');
 const { periksaWaktuTriase } = require('./konsistensiWaktuService');
 const { susunPutusan } = require('./putusanPendingService');
+const putusanPendingAiService = require('./putusanPendingAiService');
 const { aggregateKriteria, KRITERIA_LABELS } = require('./kegawatdaruratanAggregation');
 const { getDb } = require('../database/init');
 const { assessPneumoniaSeverityMismatch } = require('./pneumoniaSeverityAssessment');
@@ -48,11 +49,60 @@ const { evaluateDiagnosisConsistency } = require('./diagnosisConsistencyService'
 const { classifyPageDocumentType, hasIgdVisitSignal } = require('./pdfPageClassifier');
 const { evaluasiKombinasiKode } = require('./ketentuanKlaimService');
 const { groupCodesToInaCBG } = require('./inacbgGroupingService');
+const gatewayModelService = require('./gatewayModelService');
 const { getTarifResmi, lookupTarifInacbg, cocokJenisKlaim } = require('./tarifInacbgLookup');
 const { jalankanPagarAman, catatDitolakAwal, ALASAN_PAGAR } = require('./pagarPascaAiService');
 const { bacaTemuanPenunjang } = require('./temuanPenunjangService');
 const { bacaLabDariHalaman } = require('./bacaLabService');
 const { catatVarianBelumDikenali } = require('./kamusPenunjangService');
+const { petakanBagian } = require('./bagianTemuanService');
+const { TAHAP_PEMBACAAN, simpanTahapPembacaan } = require('./claimReadingStageService');
+
+async function simpanJejakEnamTahap(record, evidencePool, result, codes) {
+  if (!record || !record.id || !Array.isArray(evidencePool) || evidencePool.length === 0) return;
+  try {
+    const db = getDb();
+    const halaman = evidencePool
+      .filter(p => p && Number.isInteger(Number(p.page_number)) && Number(p.page_number) > 0)
+      .map(p => ({ page_number: Number(p.page_number), confidence: p.confidence ?? null }));
+    if (!halaman.length) return;
+    const referensi = { sumber: 'ocr_results', halaman: halaman.map(p => p.page_number) };
+    const types = evidencePool.map(p => ({
+      page_number: Number(p.page_number),
+      jenis: classifyPageDocumentType((p && p.ocr_text) || ''),
+    }));
+    const parts = evidencePool.flatMap(p => petakanBagian((p && p.ocr_text) || '').map(b => ({
+      page_number: Number(p.page_number), bagian: b.bagian, mulai: b.mulai, akhir: b.akhir,
+    })));
+    const findings = [
+      ...(result.suggested_codes || []).map(x => ({ jenis: x.type, kode: x.code, halaman: x.page_number, kutipan: x.quotation, sumber: 'suggested_codes' })),
+      ...(result.code_evidence || []).filter(x => x.found).map(x => ({ jenis: x.type, kode: x.code, halaman: x.page_number, kutipan: x.quotation, sumber: 'code_evidence' })),
+      ...(result.temuan_tindakan || []).flatMap(x => (x.bukti || []).map(b => ({ jenis: 'tindakan', nama: x.nama, kode_usulan: x.kode_usulan, halaman: b.page_number, kutipan: b.kutipan, sumber: b.sumber }))),
+    ];
+    await simpanTahapPembacaan(db, { recordId: record.id, stageKey: TAHAP_PEMBACAAN.AMBIL_TEKS, inputRef: referensi, output: { jumlah_halaman: halaman.length, halaman } });
+    await simpanTahapPembacaan(db, { recordId: record.id, stageKey: TAHAP_PEMBACAAN.JENIS_HALAMAN, inputRef: referensi, output: { halaman: types } });
+    await simpanTahapPembacaan(db, { recordId: record.id, stageKey: TAHAP_PEMBACAAN.BAGIAN, inputRef: { tahap: TAHAP_PEMBACAAN.JENIS_HALAMAN }, output: { bagian: parts } });
+    await simpanTahapPembacaan(db, { recordId: record.id, stageKey: TAHAP_PEMBACAAN.TEMUAN_KUTIPAN, inputRef: { tahap: TAHAP_PEMBACAAN.BAGIAN }, output: { temuan: findings } });
+    await simpanTahapPembacaan(db, { recordId: record.id, stageKey: TAHAP_PEMBACAAN.PEMBAKUAN, inputRef: { tahap: TAHAP_PEMBACAAN.TEMUAN_KUTIPAN }, output: { penunjang: result.temuan_penunjang || [], laboratorium: result.temuan_lab || [], tindakan: result.temuan_tindakan || [] } });
+    await simpanTahapPembacaan(db, { recordId: record.id, stageKey: TAHAP_PEMBACAAN.KODE_COCOK_SILANG, inputRef: { tahap: TAHAP_PEMBACAAN.PEMBAKUAN }, output: { diagnosis: codes.diagnosis, prosedur: codes.procedure, code_evidence: result.code_evidence || [], kecocokan_silang: { kombinasi_kode: result.kombinasi_kode || [], konsistensi: result.konsistensi || null, syarat_penunjang: result.syarat_penunjang || null } } });
+  } catch (err) {
+    // Jejak pembacaan bersifat observabilitas; kegagalannya tidak boleh
+    // membatalkan audit klaim yang sudah berhasil dihitung.
+    console.warn(`[AI-REVIEW] penyimpanan jejak enam tahap gagal: ${err.message || err}`);
+  }
+}
+
+function identitasUntukGateway(record = {}) {
+  return {
+    nama: record.nama_pasien || record.NAMA_PASIEN,
+    nomor_kartu: record.nokartu || record.NOKARTU,
+    nik: record.nik || record.NIK,
+    no_rm: record.mrn || record.MRN,
+    sep: record.sep || record.SEP,
+    alamat: record.alamat || record.ALAMAT,
+    telepon: record.telepon || record.TELEPON || record.no_hp || record.NO_HP,
+  };
+}
 
 const AI_REVIEW_SYSTEM_PROMPT = `Kamu asisten audit klaim BPJS E-Claim untuk perawat/verifikator rumah sakit.
 Kamu diberi data lengkap satu rekam klaim (hasil ekstraksi), daftar field yang gagal validasi otomatis,
@@ -416,7 +466,15 @@ async function annotateKamusValid(suggestedCodes) {
   return Promise.all(beranotasi.map(async (entry) => {
     if (entry.type !== 'diagnosis' || entry.kamus_valid !== false || !entry.code) return entry;
     try {
-      const pengganti = await petakanKeKodeWho(entry.code, entry.quotation);
+      const pengganti = await petakanKeKodeWho(entry.code, entry.quotation, {
+        nama: record.nama_pasien || record.NAMA_PASIEN,
+        nomor_kartu: record.nokartu || record.NOKARTU,
+        nik: record.nik || record.NIK,
+        no_rm: record.mrn || record.MRN,
+        sep: record.sep || record.SEP,
+        alamat: record.alamat || record.ALAMAT,
+        telepon: record.telepon || record.TELEPON || record.no_hp || record.NO_HP,
+      });
       if (!pengganti) return entry;
       return { ...entry, code: pengganti.kode, kamus_valid: true, kode_asal: normalizeIcdCode(entry.code) };
     } catch (errKoreksi) {
@@ -652,13 +710,8 @@ Output HANYA JSON, tanpa markdown/penjelasan:
  * @param {Array} evidencePool - [{page_number, ocr_text, confidence}]
  * @returns {Promise<Array>} suggested_codes (bisa kosong)
  */
-async function suggestDiagnosisCodesFallback(evidencePool, ditolakOut = null) {
-  const apiKey = process.env.AI_PROVIDER_API_KEY;
-  if (!apiKey || evidencePool.length === 0) return [];
-
-  const baseUrl = process.env.AI_PROVIDER_BASE_URL || 'https://api.openai.com/v1';
-  const model = process.env.AI_MODEL || 'gpt-4o-mini';
-  const timeoutMs = Number(process.env.AI_TIMEOUT_MS || 60000);
+async function suggestDiagnosisCodesFallback(evidencePool, ditolakOut = null, record = {}) {
+  if ((!process.env.AI_PROVIDER_API_KEY && !process.env.KIMI_API_KEY) || evidencePool.length === 0) return [];
 
   let userPrompt = 'TEKS DOKUMEN (per halaman):\n================================\n';
   const sorted = [...evidencePool].sort((a, b) => a.page_number - b.page_number);
@@ -667,45 +720,15 @@ async function suggestDiagnosisCodesFallback(evidencePool, ditolakOut = null) {
   }
 
   try {
-    const ac = new AbortController();
-    const timer = setTimeout(() => ac.abort(), timeoutMs);
-    let respText;
-    try {
-      const response = await fetch(`${baseUrl}/chat/completions`, {
-        method: 'POST',
-        signal: ac.signal,
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model,
-          messages: [
-            { role: 'system', content: DIAGNOSIS_SUGGESTION_SYSTEM_PROMPT },
-            { role: 'user', content: userPrompt },
-          ],
-          max_completion_tokens: 1500,
-          response_format: { type: 'json_object' },
-        }),
-      });
-      respText = await response.text();
-      if (!response.ok) throw new Error(`HTTP ${response.status}: ${respText.slice(0, 160)}`);
-    } finally {
-      clearTimeout(timer);
-    }
-
-    const data = JSON.parse(respText);
-    const content = data.choices?.[0]?.message?.content || '';
-    if (!content) return [];
-
-    let parsed;
-    try {
-      parsed = JSON.parse(content);
-    } catch {
-      const m = content.match(/\{[\s\S]*\}/);
-      if (!m) return [];
-      parsed = JSON.parse(m[0]);
-    }
+    const gateway = await gatewayModelService.panggilModel('baca_berkas', {
+      system: DIAGNOSIS_SUGGESTION_SYSTEM_PROMPT,
+      prompt: userPrompt,
+      json: true,
+      maxTokens: 1500,
+      dikenal: identitasUntukGateway(record),
+    }, { db: getDb() });
+    if (!gateway.ok || !gateway.hasil) throw new Error(gateway.error || 'Gateway tidak menghasilkan JSON');
+    const parsed = gateway.hasil;
 
     const raw = Array.isArray(parsed.suggested_codes) ? parsed.suggested_codes : [];
     const out = [];
@@ -952,7 +975,7 @@ harus persis seperti di atas; vital_findings WAJIB 8 key seperti di atas):
  * @param {Array<string>} [procedureCodes] - PROCLIST record ini (untuk K5, tidak butuh AI)
  * @returns {Promise<{ringkasan:string, parameter_findings:Array, vital_findings:Object, kriteria:Array}>}
  */
-async function assessKegawatdaruratan(evidencePool, triagePageNumbers, umurTahun, umurHari, procedureCodes = [], resumeMedisPageNumbers = [], fallbackDocPageNumbers = {}, vitalDariTabel = {}) {
+async function assessKegawatdaruratan(evidencePool, triagePageNumbers, umurTahun, umurHari, procedureCodes = [], resumeMedisPageNumbers = [], fallbackDocPageNumbers = {}, vitalDariTabel = {}, dikenal = {}) {
   const ageGroup = resolveAgeGroup(umurTahun, umurHari);
   // Instrumen skala nyeri yang diharapkan untuk usia pasien ini (4-tier,
   // dihitung DI SINI dari umur -- bukan AI -- jadi konsisten & auditable,
@@ -979,7 +1002,7 @@ async function assessKegawatdaruratan(evidencePool, triagePageNumbers, umurTahun
     age_group: ageGroup,
   });
 
-  const apiKey = process.env.AI_PROVIDER_API_KEY;
+  const apiKey = process.env.AI_PROVIDER_API_KEY || process.env.KIMI_API_KEY;
   const triagePages = evidencePool.filter(p => triagePageNumbers.includes(p.page_number));
 
   // Fallback: kalau tidak ada Triase IGD, coba gunakan Laporan Operasi (untuk vital signs)
@@ -1018,10 +1041,6 @@ async function assessKegawatdaruratan(evidencePool, triagePageNumbers, umurTahun
   // 11 Sep 2026, Opsi A), TIDAK mempengaruhi Bagian 2/3 atau agregasi K1-K5
   // (lihat catatan di getResumeMedisPageNumbers & prompt Bagian 1-3 di atas).
   const resumeMedisPages = evidencePool.filter(p => resumeMedisPageNumbers.includes(p.page_number));
-
-  const baseUrl = process.env.AI_PROVIDER_BASE_URL || 'https://api.openai.com/v1';
-  const model = process.env.AI_MODEL || 'gpt-4o-mini';
-  const timeoutMs = Number(process.env.AI_TIMEOUT_MS || 60000);
 
   let userPrompt = umurTahun ? `UMUR_TAHUN pasien: ${umurTahun}\n\n` : '';
   if (painInstrument) userPrompt += `INSTRUMEN SKALA NYERI YANG DIHARAPKAN untuk pasien usia ini: ${painInstrument}\n\n`;
@@ -1063,63 +1082,18 @@ async function assessKegawatdaruratan(evidencePool, triagePageNumbers, umurTahun
   }
 
   try {
-    const ac = new AbortController();
-    const timer = setTimeout(() => ac.abort(), timeoutMs);
-    let respText;
-    try {
-      const response = await fetch(`${baseUrl}/chat/completions`, {
-        method: 'POST',
-        signal: ac.signal,
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model,
-          messages: [
-            { role: 'system', content: KEGAWATDARURATAN_SYSTEM_PROMPT },
-            { role: 'user', content: userPrompt },
-          ],
-          // 2000 cukup untuk output lama (5 kriteria a-e), TAPI TIDAK CUKUP untuk
-          // skema baru (11 parameter + 7 vital + K1, tiap field ada kutipan) --
-          // ditemukan lewat verifikasi nyata: SEP 0170R0110426V000098 terpotong
-          // persis di completion=2000, JSON tidak valid, hasil jatuh ke
-          // emptyResult diam-diam (tidak ada log jelas karena gagal di parse,
-          // bukan di HTTP/exception level). Naikkan ke 3500 dengan margin.
-          // Naikkan LAGI ke 4200 (19 Sep 2026, fix item 5/6): Bagian 1 nambah 5
-          // parameter (11->16) + Bagian 4 baru (tindakan_keperawatan + esi) --
-          // output makin panjang, risiko kepotong sama seperti kasus di atas.
-          max_completion_tokens: 4200,
-          response_format: { type: 'json_object' },
-        }),
-      });
-      respText = await response.text();
-      if (!response.ok) throw new Error(`HTTP ${response.status}: ${respText.slice(0, 160)}`);
-    } finally {
-      clearTimeout(timer);
+    const hasilGateway = await gatewayModelService.panggilModel('baca_berkas', {
+      system: KEGAWATDARURATAN_SYSTEM_PROMPT,
+      prompt: userPrompt,
+      json: true,
+      maxTokens: 4200,
+      dikenal,
+    }, { db: getDb() });
+    if (!hasilGateway.ok || !hasilGateway.hasil) {
+      throw new Error(hasilGateway.error || 'Gateway tidak menghasilkan JSON');
     }
-
-    const data = JSON.parse(respText);
-    console.warn(`[AI-REVIEW] assessKegawatdaruratan tokens: prompt=${data.usage?.prompt_tokens ?? '?'} completion=${data.usage?.completion_tokens ?? '?'} total=${data.usage?.total_tokens ?? '?'}`);
-    const content = data.choices?.[0]?.message?.content || '';
-    if (!content) {
-      console.warn('[AI-REVIEW] assessKegawatdaruratan: respons AI kosong.');
-      return emptyResult('Penilaian Kegawatdaruratan gagal dibuat — coba Baca Ulang.');
-    }
-
-    let parsed;
-    try {
-      parsed = JSON.parse(content);
-    } catch {
-      const m = content.match(/\{[\s\S]*\}/);
-      if (!m) {
-        // Kemungkinan besar output KEPOTONG (kena max_completion_tokens) --
-        // finish_reason 'length' + content tidak diakhiri '}' yang matching.
-        console.warn(`[AI-REVIEW] assessKegawatdaruratan: gagal parse JSON (kemungkinan terpotong, finish_reason=${data.choices?.[0]?.finish_reason ?? '?'}, panjang content=${content.length}).`);
-        return emptyResult('Penilaian Kegawatdaruratan gagal dibuat — coba Baca Ulang.');
-      }
-      parsed = JSON.parse(m[0]);
-    }
+    console.warn(`[AI-REVIEW] assessKegawatdaruratan tokens: total=${hasilGateway.penggunaan?.total_tokens ?? '?'}`);
+    const parsed = hasilGateway.hasil;
 
     // --- Validasi & bangun parameter_findings (Bagian 1, anti-halusinasi) ---
     // Sumber diterima: TRIASE IGD (utama) ATAU RESUME MEDIS RAWAT INAP
@@ -1679,7 +1653,7 @@ function buildPendingRiskPrompt(record, evidencePool) {
  * @returns {Promise<Array>} pending_risk_notes — sudah divalidasi (kutipan wajib match evidencePool,
  *   anti-halusinasi), siap pakai. Best-effort: array kosong kalau gagal/timeout.
  */
-async function assessPendingRiskPatterns(record, evidencePool) {
+async function assessPendingRiskPatterns(record, evidencePool, dikenal = identitasUntukGateway(record)) {
   const KNOWN_PENDING_PATTERNS = new Set([
     'kegawatan_lemah', 'manifestasi_ikut_du', 'tb_level_fktp',
     'usg_berulang_tanpa_indikasi', 'rujuk_saja_tanpa_tindakan',
@@ -1691,7 +1665,7 @@ async function assessPendingRiskPatterns(record, evidencePool) {
     'pneumonia_tanpa_temuan_klinis',
   ]);
 
-  const apiKey = process.env.AI_PROVIDER_API_KEY;
+  const apiKey = process.env.AI_PROVIDER_API_KEY || process.env.KIMI_API_KEY;
   if (!apiKey || evidencePool.length === 0) return [];
 
   const jenisKlaimRecord = record.JENIS_KLAIM || record.jenis_klaim;
@@ -1701,55 +1675,22 @@ async function assessPendingRiskPatterns(record, evidencePool) {
   // membedakan berkas IGD dari rawat jalan biasa -- kalau pemicunya tetap
   // digantung di sana, pola ini tidak akan pernah aktif lagi.
   const isKunjunganIgd = hasIgdVisitSignal(evidencePool.map(e => (e && e.ocr_text) || '').join(String.fromCharCode(10)));
-  const baseUrl = process.env.AI_PROVIDER_BASE_URL || 'https://api.openai.com/v1';
-  const model = process.env.AI_MODEL || 'gpt-4o-mini';
-  const timeoutMs = Number(process.env.AI_TIMEOUT_MS || 60000);
   const userPrompt = buildPendingRiskPrompt(record, evidencePool);
 
   try {
-    const ac = new AbortController();
-    const timer = setTimeout(() => ac.abort(), timeoutMs);
-    let respText;
-    try {
-      const response = await fetch(`${baseUrl}/chat/completions`, {
-        method: 'POST',
-        signal: ac.signal,
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model,
-          messages: [
-            { role: 'system', content: PENDING_RISK_SYSTEM_PROMPT },
-            { role: 'user', content: userPrompt },
-          ],
-          max_completion_tokens: 3000,
-          response_format: { type: 'json_object' },
-        }),
-      });
-      respText = await response.text();
-      if (!response.ok) throw new Error(`HTTP ${response.status}: ${respText.slice(0, 160)}`);
-    } finally {
-      clearTimeout(timer);
-    }
-
-    const data = JSON.parse(respText);
+    const hasilGateway = await gatewayModelService.panggilModel('baca_berkas', {
+      system: PENDING_RISK_SYSTEM_PROMPT,
+      prompt: userPrompt,
+      json: true,
+      maxTokens: 3000,
+      dikenal,
+    }, { db: getDb() });
+    if (!hasilGateway.ok || !hasilGateway.hasil) throw new Error(hasilGateway.error || 'Gateway tidak menghasilkan JSON');
     // Logging token usage — sama seperti assessKegawatdaruratan, supaya biaya
     // panggilan terpisah ini terlihat terpisah dari result.tokens_used (yang
     // cuma menghitung panggilan gabungan utama).
-    console.warn(`[AI-REVIEW] assessPendingRiskPatterns tokens: prompt=${data.usage?.prompt_tokens ?? '?'} completion=${data.usage?.completion_tokens ?? '?'} total=${data.usage?.total_tokens ?? '?'}`);
-    const content = data.choices?.[0]?.message?.content || '';
-    if (!content) return [];
-
-    let parsed;
-    try {
-      parsed = JSON.parse(content);
-    } catch {
-      const m = content.match(/\{[\s\S]*\}/);
-      if (!m) return [];
-      parsed = JSON.parse(m[0]);
-    }
+    console.warn(`[AI-REVIEW] assessPendingRiskPatterns tokens: total=${hasilGateway.penggunaan?.total_tokens ?? '?'}`);
+    const parsed = hasilGateway.hasil;
 
     const raw = Array.isArray(parsed.pending_risk_notes) ? parsed.pending_risk_notes : [];
     const out = [];
@@ -1934,11 +1875,7 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
     return null; // tidak ada yang perlu direview
   }
 
-  const apiKey = process.env.AI_PROVIDER_API_KEY;
-  if (!apiKey) return null; // fallback ke rule-engine saja, seperti sebelumnya
-
-  const baseUrl = process.env.AI_PROVIDER_BASE_URL || 'https://api.openai.com/v1';
-  const model = process.env.AI_MODEL || 'gpt-4o-mini';
+  if (!process.env.AI_PROVIDER_API_KEY && !process.env.KIMI_API_KEY) return null;
   const maxAttempts = Number(process.env.AI_MAX_ATTEMPTS || 3);
   const timeoutMs = Number(process.env.AI_TIMEOUT_MS || 60000);
 
@@ -1946,51 +1883,26 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      const ac = new AbortController();
-      const timer = setTimeout(() => ac.abort(), timeoutMs);
-      let respText;
-      try {
-        const response = await fetch(`${baseUrl}/chat/completions`, {
-          method: 'POST',
-          signal: ac.signal,
-          headers: {
-            'Authorization': `Bearer ${apiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model,
-            messages: [
-              { role: 'system', content: AI_REVIEW_SYSTEM_PROMPT },
-              { role: 'user', content: userPrompt },
-            ],
-            // max_completion_tokens (bukan max_tokens) & tanpa temperature custom
-            // — sebagian model (mis. GPT-5.6 Luna) menolak keduanya dengan HTTP 400
-            // "Unsupported parameter: 'max_tokens'". max_completion_tokens aman
-            // dipakai untuk model lama (gpt-4o-mini dkk) juga, jadi tidak perlu
-            // deteksi model.
-            max_completion_tokens: 4000,
-            response_format: { type: 'json_object' },
-          }),
-        });
-        respText = await response.text();
-        if (!response.ok) throw new Error(`HTTP ${response.status}: ${respText.slice(0, 160)}`);
-      } finally {
-        clearTimeout(timer);
-      }
-
-      const data = JSON.parse(respText);
-      const content = data.choices?.[0]?.message?.content || '';
-      const tokensUsed = data.usage?.total_tokens || 0;
-      if (!content) throw new Error('Model membalas kosong');
-
-      let aiResult;
-      try {
-        aiResult = JSON.parse(content);
-      } catch {
-        const m = content.match(/\{[\s\S]*\}/);
-        if (!m) throw new Error('Model tidak mengembalikan JSON');
-        aiResult = JSON.parse(m[0]);
-      }
+      const db = getDb();
+      const hasilGateway = await gatewayModelService.panggilModel('baca_berkas', {
+        system: AI_REVIEW_SYSTEM_PROMPT,
+        prompt: userPrompt,
+        json: true,
+        maxTokens: 4000,
+        dikenal: {
+          nama: record.nama_pasien || record.NAMA_PASIEN,
+          nomor_kartu: record.nokartu || record.NOKARTU,
+          nik: record.nik || record.NIK,
+          no_rm: record.mrn || record.MRN,
+          sep: record.sep || record.SEP,
+          alamat: record.alamat || record.ALAMAT,
+          telepon: record.telepon || record.TELEPON || record.no_hp || record.NO_HP,
+        },
+      }, { db });
+      if (!hasilGateway.ok) throw new Error(hasilGateway.error || 'Panggilan gateway model gagal');
+      const aiResult = hasilGateway.hasil;
+      const tokensUsed = hasilGateway.penggunaan?.total_tokens || 0;
+      if (!aiResult || typeof aiResult !== 'object') throw new Error('Model tidak mengembalikan JSON');
 
       const result = {
         field_notes: {},
@@ -2209,7 +2121,7 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
         ekg: getEkgPageNumbers(evidencePool),
       };
       const [pendingRiskNotes, kegawatdaruratanAssessment] = await Promise.all([
-        assessPendingRiskPatterns(record, evidencePool).catch(riskErr => {
+        assessPendingRiskPatterns(record, evidencePool, identitasUntukGateway(record)).catch(riskErr => {
           console.warn(`[AI-REVIEW] assessPendingRiskPatterns error: ${riskErr.message}`);
           return [];
         }),
@@ -2218,7 +2130,7 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
               evidencePool, triagePageNumbers,
               record.UMUR_TAHUN || record.umur_tahun, record.UMUR_HARI || record.umur_hari,
               codes.procedure, resumeMedisPageNumbers, fallbackDocPageNumbers,
-              record._ocr_vital_signs_detected || {}
+              record._ocr_vital_signs_detected || {}, identitasUntukGateway(record)
             ).catch(kegawatErr => {
               console.warn(`[AI-REVIEW] assessKegawatdaruratan error: ${kegawatErr.message}`);
               return null;
@@ -2251,7 +2163,8 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
         result.syarat_penunjang = evaluasiSyaratPenunjang(
           record.DIAGLIST || record.diagnosa_list,
           record.PROCLIST || record.prosedur_list,
-          evidencePool
+          evidencePool,
+          { pakaiBacaLab: process.env.SYARAT_PAKAI_BACA_LAB !== 'false' }
         );
       } catch (syaratErr) {
         console.warn(`[AI-REVIEW] evaluasiSyaratPenunjang error: ${syaratErr.message}`);
@@ -2280,14 +2193,10 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
         result.temuan_penunjang = [];
       }
 
-      // Temuan lab — baris tabel laboratorium dibaca per baris + diperiksa
-      // kewajarannya (bacaLabService.js). SELALU dihitung & disimpan (murni
-      // baca, tanpa efek samping) di ai_review.temuan_lab, TERLEPAS dari
-      // SYARAT_PAKAI_BACA_LAB — flag itu HANYA mengendalikan apakah
-      // syaratPenunjangService memakai nilai ini untuk memutuskan syarat
-      // klaim terpenuhi/tidak (defaultnya tetap MATI; lihat
-      // syaratPenunjangService.js dan HANDOFF.md item 4: "aktifkan pembaca
-      // lab setelah dicoba pada PDF asli").
+      // Temuan lab dibaca dan disimpan di ai_review.temuan_lab. Untuk syarat
+      // klaim, pembacaan per baris + pemeriksa kewajaran aktif default setelah
+      // diverifikasi pada PDF asli lokal; SYARAT_PAKAI_BACA_LAB=false
+      // mempertahankan jalur lama sebagai rollback.
       let labTidakDikenali = [];
       try {
         const bacaanLab = bacaLabDariHalaman(evidencePool);
@@ -2295,7 +2204,7 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
         labTidakDikenali = bacaanLab.tidak_dikenali || [];
       } catch (labErr) {
         console.warn(`[AI-REVIEW] bacaLabDariHalaman error: ${labErr.message}`);
-        result.temuan_lab = { baris: [], tidak_dikenali: [] };
+        result.temuan_lab = { baris: [], serologi: [], tidak_dikenali: [] };
       }
 
       // Antrean varian belum dikenali — istilah penunjang/parameter lab yang
@@ -2330,7 +2239,15 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
         try {
           const takDikenal = kalimatTindakanTakDikenal(evidencePool);
           if (takDikenal.length > 0) {
-            const baru = await kodekanTindakanBaru(takDikenal);
+            const baru = await kodekanTindakanBaru(takDikenal, {
+              nama: record.nama_pasien || record.NAMA_PASIEN,
+              nomor_kartu: record.nokartu || record.NOKARTU,
+              nik: record.nik || record.NIK,
+              no_rm: record.mrn || record.MRN,
+              sep: record.sep || record.SEP,
+              alamat: record.alamat || record.ALAMAT,
+              telepon: record.telepon || record.TELEPON || record.no_hp || record.NO_HP,
+            });
             for (const b of baru) {
               // Halaman asal dicari ulang supaya kutipannya tetap bisa
               // ditelusuri ke dokumen, sama seperti tindakan dari kamus bawaan.
@@ -2383,16 +2300,6 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
         result.kode_luar_kamus = [];
       }
 
-      // Putusan pending — satu jawaban untuk pertanyaan yang sebenarnya
-      // ditanyakan koder: "pending atau tidak, dan kalau iya karena apa?"
-      // Dijalankan PALING AKHIR karena merangkum seluruh pemeriksaan di atas.
-      try {
-        result.putusan_pending = susunPutusan(result, record._validation_errors || []);
-      } catch (putusanErr) {
-        console.warn(`[AI-REVIEW] susunPutusan error: ${putusanErr.message}`);
-        result.putusan_pending = null;
-      }
-
       // Modul Pneumonia (Fase 2, 12-13 Sep 2026) -- MURNI kode deterministik,
       // dijalankan SETELAH kegawatdaruratanAssessment tersedia (piggyback pada
       // Tabel 1/2 yang sudah diekstrak & divalidasi), TIDAK ada panggilan AI
@@ -2420,7 +2327,7 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
       if (codes.diagnosis.length === 0 && result.suggested_codes.length === 0 && resumeMedisOnlyPool.length > 0) {
         try {
           const fallbackSuggestions = await Promise.race([
-            suggestDiagnosisCodesFallback(resumeMedisOnlyPool, ditolakAwal),
+            suggestDiagnosisCodesFallback(resumeMedisOnlyPool, ditolakAwal, record),
             new Promise((_, reject) => setTimeout(() => reject(new Error('fallback hard-timeout 70s')), 70000)),
           ]);
           if (fallbackSuggestions.length > 0) {
@@ -2454,6 +2361,28 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
         if (pagar.suggested_codes) result.suggested_codes = pagar.suggested_codes;
         if (pagar.pagar_temuan) result.pagar_temuan = pagar.pagar_temuan;
         if (pagar.petunjuk_resep) result.petunjuk_resep = pagar.petunjuk_resep;
+      }
+
+      // KD-14 — DIAGLIST (dari halaman "Berkas Klaim Individual", SENGAJA
+      // dikecualikan dari evidencePool supaya tidak membuktikan dirinya
+      // sendiri) dicocokkan SILANG terhadap diagnosis yang terbaca independen
+      // dari resume medis (suggested_codes, sudah lolos pagar kutipan+negasi
+      // di atas). Ditambahkan 2026-10-01 setelah backtest DWI ARIYANI dan NUR
+      // ASIAH -- pada klaim NUR ASIAH, DIAGLIST "I51.7;I48" sama sekali tidak
+      // sekategori dengan R57.0/J81.0/I69.3 yang tertulis di resume, dan
+      // alasan pending BPJS sungguhan untuk klaim itu justru soal diagnosis
+      // utama -- sesuatu yang sebelumnya TIDAK PERNAH bisa ditangkap karena
+      // kedua sumber ini tidak pernah dibandingkan. Dijalankan SETELAH pagar
+      // (bukan di blok evaluasiKonsistensi di atas) karena butuh
+      // suggested_codes yang SUDAH final (kamus_valid, disangkal terisi).
+      try {
+        const diagnosisDariSuggested = (result.suggested_codes || []).filter((s) => s && s.type === 'diagnosis');
+        result.konsistensi_data = [
+          ...(result.konsistensi_data || []),
+          ...periksaSilangDiagnosisPrimer(record, diagnosisDariSuggested),
+        ];
+      } catch (silangErr) {
+        console.warn(`[AI-REVIEW] periksaSilangDiagnosisPrimer gagal: ${silangErr.message}`);
       }
 
       // --- Ketentuan Klaim Tipe 3: aturan kombinasi kode (22 Sep 2026) ---
@@ -2635,7 +2564,31 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
       result.inacbg_result = inacbgResult;
       result.tariff_result = tarifResult;
 
+      // Putusan pending dijalankan paling akhir agar semua temuan, termasuk
+      // hasil pembacaan penunjang, pneumonia, dan kode, sudah menjadi kandidat.
+      try {
+        const kandidatPutusan = susunPutusan(result, validationErrors);
+        const keputusan = await putusanPendingAiService.putuskanDenganAi(kandidatPutusan, {
+          db: getDb(), dikenal: identitasUntukGateway(record),
+        });
+        if (keputusan.ok) {
+          result.putusan_pending = keputusan.putusan;
+          result.tokens_used += keputusan.penggunaan?.total_tokens || 0;
+        } else {
+          result.putusan_pending = {
+            ...kandidatPutusan, status: 'perlu_dicek',
+            ringkasan: 'AI belum berhasil menetapkan status pending untuk klaim ini.',
+            sumber_keputusan: 'ai_tidak_tersedia', error_keputusan: keputusan.error,
+            catatan_keandalan: 'Keputusan AI belum tersedia. Kandidat alasan ditampilkan sebagai informasi, bukan keputusan pending atau tidak pending.',
+          };
+        }
+      } catch (putusanErr) {
+        console.warn(`[AI-REVIEW] susunPutusan error: ${putusanErr.message}`);
+        result.putusan_pending = null;
+      }
+
       result.generated_at = new Date().toISOString();
+      await simpanJejakEnamTahap(record, evidencePool, result, codes);
       return result;
     } catch (error) {
       const msg = error.name === 'AbortError' ? `timeout ${timeoutMs}ms` : error.message;

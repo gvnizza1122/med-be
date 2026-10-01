@@ -65,26 +65,26 @@ describe('generateAiReview — provenance & review_status (fix item 7, 8, 9)', (
     const result = await generateAiReview(record, [], evidencePool);
     const ev = result.code_evidence.find(e => e.code === '88.78');
     expect(ev.document_type).toBe('rincian_biaya');
-    expect(ev.review_status).toBe('valid');
+    expect(ev.review_status).toBe('VALID');
   });
 
   test('fix item 8: 90.59 (lab rutin) review_status perlu_review, 88.78 tetap valid', async () => {
     const record = { DIAGLIST: 'O21.0', PROCLIST: '88.78;90.59', JENIS_KLAIM: 'RAWAT_INAP', UMUR_TAHUN: 28 };
     const result = await generateAiReview(record, [], evidencePool);
     const proc90 = result.code_evidence.find(e => e.code === '90.59');
-    expect(proc90.document_type).toBe('lab');
-    expect(proc90.review_status).toBe('perlu_review');
+    expect(proc90.document_type).toBe('lab_results');
+    expect(proc90.review_status).toBe('PENDING');
     expect(proc90.review_flags[0].reason).toMatch(/laboratorium|lab rutin/i);
 
     const proc88 = result.code_evidence.find(e => e.code === '88.78');
-    expect(proc88.review_status).toBe('valid');
+    expect(proc88.review_status).toBe('VALID');
   });
 
   test('fix item 9: O21.0 review_status perlu_review, diagnosis_consistency_flags berisi alternatif O21.1 + aksi klarifikasi DPJP', async () => {
     const record = { DIAGLIST: 'O21.0', PROCLIST: '88.78;90.59', JENIS_KLAIM: 'RAWAT_INAP', UMUR_TAHUN: 28 };
     const result = await generateAiReview(record, [], evidencePool);
     const diag = result.code_evidence.find(e => e.code === 'O21.0' && e.type === 'diagnosis');
-    expect(diag.review_status).toBe('perlu_review');
+    expect(diag.review_status).toBe('PENDING');
 
     expect(result.diagnosis_consistency_flags).toHaveLength(1);
     const flag = result.diagnosis_consistency_flags[0];
@@ -109,6 +109,6 @@ describe('generateAiReview — provenance & review_status (fix item 7, 8, 9)', (
     const fake = result.code_evidence.find(e => e.code === 'Z99.9');
     expect(fake).toBeDefined();
     expect(fake.found).toBe(false);
-    expect(fake.review_status).toBe('evidence_tidak_terverifikasi');
+    expect(fake.review_status).toBe('PENDING');
   });
 });

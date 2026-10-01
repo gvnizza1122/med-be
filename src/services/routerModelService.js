@@ -35,6 +35,12 @@ const TUGAS = Object.freeze([
   'rancang_jawaban_pending',
   'analisis_pending',
   'baca_regulasi',
+  'petakan_diagnosis_who',
+  'kodekan_tindakan_baru',
+  'audit_berkas_field',
+  'ringkas_training_pending',
+  'putuskan_pending',
+  'ekstrak_pdf',
 ]);
 
 const PENYEDIA = Object.freeze(['openai_compat', 'kimi']);
@@ -48,6 +54,9 @@ function hapusCache() {
 }
 
 function modelDariEnv(tugas, penyedia = 'openai_compat') {
+  if (tugas === 'ringkas_training_pending') {
+    return { penyedia: 'kimi', model: process.env.KIMI_MODEL || 'kimi-k3' };
+  }
   if (penyedia === 'kimi') {
     return { penyedia: 'kimi', model: process.env.KIMI_MODEL || 'kimi-k3' };
   }

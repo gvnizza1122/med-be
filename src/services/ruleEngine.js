@@ -27,6 +27,7 @@
 // ICD-10: Letter followed by 2+ digits, optionally dot + digits
 const { matchPrbCategory } = require('./prbRules');
 const { getTarifResmi, validateTarifDiscrepancy } = require('./tarifInacbgLookup');
+const { validateWithRuleLogic } = require('./genericRuleValidator');
 
 const ICD10_PATTERN = /^[A-Z]\d{2}(\.\d{1,4})?$/i;
 // ICD-9-CM: 2-3 digits, optionally dot + digits
@@ -632,6 +633,15 @@ function validateRecord(record, activeRules) {
           actual_value: `Rp ${resVal.tarifKlaim.toLocaleString('id-ID')} (selisih Rp ${resVal.selisih.toLocaleString('id-ID')})`
         });
       }
+    }
+  }
+
+  // Aturan konfigurabel disimpan di DB terpisah dari rule kode-bawaan.
+  // Jalankan hanya aturan aktif dan jangan menganggap rule_logic yang gagal
+  // diparse sebagai validasi sukses (service mengembalikan daftar kosong).
+  for (const rule of activeRules || []) {
+    if (rule && rule.rule_type === 'configurable' && rule.is_active) {
+      errors.push(...validateWithRuleLogic(record, rule));
     }
   }
 

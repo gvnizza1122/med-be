@@ -50,6 +50,8 @@ coverage/
 *.seed
 *.pid.lock
 *.traineddata
+# Kecuali data bahasa OCR resmi yang dipakai ocrService.js (harus ikut di-clone)
+!tessdata/*.traineddata
 
 # Bulk test upload logs (scripts/bulkTestUpload.js)
 bulk-upload-log-*.json

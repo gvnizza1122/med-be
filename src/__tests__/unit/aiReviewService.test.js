@@ -124,10 +124,61 @@ describe('generateAiReview — dengan AI dikonfigurasi (fetch dimock)', () => {
       []
     );
 
-    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(global.fetch).toHaveBeenCalledTimes(2);
     const sentBody = JSON.parse(global.fetch.mock.calls[0][1].body);
     const userMessage = sentBody.messages.find(m => m.role === 'user').content;
     expect(userMessage).toContain('JENIS_KLAIM: RAWAT_JALAN');
+  });
+
+  test('status dan alasan putusan pending final dipilih dari kandidat oleh AI', async () => {
+    global.fetch = jest.fn().mockImplementation(async (_url, options) => {
+      const body = JSON.parse(options.body);
+      const system = body.messages.find(m => m.role === 'system')?.content || '';
+      const jawaban = system.includes('Anda menilai apakah klaim berisiko dipending')
+        ? { status: 'berisiko_pending', alasan_ids: ['kandidat-1'] }
+        : { field_notes: {}, code_evidence: [], suggested_codes: [] };
+      return {
+        ok: true,
+        text: () => Promise.resolve(JSON.stringify({
+          choices: [{ message: { content: JSON.stringify(jawaban) } }],
+          usage: { total_tokens: 7 },
+        })),
+      };
+    });
+
+    const hasil = await generateAiReview(
+      { sep: 'ABC' },
+      [{ rule_id: 'RV-05', field_name: 'diagnosa_list', error_message: 'DIAGLIST kosong', severity: 'major' }],
+      [],
+    );
+
+    expect(hasil.putusan_pending.status).toBe('berisiko_pending');
+    expect(hasil.putusan_pending.sumber_keputusan).toBe('ai');
+    expect(hasil.putusan_pending.alasan).toHaveLength(1);
+    expect(hasil.putusan_pending.alasan[0].kode).toBe('RV-05');
+  });
+
+  test('caller utama menyamarkan identitas dari record dan kutipan sebelum panggilan model', async () => {
+    mockFetchOk({ field_notes: {}, code_evidence: [], suggested_codes: [] });
+
+    await generateAiReview(
+      {
+        sep: '0170R0110826V003045', nokartu: '0003604746071', nama_pasien: 'SUMIDAH', mrn: '104853',
+        DIAGLIST: 'R10.4',
+      },
+      [{ field_name: 'sep', error_message: 'contoh', actual_value: '0170R0110826V003045' }],
+      [{ page_number: 2, ocr_text: 'Nama Pasien SUMIDAH; Kartu 0003604746071; RM 104853; SEP 0170R0110826V003045' }],
+    );
+
+    const body = JSON.parse(global.fetch.mock.calls[0][1].body);
+    const prompt = body.messages.map(m => m.content).join('\n');
+    for (const identitas of ['SUMIDAH', '0003604746071', '104853', '0170R0110826V003045']) {
+      expect(prompt).not.toContain(identitas);
+    }
+    expect(prompt).toContain('[NAMA_1]');
+    expect(prompt).toContain('[KARTU_1]');
+    expect(prompt).toContain('[RM_1]');
+    expect(prompt).toContain('[SEP_1]');
   });
 
   test('inacbg_result dan tariff_result diisi dari grouping service + tariff lookup', async () => {

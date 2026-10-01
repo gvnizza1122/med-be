@@ -25,9 +25,9 @@
  * Nama parameter dinormalkan dengan kamusPenunjangService (cocokkan) ditambah
  * alias lokal untuk parameter yang di kamus bergabung (kreatinin/ureum, dll).
  *
- * STATUS: modul murni, teruji dengan teks tiruan. Belum diuji pada PDF
- * asli. syaratPenunjangService memakainya hanya bila opsi.pakaiBacaLab atau
- * env SYARAT_PAKAI_BACA_LAB=true (default mati).
+ * STATUS: ekstraksi baris lab dan serologi diuji pada PDF asli lokal serta
+ * fixture sintetis. Pemakaian nilai untuk syarat klaim aktif secara default;
+ * SYARAT_PAKAI_BACA_LAB=false mematikannya.
  */
 
 const { cocokkan, rapikan } = require('./kamusPenunjangService');
@@ -343,12 +343,13 @@ function bacaSatuBaris(baris, { tanggal = null, tanggalDari = null } = {}) {
 
   const wajar = periksaKewajaran(key, nilai, satuanTertulis);
   const alasan = [...wajar.alasan];
+  if (key && !satuanTertulis) alasan.push('satuan tidak terbaca pada baris yang sama');
   if (angka.koreksiHuruf) alasan.push(`angka "${angka.teks}" memuat huruf yang mirip angka (O/l); dibaca ${nilai}`);
   const konflik = key ? ujiSilangFlag(flagCetak, nilai, wajar.nilai_dinormalkan, rj.rujukan, key) : null;
   if (konflik) alasan.push(konflik);
   if (!key) alasan.push(ambigu ? 'nama parameter bertabrakan, perlu konfirmasi' : 'parameter tidak dikenali');
 
-  const dapatDipakai = Boolean(key) && wajar.status === STATUS_KEWAJARAN.WAJAR && !konflik && !angka.koreksiHuruf && !wajar.ambigu_satuan && !wajar.satuan_tidak_cocok;
+  const dapatDipakai = Boolean(key) && Boolean(satuanTertulis) && wajar.status === STATUS_KEWAJARAN.WAJAR && !konflik && !angka.koreksiHuruf && !wajar.ambigu_satuan && !wajar.satuan_tidak_cocok;
 
   return {
     parameter: key,
@@ -401,6 +402,57 @@ function bacaBarisLab(teks, { halaman = null, tanggalAwal = null } = {}) {
   return hasil;
 }
 
+function statusSerologi(raw) {
+  const teks = String(raw || '').toLowerCase();
+  if (/\b(non[\s-]*reactive|non[\s-]*reaktif|negatif|negative)\b/.test(teks)) return 'NEGATIF';
+  if (/\b(positif|positive|reactive|reaktif)\b/.test(teks)) return 'POSITIF';
+  return null;
+}
+
+/** Baca hasil serologi yang tertulis pada baris yang sama dengan nama tes. */
+function bacaSerologiDariHalaman(halaman) {
+  const hasil = [];
+  for (const hal of halaman || []) {
+    const teks = hal && (hal.ocr_text != null ? hal.ocr_text : hal.text);
+    if (!teks) continue;
+    for (const baris of String(teks).split('\n')) {
+      const line = baris.trim();
+      if (!line) continue;
+
+      const dengue = line.match(/\b(IgG|IgM)\b.*\bDengue\b|\bDengue\b.*\b(IgG|IgM)\b/i);
+      if (dengue) {
+        const jenis = (dengue[1] || dengue[2]).toUpperCase();
+        const status = statusSerologi(line);
+        // Judul pemeriksaan (mis. "DENGUE IGG/IGM") dan baris tarif bukan
+        // hasil pasien. Tanpa hasil kualitatif eksplisit, jangan buat temuan.
+        if (!status) continue;
+        hasil.push({
+          jenis: 'dengue_serologi', parameter: `dengue_${jenis.toLowerCase()}`,
+          hasil: status, hasil_ditulis: line, page_number: hal.page_number || null,
+          kutipan: line.slice(0, 200), perlu_cek_manusia: status === null,
+        });
+        continue;
+      }
+
+      const widal = line.match(/^\s*(?:Salmonella\s+)?(Typhi|Paratyphi)\s+(AO|BO|CO|AH|BH|CH|O|H)\b\s*(.*)$/i);
+      if (!widal) continue;
+      const kelompok = widal[1].toLowerCase();
+      const antigen = widal[2].toUpperCase();
+      const raw = widal[3].trim();
+      const titer = raw.match(/\b(\d+)\s*[:/]\s*(\d+)\b/);
+      const status = statusSerologi(raw);
+      hasil.push({
+        jenis: 'widal', parameter: `widal_${kelompok}_${antigen.toLowerCase()}`,
+        hasil: status, hasil_ditulis: raw || null,
+        ...(titer ? { titer: `${titer[1]}/${titer[2]}`, titer_penyebut: Number(titer[2]) } : {}),
+        page_number: hal.page_number || null, kutipan: line.slice(0, 200),
+        perlu_cek_manusia: !status && !titer,
+      });
+    }
+  }
+  return hasil;
+}
+
 /**
  * Baca banyak halaman.
  * @param {Array<{page_number:number, ocr_text?:string, text?:string}>} halaman
@@ -416,7 +468,7 @@ function bacaLabDariHalaman(halaman) {
       if (b.parameter) baris.push(b); else tidakDikenali.push({ nama: b.parameter_ditulis, halaman: b.halaman });
     }
   }
-  return { baris, tidak_dikenali: tidakDikenali };
+  return { baris, serologi: bacaSerologiDariHalaman(halaman), tidak_dikenali: tidakDikenali };
 }
 
 /** Semua baris satu parameter, urut tanggal (tanggal kosong di akhir). Tidak ada yang ditimpa. */
@@ -470,4 +522,5 @@ module.exports = {
   periksaKewajaran, ujiSilangFlag,
   bacaSatuBaris, bacaBarisLab, bacaLabDariHalaman,
   barisPerParameter, nilaiLabDariBaris,
+  bacaSerologiDariHalaman,
 };

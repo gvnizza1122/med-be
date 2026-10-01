@@ -249,16 +249,13 @@ function translateAbbreviation(text) {
  */
 function translateClinicalText(text) {
   if (!text || typeof text !== 'string') return text;
-
-  let result = text;
-
-  // Replace singkatan secara case-insensitive
-  for (const [key, value] of singkatanDict.entries()) {
-    const regex = new RegExp(`\\b${key}\\b`, 'gi');
-    result = result.replace(regex, value);
-  }
-
-  return result;
+  // Satu lintasan mencegah hasil penggantian diterjemahkan kembali oleh alias
+  // lain (mis. SI -> "sklera ikterik", lalu "ikterik" berubah lagi).
+  const entries = [...singkatanDict.entries()].sort((a, b) => b[0].length - a[0].length);
+  const alternatif = entries.map(([key]) => key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+  const pola = new RegExp(`\\b(?:${alternatif})\\b`, 'gi');
+  const terjemahan = new Map(entries.map(([key, value]) => [key.toUpperCase(), value]));
+  return text.replace(pola, cocok => terjemahan.get(cocok.toUpperCase()) || cocok);
 }
 
 /**

@@ -29,6 +29,7 @@
  */
 
 const { getDb } = require('../database/init');
+const gatewayModelService = require('./gatewayModelService');
 
 /** Samakan bentuk kalimat tindakan supaya "Inj. Omeprazole 1A" dan "inj omeprazole 1a" dianggap sama. */
 function kunciIstilah(teks) {
@@ -96,7 +97,7 @@ async function saringKodeNyata(db, kode) {
  * @param {string[]} kalimatTindakan kalimat mentah dari kolom Tindakan
  * @returns {Promise<Array<{teks, kode, nama, dari}>>}
  */
-async function kodekanTindakanBaru(kalimatTindakan) {
+async function kodekanTindakanBaru(kalimatTindakan, dikenal = {}) {
   const unik = [...new Set((kalimatTindakan || []).map(t => String(t || '').trim()).filter(Boolean))];
   if (unik.length === 0) return [];
 
@@ -128,41 +129,19 @@ async function kodekanTindakanBaru(kalimatTindakan) {
   if (belumDikenal.length === 0) return hasil;
 
   // Lapis 2 — tanya AI, lalu saring terhadap kamus resmi.
-  const apiKey = process.env.AI_PROVIDER_API_KEY;
-  if (!apiKey) return hasil;
-
-  const baseUrl = process.env.AI_PROVIDER_BASE_URL || 'https://api.openai.com/v1';
-  const model = process.env.AI_MODEL || 'gpt-4o-mini';
-  const timeoutMs = Number(process.env.AI_TIMEOUT_MS || 60000);
+  if (!process.env.AI_PROVIDER_API_KEY && !process.env.KIMI_API_KEY) return hasil;
 
   let usulan = [];
   try {
-    const ac = new AbortController();
-    const timer = setTimeout(() => ac.abort(), timeoutMs);
-    let respText;
-    try {
-      const response = await fetch(`${baseUrl}/chat/completions`, {
-        method: 'POST',
-        signal: ac.signal,
-        headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model,
-          messages: [
-            { role: 'system', content: SISTEM_PROMPT },
-            { role: 'user', content: belumDikenal.map(t => `- ${t}`).join('\n') },
-          ],
-          max_completion_tokens: 1200,
-          response_format: { type: 'json_object' },
-        }),
-      });
-      respText = await response.text();
-      if (!response.ok) throw new Error(`HTTP ${response.status}: ${respText.slice(0, 160)}`);
-    } finally {
-      clearTimeout(timer);
-    }
-    const data = JSON.parse(respText);
-    console.warn(`[KodeTindakan] tokens: ${data.usage?.total_tokens ?? '?'} untuk ${belumDikenal.length} istilah baru`);
-    usulan = JSON.parse(data.choices?.[0]?.message?.content || '{}').hasil || [];
+    const panggilan = await gatewayModelService.panggilModel('kodekan_tindakan_baru', {
+      system: SISTEM_PROMPT,
+      prompt: belumDikenal.map(t => `- ${t}`).join('\n'),
+      json: true,
+      maxTokens: 1200,
+      dikenal,
+    }, { db });
+    if (!panggilan.ok) throw new Error(panggilan.error || 'Panggilan gateway gagal');
+    usulan = panggilan.hasil && Array.isArray(panggilan.hasil.hasil) ? panggilan.hasil.hasil : [];
   } catch (err) {
     console.warn(`[KodeTindakan] Gagal meminta kode: ${err.message}`);
     return hasil;
