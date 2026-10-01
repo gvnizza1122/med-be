@@ -53,7 +53,7 @@ const gatewayModelService = require('./gatewayModelService');
 const { getTarifResmi, lookupTarifInacbg, cocokJenisKlaim } = require('./tarifInacbgLookup');
 const { jalankanPagarAman, catatDitolakAwal, ALASAN_PAGAR } = require('./pagarPascaAiService');
 const { bacaTemuanPenunjang } = require('./temuanPenunjangService');
-const { bacaLabDariHalaman } = require('./bacaLabService');
+const { bacaLabDariHalaman, temuanLabRawatInap } = require('./bacaLabService');
 const { catatVarianBelumDikenali } = require('./kamusPenunjangService');
 const { petakanBagian } = require('./bagianTemuanService');
 const { periksaKode: periksaKodeKamus, tandaiStatusKamusEvidence, STATUS: STATUS_KAMUS } = require('./validasiKamusService');
@@ -2284,7 +2284,7 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
         labTidakDikenali = bacaanLab.tidak_dikenali || [];
       } catch (labErr) {
         console.warn(`[AI-REVIEW] bacaLabDariHalaman error: ${labErr.message}`);
-        result.temuan_lab = { baris: [], serologi: [], tidak_dikenali: [] };
+        result.temuan_lab = { baris: [], serologi: [], kualitatif: [], tidak_dikenali: [], halaman_lab: [], status_bacaan: 'gagal_dibaca' };
       }
 
       // Antrean varian belum dikenali — istilah penunjang/parameter lab yang
@@ -2464,6 +2464,13 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
       } catch (silangErr) {
         console.warn(`[AI-REVIEW] periksaSilangDiagnosisPrimer gagal: ${silangErr.message}`);
       }
+
+      // LAB-01: rawat inap dengan lembar hasil lab yang tidak terbaca sama
+      // sekali tidak boleh lewat diam-diam (lihat bacaLabService).
+      result.konsistensi_data = [
+        ...(result.konsistensi_data || []),
+        ...temuanLabRawatInap(jenisKlaimRecord, result.temuan_lab),
+      ];
 
       // --- Ketentuan Klaim Tipe 3: aturan kombinasi kode (22 Sep 2026) ---
       // Dievaluasi terhadap kode FINAL, yaitu DIAGLIST yang ada DITAMBAH

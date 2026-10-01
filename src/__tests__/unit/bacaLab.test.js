@@ -209,6 +209,72 @@ describe('bacaSerologiDariHalaman', () => {
   });
 });
 
+describe('format lembar lab RS Lestari Raharja (keluaran RapidOCR)', () => {
+  const { temuanLabRawatInap } = require('../../services/bacaLabService');
+  // Data sintetis; tata letak meniru keluaran RapidOCR pada lembar asli:
+  // teks yang sejajar digabung satu baris, kolom dipisah spasi tunggal.
+  const LEMBAR = [
+    'HASIL PEMERIKSAAN LABORATORIUM',
+    'No.RM : 100000 No.Permintaan Lab : 500000',
+    'Nama Pasien : PASIEN UJI Tgl.Permintaan : 16-09-2026',
+    'Alamat : DUSUN 001/002, Tgl.Keluar Hasil : 17-09-2026',
+    'Pemeriksaan Hasil Flag Nilai',
+    'HEMATOLOGI',
+    'Hemoglobin 11.9 L 12-15 g/dL Spectrofotometric',
+    'Lekosit 5.35 4.5-11 10^3/uL Flowcytometry',
+    'Trombosit 102 L 150-400 ribu/uL Impedance',
+    'Hematokrit 35.3 35-49 % Numeric Integration',
+    'Glukosa Darah Sewaktu 103 82-115 mg/dL Hexokinase',
+    'HBsAg Kualitatif Negatif Negatif',
+    'Tgl.Cetak : 17-09-2026 06:11:20',
+  ].join('\n');
+
+  const hasil = bacaLabDariHalaman([{ page_number: 7, ocr_text: LEMBAR }]);
+  const ambil = (p) => hasil.baris.find(b => b.parameter === p);
+
+  test('nilai inti terbaca, termasuk ejaan "Lekosit" dan "Glukosa Darah Sewaktu"', () => {
+    expect(ambil('hemoglobin')).toMatchObject({ nilai: 11.9, flag_cetak: 'L', dapat_dipakai_memutuskan_syarat: true });
+    expect(ambil('leukosit')).toMatchObject({ nilai: 5.35, dapat_dipakai_memutuskan_syarat: true });
+    expect(ambil('leukosit').kewajaran.nilai_dinormalkan).toBe(5350);
+    expect(ambil('trombosit').kewajaran.nilai_dinormalkan).toBe(102000);
+    expect(ambil('hematokrit').nilai).toBe(35.3);
+    expect(ambil('gula_darah_sewaktu').nilai).toBe(103);
+  });
+
+  test('rentang rujukan "4.5-11" tidak dibaca sebagai tanggal; tanggal dari kop Tgl.Keluar Hasil', () => {
+    for (const b of hasil.baris) {
+      expect(b.tanggal).toBe('2026-09-17');
+      expect(b.tanggal_dari).toBe('kop');
+    }
+  });
+
+  test('hasil kualitatif (HBsAg) dicatat', () => {
+    expect(hasil.kualitatif).toEqual([expect.objectContaining({ nama: 'HBsAg', hasil: 'NEGATIF', halaman: 7 })]);
+  });
+
+  test('status bacaan terbaca, halaman lab dikenali', () => {
+    expect(hasil.status_bacaan).toBe('terbaca');
+    expect(hasil.halaman_lab).toEqual([7]);
+    expect(temuanLabRawatInap('RAWAT_INAP', hasil)).toEqual([]);
+  });
+
+  test('lembar lab ada tetapi tidak terbaca: rawat inap mendapat LAB-01, rawat jalan tidak', () => {
+    const rusak = bacaLabDariHalaman([{ page_number: 5, ocr_text: 'HASIL PEMERIKSAAN LABORATORIUM\nreve || re [| own | ee\nCatatan :' }]);
+    expect(rusak.status_bacaan).toBe('halaman_lab_tidak_terbaca');
+    const t = temuanLabRawatInap('RAWAT_INAP', rusak);
+    expect(t).toHaveLength(1);
+    expect(t[0]).toMatchObject({ id: 'LAB-01', keparahan: 'rendah', diverifikasi: false });
+    expect(t[0].pesan).toContain('halaman 5');
+    expect(temuanLabRawatInap('RAWAT_JALAN', rusak)).toEqual([]);
+  });
+
+  test('berkas tanpa lembar lab: tidak ada temuan', () => {
+    const kosong = bacaLabDariHalaman([{ page_number: 1, ocr_text: 'RESUME MEDIS\nDiagnosa: Pneumonia' }]);
+    expect(kosong.status_bacaan).toBe('tidak_ada_halaman_lab');
+    expect(temuanLabRawatInap('RAWAT_INAP', kosong)).toEqual([]);
+  });
+});
+
 describe('helper', () => {
   test('normalisasiSatuan', () => {
     expect(normalisasiSatuan('10^3/µL')).toBe('ribu/ul');

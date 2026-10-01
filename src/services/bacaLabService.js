@@ -65,7 +65,10 @@ const ALIAS = {
   kreatinin: 'kreatinin', creatinin: 'kreatinin', creatinine: 'kreatinin', 'serum creatinin': 'kreatinin', 'serum kreatinin': 'kreatinin',
   ureum: 'ureum', urea: 'ureum', bun: 'ureum',
   gds: 'gula_darah_sewaktu', 'gula darah sewaktu': 'gula_darah_sewaktu', 'gula darah acak': 'gula_darah_sewaktu',
-  gdp: 'gula_darah_puasa', 'gula darah puasa': 'gula_darah_puasa',
+  'glukosa darah sewaktu': 'gula_darah_sewaktu', 'glukosa sewaktu': 'gula_darah_sewaktu',
+  gdp: 'gula_darah_puasa', 'gula darah puasa': 'gula_darah_puasa', 'glukosa darah puasa': 'gula_darah_puasa', 'glukosa puasa': 'gula_darah_puasa',
+  // Ejaan cetakan lab RS Lestari Raharja.
+  lekosit: 'leukosit',
   natrium: 'natrium', sodium: 'natrium', na: 'natrium',
   kalium: 'kalium', potassium: 'kalium', k: 'kalium',
   sgot: 'sgot', ast: 'sgot', sgpt: 'sgpt', alt: 'sgpt',
@@ -98,7 +101,24 @@ function normalisasiSatuan(satuan) {
 }
 
 // ── tanggal ─────────────────────────────────────────────────────────────────
-const RE_TANGGAL = /(?<!\d)(\d{1,2})[/.\-](\d{1,2})[/.\-](\d{2,4})(?!\d)|(?<!\d)(\d{4})-(\d{1,2})-(\d{1,2})(?!\d)/;
+// Tahun WAJIB 4 digit. Dengan tahun 2 digit, rentang rujukan "4.5-11" pada
+// baris Lekosit terbaca sebagai tanggal 4-5-2011 (ditemukan pada berkas lab
+// RS Lestari Raharja, 1 Okt 2026) -- dan tanggal itulah yang dipakai
+// mengurutkan hasil lab antarhari pada rawat inap.
+const RE_TANGGAL = /(?<![\d.,])(\d{1,2})[/.\-](\d{1,2})[/.\-](\d{4})(?!\d)|(?<!\d)(\d{4})-(\d{1,2})-(\d{1,2})(?!\d)/;
+
+// Kop lembar hasil lab: "Tgl.Keluar Hasil : 17-09-2026". RapidOCR menggabungkan
+// teks yang sejajar menjadi satu baris (mis. dengan "Alamat : ..."), sehingga
+// tanggalJudul() yang mensyaratkan baris pendek tidak menangkapnya.
+const RE_TGL_KELUAR_HASIL = /Tgl\.?\s*Keluar\s*Hasil\s*:?\s*/i;
+const RE_TGL_PERMINTAAN = /Tgl\.?\s*Permintaan\s*:?\s*/i;
+
+function tanggalKop(baris, re) {
+  const m = re.exec(baris);
+  if (!m) return null;
+  const t = ambilTanggal(baris.slice(m.index + m[0].length));
+  return t.tanggal;
+}
 
 function ubahTanggal(m) {
   let d, bln, th;
@@ -392,7 +412,14 @@ function bacaBarisLab(teks, { halaman = null, tanggalAwal = null } = {}) {
   let tanggal = tanggalAwal;
   let tanggalDari = tanggalAwal ? 'halaman' : null;
   const barisList = String(teks || '').split('\n');
+  let dariKeluarHasil = false;
   barisList.forEach((baris, i) => {
+    // Tanggal kop lembar lab. "Tgl.Keluar Hasil" didahulukan atas
+    // "Tgl.Permintaan" (sampel bisa diambil malam, hasil keluar esok hari).
+    const keluar = tanggalKop(baris, RE_TGL_KELUAR_HASIL);
+    if (keluar) { tanggal = keluar; tanggalDari = 'kop'; dariKeluarHasil = true; return; }
+    const minta = !dariKeluarHasil && tanggalKop(baris, RE_TGL_PERMINTAAN);
+    if (minta) { tanggal = minta; tanggalDari = 'kop'; return; }
     const judul = tanggalJudul(baris);
     if (judul) { tanggal = judul; tanggalDari = 'judul'; return; }
     const r = bacaSatuBaris(baris, { tanggal, tanggalDari });
@@ -458,17 +485,91 @@ function bacaSerologiDariHalaman(halaman) {
  * @param {Array<{page_number:number, ocr_text?:string, text?:string}>} halaman
  * @returns {{baris: Array, tidak_dikenali: Array<{nama:string, halaman:number|null}>}}
  */
+// Lembar hasil lab (kop "HASIL PEMERIKSAAN LABORATORIUM" RS Lestari Raharja,
+// atau judul serupa). Dipakai untuk membedakan "berkas tanpa hasil lab" dari
+// "hasil lab ada tetapi tidak terbaca" -- yang kedua tidak boleh lewat diam-diam.
+const RE_HALAMAN_LAB = /HASIL\s+(?:PEMERIKSAAN\s+)?LAB(?:ORATORIUM|ORATORIK)?\b/i;
+
+const RE_KUALITATIF = /\b(non[\s-]*reaktif|non[\s-]*reactive|negatif|negative|positif|positive|reaktif|reactive)\b/i;
+
+/**
+ * Hasil kualitatif pada lembar lab (mis. "HBsAg Kualitatif Negatif Negatif")
+ * yang tidak berupa angka sehingga tidak tertangkap bacaSatuBaris. Hanya
+ * dicatat apa adanya -- tidak dipakai memutuskan syarat klaim.
+ */
+function bacaKualitatif(teks, halaman, sudahSerologi) {
+  const hasil = [];
+  for (const baris of String(teks || '').split('\n')) {
+    const line = baris.trim();
+    const m = RE_KUALITATIF.exec(line);
+    if (!m || m.index === 0 || sudahSerologi.has(line)) continue;
+    const nama = line.slice(0, m.index).replace(/\b(kualitatif|kuantitatif)\b/ig, '').replace(/[:\s]+$/, '').trim();
+    if (!/^[A-Za-z]/.test(nama) || nama.length > 40 || /catatan|kesimpulan|kesan/i.test(nama)) continue;
+    hasil.push({ nama, hasil: statusSerologi(m[1]), hasil_ditulis: m[1], halaman, kutipan: line.slice(0, 200) });
+  }
+  return hasil;
+}
+
 function bacaLabDariHalaman(halaman) {
   const baris = [];
   const tidakDikenali = [];
+  const kualitatif = [];
+  const halamanLab = [];
+  const serologi = bacaSerologiDariHalaman(halaman);
+  const sudahSerologi = new Set(serologi.map(s => s.kutipan));
   for (const h of halaman || []) {
     const teks = h && (h.ocr_text != null ? h.ocr_text : h.text);
     if (!teks) continue;
+    const lembarLab = RE_HALAMAN_LAB.test(teks);
+    if (lembarLab) halamanLab.push(h.page_number || null);
     for (const b of bacaBarisLab(teks, { halaman: h.page_number || null })) {
       if (b.parameter) baris.push(b); else tidakDikenali.push({ nama: b.parameter_ditulis, halaman: b.halaman });
     }
+    if (lembarLab) kualitatif.push(...bacaKualitatif(teks, h.page_number || null, sudahSerologi));
   }
-  return { baris, serologi: bacaSerologiDariHalaman(halaman), tidak_dikenali: tidakDikenali };
+
+  // Status bacaan:
+  //   terbaca                     -- ada nilai lab yang terbaca
+  //   halaman_lab_tidak_terbaca   -- lembar hasil lab ADA tetapi tak satu pun
+  //                                  hasil terbaca (OCR buruk / format baru)
+  //   tidak_ada_halaman_lab       -- berkas memang tidak memuat lembar lab
+  const adaHasil = baris.length + serologi.length + kualitatif.length + tidakDikenali.length > 0;
+  let statusBacaan = 'tidak_ada_halaman_lab';
+  if (adaHasil) statusBacaan = 'terbaca';
+  else if (halamanLab.length > 0) statusBacaan = 'halaman_lab_tidak_terbaca';
+
+  return {
+    baris,
+    serologi,
+    kualitatif,
+    tidak_dikenali: tidakDikenali,
+    halaman_lab: halamanLab,
+    status_bacaan: statusBacaan,
+  };
+}
+
+/**
+ * Temuan konsistensi untuk klaim RAWAT INAP yang lembar hasil lab-nya ada
+ * tetapi tidak terbaca sama sekali -- supaya koder memeriksanya manual dan
+ * aplikasi tidak diam-diam menganggap "tidak ada hasil lab".
+ */
+function temuanLabRawatInap(jenisKlaim, bacaanLab) {
+  if (jenisKlaim !== 'RAWAT_INAP' || !bacaanLab) return [];
+  if (!['halaman_lab_tidak_terbaca', 'gagal_dibaca'].includes(bacaanLab.status_bacaan)) return [];
+  const hal = (bacaanLab.halaman_lab || []).filter(h => h != null);
+  return [{
+    id: 'LAB-01',
+    nama: 'Hasil laboratorium tidak terbaca',
+    keparahan: 'rendah',
+    pesan: (bacaanLab.status_bacaan === 'gagal_dibaca'
+      ? 'Pembacaan hasil laboratorium gagal karena gangguan sistem.'
+      : `Lembar hasil laboratorium ditemukan${hal.length ? ` di halaman ${hal.join(', ')}` : ''}, tetapi tidak satu pun hasilnya terbaca otomatis.`)
+      + ' Hasil lab rawat inap sering menjadi dasar syarat klaim -- periksa lembar hasil lab secara manual.',
+    yang_ditemukan: hal.length ? { kutipan: 'HASIL PEMERIKSAAN LABORATORIUM', page_number: hal[0] } : null,
+    yang_dicari: 'Nilai hasil laboratorium (mis. Hemoglobin, Trombosit, Leukosit) yang terbaca dari lembar hasil lab',
+    sumber_aturan: null,
+    diverifikasi: false,
+  }];
 }
 
 /** Semua baris satu parameter, urut tanggal (tanggal kosong di akhir). Tidak ada yang ditimpa. */
@@ -520,7 +621,7 @@ module.exports = {
   PARAMETER, STATUS_KEWAJARAN, PESAN_TIDAK_DAPAT_DIPAKAI,
   normalisasiSatuan, bacaAngka, kunciParameter,
   periksaKewajaran, ujiSilangFlag,
-  bacaSatuBaris, bacaBarisLab, bacaLabDariHalaman,
+  bacaSatuBaris, bacaBarisLab, bacaLabDariHalaman, temuanLabRawatInap,
   barisPerParameter, nilaiLabDariBaris,
   bacaSerologiDariHalaman,
 };
