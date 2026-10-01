@@ -854,16 +854,15 @@ async function migrateSchema(db) {
       }
     }
 
-    // Isi ref_kode/ref_istilah_kode dari icd10_who_codes (18.549 baris) dan
-    // icd9_cm_procedures (4.626 baris) -- sistem pencarian kode baru, BELUM
-    // disambung ke generateAiReview. Idempoten (check-before-insert); dibiarkan
-    // jalan setiap start seperti seed kamus penunjang, supaya tabel referensi
-    // ICD yang bertambah ikut terbawa tanpa migrasi manual.
-    try {
-      await require('../services/pencarianKodeService').seedDariTabelReferensi(dbHelper);
-    } catch (e) {
-      console.error('[init] Seed pencarian kode gagal:', e.message);
-    }
+    // INSIDEN PRODUKSI 2026-10-01: seedDariTabelReferensi menulis ~65.000 baris
+    // (18.549 kode ICD-10 + 4.626 ICD-9 + ~42.000 baris istilah) lewat INSERT
+    // SATU PER SATU yang di-await berurutan -- menahan start server bermenit-
+    // menit SEBELUM app.listen() sempat jalan, sehingga nginx melempar 502 dan
+    // login tidak bisa dipakai. DIMATIKAN SEMENTARA di sini sampai fungsinya
+    // ditulis ulang pakai INSERT bertumpuk (batch), DIUJI kecepatannya
+    // terhadap data asli, baru diaktifkan lagi. Jangan panggil ini dari jalur
+    // start server lagi sebelum itu selesai. Tabel ref_kode/ref_istilah_kode
+    // tetap dibuat (ensureSchema di atas), cuma kosong sampai di-seed manual.
 
     // Add constraint: If jenis_field='Koding', kutipan must NOT be NULL
     // PostgreSQL CHECK constraint validation
