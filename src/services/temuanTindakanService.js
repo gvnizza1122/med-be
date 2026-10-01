@@ -71,6 +71,16 @@ const KAMUS_TINDAKAN = [
     kode_usulan: '87.44',
     pola: /\b(ro|rontgen|foto|x[\s-]?ray)\s*(thorax|thoraks|toraks|dada)\b/i,
   },
+  // Indeks alfabetis ICD-9-CM: "Removal, cerumen, ear 96.52". Ditemukan pada
+  // berkas 0170R0110826V000019 (H61.2): "ekstraksi serumen" di kolom Tindakan
+  // resume poli THT tidak terbaca sama sekali, PROCLIST tetap kosong.
+  // Diagnosis "impacted serumen" sengaja tidak cocok — itu bukan tindakan.
+  {
+    id: 'ekstraksi_serumen',
+    nama: 'Ekstraksi serumen',
+    kode_usulan: '96.52',
+    pola: /\b(ekstraksi|ekstrasi|evakuasi|pengambilan|pembersihan|irigasi|spoe?ling|spooling)\s*(serumen|cerumen)\b|\birigasi\s*telinga\b/i,
+  },
   {
     id: 'pemeriksaan_darah',
     nama: 'Pemeriksaan darah',

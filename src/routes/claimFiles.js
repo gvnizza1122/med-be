@@ -23,6 +23,12 @@ const { pastikanDiagnosisWho } = require('../services/pastikanDiagnosisWhoServic
 
 const router = express.Router();
 
+// UI uses the same age-specific reference as lookupBand, including existing records.
+router.get('/reference/vital-ranges', authenticate, (req, res) => {
+  const { THRESHOLD_TABLE } = require('../services/kegawatdaruratanReference');
+  res.json({ thresholds: THRESHOLD_TABLE });
+});
+
 // OCR (tesseract.js) berat di CPU dan makan waktu tak terduga. Sebelumnya tiap
 // panggilan ke /ocr-pages yang belum ada hasilnya langsung memicu proses baru
 // dengan Promise.race + setTimeout — tapi setTimeout cuma membuat REQUEST-nya

@@ -156,6 +156,7 @@ async function initializeSchema() {
       CREATE TABLE IF NOT EXISTS users (
         id TEXT PRIMARY KEY,
         email TEXT UNIQUE NOT NULL,
+        username TEXT UNIQUE,
         password_hash TEXT NOT NULL,
         full_name TEXT NOT NULL,
         nik TEXT UNIQUE,
@@ -566,6 +567,9 @@ async function initializeSchema() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
+    // Existing installations predate username login. Keep their user records
+    // intact while adding the nullable, unique username field.
+    await dbHelper.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS username TEXT UNIQUE');
 
     // Create Indexes
     await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_claim_files_hospital_period ON claim_files(hospital_code, period)`);

@@ -29,15 +29,20 @@ const prbExemptRoutes = require('./routes/prbExempt');
 const bpjsPendingRoutes = require('./routes/bpjsPending');
 const jawabPendingRoutes = require('./routes/jawabPending');
 const auditLogRoutes = require('./routes/auditLogs');
+const codeDescriptionRoutes = require('./routes/codeDescriptions');
 
 const app = express();
 app.set('trust proxy', 1);
 const server = http.createServer(app);
+const corsOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 
 // Socket.IO setup
 const io = new Server(server, {
   cors: {
-    origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+    origin: corsOrigins,
     methods: ['GET', 'POST']
   }
 });
@@ -47,7 +52,7 @@ app.set('io', io);
 // Middleware
 app.use(helmet({ crossOriginResourcePolicy: false }));
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+  origin: corsOrigins,
   credentials: true
 }));
 app.use(express.json({ limit: '10mb' }));
@@ -139,6 +144,7 @@ app.use('/api/v1/bridging', bridgingRoutes);
 app.use('/api/v1/hospital-settings', hospitalSettingsRoutes);
 app.use('/api/v1/prb-exempt', prbExemptRoutes);
 app.use('/api/v1/audit-logs', auditLogRoutes);
+app.use('/api/v1/code-descriptions', codeDescriptionRoutes);
 // BUG LAMA yang ditemukan & diperbaiki di sesi ini: recordsRouter
 // (rv20-confirm, audit, batch-audit) diexport tapi TIDAK PERNAH di-mount di
 // entry point produksi (src/index.js) — cuma ada di src/server.js yang tidak

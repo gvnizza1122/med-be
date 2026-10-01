@@ -44,7 +44,7 @@ const PARAMETER_TABLE = [
   { key: 'akral', label: 'Akral', sistem_tubuh: 'Sirkulasi', contoh_normal: 'hangat, kering', contoh_abnormal: 'dingin, basah, pucat', kriteria_terkait: ['K2', 'K4'] },
   { key: 'crt', label: 'CRT (capillary refill time)', sistem_tubuh: 'Sirkulasi', contoh_normal: '<2 detik', contoh_abnormal: '>=2 detik', kriteria_terkait: ['K2', 'K4'] },
   { key: 'edema', label: 'Edema ekstremitas', sistem_tubuh: 'Ekstremitas', contoh_normal: '(-/-/-/-)', contoh_abnormal: 'ada, derajat/pitting', kriteria_terkait: ['K4'] },
-  { key: 'bunyi_jantung', label: 'Bunyi jantung tambahan', sistem_tubuh: 'Kardiovaskular', contoh_normal: 'reguler, tanpa murmur', contoh_abnormal: 'gallop/murmur', kriteria_terkait: ['K4'] },
+  { key: 'bunyi_jantung', label: 'Bunyi jantung (S1/S2, irama)', sistem_tubuh: 'Kardiovaskular', contoh_normal: 'S1 S2 reguler, tanpa murmur', contoh_abnormal: 'irama tidak reguler/gallop/murmur', kriteria_terkait: ['K4'] },
   { key: 'kesadaran_kualitatif', label: 'Kesadaran kualitatif', sistem_tubuh: 'Neurologis', contoh_normal: 'compos mentis', contoh_abnormal: 'somnolen/sopor/koma', kriteria_terkait: ['K3'] },
   { key: 'deformitas_luka', label: 'Deformitas/luka', sistem_tubuh: 'Trauma', contoh_normal: 'tidak ada', contoh_abnormal: 'ada, deskripsi', kriteria_terkait: ['K1'] },
   // --- 5 parameter baru (KEADAAN/primary survey), 19 Sep 2026 ---
@@ -53,6 +53,12 @@ const PARAMETER_TABLE = [
   { key: 'thorak', label: 'Thorak', sistem_tubuh: 'KEADAAN', contoh_normal: 'simetris, tidak ada jejas/retraksi', contoh_abnormal: 'asimetris/jejas/retraksi/nyeri tekan', kriteria_terkait: [] },
   { key: 'abdomen', label: 'Abdomen', sistem_tubuh: 'KEADAAN', contoh_normal: 'supel, bising usus (BU) normal', contoh_abnormal: 'distensi/nyeri tekan/BU abnormal (meningkat/menurun/tidak ada)', kriteria_terkait: [] },
   { key: 'ekstremitas', label: 'Ekstremitas (KEADAAN umum)', sistem_tubuh: 'KEADAAN', contoh_normal: 'tidak ada kelainan bentuk/gerak', contoh_abnormal: 'ada kelainan bentuk/gerak/kelemahan', kriteria_terkait: [] },
+  // Rincian pemeriksaan kepala dan abdomen. Hanya ditampilkan jika ada
+  // kutipan eksplisit; tidak ikut mengubah agregasi kegawatdaruratan K1-K5.
+  { key: 'konjungtiva_anemis', label: 'Konjungtiva anemis (CA)', sistem_tubuh: 'Kepala', contoh_normal: 'CA (-/-), tidak anemis', contoh_abnormal: 'CA (+/+), tampak anemis', kriteria_terkait: [] },
+  { key: 'nyeri_tekan_epigastrium', label: 'Nyeri tekan epigastrium', sistem_tubuh: 'Abdomen', contoh_normal: 'NT epigastrium (-)', contoh_abnormal: 'NT epigastrium (+)', kriteria_terkait: [] },
+  { key: 'bising_usus', label: 'Bising usus (BU)', sistem_tubuh: 'Abdomen', contoh_normal: 'BU (+), terdengar normal', contoh_abnormal: 'BU tidak ada/meningkat/menurun', kriteria_terkait: [] },
+  { key: 'timpani', label: 'Perkusi timpani', sistem_tubuh: 'Abdomen', contoh_normal: 'timpani fisiologis', contoh_abnormal: 'timpani patologis dengan distensi', kriteria_terkait: [] },
 ];
 
 // ===== Kelompok usia =====

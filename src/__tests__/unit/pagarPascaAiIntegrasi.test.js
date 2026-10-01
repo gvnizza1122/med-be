@@ -316,7 +316,10 @@ describe('isiKodeDariSaranTervalidasi (regresi)', () => {
       ai,
     );
     expect(ai.inacbg_result).not.toBeNull();
-    expect(ai.inacbg_result.code).toMatch(/^J-/);
+    // Rawat jalan memakai kode ambulatori bertarif tunggal (dulu J-4-16-II
+    // rawat inap, tarifnya null karena kelas rawat kosong).
+    expect(ai.inacbg_result.code).toBe('Q-5-26-0');
+    expect(ai.tariff_result.amount).toBeGreaterThan(0);
     const tulisAiReview = db.tulis.filter(t => /SET ai_review/.test(t.sql));
     expect(tulisAiReview.some(t => JSON.parse(t.a[0]).inacbg_result)).toBe(true);
   });

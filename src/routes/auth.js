@@ -25,8 +25,8 @@ router.post('/login', async (req, res) => {
     // Select hanya kolom yang diperlukan untuk login (bukan SELECT *)
     // Ini reduce network transfer dan potential index scan optimization
     const user = await db.prepare(
-      'SELECT id, email, password_hash, is_active, role, hospital_code FROM users WHERE email = ?'
-    ).get(username);
+      'SELECT id, email, username, password_hash, full_name, is_active, role, hospital_code FROM users WHERE username = ? OR email = ?'
+    ).get(username, username);
 
     if (!user) {
       return res.status(401).json({ error: 'Username atau password salah.' });

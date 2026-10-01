@@ -158,3 +158,22 @@ describe('injeksi obat — kasus SUMIDAH', () => {
     expect(t).toEqual([]);
   });
 });
+
+// Berkas 0170R0110826V000019 (poli THT, H61.2): kolom Tindakan resume berisi
+// "ekstraksi serumen" dan dulu tidak terbaca sama sekali.
+describe('ekstraksi serumen', () => {
+  test('dari posisi kolom Tindakan resume -> 96.52', () => {
+    const halaman = [{
+      page_number: 2,
+      ocr_text: 'RESUME MEDIS RAWAT JALAN\nA Diagnosa H61.2 - Impacted cerumen\nTindakan\nP Rencana -',
+      nilai_label: { Tindakan: 'ekstraksi serumen' },
+    }];
+    const t = bacaTemuanTindakan(halaman);
+    expect(t.map(x => [x.id, x.kode_usulan])).toEqual([['ekstraksi_serumen', '96.52']]);
+    expect(t[0].bukti[0]).toMatchObject({ page_number: 2, sumber: 'resume_medis' });
+  });
+
+  test('diagnosis "impacted serumen" bukan tindakan', () => {
+    expect(bacaTemuanTindakan([hal(2, 'RESUME MEDIS\nDiagnosa impacted serumen\nTindakan\n-')])).toEqual([]);
+  });
+});

@@ -48,7 +48,7 @@ const { evaluateDiagnosisConsistency } = require('./diagnosisConsistencyService'
 const { classifyPageDocumentType, hasIgdVisitSignal } = require('./pdfPageClassifier');
 const { evaluasiKombinasiKode } = require('./ketentuanKlaimService');
 const { groupCodesToInaCBG } = require('./inacbgGroupingService');
-const { getTarifResmi, lookupTarifInacbg } = require('./tarifInacbgLookup');
+const { getTarifResmi, lookupTarifInacbg, cocokJenisKlaim } = require('./tarifInacbgLookup');
 const { jalankanPagarAman, catatDitolakAwal, ALASAN_PAGAR } = require('./pagarPascaAiService');
 const { bacaTemuanPenunjang } = require('./temuanPenunjangService');
 const { bacaLabDariHalaman } = require('./bacaLabService');
@@ -772,12 +772,12 @@ yang tercetak, tapi tata letak bisa sedikit beda antar dokumen):
 - "KESADARAN PASIEN / GCS" — rincian Buka mata (E)/Respon Verbal (V)/Respon Motorik (M), baris "Hasil"
 - "Skala Nyeri" — VAS/NRS 0-10
 - "PSIKOSOSIAL/SPIRITUAL" (termasuk baris SIRS/Suicidal Intention Rating Scale kalau ada)
-- Pemeriksaan fisik (ronkhi, wheezing, SDV, retraksi, sianosis, akral, CRT, edema, bunyi jantung,
-  deformitas/luka) bisa tersebar di beberapa bagian (KEADAAN UMUM, PRIMARY SURVEY, pemeriksaan fisik
-  tambahan) — cari di semua bagian, jangan cuma satu section.
+- Pemeriksaan fisik (konjungtiva anemis, sianosis, ronkhi, wheezing, S1/S2, nyeri tekan epigastrium,
+  bising usus, timpani, akral, edema, serta parameter lain di bawah) bisa tersebar di KEADAAN UMUM,
+  PRIMARY SURVEY, dan pemeriksaan fisik tambahan — cari di semua bagian, jangan cuma satu section.
 Kalau dokumen tidak memakai label section persis seperti di atas, tetap cari data setara secara maknanya.
 
-=== BAGIAN 1: EKSTRAK 16 PARAMETER PEMERIKSAAN FISIK ===
+=== BAGIAN 1: EKSTRAK 20 PARAMETER PEMERIKSAAN FISIK ===
 CATATAN NOTASI & SINGKATAN (baca ini dulu sebelum ekstraksi Bagian 1 -- dokumen RS ini sering pakai notasi
 singkat, bukan kalimat lengkap):
 - Notasi tanda: "+" = ada/positif, "-" atau "−" = tidak ada/negatif. Untuk pasangan sisi kanan/kiri: "+/+" =
@@ -798,9 +798,9 @@ singkat, bukan kalimat lengkap):
   mis. "pulmo ronchi +/+ whezing +/+") -- WAJIB utamakan kutipan dari PEMERIKSAAN FISIK, JANGAN dari Keluhan,
   karena itu bukti objektif dokter bukan laporan subjektif orang tua/pasien. Baca SELURUH bagian Pemeriksaan
   Fisik dulu sebelum menyerah dan memakai kutipan dari Keluhan untuk parameter yang sama.
-- Field "CA" (conjunctiva anemis) dan "SI" (sklera ikterik) bisa muncul di teks pemeriksaan mata -- keduanya
-  BUKAN salah satu dari 16 parameter di bawah, JANGAN dipetakan ke parameter manapun. Khusus "SI": dalam
-  konteks pemeriksaan fisik/mata ini artinya sklera ikterik, BUKAN field "SI" INA-CBG/tarif -- jangan tertukar.
+- Field "CA" (conjunctiva/konjungtiva anemis) adalah parameter konjungtiva_anemis di bawah.
+  "SI" dalam pemeriksaan mata berarti sklera ikterik, BUKAN field "SI" INA-CBG/tarif; jangan tertukar
+  atau petakan "SI" ke konjungtiva_anemis.
 
 Untuk TIAP parameter di bawah: cari DULU di teks TRIASE IGD. Kalau TIDAK disebutkan di Triase IGD SAMA
 SEKALI DAN teks Resume Medis Rawat Inap TERSEDIA (lihat header di atas), boleh cari di sana juga sebagai
@@ -823,7 +823,9 @@ disebutkan sama sekali di KEDUA sumber, JANGAN mengarang — laporkan "ditemukan
 - akral: normal="hangat, kering", abnormal="dingin, basah, pucat"
 - crt (capillary refill time): normal="<2 detik", abnormal=">=2 detik"
 - edema (edema ekstremitas): normal="tidak ada/(-/-/-/-)", abnormal="ada, derajat/pitting"
-- bunyi_jantung (bunyi jantung tambahan): normal="reguler, tanpa murmur", abnormal="gallop/murmur"
+- bunyi_jantung (bunyi jantung S1/S2 dan irama): normal="S1 S2 reguler, tanpa murmur", abnormal="irama
+  tidak reguler, gallop, atau murmur". "S1 S2 reguler" yang tertulis eksplisit tetap ditemukan=true,
+  status=normal; jangan menunggu temuan bunyi tambahan.
 - kesadaran_kualitatif: normal="compos mentis", abnormal="somnolen/sopor/koma/delirium"
 - deformitas_luka: normal="tidak ada", abnormal="ada, deskripsi luka/cedera"
 - kepala (kepala/wajah, TERMASUK mukosa mulut/bibir/konjungtiva -- dipakai kalau dokumen menyebut kondisi
@@ -839,6 +841,14 @@ disebutkan sama sekali di KEDUA sumber, JANGAN mengarang — laporkan "ditemukan
 - ekstremitas (KEADAAN umum ekstremitas -- BEDA dari parameter "edema" & "akral" & "crt" di atas yang lebih
   spesifik; ekstremitas di sini rangkuman umum bentuk/gerak, BOLEH tumpang tindih narasi): normal="tidak ada
   kelainan bentuk/gerak", abnormal="ada kelainan bentuk/gerak/kelemahan"
+- konjungtiva_anemis (CA pada pemeriksaan mata/kepala): normal="CA (-/-), konjungtiva tidak anemis",
+  abnormal="CA (+/+), konjungtiva anemis". Jangan simpulkan dari kadar Hb saja; perlu temuan pemeriksaan fisik.
+- nyeri_tekan_epigastrium (NT epigastrik/epigastrium): normal="NT epigastrium (-)", abnormal="NT epigastrium
+  (+)". Jangan simpulkan dari keluhan nyeri ulu hati saja; perlu temuan nyeri tekan saat pemeriksaan.
+- bising_usus (BU): normal="BU (+) atau terdengar normal", abnormal="BU tidak ada, meningkat, atau menurun".
+  BU (+) berarti bunyi terdengar, BUKAN temuan patologis.
+- timpani (perkusi abdomen): normal="timpani fisiologis", abnormal="timpani dinyatakan patologis atau disertai
+  distensi yang jelas". Jangan menilai timpani tunggal sebagai abnormal tanpa konteks patologis.
 Untuk 5 parameter baru ini (kepala/leher/thorak/abdomen/ekstremitas), cari juga di baris "PRIMARY SURVEY"
 (Airway/Breathing/Circulation/Disability/Exposure) kalau tabel "KEADAAN" tidak ada -- mis. "Exposure: Clear"
 tanpa rincian lebih lanjut TETAP boleh dipetakan sebagai status normal untuk parameter yang relevan HANYA
@@ -905,7 +915,7 @@ ATURAN ANTI-HALUSINASI (WAJIB untuk SEMUA field kutipan di KEEMPAT bagian):
 - Kalau parameter/nilai TIDAK ditemukan sama sekali, laporkan "ditemukan":false (Bagian 1) atau "nilai":null
   (Bagian 2) — JANGAN diam-diam hilangkan field itu dari output, dan JANGAN mengarang supaya "lengkap".
 
-Output HANYA JSON, tanpa markdown/penjelasan, PERSIS struktur ini (parameter_findings WAJIB 16 entri, key
+Output HANYA JSON, tanpa markdown/penjelasan, PERSIS struktur ini (parameter_findings WAJIB 20 entri, key
 harus persis seperti di atas; vital_findings WAJIB 8 key seperti di atas):
 {
   "parameter_findings": [
@@ -1809,10 +1819,10 @@ function hitungInacbgDanTarif(diagnosisCodes, procedureCodes, jenisKlaim, kelasR
 
   if (aiSuggestedInacbg && typeof aiSuggestedInacbg === 'string') {
     const aiSuggestedCode = aiSuggestedInacbg.trim().toUpperCase();
-    if (lookupTarifInacbg(aiSuggestedCode)) {
+    if (lookupTarifInacbg(aiSuggestedCode) && cocokJenisKlaim(aiSuggestedCode, jenisKlaim)) {
       inacbgCodeForLookup = aiSuggestedCode;
     } else {
-      console.warn(`[AI-REVIEW] AI suggested_inacbg "${aiSuggestedCode}" tidak ditemukan di tabel PMK 3/2023 (Regional 1 Kelas D Swasta) -- diabaikan, fallback ke grouping service.`);
+      console.warn(`[AI-REVIEW] AI suggested_inacbg "${aiSuggestedCode}" tidak ditemukan di tabel PMK 3/2023 (Regional 1 Kelas D Swasta) atau tidak sesuai jenis klaim -- diabaikan, fallback ke grouping service.`);
       if (inacbgGrouping) inacbgCodeForLookup = inacbgGrouping.code;
     }
   } else if (inacbgGrouping) {
@@ -2485,10 +2495,10 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
       // heuristik alih-alih menggagalkan seluruh pipeline.
       if (aiResult.suggested_inacbg && typeof aiResult.suggested_inacbg === 'string') {
         const aiSuggestedCode = aiResult.suggested_inacbg.trim().toUpperCase();
-        if (lookupTarifInacbg(aiSuggestedCode)) {
+        if (lookupTarifInacbg(aiSuggestedCode) && cocokJenisKlaim(aiSuggestedCode, jenisKlaimRecord)) {
           inacbgCodeForLookup = aiSuggestedCode;
         } else {
-          console.warn(`[AI-REVIEW] AI suggested_inacbg "${aiSuggestedCode}" tidak ditemukan di tabel PMK 3/2023 (Regional 1 Kelas D Swasta) -- diabaikan, fallback ke grouping service.`);
+          console.warn(`[AI-REVIEW] AI suggested_inacbg "${aiSuggestedCode}" tidak ditemukan di tabel PMK 3/2023 (Regional 1 Kelas D Swasta) atau tidak sesuai jenis klaim -- diabaikan, fallback ke grouping service.`);
           if (inacbgGrouping) {
             inacbgCodeForLookup = inacbgGrouping.code;
           }

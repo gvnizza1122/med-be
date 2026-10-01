@@ -167,5 +167,22 @@ function validateTarifDiscrepancy(kodeInacbg, kelasRawat, tarifKlaim) {
   };
 }
 
-module.exports = { lookupTarifInacbg, getTarifResmi, validateTarifDiscrepancy, TARIF_MAP };
+/**
+ * Apakah kode INA-CBG cocok dengan jenis klaim. Kode rawat jalan/day-care
+ * hanya bertarif tunggal di kolom kelasD; kode rawat inap bertarif per kelas
+ * kamar (kelasA/B/C). Dipakai untuk menolak usulan AI yang ada di tabel
+ * tetapi salah jenis layanan -- ditemukan pada klaim rawat jalan EIFFELIN
+ * (R06.0;J45.3) yang diberi J-4-13-I "Trauma Dada" Rp3.276.500.
+ * Jenis klaim tidak dikenal -> tidak dinilai (true).
+ */
+function cocokJenisKlaim(kodeInacbg, jenisKlaim) {
+  const row = lookupTarifInacbg(kodeInacbg);
+  if (!row) return false;
+  const rawatJalan = row.kelasD != null;
+  if (jenisKlaim === 'RAWAT_JALAN') return rawatJalan;
+  if (jenisKlaim === 'RAWAT_INAP') return row.kelasA != null || row.kelasB != null || row.kelasC != null;
+  return true;
+}
+
+module.exports = { lookupTarifInacbg, getTarifResmi, validateTarifDiscrepancy, cocokJenisKlaim, TARIF_MAP };
 

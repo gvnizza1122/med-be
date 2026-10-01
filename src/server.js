@@ -11,15 +11,20 @@ const dashboardRoutes = require('./routes/dashboard');
 const validationRulesRoutes = require('./routes/validationRules');
 const simrsRoutes = require('./routes/simrs');
 const tarifInacbgRoutes = require('./routes/tarifInacbg');
+const codeDescriptionRoutes = require('./routes/codeDescriptions');
 const { redisClient } = require('./config/queue');
 
 const app = express();
+const corsOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 
 // Middleware
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+  origin: corsOrigins,
   credentials: true,
 }));
 
@@ -44,6 +49,7 @@ app.use('/api/v1/validation-rules', validationRulesRoutes);
 app.use('/api/v1/records', validationRulesRoutes.recordsRouter);
 app.use('/api/v1/simrs', simrsRoutes);
 app.use('/api/v1/tarif', tarifInacbgRoutes);
+app.use('/api/v1/code-descriptions', codeDescriptionRoutes);
 
 // Error handling
 app.use((error, req, res, next) => {

@@ -273,7 +273,7 @@ describe('generateAiReview — dengan AI dikonfigurasi (fetch dimock)', () => {
     expect(result.inacbg_result.reasoning).toContain('Pemetaan dari diagnosis utama');
   });
 
-  test('AI suggested_inacbg tidak valid & kode fallback juga tidak ada di manapun → tariff_result null (bukan angka fiktif)', async () => {
+  test('AI suggested_inacbg tidak valid & grouping tidak punya pemetaan resmi → tanpa kode & tanpa tarif (bukan angka fiktif)', async () => {
     mockFetchOk({
       field_notes: {},
       code_evidence: [],
@@ -281,24 +281,21 @@ describe('generateAiReview — dengan AI dikonfigurasi (fetch dimock)', () => {
       suggested_inacbg: 'ZZ-9-99-XYZ-HALU',
     });
 
-    // Diagnosis prefix 'Z' (faktor yang memengaruhi status kesehatan) --
-    // grouping heuristik akan memetakan ke 'Z-4-21-I', kode yang diverifikasi
-    // TIDAK ada di tabel resmi PMK 3/2023 maupun kamus fallback 13-entri.
-    const evidencePool = [{ page_number: 1, ocr_text: 'Diagnosa: perawatan paliatif', confidence: 100 }];
+    // Diagnosis perinatal (P07) -- grup neonatal INA-CBG tidak dipetakan
+    // heuristik grouping, dan grouping tidak lagi mengarang kode yang tidak
+    // ada di tabel PMK 3/2023 (dulu: 'Z-4-21-I' dkk.).
+    const evidencePool = [{ page_number: 1, ocr_text: 'Diagnosa: BBLR', confidence: 100 }];
 
     const result = await generateAiReview(
-      { sep: 'ABC', DIAGLIST: 'Z515', PROCLIST: '', KELAS_RAWAT: '3', JENIS_KLAIM: 'RAWAT_INAP' },
+      { sep: 'ABC', DIAGLIST: 'P07.3', PROCLIST: '', KELAS_RAWAT: '3', JENIS_KLAIM: 'RAWAT_INAP' },
       [],
       evidencePool
     );
 
     expect(result).not.toBeNull();
-    expect(result.inacbg_result).not.toBeNull();
-    expect(result.inacbg_result.code).toBe('Z-4-21-I');
-    expect(result.inacbg_result.source).toBe('GENERATED');
-    // Tidak boleh ada tarif fiktif yang ditempelkan
+    expect(result.inacbg_result).toBeNull();
     expect(result.tariff_result).toBeNull();
-    expect(result.suggested_tarif).toBeNull();
+    expect(result.suggested_inacbg).not.toBe('ZZ-9-99-XYZ-HALU');
   });
 
   // Fix 19 Sep 2026: kode day-care/RJTL (mis. B-2-12-0) di tabel PMK 3/2023
