@@ -269,7 +269,7 @@ function jelaskan(t, periodeList, indeks) {
 async function muatIndeksKlaim(db) {
   const rows = await db.prepare(`
     SELECT id, sep, CASE WHEN sep IS NULL OR TRIM(sep) = '' THEN raw_data ELSE NULL END AS raw_data
-    FROM claim_records
+    FROM claim_records WHERE file_id IN (SELECT id FROM claim_files WHERE is_testing = FALSE)
   `).all();
   return bangunIndeksKlaim(rows);
 }

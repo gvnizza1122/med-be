@@ -17,6 +17,52 @@ router.use((req, res, next) => {
   next();
 });
 
+router.post('/upload', (req, res, next) => {
+  require('./claimFiles').pdfUpload.single('file')(req, res, err => {
+    if (err) return res.status(400).json({ error: err.code === 'LIMIT_FILE_SIZE' ? 'Ukuran PDF maksimal 20 MB.' : 'Pilih berkas PDF yang valid.' });
+    next();
+  });
+}, async (req, res) => {
+  let started = false;
+  try {
+    if (!req.file) return res.status(400).json({ error: 'Pilih PDF klaim untuk diuji.' });
+    if (!['RAWAT_JALAN','RAWAT_INAP'].includes(req.body.jenis_klaim))
+      return res.status(400).json({ error: 'Pilih rawat jalan atau rawat inap.' });
+    const label = validasiInput({ ...req.body, reason_match: 'belum_dinilai' });
+    if (!['pending','diterima'].includes(label.actual_result))
+      return res.status(400).json({ error: 'Pilih hasil yang sudah diketahui: ACC atau pending.' });
+    const db = getDb();
+    const storage = await aksesPenyimpanan(db);
+    if (!storage.write || !storage.read) return res.status(503).json({ error: 'Penyimpanan testing belum tersedia.' });
+    started = true;
+    // Ground truth never enters extraction/review options or model messages.
+    const result = await require('./claimFiles').processSinglePdfUpload(db, {
+      filePath: req.file.path, originalName: req.file.originalname,
+      jenisKlaim: req.body.jenis_klaim, userId: req.user.id,
+      hospitalCode: req.user.hospital_code, isTesting: true,
+    });
+    if (!result.success) return res.status(422).json({ error: result.error });
+    try {
+      const record = await db.get('SELECT * FROM claim_records WHERE id = ?', [result.record_id]);
+      const errors = await db.all('SELECT * FROM validation_errors WHERE record_id = ?', [result.record_id]);
+      const snapshot = prediksi(record, errors);
+      await db.run(`INSERT INTO testing_pending(record_id,hospital_code,prediction,prediction_snapshot,
+        actual_result,reference_source,actual_reason,reason_match,notes,updated_by) VALUES (?,?,?,?,?,?,?,?,?,?)`,
+        [record.id, req.user.hospital_code, snapshot.status, JSON.stringify(snapshot), label.actual_result,
+          label.reference_source, label.actual_reason || '', 'belum_dinilai', label.notes || '', req.user.id]);
+      res.json({ success: true, file_id: result.file_id, record_id: result.record_id, prediction: snapshot, label_saved: true });
+    } catch (err) {
+      console.error('[TestingPending] label upload gagal:', err.message);
+      res.json({ success: true, file_id: result.file_id, record_id: result.record_id, label_saved: false,
+        warning: 'PDF sudah dianalisis. Simpan hasil acuan melalui Edit penilaian di Testing Pending.' });
+    }
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.status ? err.message : 'Upload testing belum berhasil. Periksa daftar testing sebelum mencoba ulang.' });
+  } finally {
+    if (!started && req.file?.path) require('fs').promises.unlink(req.file.path).catch(() => {});
+  }
+});
+
 router.get('/', async (req, res) => {
   try {
     const { jenis_klaim = 'RAWAT_JALAN', search = '' } = req.query;
@@ -28,7 +74,7 @@ router.get('/', async (req, res) => {
     const db = getDb();
     const storage = await aksesPenyimpanan(db);
     const params = [req.user.hospital_code, jenis_klaim, `%${search}%`, `%${search}%`];
-    const where = `WHERE cf.hospital_code = ? AND COALESCE(cr.jenis_klaim,cf.jenis_klaim) = ?
+    const where = `WHERE cf.is_testing = TRUE AND cf.hospital_code = ? AND COALESCE(cr.jenis_klaim,cf.jenis_klaim) = ?
       AND (COALESCE(cr.nama_pasien,'') ILIKE ? OR COALESCE(cr.sep,'') ILIKE ?)
       ${includeArchived ? '' : 'AND cf.diarsipkan_pada IS NULL'}`;
     const join = 'FROM claim_records cr JOIN claim_files cf ON cf.id = cr.file_id';
@@ -43,7 +89,7 @@ router.get('/', async (req, res) => {
       db.get(`SELECT COUNT(*) AS total ${join} ${where}`, params),
       storage.read ? db.all(`SELECT t.prediction, t.actual_result, t.reference_source, t.reason_match
         FROM testing_pending t JOIN claim_records cr ON cr.id=t.record_id JOIN claim_files cf ON cf.id=cr.file_id
-        WHERE t.hospital_code = ? AND cf.hospital_code = ? AND COALESCE(cr.jenis_klaim,cf.jenis_klaim) = ?
+        WHERE cf.is_testing = TRUE AND t.hospital_code = ? AND cf.hospital_code = ? AND COALESCE(cr.jenis_klaim,cf.jenis_klaim) = ?
         ${includeArchived ? '' : 'AND cf.diarsipkan_pada IS NULL'}`,
       [req.user.hospital_code, req.user.hospital_code, jenis_klaim]) : Promise.resolve([]),
     ]);
@@ -75,7 +121,7 @@ router.put('/:recordId', async (req, res) => {
     const storage = await aksesPenyimpanan(db);
     if (!storage.read || !storage.write) return res.status(503).json({ error: 'Penyimpanan penilaian testing belum diaktifkan oleh administrator.' });
     const record = await db.get(`SELECT cr.* FROM claim_records cr JOIN claim_files cf ON cf.id=cr.file_id
-      WHERE cr.id = ? AND cf.hospital_code = ?`, [req.params.recordId, req.user.hospital_code]);
+      WHERE cr.id = ? AND cf.is_testing = TRUE AND cf.hospital_code = ?`, [req.params.recordId, req.user.hospital_code]);
     if (!record) return res.status(404).json({ error: 'Berkas tidak ditemukan.' });
     const errors = await db.all('SELECT * FROM validation_errors WHERE record_id = ?', [record.id]);
     const snapshot = prediksi(record, errors);

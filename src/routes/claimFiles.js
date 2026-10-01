@@ -34,6 +34,21 @@ const { susunSaranKoding } = require('../services/saranKodingService');
 const { perbaruiRisikoTampilan } = require('../services/risikoKlaimTampilanService');
 
 const router = express.Router();
+router.use(async (req, res, next) => {
+  if (!['POST','PUT','PATCH'].includes(req.method)) return next();
+  const ids = req.path.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/ig) || [];
+  if (typeof req.body?.file_id === 'string') ids.push(req.body.file_id);
+  if (!ids.length) return next();
+  try {
+    for (const id of ids) {
+      const test = await getDb().get(`SELECT cf.id FROM claim_files cf
+        WHERE cf.is_testing = TRUE AND (cf.id = ? OR cf.id IN (SELECT file_id FROM claim_records WHERE id = ?))`, [id,id]);
+      if (test) return res.status(409).json({ error: 'Berkas testing hanya untuk pengujian. Ubah hasil acuan melalui Testing Pending.' });
+    }
+    next();
+  } catch (err) { next(err); }
+});
+
 
 // UI uses the same age-specific reference as lookupBand, including existing records.
 router.get('/reference/vital-ranges', authenticate, (req, res) => {
@@ -538,6 +553,7 @@ router.get('/kelompok', authenticate, async (req, res) => {
     const { arsip, jenis_klaim } = req.query;
 
     let where = arsip === '1' ? 'WHERE cf.diarsipkan_pada IS NOT NULL' : 'WHERE cf.diarsipkan_pada IS NULL';
+    where += ' AND cf.is_testing = FALSE';
     const params = [];
     if (jenis_klaim) { where += ' AND cf.jenis_klaim = ?'; params.push(jenis_klaim); }
 
@@ -579,7 +595,7 @@ router.get('/', authenticate, async (req, res) => {
     const { page = 1, limit = 20, status, jenis_klaim, from_date, to_date, search, arsip, periode, tampilan } = req.query;
     const offset = (parseInt(page) - 1) * parseInt(limit);
 
-    let where = 'WHERE 1=1';
+    let where = 'WHERE cf.is_testing = FALSE';
     const params = [];
 
     // Berkas terarsip disembunyikan dari daftar aktif secara bawaan — itulah
@@ -1010,7 +1026,7 @@ router.get('/export/daftar-kerja', authenticate, authorize('admin', 'verifikator
     const db = getDb();
     const { periode, kategori, from_date, to_date, search, arsip } = req.query;
 
-    const syarat = ["cr.validation_status <> 'valid'"];
+    const syarat = ["cr.validation_status <> 'valid'", "cf.is_testing = FALSE"];
     // Klaim yang berkasnya sudah diarsipkan tidak muncul di lembar kerja
     // harian — kalau ikut, koder akan mengerjakan ulang yang sudah sengaja
     // disingkirkan.
@@ -1075,7 +1091,7 @@ router.get('/export/siap-submit', authenticate, authorize('admin', 'verifikator'
   try {
     const db = getDb();
     const { periode, kategori, from_date, to_date, search, arsip } = req.query;
-    const where = ["cr.validation_status = 'valid'", 'cf.pending_count = 0', 'cf.error_count = 0'];
+    const where = ["cr.validation_status = 'valid'", 'cf.pending_count = 0', 'cf.error_count = 0', 'cf.is_testing = FALSE'];
     const params = [];
     where.push(arsip === '1' ? 'cf.diarsipkan_pada IS NOT NULL' : 'cf.diarsipkan_pada IS NULL');
     if (periode) {
@@ -1676,7 +1692,7 @@ async function detectAndFlagInternalEpisodes(db, { hospitalCode, nokartu, admiss
              cr.prosedur_list, cr.dpjp_name, cr.tarif_rs, cr.jenis_klaim
       FROM claim_records cr
       JOIN claim_files cf ON cf.id = cr.file_id
-      WHERE cr.nokartu = ? AND cr.admission_date = ? AND cf.hospital_code = ?
+      WHERE cr.nokartu = ? AND cr.admission_date = ? AND cf.hospital_code = ? AND cf.is_testing = FALSE
     `).all(nokartu, admissionDate, hospitalCode || '3371084');
 
     if (!siblings || siblings.length < 2) return; // cuma 1 kunjungan, tidak ada yang perlu digabung
@@ -1757,7 +1773,7 @@ async function autofillFromMrn(db, { hospitalCode, extractedData, jenisKlaim }) 
       SELECT cr.nokartu, cr.nama_pasien, cr.kelas_rawat, cr.birth_date, cr.gender
       FROM claim_records cr
       JOIN claim_files cf ON cf.id = cr.file_id
-      WHERE cr.mrn = ? AND cf.hospital_code = ?
+      WHERE cr.mrn = ? AND cf.hospital_code = ? AND cf.is_testing = FALSE
       ORDER BY cr.admission_date DESC
       LIMIT 1
     `).get(extractedData.MRN, hospitalCode || '3371084');
@@ -1857,7 +1873,7 @@ async function detectAndFlagPRB(db, { hospitalCode, mrn, nokartu, admissionDate,
       SELECT cr.id, cr.admission_date, cr.diagnosa_list, cr.flag_rujuk_balik_prb
       FROM claim_records cr
       JOIN claim_files cf ON cf.id = cr.file_id
-      WHERE cr.nokartu = ? AND cf.hospital_code = ?
+      WHERE cr.nokartu = ? AND cf.hospital_code = ? AND cf.is_testing = FALSE
     `).all(nokartu, hospitalCode || '3371084');
 
     // Cuma record dengan kategori PRB yang SAMA, dikelompokkan per periode_bulan.
@@ -2407,7 +2423,7 @@ async function findExistingRecordBySep(db, { hospitalCode, sep }) {
     SELECT cr.jenis_klaim, cr.created_at, cf.file_name
     FROM claim_records cr
     JOIN claim_files cf ON cf.id = cr.file_id
-    WHERE cr.sep = ? AND cf.hospital_code = ?
+    WHERE cr.sep = ? AND cf.hospital_code = ? AND cf.is_testing = FALSE
     ORDER BY cr.created_at ASC
     LIMIT 1
   `).get(sep, hospitalCode || '3371084');
@@ -2419,10 +2435,10 @@ function processSinglePdfUpload(db, options) {
     () => processSinglePdfUploadDenganKonteks(db, options));
 }
 
-async function processSinglePdfUploadDenganKonteks(db, { filePath, originalName, jenisKlaim: fixedJenisKlaim, allowedJenisKlaim, userId, hospitalCode }) {
+async function processSinglePdfUploadDenganKonteks(db, { filePath, originalName, jenisKlaim: fixedJenisKlaim, allowedJenisKlaim, userId, hospitalCode, isTesting = false }) {
   try {
     const { extractFromPDF } = require('../services/pdfExtractionPipeline');
-    const result = await extractFromPDF(filePath, { jenisKlaim: fixedJenisKlaim, allowedJenisKlaim, originalName });
+    const result = await extractFromPDF(filePath, { jenisKlaim: fixedJenisKlaim, allowedJenisKlaim, originalName: isTesting ? 'berkas-klaim.pdf' : originalName });
 
     if (!result.success) {
       // Detail teknis hanya untuk log server, tidak dikirim ke pengguna.
@@ -2464,7 +2480,7 @@ async function processSinglePdfUploadDenganKonteks(db, { filePath, originalName,
     //
     // KONSEKUENSI yang disadari: Riwayat Upload bisa memuat beberapa baris
     // dengan SEP sama, dan rekap yang menghitung per baris bisa terhitung ganda.
-    if (extractedData.SEP) {
+    if (!isTesting && extractedData.SEP) {
       try {
         const duplikat = await findExistingRecordBySep(db, { hospitalCode, sep: extractedData.SEP });
         if (duplikat) {
@@ -2497,7 +2513,7 @@ async function processSinglePdfUploadDenganKonteks(db, { filePath, originalName,
 
     // Isi field administratif yang kosong dari riwayat kunjungan MRN yang sama
     // (solusi sementara saat integrasi SIMRS bermasalah — lihat autofillFromMrn).
-    await autofillFromMrn(db, { hospitalCode, extractedData, jenisKlaim });
+    if (!isTesting) await autofillFromMrn(db, { hospitalCode, extractedData, jenisKlaim });
 
     // Convert vClaim format to database format for validation
     const dbRecord = vclaimToDbFormat(extractedData);
@@ -2523,14 +2539,14 @@ async function processSinglePdfUploadDenganKonteks(db, { filePath, originalName,
     // dan untuk jalur PDF (1 file = 1 record) nilainya langsung turunan dari
     // validationStatus record itu sendiri.
     await db.prepare(`
-      INSERT INTO claim_files (id, hospital_code, file_name, file_path, status, uploaded_by, total_records, valid_count, error_count, pending_count, description, jenis_klaim)
-      VALUES (?, ?, ?, ?, 'uploaded', ?, 1, ?, ?, ?, 'Extracted from PDF', ?)
+      INSERT INTO claim_files (id, hospital_code, file_name, file_path, status, uploaded_by, total_records, valid_count, error_count, pending_count, description, jenis_klaim, is_testing)
+      VALUES (?, ?, ?, ?, 'uploaded', ?, 1, ?, ?, ?, 'Extracted from PDF', ?, ?)
     `).run(
       fileId, hospitalCode || '3371084', originalName, resolvedFilePath, userId,
       validationStatus === 'valid' ? 1 : 0,
       validationStatus === 'error' ? 1 : 0,
       validationStatus === 'pending' ? 1 : 0,
-      jenisKlaim
+      jenisKlaim, isTesting
     );
 
     // Save extracted record with validation results using transaction
@@ -2580,26 +2596,28 @@ async function processSinglePdfUploadDenganKonteks(db, { filePath, originalName,
     // lain yang sudah ada di DB untuk NOKARTU+tanggal yang sama — lihat
     // dokumentasi lengkap di detectAndFlagInternalEpisodes(). Best-effort,
     // tidak menggagalkan upload kalau error.
-    await detectAndFlagInternalEpisodes(db, {
-      hospitalCode,
-      nokartu: extractedData.NOKARTU,
-      admissionDate: vclaimDateToISO(extractedData.ADMISSION_DATE),
-    });
+    if (!isTesting) {
+      await detectAndFlagInternalEpisodes(db, {
+        hospitalCode,
+        nokartu: extractedData.NOKARTU,
+        admissionDate: vclaimDateToISO(extractedData.ADMISSION_DATE),
+      });
 
-    // RV-15 (PRB) & RV-16 (iterasi obat kronis) — lihat dokumentasi lengkap
-    // di detectAndFlagPRB(). Best-effort, tidak menggagalkan upload.
-    await detectAndFlagPRB(db, {
-      hospitalCode,
-      mrn: extractedData.MRN,
-      nokartu: extractedData.NOKARTU,
-      admissionDate: vclaimDateToISO(extractedData.ADMISSION_DATE),
-      diagnosaList: extractedData.DIAGLIST,
-    });
+      // RV-15 (PRB) & RV-16 (iterasi obat kronis) — lihat dokumentasi lengkap
+      // di detectAndFlagPRB(). Best-effort, tidak menggagalkan upload.
+      await detectAndFlagPRB(db, {
+        hospitalCode,
+        mrn: extractedData.MRN,
+        nokartu: extractedData.NOKARTU,
+        admissionDate: vclaimDateToISO(extractedData.ADMISSION_DATE),
+        diagnosaList: extractedData.DIAGLIST,
+      });
 
-    // Sinkronkan ke Pending BPJS — kalau ada baris pending yang SEP-nya sama
-    // tapi tadinya "belum ditemukan" (diimpor sebelum klaim ini diupload),
-    // otomatis ke-link sekarang. Lihat bpjsPendingLink.js.
-    await linkPendingBpjsForSep(db, extractedData.SEP, recordId);
+      // Sinkronkan ke Pending BPJS — kalau ada baris pending yang SEP-nya sama
+      // tapi tadinya "belum ditemukan" (diimpor sebelum klaim ini diupload),
+      // otomatis ke-link sekarang. Lihat bpjsPendingLink.js.
+      await linkPendingBpjsForSep(db, extractedData.SEP, recordId);
+    }
 
     // Periode diisi di sini, setelah record tersimpan, supaya pengelompokan
     // dan arsip per bulan ikut terbentuk untuk berkas yang baru masuk.
@@ -2625,10 +2643,12 @@ async function processSinglePdfUploadDenganKonteks(db, { filePath, originalName,
         // Kode saran yang sudah terverifikasi kamus ICD-10 langsung mengisi
         // DIAGLIST/PROCLIST yang masih kosong -- koder tidak perlu mengetik
         // ulang. Best-effort: kegagalan di sini tidak menggagalkan review.
-        await isiKodeDariSaranTervalidasi(db, recordId, extractedData, aiReview).catch(errIsi =>
-          console.warn(`[AutoIsi] gagal untuk record ${recordId}: ${errIsi.message || errIsi}`));
-        recordKnowledge(db, aiReview.knowledge_updates).catch(kbErr =>
-          console.warn(`[upload-pdf] Gagal simpan knowledge base: ${kbErr.message}`));
+        if (!isTesting) {
+          await isiKodeDariSaranTervalidasi(db, recordId, extractedData, aiReview).catch(errIsi =>
+            console.warn(`[AutoIsi] gagal untuk record ${recordId}: ${errIsi.message || errIsi}`));
+          recordKnowledge(db, aiReview.knowledge_updates).catch(kbErr =>
+            console.warn(`[upload-pdf] Gagal simpan knowledge base: ${kbErr.message}`));
+        }
       }
     } catch (aiErr) {
       console.warn(`[upload-pdf] AI review gagal untuk record ${recordId}: ${aiErr.message}`);
@@ -3652,7 +3672,7 @@ router.post('/scan-episodes', authenticate, async (req, res) => {
       SELECT DISTINCT cr.nokartu, cr.mrn, cr.admission_date, cr.diagnosa_list
       FROM claim_records cr
       JOIN claim_files cf ON cf.id = cr.file_id
-      WHERE cf.hospital_code = ? AND cr.admission_date LIKE ? AND cr.nokartu IS NOT NULL
+      WHERE cf.hospital_code = ? AND cr.admission_date LIKE ? AND cf.is_testing = FALSE AND cr.nokartu IS NOT NULL
     `).all(req.user.hospital_code, `${isoPrefix}%`);
 
     let scanned = 0;
@@ -3697,3 +3717,6 @@ module.exports.vclaimDateToISO = vclaimDateToISO;
 module.exports.resolvePdfPath = resolvePdfPath;
 module.exports.RESOLVED_UPLOAD_DIR = RESOLVED_UPLOAD_DIR;
 module.exports.isiKodeDariSaranTervalidasi = isiKodeDariSaranTervalidasi;
+
+module.exports.processSinglePdfUpload = processSinglePdfUpload;
+module.exports.pdfUpload = pdfUpload;

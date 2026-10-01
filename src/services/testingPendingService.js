@@ -1,5 +1,6 @@
 const { perbaruiRisikoTampilan } = require('./risikoKlaimTampilanService');
-const SCHEMA = `CREATE TABLE IF NOT EXISTS testing_pending (
+const SCHEMA = `ALTER TABLE claim_files ADD COLUMN IF NOT EXISTS is_testing BOOLEAN NOT NULL DEFAULT FALSE;
+CREATE TABLE IF NOT EXISTS testing_pending (
   record_id TEXT PRIMARY KEY REFERENCES claim_records(id) ON DELETE CASCADE,
   hospital_code TEXT NOT NULL,
   prediction TEXT NOT NULL,

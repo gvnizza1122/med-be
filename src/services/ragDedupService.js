@@ -89,7 +89,7 @@ async function findClaimBySep(sep) {
   return db.prepare(
     `SELECT id, kode_rs, nama_pasien, mrn, diagnosa_list, prosedur_list, jenis_klaim
      FROM claim_records
-     WHERE sep = ? LIMIT 1`
+     WHERE sep = ? AND file_id IN (SELECT id FROM claim_files WHERE is_testing = FALSE) LIMIT 1`
   ).get(sep);
 }
 
