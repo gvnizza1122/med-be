@@ -8,3 +8,4 @@ uploads
 .git
 .gitignore
 .DS_Store
+ocr-paddle

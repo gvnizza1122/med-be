@@ -264,7 +264,62 @@ process.on('SIGINT', () => { shutdownOcrPool(); shutdownRenderPool(); });
  *   signature lama.
  * @returns {Promise<OCRResult>}
  */
+// PaddleOCR (container ocr_paddle, lihat ocr-paddle/app.py) dipakai bila
+// OCR_ENGINE=paddle. Pada uji berkas EIFFELIN keyakinannya ~97-99% vs
+// Tesseract 56-85%, dan tabel tanda vital terbaca utuh ("33 KG ... 163 Kali
+// 32 Kali 36.2") yang di Tesseract rusak ("3k6", "163kKali"). Gagal/timeout
+// -> jatuh ke Tesseract untuk halaman itu, upload tidak pernah gagal karena
+// layanan Paddle mati.
+const PADDLE_OCR_URL = process.env.PADDLE_OCR_URL || 'http://ocr_paddle:8866';
+const PADDLE_OCR_TIMEOUT_MS = Number(process.env.PADDLE_OCR_TIMEOUT_MS || 60000);
+
+function pakaiPaddle() {
+  return (process.env.OCR_ENGINE || 'tesseract').toLowerCase() === 'paddle';
+}
+
+async function ocrDenganPaddle(input) {
+  const startTime = Date.now();
+  const body = Buffer.isBuffer(input) ? input : fs.readFileSync(input);
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), PADDLE_OCR_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${PADDLE_OCR_URL}/ocr`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/octet-stream' },
+      body,
+      signal: ac.signal,
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 160)}`);
+    const data = await res.json();
+    const lines = Array.isArray(data.lines) ? data.lines : [];
+    return {
+      success: true,
+      engine: 'paddle',
+      text: data.text || '',
+      confidence: Math.round(Number(data.confidence || 0) * 100) / 100,
+      block_count: lines.length,
+      duration_ms: Date.now() - startTime,
+      blocks: lines.map(l => ({
+        text: l.text,
+        confidence: l.confidence,
+        bounds: Array.isArray(l.bbox) ? { x0: l.bbox[0], y0: l.bbox[1], x1: l.bbox[2], y1: l.bbox[3] } : {},
+      })),
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function ocrSingleFile(input, language = OCR_CONFIG.language) {
+  if (pakaiPaddle()) {
+    try {
+      return await ocrDenganPaddle(input);
+    } catch (err) {
+      const msg = err.name === 'AbortError' ? `timeout ${PADDLE_OCR_TIMEOUT_MS}ms` : err.message;
+      console.warn(`[OCR] PaddleOCR gagal (${msg}) -- halaman ini dibaca Tesseract.`);
+    }
+  }
+
   if (!Tesseract) {
     throw new Error('[OCR] tesseract.js not available. Install with: npm install tesseract.js');
   }
