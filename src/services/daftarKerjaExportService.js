@@ -238,6 +238,9 @@ function namaBerkasDaftarKerja(cakupan = {}) {
   const bagian = ['daftar-kerja'];
   if (cakupan.periode) bagian.push(cakupan.periode);
   if (cakupan.kategori) bagian.push(String(cakupan.kategori).toLowerCase().replace(/_/g, '-'));
+  if (cakupan.from_date || cakupan.to_date) bagian.push(`${cakupan.from_date || 'awal'}-${cakupan.to_date || 'akhir'}`);
+  if (cakupan.search) bagian.push('hasil-pencarian');
+  if (cakupan.arsip) bagian.push('arsip');
   return bagian.join('_') + '.xlsx';
 }
 

@@ -9,6 +9,7 @@ const { parseClaimFile, normalizeColumnName } = require('../services/fileParser'
 const { validateRecord, determineStatus } = require('../services/ruleEngine');
 const { generateExcel } = require('../services/exportService');
 const { buatDaftarKerja, namaBerkasDaftarKerja } = require('../services/daftarKerjaExportService');
+const { buatSiapSubmit, namaBerkasSiapSubmit } = require('../services/siapSubmitExportService');
 const { logAudit } = require('../services/auditService');
 const { estimatePromptTokens, estimateCompletionTokens } = require('../services/aiValidationService');
 const { generateAiReview, hitungInacbgDanTarif } = require('../services/aiReviewService');
@@ -983,16 +984,22 @@ router.post('/:id/approve', authenticate, authorize('supervisor', 'admin'), asyn
 router.get('/export/daftar-kerja', authenticate, async (req, res) => {
   try {
     const db = getDb();
-    const { periode, kategori } = req.query;
+    const { periode, kategori, from_date, to_date, search, arsip } = req.query;
 
     const syarat = ["cr.validation_status <> 'valid'"];
     // Klaim yang berkasnya sudah diarsipkan tidak muncul di lembar kerja
     // harian — kalau ikut, koder akan mengerjakan ulang yang sudah sengaja
     // disingkirkan.
-    syarat.push('cf.diarsipkan_pada IS NULL');
+    syarat.push(arsip === '1' ? 'cf.diarsipkan_pada IS NOT NULL' : 'cf.diarsipkan_pada IS NULL');
     const nilai = [];
     if (periode) { syarat.push('cr.periode = ?'); nilai.push(periode); }
     if (kategori) { syarat.push('cr.jenis_klaim = ?'); nilai.push(kategori); }
+    if (from_date) { syarat.push('cf.created_at >= ?'); nilai.push(from_date); }
+    if (to_date) { syarat.push('cf.created_at <= ?'); nilai.push(to_date + 'T23:59:59'); }
+    if (search) {
+      syarat.push('(cr.nama_pasien LIKE ? OR cr.sep LIKE ?)');
+      nilai.push(`%${search}%`, `%${search}%`);
+    }
 
     const records = await db.prepare(
       'SELECT cr.* FROM claim_records cr JOIN claim_files cf ON cf.id = cr.file_id WHERE ' + syarat.join(' AND ') +
@@ -1008,6 +1015,12 @@ router.get('/export/daftar-kerja', authenticate, async (req, res) => {
     const cakupan = {
       periode: periode || null,
       kategori: kategori || null,
+      filter: [
+        'Klaim berstatus perlu dikerjakan',
+        search ? 'hasil pencarian' : null,
+        from_date || to_date ? `tanggal upload ${from_date || 'awal'}—${to_date || 'akhir'}` : null,
+        arsip === '1' ? 'arsip' : 'aktif',
+      ].filter(Boolean).join('; '),
       diexportOleh: req.user.email,
     };
     const buffer = await buatDaftarKerja(klaim, cakupan);
@@ -1027,6 +1040,60 @@ router.get('/export/daftar-kerja', authenticate, async (req, res) => {
     res.send(Buffer.from(buffer));
   } catch (err) {
     console.error('[daftar-kerja] error:', err);
+    res.status(500).json({ error: 'Terjadi gangguan pada sistem. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' });
+  }
+});
+
+/** Export klaim bersih, satu lembar data dalam urutan field vClaim. */
+router.get('/export/siap-submit', authenticate, async (req, res) => {
+  try {
+    const db = getDb();
+    const { periode, kategori, from_date, to_date, search, arsip } = req.query;
+    const where = ["cr.validation_status = 'valid'", 'cf.pending_count = 0', 'cf.error_count = 0'];
+    const params = [];
+    where.push(arsip === '1' ? 'cf.diarsipkan_pada IS NOT NULL' : 'cf.diarsipkan_pada IS NULL');
+    if (periode) {
+      const sqlPeriode = '(SELECT periode FROM claim_records WHERE file_id = cf.id ORDER BY row_number LIMIT 1)';
+      if (periode === 'tanpa') where.push(`${sqlPeriode} IS NULL`);
+      else { where.push(`${sqlPeriode} = ?`); params.push(String(periode)); }
+    }
+    if (kategori) { where.push('cf.jenis_klaim = ?'); params.push(String(kategori)); }
+    if (from_date) { where.push('cf.created_at >= ?'); params.push(from_date); }
+    if (to_date) { where.push('cf.created_at <= ?'); params.push(`${to_date}T23:59:59`); }
+    if (search) {
+      where.push('(cr.nama_pasien LIKE ? OR cr.sep LIKE ?)');
+      params.push(`%${search}%`, `%${search}%`);
+    }
+    const klaim = await db.prepare(
+      `SELECT cr.* FROM claim_records cr JOIN claim_files cf ON cf.id = cr.file_id WHERE ${where.join(' AND ')} ORDER BY cr.periode DESC, cr.nama_pasien ASC`,
+    ).all(...params);
+    const cakupan = {
+      periode: periode || null,
+      kategori: kategori || null,
+      from_date: from_date || null,
+      to_date: to_date || null,
+      search: search || null,
+      arsip: arsip === '1',
+      filter: [
+        'Klaim bersih (valid, tanpa masalah)',
+        search ? 'hasil pencarian' : null,
+        from_date || to_date ? `tanggal upload ${from_date || 'awal'}—${to_date || 'akhir'}` : null,
+        arsip === '1' ? 'arsip' : 'aktif',
+      ].filter(Boolean).join('; '),
+      diexportOleh: req.user.email,
+    };
+    const buffer = await buatSiapSubmit(klaim, cakupan);
+    logAudit({
+      userId: req.user.id, userEmail: req.user.email, action: 'export',
+      resourceType: 'siap_submit', resourceId: null,
+      details: { format: 'excel', periode: periode || 'semua', kategori: kategori || 'semua', jumlah_klaim: klaim.length },
+      ipAddress: req.ip,
+    });
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename=${namaBerkasSiapSubmit(cakupan)}`);
+    res.send(Buffer.from(buffer));
+  } catch (err) {
+    console.error('[siap-submit] error:', err);
     res.status(500).json({ error: 'Terjadi gangguan pada sistem. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' });
   }
 });
