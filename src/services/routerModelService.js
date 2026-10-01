@@ -35,6 +35,9 @@ const TUGAS = Object.freeze([
   'rancang_jawaban_pending',
   'analisis_pending',
   'baca_regulasi',
+  'petakan_diagnosis_who',
+  'kodekan_tindakan_baru',
+  'audit_berkas_field',
 ]);
 
 const PENYEDIA = Object.freeze(['openai_compat', 'kimi']);

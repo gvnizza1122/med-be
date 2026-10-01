@@ -417,7 +417,15 @@ async function annotateKamusValid(suggestedCodes) {
   return Promise.all(beranotasi.map(async (entry) => {
     if (entry.type !== 'diagnosis' || entry.kamus_valid !== false || !entry.code) return entry;
     try {
-      const pengganti = await petakanKeKodeWho(entry.code, entry.quotation);
+      const pengganti = await petakanKeKodeWho(entry.code, entry.quotation, {
+        nama: record.nama_pasien || record.NAMA_PASIEN,
+        nomor_kartu: record.nokartu || record.NOKARTU,
+        nik: record.nik || record.NIK,
+        no_rm: record.mrn || record.MRN,
+        sep: record.sep || record.SEP,
+        alamat: record.alamat || record.ALAMAT,
+        telepon: record.telepon || record.TELEPON || record.no_hp || record.NO_HP,
+      });
       if (!pengganti) return entry;
       return { ...entry, code: pengganti.kode, kamus_valid: true, kode_asal: normalizeIcdCode(entry.code) };
     } catch (errKoreksi) {
@@ -2292,7 +2300,15 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
         try {
           const takDikenal = kalimatTindakanTakDikenal(evidencePool);
           if (takDikenal.length > 0) {
-            const baru = await kodekanTindakanBaru(takDikenal);
+            const baru = await kodekanTindakanBaru(takDikenal, {
+              nama: record.nama_pasien || record.NAMA_PASIEN,
+              nomor_kartu: record.nokartu || record.NOKARTU,
+              nik: record.nik || record.NIK,
+              no_rm: record.mrn || record.MRN,
+              sep: record.sep || record.SEP,
+              alamat: record.alamat || record.ALAMAT,
+              telepon: record.telepon || record.TELEPON || record.no_hp || record.NO_HP,
+            });
             for (const b of baru) {
               // Halaman asal dicari ulang supaya kutipannya tetap bisa
               // ditelusuri ke dokumen, sama seperti tindakan dari kamus bawaan.
