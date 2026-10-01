@@ -110,11 +110,11 @@ describe('Daftar Kerja — jebakan Excel', () => {
   });
 
   test('judul kolom menetap saat digulir dan filter aktif', () => {
-    for (const nama of ['Daftar Klaim', 'Rincian Masalah']) {
+    for (const [nama, rentang] of [['Daftar Klaim', 'A1:P3'], ['Rincian Masalah', 'A1:I4']]) {
       const ws = wb.getWorksheet(nama);
       expect(ws.views[0].state).toBe('frozen');
       expect(ws.views[0].ySplit).toBe(1);
-      expect(ws.autoFilter).toBeTruthy();
+      expect(ws.autoFilter).toBe(rentang);
     }
   });
 

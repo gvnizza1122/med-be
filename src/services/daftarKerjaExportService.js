@@ -133,7 +133,7 @@ function pasangLembar(ws, kolom, baris) {
   ws.views = [{ state: 'frozen', ySplit: 1 }];
 
   if (baris.length > 0) {
-    ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: kolom.length } };
+    ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: baris.length + 1, column: kolom.length } };
   }
 }
 
