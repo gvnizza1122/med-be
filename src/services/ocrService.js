@@ -278,13 +278,15 @@ process.on('SIGINT', () => { shutdownOcrPool(); shutdownRenderPool(); });
  *   signature lama.
  * @returns {Promise<OCRResult>}
  */
-// PaddleOCR (container ocr_paddle, lihat ocr-paddle/app.py) dipakai bila
-// OCR_ENGINE=paddle. Pada uji berkas EIFFELIN keyakinannya ~97-99% vs
-// Tesseract 56-85%, dan tabel tanda vital terbaca utuh ("33 KG ... 163 Kali
-// 32 Kali 36.2") yang di Tesseract rusak ("3k6", "163kKali"). Gagal/timeout
-// -> jatuh ke Tesseract untuk halaman itu, upload tidak pernah gagal karena
-// layanan Paddle mati.
-const PADDLE_OCR_URL = process.env.PADDLE_OCR_URL || 'http://ocr_paddle:8866';
+// Model PaddleOCR (PP-OCRv5) dipakai bila OCR_ENGINE=paddle, lewat layanan
+// HTTP di PADDLE_OCR_URL: ocr_rapid (ocr-rapid/app.py, RapidOCR/ONNX,
+// ~1,5-2 dtk/halaman, default) atau ocr_paddle lama (ocr-paddle/app.py,
+// runtime Paddle, 10-16 dtk/halaman) -- API keduanya sama. Pada uji berkas
+// EIFFELIN keyakinannya ~98-99% vs Tesseract 56-85%, dan tabel tanda vital
+// terbaca utuh ("33 KG ... 163 Kali 32 Kali 36.2") yang di Tesseract rusak
+// ("3k6", "163kKali"). Gagal/timeout -> jatuh ke Tesseract untuk halaman itu,
+// upload tidak pernah gagal karena layanan OCR mati.
+const PADDLE_OCR_URL = process.env.PADDLE_OCR_URL || 'http://ocr_rapid:8866';
 const PADDLE_OCR_TIMEOUT_MS = Number(process.env.PADDLE_OCR_TIMEOUT_MS || 60000);
 
 function pakaiPaddle() {
@@ -293,7 +295,9 @@ function pakaiPaddle() {
 
 async function ocrDenganPaddle(input) {
   const startTime = Date.now();
-  const body = Buffer.isBuffer(input) ? input : fs.readFileSync(input);
+  // Alur upload mengirim PNG hasil render mupdf sebagai Uint8Array (bukan
+  // Buffer); hanya string yang berarti path file.
+  const body = typeof input === 'string' ? fs.readFileSync(input) : Buffer.from(input);
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), PADDLE_OCR_TIMEOUT_MS);
   try {
@@ -330,7 +334,7 @@ async function ocrSingleFile(input, language = OCR_CONFIG.language) {
       return await ocrDenganPaddle(input);
     } catch (err) {
       const msg = err.name === 'AbortError' ? `timeout ${PADDLE_OCR_TIMEOUT_MS}ms` : err.message;
-      console.warn(`[OCR] PaddleOCR gagal (${msg}) -- halaman ini dibaca Tesseract.`);
+      console.warn(`[OCR] Layanan OCR PaddleOCR (${PADDLE_OCR_URL}) gagal (${msg}) -- halaman ini dibaca Tesseract.`);
     }
   }
 

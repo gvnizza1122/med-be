@@ -274,6 +274,7 @@ async function extractFromPDF(filePath, options = {}) {
             if (isClaimDataPage(classification.claimDataText)) {
               result.metadata.ocrFallback = true;
               result.metadata.ocrEnhancementApplied = classification.enhancement_applied || false;
+              result.metadata.claimDataPagesFound = (classification.claimDataPages || []).length;
               ocrFallbackWorked = true;
               console.log(`[Pipeline] OCR fallback berhasil, enhancement: ${classification.enhancement_applied ? 'yes' : 'no'}`);
             }
