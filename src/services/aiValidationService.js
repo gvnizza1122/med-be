@@ -428,6 +428,14 @@ function _resetTotalUsage() {
 async function runAiAudit(records, onBatchComplete, errorFieldsByRecord = null, opsi = {}) {
   _resetTotalUsage();
 
+  // Pertahankan fallback lokal tanpa cache kegagalan saat kedua provider tidak punya kunci.
+  if (!process.env.AI_PROVIDER_API_KEY && !process.env.KIMI_API_KEY) {
+    console.warn('[AI Audit] No model API key configured, using rule-based fallback');
+    const results = runRuleBasedAudit(records);
+    if (onBatchComplete) await onBatchComplete(results, records.length);
+    return results;
+  }
+
   const BATCH_SIZE = 10;
   const allResults = [];
 
