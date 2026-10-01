@@ -2654,6 +2654,15 @@ async function processSinglePdfUploadDenganKonteks(db, { filePath, originalName,
       console.warn(`[upload-pdf] AI review gagal untuk record ${recordId}: ${aiErr.message}`);
     }
 
+    if (isTesting) {
+      const stored = await db.prepare('SELECT * FROM claim_records WHERE id = ?').get(recordId);
+      const { prediksi } = require('../services/testingPendingService');
+      const snapshot = prediksi(stored, validationErrors);
+      await db.run(`INSERT INTO testing_pending(record_id,hospital_code,prediction,prediction_snapshot,
+        actual_result,reference_source,reason_match,updated_by) VALUES (?,?,?,?,?,?,?,?) ON CONFLICT(record_id) DO NOTHING`,
+        [recordId, hospitalCode, snapshot.status, JSON.stringify(snapshot), 'belum_diketahui', 'BPJS', 'belum_dinilai', userId]);
+    }
+
     return {
       success: true,
       file_id: fileId,
@@ -3720,3 +3729,8 @@ module.exports.isiKodeDariSaranTervalidasi = isiKodeDariSaranTervalidasi;
 
 module.exports.processSinglePdfUpload = processSinglePdfUpload;
 module.exports.pdfUpload = pdfUpload;
+
+module.exports.pdfUploadBatch = multer({ storage, limits: { fileSize: 20 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => path.extname(file.originalname).toLowerCase() === ".pdf" ? cb(null, true) : cb(new Error("PDF saja")) });
+module.exports.runWithConcurrencyLimit = runWithConcurrencyLimit;
+module.exports.BATCH_AI_CONCURRENCY = BATCH_AI_CONCURRENCY;
