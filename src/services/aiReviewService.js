@@ -56,6 +56,7 @@ const { bacaTemuanPenunjang } = require('./temuanPenunjangService');
 const { bacaLabDariHalaman } = require('./bacaLabService');
 const { catatVarianBelumDikenali } = require('./kamusPenunjangService');
 const { petakanBagian } = require('./bagianTemuanService');
+const { periksaKode: periksaKodeKamus, tandaiStatusKamusEvidence, STATUS: STATUS_KAMUS } = require('./validasiKamusService');
 const { TAHAP_PEMBACAAN, simpanTahapPembacaan } = require('./claimReadingStageService');
 
 async function simpanJejakEnamTahap(record, evidencePool, result, codes) {
@@ -344,15 +345,15 @@ function normalizeIcdCode(code) {
  */
 async function lookupCodesInTable(table, codes) {
   if (codes.length === 0) return new Set();
-  try {
-    const db = getDb();
-    const placeholders = codes.map(() => '?').join(', ');
-    const rows = await db.all(`SELECT code FROM ${table} WHERE code IN (${placeholders})`, codes);
-    return new Set(rows.map(r => r.code));
-  } catch (err) {
-    console.warn(`[AI-REVIEW] Gagal cek kamus di tabel ${table}, kamus_valid diisi null: ${err.message}`);
+  // Lewat validasiKamusService supaya tabel KOSONG juga dibaca "tidak bisa
+  // dicek" (null), bukan Set kosong yang membuat semua kode tampak salah.
+  const jenis = table === 'icd9_cm_procedures' ? 'prosedur' : 'diagnosis';
+  const periksa = await periksaKodeKamus(getDb(), codes, jenis);
+  if (periksa.status === 'tidak_tersedia') {
+    console.warn(`[AI-REVIEW] Kamus ${table} tidak tersedia, kamus_valid diisi null: ${periksa.alasan}`);
     return null;
   }
+  return new Set(Object.keys(periksa.hasil).filter(k => periksa.hasil[k] === STATUS_KAMUS.VALID));
 }
 
 /**
@@ -2040,6 +2041,27 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
         }
       } catch (consistencyErr) {
         console.warn(`[AI-REVIEW] evaluateDiagnosisConsistency gagal: ${consistencyErr.message}`);
+      }
+
+      // Bukti tercetak ≠ kode sah. Kasus Eifelin: "J45.3" tercetak di resume
+      // (found=true -> VALID hijau) padahal J45.3 tidak ada di ICD-10 WHO.
+      // evidence_found / dictionary_status / review_status dipisah di sini.
+      try {
+        const kodeEv = (jenis) => result.code_evidence
+          .filter(e => e && e.code && (e.type === 'procedure') === (jenis === 'prosedur'))
+          .map(e => e.code);
+        const db = getDb();
+        const [periksaDiag, periksaProc] = await Promise.all([
+          periksaKodeKamus(db, kodeEv('diagnosis'), 'diagnosis'),
+          periksaKodeKamus(db, kodeEv('prosedur'), 'prosedur'),
+        ]);
+        tandaiStatusKamusEvidence(result.code_evidence, { diagnosis: periksaDiag, prosedur: periksaProc });
+        result.status_kamus = {
+          diagnosis: { status: periksaDiag.status, alasan: periksaDiag.alasan, dataset: periksaDiag.dataset },
+          prosedur: { status: periksaProc.status, alasan: periksaProc.alasan, dataset: periksaProc.dataset },
+        };
+      } catch (kamusEvErr) {
+        console.warn(`[AI-REVIEW] Penandaan status kamus code_evidence gagal: ${kamusEvErr.message}`);
       }
 
       // suggested_codes — quotation adalah kutipan VERBATIM dari dokumen (tidak

@@ -6,7 +6,7 @@ const { v4: uuidv4 } = require('uuid');
 const { getDb } = require('../database/init');
 const { authenticate, authorize } = require('../middleware/auth');
 const { parseClaimFile, normalizeColumnName } = require('../services/fileParser');
-const { validateRecord, determineStatus } = require('../services/ruleEngine');
+const { determineStatus } = require('../services/ruleEngine');
 const { generateExcel } = require('../services/exportService');
 const { buatDaftarKerja, namaBerkasDaftarKerja } = require('../services/daftarKerjaExportService');
 const { buatSiapSubmit, namaBerkasSiapSubmit } = require('../services/siapSubmitExportService');
@@ -21,6 +21,9 @@ const { tentukanProsedurDariTemuan } = require('../services/aturanKodingRsServic
 const { ekstrakKotakKata } = require('../services/pdfWordBoxService');
 const { bacaLabelHalaman } = require('../services/pasanganLabelPosisiService');
 const { pastikanDiagnosisWho } = require('../services/pastikanDiagnosisWhoService');
+const { galatKamusRecord, periksaKode, tandaiStatusKamusEvidence } = require('../services/validasiKamusService');
+const { validasiRecordDenganKamus } = require('../services/validasiRecordKamusService');
+const { simpanAiReview } = require('../services/simpanAiReviewService');
 
 const router = express.Router();
 
@@ -339,7 +342,7 @@ router.post('/upload', authenticate, upload.single('file'), async (req, res) => 
       for (let idx = 0; idx < parseResult.records.length; idx++) {
         const record = parseResult.records[idx];
         const recordId = uuidv4();
-        const errors = validateRecord(record, activeRules);
+        const errors = await validasiRecordDenganKamus(db, record, activeRules);
         const status = determineStatus(errors);
 
         if (status === 'valid') validCount++;
@@ -422,8 +425,7 @@ router.post('/upload', authenticate, upload.single('file'), async (req, res) => 
           const aiReview = await generateAiReview(record, recordErrors, [], knowledgeEntries, bpjsExamples);
           if (aiReview) {
             totalAiTokens += aiReview.tokens_used || 0;
-            await db.prepare('UPDATE claim_records SET ai_review = ? WHERE id = ?')
-              .run(JSON.stringify(aiReview), record.id);
+            await simpanAiReview(db, record.id, aiReview);
             // Kode saran yang sudah terverifikasi kamus ICD-10 langsung mengisi
             // DIAGLIST/PROCLIST yang masih kosong -- koder tidak perlu mengetik
             // ulang. Best-effort: kegagalan di sini tidak menggagalkan review.
@@ -898,6 +900,13 @@ router.post('/:id/approve', authenticate, authorize('supervisor', 'admin'), asyn
       return res.status(400).json({ error: 'File belum selesai divalidasi.' });
     }
 
+    const records = await db.prepare('SELECT * FROM claim_records WHERE file_id = ?').all(req.params.id);
+    for (const record of records) {
+      const errors = await galatKamusRecord(db, record);
+      if (errors.length) return res.status(errors.some(e => e.dictionary_status === 'unavailable') ? 503 : 409)
+        .json({ error: 'Klaim belum siap dikirim: pemeriksaan kamus belum lolos.', errors });
+    }
+
     await db.prepare(`
       UPDATE claim_files SET status = 'approved', approved_by = ?, approved_at = datetime('now'), updated_at = datetime('now')
       WHERE id = ?
@@ -1090,6 +1099,11 @@ router.get('/export/siap-submit', authenticate, authorize('admin', 'verifikator'
       ].filter(Boolean).join('; '),
       diexportOleh: req.user.email,
     };
+    for (const record of klaim) {
+      const errors = await galatKamusRecord(db, record);
+      if (errors.length) return res.status(errors.some(e => e.dictionary_status === 'unavailable') ? 503 : 409)
+        .json({ error: 'Ekspor siap submit ditunda: pemeriksaan kamus belum lolos.', errors });
+    }
     const buffer = await buatSiapSubmit(klaim, cakupan);
     logAudit({
       userId: req.user.id, userEmail: req.user.email, action: 'export',
@@ -1196,8 +1210,7 @@ router.post('/:id/ai-audit', authenticate, async (req, res) => {
         const bpjsExamples = await getRelevantBpjsExamples(db);
         const aiReview = await generateAiReview(record, recordErrors, evidencePool, knowledgeEntries, bpjsExamples);
         if (aiReview) {
-          await db.prepare('UPDATE claim_records SET ai_review = ? WHERE id = ?')
-            .run(JSON.stringify(aiReview), record.id);
+          await simpanAiReview(db, record.id, aiReview);
           // Kode saran yang sudah terverifikasi kamus ICD-10 langsung mengisi
           // DIAGLIST/PROCLIST yang masih kosong -- koder tidak perlu mengetik
           // ulang. Best-effort: kegagalan di sini tidak menggagalkan review.
@@ -1678,7 +1691,7 @@ async function detectAndFlagInternalEpisodes(db, { hospitalCode, nokartu, admiss
         jenis_konsultasi: isCrossPoli ? 'KONSUL_INTERNAL' : (sib.jenis_konsultasi || null),
       };
 
-      const validationErrors = validateRecord(dbRecord, activeRules);
+      const validationErrors = await validasiRecordDenganKamus(db, dbRecord, activeRules);
       const validationStatus = determineStatus(validationErrors);
 
       await db.transaction(async (tx) => {
@@ -1893,7 +1906,7 @@ async function detectAndFlagPRB(db, { hospitalCode, mrn, nokartu, admissionDate,
         urutan_iterasi: urutanIterasi,
         prb_exempt_reason: exemptReason,
       };
-      const validationErrors = validateRecord(dbRecord, activeRules);
+      const validationErrors = await validasiRecordDenganKamus(db, dbRecord, activeRules);
       const validationStatus = determineStatus(validationErrors);
 
       await db.transaction(async (tx) => {
@@ -1961,7 +1974,33 @@ const JENIS_KLAIM_OPTIONS = ['RAWAT_JALAN', 'RAWAT_INAP'];
  * Validasi dijalankan ULANG setelah pengisian: tanpa itu, error "DIAGLIST
  * wajib diisi" tetap menempel padahal kolomnya sudah terisi.
  */
+/**
+ * Entri code_evidence untuk kode yang sudah diganti otomatis diberi
+ * `diganti_menjadi`, supaya layar menjelaskan "J45.3 tercetak di dokumen,
+ * diganti J45.9" alih-alih hanya menampilkan kode lama tanpa penjelasan.
+ */
+function tandaiEvidenceDiganti(aiReview, penggantian) {
+  const ev = Array.isArray(aiReview.code_evidence) ? aiReview.code_evidence : [];
+  for (const p of penggantian || []) {
+    for (const e of ev) {
+      if (e && e.type === 'diagnosis' && String(e.code || '').trim().toUpperCase() === p.kode_asal) {
+        e.diganti_menjadi = p.kode_baru;
+      }
+    }
+  }
+}
+
 async function isiKodeDariSaranTervalidasi(db, recordId, record, aiReview) {
+  if (typeof db.transaction === 'function') {
+    return db.transaction(async tx => {
+      await tx.prepare('SELECT id FROM claim_records WHERE id = ? FOR UPDATE').get(recordId);
+      return isiKodeDariSaranDalamTransaksi(tx, recordId, record, aiReview);
+    });
+  }
+  return isiKodeDariSaranDalamTransaksi(db, recordId, record, aiReview);
+}
+
+async function isiKodeDariSaranDalamTransaksi(db, recordId, record, aiReview) {
   aiReview = aiReview && typeof aiReview === 'object' ? aiReview : {};
   const saran = Array.isArray(aiReview && aiReview.suggested_codes) ? aiReview.suggested_codes : [];
   const tindakanTerbaca = Array.isArray(aiReview && aiReview.temuan_tindakan) ? aiReview.temuan_tindakan : [];
@@ -1991,24 +2030,70 @@ async function isiKodeDariSaranTervalidasi(db, recordId, record, aiReview) {
   // kode sah dan isian lain di kolom yang sama tidak disentuh.
   const koreksiWho = new Map(
     saran
-      .filter(s => s && s.type === 'diagnosis' && s.kode_asal && s.kamus_valid === true && s.code)
+      .filter(s => s && s.type === 'diagnosis' && s.kode_asal && s.kamus_valid === true && s.code && s.boleh_isi_otomatis !== false)
       .map(s => [String(s.kode_asal).trim().toUpperCase(), String(s.code).trim().toUpperCase()])
   );
   const diaglistSaatIni = String(record.DIAGLIST || record.diagnosa_list || '');
+  aiReview.ekstraksi_kode_asli = aiReview.ekstraksi_kode_asli || { DIAGLIST: diaglistSaatIni, PROCLIST: record.PROCLIST || record.prosedur_list || '', waktu: new Date().toISOString() };
   const teksDiagnosis = saran.filter(s => s && s.type === 'diagnosis')
     .map(s => s.quotation || s.text || '').filter(Boolean).join(' ');
-  const hasilWho = await pastikanDiagnosisWho(db, diaglistSaatIni, teksDiagnosis);
+  // Konteks pemetaan PER KODE dari kutipan dokumen tempat kode itu tercetak
+  // (kasus Eifelin: "J45.3 - Asthma with Exacerbation (IM)"). Tanpa ini, kode
+  // yang tidak disarankan AI dipetakan tanpa konteks apa pun dan, kalau
+  // kandidatnya lebih dari satu, tidak pernah terpetakan.
+  const konteksPerKode = {};
+  const buktiPerKode = {};
+  for (const e of (Array.isArray(aiReview.code_evidence) ? aiReview.code_evidence : [])) {
+    if (!e || e.type !== 'diagnosis' || !e.code || !e.found || !e.quotation) continue;
+    const k = String(e.code).trim().toUpperCase();
+    konteksPerKode[k] = [konteksPerKode[k], String(e.quotation)].filter(Boolean).join(' ');
+    buktiPerKode[k] = [...(buktiPerKode[k] || []), { halaman: e.page_number, kutipan: e.quotation }];
+  }
+  const identitasDb = await db.prepare('SELECT nama_pasien, nokartu, mrn, sep FROM claim_records WHERE id = ?').get(recordId) || {};
+  const dikenal = { nama: [identitasDb.nama_pasien, record.nama_pasien, record.NAMA_PASIEN].filter(Boolean),
+    nomor_kartu: [identitasDb.nokartu, record.nokartu, record.NOKARTU].filter(Boolean),
+    no_rm: [identitasDb.mrn, record.mrn, record.MRN].filter(Boolean),
+    sep: [identitasDb.sep, record.sep, record.SEP].filter(Boolean),
+    nik: record.nik || record.NIK, alamat: record.alamat || record.ALAMAT, telepon: record.telepon || record.TELEPON };
+  const hasilWho = await pastikanDiagnosisWho(db, diaglistSaatIni, teksDiagnosis, { konteksPerKode, buktiPerKode, dikenal });
+  // Saran lama tidak boleh menimpa hasil pemetaan baru atau mengubah kode WHO sah.
+  const cekAsal = koreksiWho.size ? await periksaKode(db, [...koreksiWho.keys()], 'diagnosis') : { hasil: {} };
+  const cekTujuan = koreksiWho.size ? await periksaKode(db, [...koreksiWho.values()], 'diagnosis') : { hasil: {} };
+  for (const [asal, tujuan] of koreksiWho) {
+    if (hasilWho.statusKamus !== 'tersedia' || cekAsal.hasil[asal] !== 'not_found'
+      || cekTujuan.hasil[tujuan] !== 'valid' || asal.slice(0, 3) !== tujuan.slice(0, 3)
+      || hasilWho.penggantian.some(p => p.kode_asal === asal)) koreksiWho.delete(asal);
+  }
+  // Jejak audit setiap penggantian otomatis -- ditambahkan, tidak menimpa
+  // riwayat dari pembacaan sebelumnya.
+  if (hasilWho.penggantian && hasilWho.penggantian.length > 0) {
+    const lama = Array.isArray(aiReview.penggantian_kode) ? aiReview.penggantian_kode : [];
+    aiReview.penggantian_kode = [...lama, ...hasilWho.penggantian];
+    tandaiEvidenceDiganti(aiReview, hasilWho.penggantian);
+    console.log(`[AutoIsi] record ${recordId}: ${hasilWho.penggantian.map(p => `${p.kode_asal} -> ${p.kode_baru} (${p.sumber})`).join(', ')}`);
+  }
+  aiReview.status_kamus = {
+    ...(aiReview.status_kamus || {}),
+    diagnosis: { status: hasilWho.statusKamus, alasan: hasilWho.alasanKamus || null, dataset: hasilWho.dataset || null },
+  };
+  const evidence = Array.isArray(aiReview.code_evidence) ? aiReview.code_evidence : [];
+  if (evidence.length) {
+    const diagnosis = await periksaKode(db, evidence.filter(e => e.type === 'diagnosis').map(e => e.code), 'diagnosis');
+    const prosedur = await periksaKode(db, evidence.filter(e => e.type === 'procedure').map(e => e.code), 'prosedur');
+    tandaiStatusKamusEvidence(evidence, { diagnosis, prosedur });
+  }
   if (hasilWho.diaglist && hasilWho.diaglist !== diaglistSaatIni) {
     perubahan.diagnosa_list = hasilWho.diaglist;
     record.DIAGLIST = hasilWho.diaglist;
     record.diagnosa_list = hasilWho.diaglist;
     try {
       const baris = await db.prepare('SELECT raw_data FROM claim_records WHERE id = ?').get(recordId);
-      const raw = baris && baris.raw_data ? JSON.parse(baris.raw_data) : {};
+      const raw = baris && baris.raw_data
+        ? (typeof baris.raw_data === 'string' ? JSON.parse(baris.raw_data) : { ...baris.raw_data }) : {};
       raw.DIAGLIST = hasilWho.diaglist;
       await db.prepare('UPDATE claim_records SET raw_data = ? WHERE id = ?').run(JSON.stringify(raw), recordId);
     } catch (errRaw) {
-      console.warn(`[AutoIsi] Gagal memperbarui raw_data record ${recordId}: ${errRaw.message}`);
+      throw errRaw;
     }
   }
   // kode_luar_kamus juga diisi aiReviewService untuk PROSEDUR dan dibaca
@@ -2017,10 +2102,9 @@ async function isiKodeDariSaranTervalidasi(db, recordId, record, aiReview) {
   const luarKamusLain = (Array.isArray(aiReview.kode_luar_kamus) ? aiReview.kode_luar_kamus : [])
     .filter(k => k && k.jenis !== 'diagnosis');
   aiReview.kode_luar_kamus = [...hasilWho.kodeLuarKamus, ...luarKamusLain];
-  await db.prepare('UPDATE claim_records SET ai_review = ? WHERE id = ?')
-    .run(JSON.stringify(aiReview), recordId);
+  await simpanAiReview(db, recordId, aiReview);
   if (koreksiWho.size > 0 && diaglistSaatIni.trim() !== '') {
-    const pecah = diaglistSaatIni.split(/[;,]/).map(s => s.trim()).filter(Boolean);
+    const pecah = (perubahan.diagnosa_list || diaglistSaatIni).split(/[;,]/).map(s => s.trim()).filter(Boolean);
     const dikoreksi = [];
     const hasilKode = pecah.map(k => {
       const ganti = koreksiWho.get(k.toUpperCase());
@@ -2031,17 +2115,30 @@ async function isiKodeDariSaranTervalidasi(db, recordId, record, aiReview) {
     if (dikoreksi.length > 0) {
       const baru = [...new Set(hasilKode)].join(';');
       perubahan.diagnosa_list = baru;
+      record.DIAGLIST = baru;
+      record.diagnosa_list = baru;
+      const waktu = new Date().toISOString();
+      const jejak = pecah
+        // Kode yang sudah diganti & dicatat pastikanDiagnosisWho tidak dicatat dua kali.
+        .filter(k => koreksiWho.has(k.toUpperCase())
+          && !(hasilWho.penggantian || []).some(p => p.kode_asal === k.toUpperCase()))
+        .map(k => ({ kode_asal: k.toUpperCase(), kode_baru: koreksiWho.get(k.toUpperCase()), sumber: 'saran_kode', konteks: null, kamus: 'ICD-10 WHO 2010', waktu }));
+      aiReview.penggantian_kode = [...(Array.isArray(aiReview.penggantian_kode) ? aiReview.penggantian_kode : []), ...jejak];
+      tandaiEvidenceDiganti(aiReview, jejak);
+      aiReview.kode_luar_kamus = aiReview.kode_luar_kamus.filter(k => !koreksiWho.has(k.kode));
+      await simpanAiReview(db, recordId, aiReview);
       // raw_data ikut diperbarui: tampilan membaca dari sana, dan tanpa ini
       // kolom basis data sudah benar tetapi layar masih menunjukkan kode lama.
       try {
         const baris = await db.prepare('SELECT raw_data FROM claim_records WHERE id = ?').get(recordId);
-        const raw = baris && baris.raw_data ? JSON.parse(baris.raw_data) : null;
+        const raw = baris && baris.raw_data
+          ? (typeof baris.raw_data === 'string' ? JSON.parse(baris.raw_data) : { ...baris.raw_data }) : {};
         if (raw && typeof raw === 'object') {
           raw.DIAGLIST = baru;
           await db.prepare('UPDATE claim_records SET raw_data = ? WHERE id = ?').run(JSON.stringify(raw), recordId);
         }
       } catch (errRaw) {
-        console.warn(`[AutoIsi] Gagal memperbarui raw_data record ${recordId}: ${errRaw.message}`);
+        throw errRaw;
       }
       console.log(`[AutoIsi] record ${recordId}: kode di luar ICD-10 WHO diganti ${dikoreksi.join(', ')}`);
     }
@@ -2060,8 +2157,7 @@ async function isiKodeDariSaranTervalidasi(db, recordId, record, aiReview) {
     try {
       usulanProsedur = await tentukanProsedurDariTemuan(db, recordId, tindakanTerbaca);
       aiReview.usulan_prosedur = usulanProsedur.usulan;
-      await db.prepare('UPDATE claim_records SET ai_review = ? WHERE id = ?')
-        .run(JSON.stringify(aiReview), recordId);
+      await simpanAiReview(db, recordId, aiReview);
     } catch (errUsulan) {
       console.warn(`[AutoIsi] usulan prosedur gagal untuk record ${recordId}: ${errUsulan.message || errUsulan}`);
     }
@@ -2150,8 +2246,7 @@ async function isiKodeDariSaranTervalidasi(db, recordId, record, aiReview) {
   }
 
   if (catatanBasiDibuang) {
-    await db.prepare('UPDATE claim_records SET ai_review = ? WHERE id = ?')
-      .run(JSON.stringify(aiReview), recordId);
+    await simpanAiReview(db, recordId, aiReview);
   }
 
   // AI yang MEMUTUSKAN pending, bukan rule engine. Rule engine (validateRecord)
@@ -2194,6 +2289,12 @@ async function isiKodeDariSaranTervalidasi(db, recordId, record, aiReview) {
   // Dijalankan SELALU (sebelum "if (Object.keys(perubahan)...) return" di
   // bawah), supaya berlaku juga saat DIAGLIST/PROCLIST sudah lengkap sejak
   // awal dan tidak ada yang perlu diisi otomatis.
+  if (perubahan.diagnosa_list || perubahan.prosedur_list) {
+    aiReview.inacbg_result = null;
+    aiReview.tariff_result = null;
+    aiReview.suggested_inacbg = '';
+    aiReview.suggested_tarif = null;
+  }
   if (aiReview && !aiReview.inacbg_result) {
     try {
       const diaglistAkhir = perubahan.diagnosa_list || record.DIAGLIST || record.diagnosa_list || '';
@@ -2213,16 +2314,13 @@ async function isiKodeDariSaranTervalidasi(db, recordId, record, aiReview) {
             aiReview.suggested_inacbg = inacbgCodeForLookup;
             aiReview.suggested_tarif = tarifResult ? tarifResult.amount : null;
           }
-          await db.prepare('UPDATE claim_records SET ai_review = ? WHERE id = ?')
-            .run(JSON.stringify(aiReview), recordId);
+          await simpanAiReview(db, recordId, aiReview);
         }
       }
     } catch (errInacbg) {
       console.warn(`[AutoIsi] Gagal menghitung ulang INA-CBG/tarif record ${recordId}: ${errInacbg.message}`);
     }
   }
-
-  if (Object.keys(perubahan).length === 0) return;
 
   for (const [kolom, nilai] of Object.entries(perubahan)) {
     await db.prepare(`UPDATE claim_records SET ${kolom} = ? WHERE id = ?`).run(nilai, recordId);
@@ -2234,7 +2332,7 @@ async function isiKodeDariSaranTervalidasi(db, recordId, record, aiReview) {
     const barisTerbaru = await db.prepare('SELECT * FROM claim_records WHERE id = ?').get(recordId);
     if (!barisTerbaru) return;
     const activeRules = await db.prepare('SELECT * FROM validation_rules WHERE is_active = 1').all();
-    const errorBaru = validateRecord(barisTerbaru, activeRules);
+    const errorBaru = await validasiRecordDenganKamus(db, barisTerbaru, activeRules);
     await db.prepare('DELETE FROM validation_errors WHERE record_id = ?').run(recordId);
     if (errorBaru.length > 0) {
       const insert = db.prepare(`
@@ -2252,7 +2350,8 @@ async function isiKodeDariSaranTervalidasi(db, recordId, record, aiReview) {
     // Ambil yang lebih parah dari keduanya, bukan menimpa begitu saja.
     const statusRuleEngine = determineStatus(errorBaru);
     const URUTAN_STATUS = { valid: 0, pending: 1, error: 2 };
-    const statusSaatIni = barisTerbaru.validation_status;
+    const statusSaatIni = Object.keys(perubahan).length > 0
+      ? (aiBilangPending ? 'pending' : 'valid') : barisTerbaru.validation_status;
     const statusAkhir = (URUTAN_STATUS[statusSaatIni] || 0) > (URUTAN_STATUS[statusRuleEngine] || 0)
       ? statusSaatIni
       : statusRuleEngine;
@@ -2390,7 +2489,7 @@ async function processSinglePdfUpload(db, { filePath, originalName, jenisKlaim: 
 
     // Run validation on extracted record
     const activeRules = await db.prepare('SELECT * FROM validation_rules WHERE is_active = 1').all();
-    const validationErrors = validateRecord(dbRecord, activeRules);
+    const validationErrors = await validasiRecordDenganKamus(db, dbRecord, activeRules);
     const validationStatus = determineStatus(validationErrors);
 
     // Save file record with status='uploaded' (data extraction complete).
@@ -2497,8 +2596,7 @@ async function processSinglePdfUpload(db, { filePath, originalName, jenisKlaim: 
       const bpjsExamples = await getRelevantBpjsExamples(db);
       aiReview = await generateAiReview({ ...extractedData, id: recordId }, validationErrors, evidencePool, knowledgeEntries, bpjsExamples);
       if (aiReview) {
-        await db.prepare('UPDATE claim_records SET ai_review = ? WHERE id = ?')
-          .run(JSON.stringify(aiReview), recordId);
+        await simpanAiReview(db, recordId, aiReview);
         // Kode saran yang sudah terverifikasi kamus ICD-10 langsung mengisi
         // DIAGLIST/PROCLIST yang masih kosong -- koder tidak perlu mengetik
         // ulang. Best-effort: kegagalan di sini tidak menggagalkan review.
@@ -2576,7 +2674,7 @@ async function reprocessExistingRecord(db, { fileId, recordId, filePath, jenisKl
     dbRecord.has_hasil_pa = result.record.has_hasil_pa === true;
 
     const activeRules = await db.prepare('SELECT * FROM validation_rules WHERE is_active = 1').all();
-    const validationErrors = validateRecord(dbRecord, activeRules);
+    const validationErrors = await validasiRecordDenganKamus(db, dbRecord, activeRules);
     const validationStatus = determineStatus(validationErrors);
 
     await db.transaction(async (tx) => {
@@ -2675,8 +2773,7 @@ async function reprocessExistingRecord(db, { fileId, recordId, filePath, jenisKl
             .run(finalStatus, recordId);
         }
 
-        await db.prepare('UPDATE claim_records SET ai_review = ? WHERE id = ?')
-          .run(JSON.stringify(aiReview), recordId);
+        await simpanAiReview(db, recordId, aiReview);
         // Kode saran yang sudah terverifikasi kamus ICD-10 langsung mengisi
         // DIAGLIST/PROCLIST yang masih kosong -- koder tidak perlu mengetik
         // ulang. Best-effort: kegagalan di sini tidak menggagalkan review.
@@ -3189,7 +3286,7 @@ router.post('/:record_id/update-values', authenticate, async (req, res) => {
       SELECT id, file_id, raw_data, kode_rs, sep, nokartu, nama_pasien, mrn,
         birth_date, gender, kelas_rawat, admission_date, discharge_date,
         discharge_status, diagnosa_list, prosedur_list, dpjp_name, tarif_rs, has_bpjs_page,
-        has_laporan_operasi, has_hasil_pa
+        has_laporan_operasi, has_hasil_pa, ai_review
       FROM claim_records WHERE id = ?
     `).get(req.params.record_id);
 
@@ -3233,8 +3330,43 @@ router.post('/:record_id/update-values', authenticate, async (req, res) => {
     dbRecord.has_laporan_operasi = existing.has_laporan_operasi === true;
     dbRecord.has_hasil_pa = existing.has_hasil_pa === true;
     const activeRules = await db.prepare('SELECT * FROM validation_rules WHERE is_active = 1').all();
-    const validationErrors = validateRecord(dbRecord, activeRules);
+    const validationErrors = await validasiRecordDenganKamus(db, dbRecord, activeRules);
     const validationStatus = determineStatus(validationErrors);
+    const review = typeof existing.ai_review === 'string' ? JSON.parse(existing.ai_review) : (existing.ai_review || {});
+    review.ekstraksi_kode_asli = review.ekstraksi_kode_asli || {
+      DIAGLIST: pristineData.DIAGLIST || existing.diagnosa_list || '',
+      PROCLIST: pristineData.PROCLIST || existing.prosedur_list || '',
+    };
+    const [diagnosis, prosedur] = await Promise.all([
+      periksaKode(db, [...String(dbRecord.diagnosa_list || '').split(/[;,]/).filter(Boolean),
+        ...(review.code_evidence || []).filter(e => e.type === 'diagnosis').map(e => e.code)], 'diagnosis'),
+      periksaKode(db, [...String(dbRecord.prosedur_list || '').split(/[;,]/).filter(Boolean),
+        ...(review.code_evidence || []).filter(e => e.type === 'procedure').map(e => e.code)], 'prosedur'),
+    ]);
+    review.status_kamus = { diagnosis, prosedur };
+    tandaiStatusKamusEvidence(review.code_evidence, { diagnosis, prosedur });
+    review.kode_luar_kamus = validationErrors.filter(e => e.dictionary_status === 'not_found')
+      .map(e => ({ kode: e.actual_value, jenis: e.rule_id === 'RV-05' ? 'diagnosis' : 'prosedur', status: 'kode_luar_kamus', pesan: e.error_message }));
+    if (mergedData.DIAGLIST !== existing.diagnosa_list || mergedData.PROCLIST !== existing.prosedur_list) {
+      review.inacbg_result = null; review.tariff_result = null;
+      review.suggested_inacbg = ''; review.suggested_tarif = null;
+      for (const [jenis, before, after] of [
+        ['diagnosis', existing.diagnosa_list || '', mergedData.DIAGLIST || ''],
+        ['prosedur', existing.prosedur_list || '', mergedData.PROCLIST || ''],
+      ]) {
+        if (before === after) continue;
+        const change = { jenis, kode_asal: before, kode_baru: after, sumber: 'edit_manual',
+          alasan: 'Perubahan kode melalui formulir edit', petugas: req.user.id, waktu: new Date().toISOString() };
+        review.penggantian_kode = [...(review.penggantian_kode || []), change];
+        const split = value => String(value).split(/[;,]/).map(code => code.trim().toUpperCase()).filter(Boolean);
+        const oldCodes = split(before); const newCodes = split(after);
+        const removed = oldCodes.filter(code => !newCodes.includes(code));
+        const added = newCodes.filter(code => !oldCodes.includes(code));
+        if (jenis === 'diagnosis' && removed.length === 1 && added.length === 1) {
+          tandaiEvidenceDiganti(review, [{ kode_asal: removed[0], kode_baru: added[0] }]);
+        }
+      }
+    }
 
     await db.transaction(async (tx) => {
       const txUpdateRecord = tx.prepare(`
@@ -3258,6 +3390,7 @@ router.post('/:record_id/update-values', authenticate, async (req, res) => {
         validationStatus, validationErrors.length, JSON.stringify(mergedData),
         req.params.record_id
       );
+      await simpanAiReview(tx, req.params.record_id, review);
 
       // Ganti seluruh validation_errors lama dengan hasil validasi baru
       await tx.prepare('DELETE FROM validation_errors WHERE record_id = ?').run(req.params.record_id);
@@ -3339,7 +3472,7 @@ router.post('/validate-pdf', authenticate, async (req, res) => {
 
     // Validate with rule engine
     const activeRules = await db.prepare('SELECT * FROM validation_rules WHERE is_active = 1').all();
-    const ruleErrors = validateRecord(record, activeRules);
+    const ruleErrors = await validasiRecordDenganKamus(db, record, activeRules);
     const allErrors = [...fieldErrors.map(e => ({ ...e, rule_id: 'FIELD_VALIDATION' })), ...ruleErrors];
     const status = allErrors.length === 0 ? 'valid' : 'error';
 

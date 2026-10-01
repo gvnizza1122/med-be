@@ -12,6 +12,7 @@ jest.mock('../../database/init', () => ({
     all: async (sql, params) => {
       if (/LIKE/i.test(sql)) return []; // pemetaan WHO: tidak ada padanan
       const tabel = /icd10_who_codes/.test(sql) ? 'icd10_who_codes' : 'icd9_cm_procedures';
+      if (/COUNT\(\*\)/i.test(sql)) return [{ jumlah: mockKamus[tabel].size }];
       return (params || []).filter(k => mockKamus[tabel].has(k)).map(code => ({ code }));
     },
     run: async () => {},
@@ -173,7 +174,9 @@ function dbPalsu() {
   const tulis = [];
   return {
     tulis,
-    all: async (_sql, params = []) => params.filter(k => ['J18.9', 'J45.9', 'R10.4'].includes(String(k).toUpperCase())).map(code => ({ code })),
+    all: async (sql, params = []) => /COUNT\(\*\)/i.test(sql)
+      ? [{ jumlah: 3 }]
+      : params.filter(k => ['J18.9', 'J45.9', 'R10.4'].includes(String(k).toUpperCase())).map(code => ({ code })),
     prepare: (sql) => ({
       run: async (...a) => { tulis.push({ sql, a }); },
       get: async () => undefined,
