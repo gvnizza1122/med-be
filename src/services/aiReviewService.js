@@ -2153,7 +2153,8 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
         result.syarat_penunjang = evaluasiSyaratPenunjang(
           record.DIAGLIST || record.diagnosa_list,
           record.PROCLIST || record.prosedur_list,
-          evidencePool
+          evidencePool,
+          { pakaiBacaLab: process.env.SYARAT_PAKAI_BACA_LAB !== 'false' }
         );
       } catch (syaratErr) {
         console.warn(`[AI-REVIEW] evaluasiSyaratPenunjang error: ${syaratErr.message}`);
@@ -2182,14 +2183,10 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
         result.temuan_penunjang = [];
       }
 
-      // Temuan lab — baris tabel laboratorium dibaca per baris + diperiksa
-      // kewajarannya (bacaLabService.js). SELALU dihitung & disimpan (murni
-      // baca, tanpa efek samping) di ai_review.temuan_lab, TERLEPAS dari
-      // SYARAT_PAKAI_BACA_LAB — flag itu HANYA mengendalikan apakah
-      // syaratPenunjangService memakai nilai ini untuk memutuskan syarat
-      // klaim terpenuhi/tidak (defaultnya tetap MATI; lihat
-      // syaratPenunjangService.js dan HANDOFF.md item 4: "aktifkan pembaca
-      // lab setelah dicoba pada PDF asli").
+      // Temuan lab dibaca dan disimpan di ai_review.temuan_lab. Untuk syarat
+      // klaim, pembacaan per baris + pemeriksa kewajaran aktif default setelah
+      // diverifikasi pada PDF asli lokal; SYARAT_PAKAI_BACA_LAB=false
+      // mempertahankan jalur lama sebagai rollback.
       let labTidakDikenali = [];
       try {
         const bacaanLab = bacaLabDariHalaman(evidencePool);
@@ -2197,7 +2194,7 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
         labTidakDikenali = bacaanLab.tidak_dikenali || [];
       } catch (labErr) {
         console.warn(`[AI-REVIEW] bacaLabDariHalaman error: ${labErr.message}`);
-        result.temuan_lab = { baris: [], tidak_dikenali: [] };
+        result.temuan_lab = { baris: [], serologi: [], tidak_dikenali: [] };
       }
 
       // Antrean varian belum dikenali — istilah penunjang/parameter lab yang

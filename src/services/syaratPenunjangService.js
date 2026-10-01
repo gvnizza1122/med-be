@@ -192,7 +192,12 @@ function nilaiSyarat(syarat, kodeProsedur, halaman, opsi = {}) {
         }
         return hasil;
       }
-      // Tidak ada baris terbaca: jatuh ke pembacaan lama di bawah.
+      // Saklar line-based dimaksudkan sebagai jalur aman. Bila tabel tidak
+      // berhasil dibaca sebagai satu baris, jangan jatuh ke regex lama yang
+      // bisa mengambil angka dari baris tetangga/kutipan bebas.
+      hasil.status = STATUS.PERLU_CEK_MANUAL;
+      hasil.catatan_batasan = 'Nilai lab tidak terbaca sebagai satu baris parameter-nilai-satuan; verifikasi berkas asli secara manual.';
+      return hasil;
     }
     const temuan = bacaNilaiLab(halaman, syarat.parameter_lab);
     if (temuan) {
