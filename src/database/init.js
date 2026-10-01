@@ -844,12 +844,25 @@ async function migrateSchema(db) {
       'kotakRegulasiService',
       'aturanKodingRsService',
       'alurJawabPendingSchema',
+      'ambangKlinisService',
+      'pencarianKodeService',
     ]) {
       try {
         await require(`../services/${nama}`).ensureSchema(dbHelper);
       } catch (e) {
         console.error(`[init] Skema ${nama} gagal:`, e.message);
       }
+    }
+
+    // Isi ref_kode/ref_istilah_kode dari icd10_who_codes (18.549 baris) dan
+    // icd9_cm_procedures (4.626 baris) -- sistem pencarian kode baru, BELUM
+    // disambung ke generateAiReview. Idempoten (check-before-insert); dibiarkan
+    // jalan setiap start seperti seed kamus penunjang, supaya tabel referensi
+    // ICD yang bertambah ikut terbawa tanpa migrasi manual.
+    try {
+      await require('../services/pencarianKodeService').seedDariTabelReferensi(dbHelper);
+    } catch (e) {
+      console.error('[init] Seed pencarian kode gagal:', e.message);
     }
 
     // Add constraint: If jenis_field='Koding', kutipan must NOT be NULL
