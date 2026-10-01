@@ -94,6 +94,33 @@ function susunPutusan(aiReviewMasuk = {}, validationErrorsMasuk = []) {
     });
   }
 
+  // Kunjungan IGD yang TIDAK memenuhi kriteria kegawatdaruratan (Permenkes
+  // 47/2018 Pasal 3 ayat 2): BPJS mempending klaim IGD tanpa kriteria gawat
+  // darurat -- permintaan klien 1 Okt 2026. Hanya kunjungan IGD (klaim poli
+  // tidak pernah pending karena ini) dan hanya bila penilaian benar-benar
+  // dijalankan. Borderline belum dianggap terpenuhi. Alasan ini WAJIB: AI
+  // putusan tidak boleh menggugurkannya (lihat putusanPendingAiService).
+  const kgd = aiReview.kegawatdaruratan_assessment;
+  if (kgd && kgd.kunjungan_igd === true && kgd.has_data === true && Array.isArray(kgd.kriteria)
+    && !kgd.kriteria.some(k => k && (k.status === 'ya' || k.status === 'TERPENUHI'))) {
+    const borderline = kgd.kriteria.filter(k => k && k.status === 'borderline');
+    tambah(alasan, {
+      sumber_pemeriksaan: 'Kriteria kegawatdaruratan',
+      kode: 'KGD-IGD',
+      ringkas: 'Kunjungan IGD tidak memenuhi kriteria kegawatdaruratan',
+      penjelasan: 'Tidak ada kriteria K1-K5 (Permenkes 47/2018 Pasal 3 ayat 2) yang terpenuhi dari pemeriksaan fisik dan tanda vital di Triase/Resume IGD.'
+        + (borderline.length > 0
+          ? ` Mendekati ambang: ${borderline.map(k => `${k.kriteria} (${k.catatan || k.label || 'borderline'})`).join('; ')}.`
+          : ''),
+      keparahan: 'tinggi',
+      bukti: kgd.kriteria.map(k => `${k.kriteria}: ${k.status}`).join(', '),
+      tindakan: 'Pastikan pemeriksaan fisik dan tanda vital saat datang tercatat lengkap di Triase/Resume IGD',
+      diverifikasi: true,
+      dari_rekap_pending: false,
+      wajib_pending: true,
+    });
+  }
+
   // 2. Konsistensi antar data — data yang diklaim tanpa pendukungnya.
   for (const k of aiReview.konsistensi_data || []) {
     tambah(alasan, {

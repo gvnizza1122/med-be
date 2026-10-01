@@ -52,8 +52,11 @@ function bentukPutusan(putusanKandidat, keputusan, metadata = {}) {
     return { ok: false, error: 'Tidak ada kandidat pendukung untuk status yang dipilih' };
   }
 
-  const alasan = ids.map(id => indeks.get(id));
-  const status = keputusan.status;
+  // Alasan wajib (mis. kunjungan IGD tanpa kriteria kegawatdaruratan) tidak
+  // boleh digugurkan AI: selalu ikut, dan statusnya selalu berisiko_pending.
+  const wajib = putusanKandidat.alasan.filter(a => a && a.wajib_pending === true);
+  const alasan = [...new Set([...wajib, ...ids.map(id => indeks.get(id))])];
+  const status = wajib.length > 0 ? 'berisiko_pending' : keputusan.status;
   const ringkasan = status === 'berisiko_pending'
     ? `AI menilai ada ${alasan.length} alasan yang berisiko membuat klaim ini dipending.`
     : status === 'perlu_dicek'

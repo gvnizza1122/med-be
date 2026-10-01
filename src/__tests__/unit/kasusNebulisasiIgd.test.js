@@ -95,18 +95,26 @@ describe('kasus nebulisasi IGD — dengan pasangan label dari posisi kata', () =
 });
 
 describe('kasus nebulisasi IGD — TANPA koordinat (jalur teks lama)', () => {
-  // Bila PDF scan / koordinat gagal, perilaku lama dipertahankan: resume tetap
-  // tidak terbaca, tetapi peringatan silang menangkapnya.
+  // Bila PDF scan / koordinat gagal, isi kolom Tindakan yang menempel SATU
+  // BARIS DI ATAS labelnya tetap terbaca dari teks (1 Okt 2026) -- hasilnya
+  // sama dengan jalur posisi kata. Sebelumnya resume tidak terbaca dan hanya
+  // peringatan silang yang menangkapnya.
   const berkas = [HAL1, halaman2Teks, HAL3, HAL4, HAL5, HAL6];
   const temuan = bacaTemuanTindakan(berkas);
 
-  test('nebulisasi tetap terbaca dari resep dan triase, resume tidak', () => {
+  test('nebulisasi terbaca dari resume, resep, dan triase', () => {
     const nebul = temuan.find(t => t.id === 'nebulisasi');
-    expect(nebul.bukti.map(b => b.sumber).sort()).toEqual(['resep', 'triase_igd']);
+    expect(nebul.bukti.map(b => b.sumber).sort()).toEqual(['resep', 'resume_medis', 'triase_igd']);
+    expect(nebul.bukti.find(b => b.sumber === 'resume_medis').kutipan).toMatch(/^Nebulisasi Ventasal/);
   });
 
-  test('peringatan: kemungkinan tindakan nebulisasi belum terbaca', () => {
-    const c = periksaSilangTindakan(temuan);
+  test('resume sudah memuatnya -> tidak ada peringatan silang', () => {
+    expect(periksaSilangTindakan(temuan)).toEqual([]);
+  });
+
+  test('peringatan tetap muncul bila kolom Tindakan resume benar-benar kosong', () => {
+    const resumeKosong = { page_number: 2, ocr_text: 'RESUME MEDIS IGD\nDiagnosa\nPPOK,\nPneumonia\nPenyebab Cedera\nTindakan\nRencana Rawat jalan' };
+    const c = periksaSilangTindakan(bacaTemuanTindakan([HAL1, resumeKosong, HAL3, HAL4, HAL5, HAL6]));
     expect(c).toHaveLength(1);
     expect(c[0].pesan).toMatch(/^Kemungkinan tindakan nebulisasi belum terbaca/);
     expect(c[0].jenis).toBe('tindakan_tidak_ada_di_resume');
@@ -118,6 +126,6 @@ describe('kasus nebulisasi IGD — TANPA koordinat (jalur teks lama)', () => {
   test('halaman scan tanpa nilai_label: isian kosong tidak merusak jalur teks', () => {
     const kosong = { ...halaman2Teks, nilai_label: { Tindakan: '' } };
     const t = bacaTemuanTindakan([kosong, HAL3, HAL5]).find(x => x.id === 'nebulisasi');
-    expect(t.bukti.map(b => b.sumber).sort()).toEqual(['resep', 'triase_igd']);
+    expect(t.bukti.map(b => b.sumber).sort()).toEqual(['resep', 'resume_medis', 'triase_igd']);
   });
 });

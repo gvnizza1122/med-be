@@ -47,23 +47,34 @@ services:
       - DB_POOL_MAX=${DB_POOL_MAX:-30}
       - SKIP_OCR_EVIDENCE=${SKIP_OCR_EVIDENCE:-false}
       - OCR_ENHANCEMENT_TIMEOUT=${OCR_ENHANCEMENT_TIMEOUT:-180000}
-      # PaddleOCR (layanan ocr_paddle) untuk halaman scan; gagal/timeout ->
-      # Tesseract. OCR_ENGINE=tesseract untuk mematikan.
+      # OCR halaman scan memakai model PP-OCRv5 lewat layanan ocr_rapid
+      # (RapidOCR/ONNX, ~1,5-2 dtk/halaman); gagal/timeout -> Tesseract.
+      # Kembali ke runtime Paddle lama: PADDLE_OCR_URL=http://ocr_paddle:8866
+      # dan jalankan dengan --profile ocr-paddle-lama.
+      # OCR_ENGINE=tesseract untuk mematikan keduanya.
       - OCR_ENGINE=${OCR_ENGINE:-paddle}
-      - PADDLE_OCR_URL=${PADDLE_OCR_URL:-http://ocr_paddle:8866}
+      - PADDLE_OCR_URL=${PADDLE_OCR_URL:-http://ocr_rapid:8866}
       - PADDLE_OCR_TIMEOUT_MS=${PADDLE_OCR_TIMEOUT_MS:-60000}
     depends_on:
       - db
-      - ocr_paddle
+      - ocr_rapid
     volumes:
       - ./uploads:/usr/src/app/uploads
       - ./logs:/usr/src/app/logs
     restart: unless-stopped
 
+  ocr_rapid:
+    build: ./ocr-rapid
+    container_name: eclaim_ocr_rapid
+    # Tidak dipublikasikan ke host; hanya dipanggil eclaim_api lewat jaringan compose.
+    restart: unless-stopped
+
+  # Versi lama (runtime Paddle, 10-16 dtk/halaman) -- disimpan sebagai cadangan,
+  # tidak ikut jalan kecuali: docker compose --profile ocr-paddle-lama up -d
   ocr_paddle:
     build: ./ocr-paddle
     container_name: eclaim_ocr_paddle
-    # Tidak dipublikasikan ke host; hanya dipanggil eclaim_api lewat jaringan compose.
+    profiles: ["ocr-paddle-lama"]
     restart: unless-stopped
 
 volumes:
