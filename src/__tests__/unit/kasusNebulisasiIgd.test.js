@@ -71,11 +71,13 @@ describe('kasus nebulisasi IGD — dengan pasangan label dari posisi kata', () =
     expect(periksaSilangTindakan(temuan)).toEqual([]);
   });
 
-  test('tahap koding: masuk usulan prosedur 93.94 (perilaku bawaan, tanpa aturan RS)', () => {
+  test('tahap koding: usulan 93.94 tetap terlihat tetapi tidak otomatis masuk PROCLIST', () => {
     const usulan = susunUsulanProsedur(temuan, new Map(), { jenisKlaim: 'RAWAT_JALAN', igd: true });
-    expect(kodeProclistDariUsulan(usulan)).toEqual(['93.94']);
+    expect(kodeProclistDariUsulan(usulan)).toEqual([]);
     expect(usulan[0].belum_ada_aturan_rs).toBe(true);
     expect(usulan[0].kode_terverifikasi).toBe(false);
+    expect(usulan[0].kode_usulan).toBe('93.94');
+    expect(usulan[0].alasan).toMatch(/belum diizinkan.*pengisian otomatis/i);
   });
 
   test('kolom Tindakan yang sudah dikenali tidak dilempar lagi ke AI untuk dikodekan', () => {
