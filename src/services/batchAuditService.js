@@ -94,7 +94,8 @@ async function batchAuditRecords(db, recordIds, style = 'ponytail', onProgress =
             record,
             err.field_name || 'unknown',
             style,
-            err.error_message
+            err.error_message,
+            { db }
           );
 
           // Log audit to DB

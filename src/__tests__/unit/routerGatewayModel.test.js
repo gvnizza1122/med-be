@@ -70,6 +70,30 @@ describe('routerModelService — fallback env', () => {
     delete process.env.AI_MODEL;
     expect((await router.resolve(dbTiruan(), 'baca_berkas')).model).toBe('gpt-4o-mini');
   });
+
+  test('ringkas_training_pending kosong di router tetap memakai Kimi dan env khusus Kimi', async () => {
+    const db = dbTiruan();
+    const rute = await router.resolve(db, 'ringkas_training_pending');
+    expect(rute).toMatchObject({ penyedia: 'kimi', model: 'kimi-k3', sumber: 'env' });
+    const f = jest.fn(async (url, init) => ({
+      ok: true, status: 200,
+      text: async () => JSON.stringify({ choices: [{ message: { content: '{"kategori_pending":"koding_diagnosis"}' } }] }),
+    }));
+    const hasil = await gateway.panggilModel('ringkas_training_pending', {
+      prompt: 'Alasan untuk SEP 0170R0111225V003433',
+      dikenal: { sep: '0170R0111225V003433' }, json: true, fetchImpl: f,
+    }, { db });
+    expect(hasil.ok).toBe(true);
+    expect(f.mock.calls[0][0]).toBe('https://kimi.example/v1/chat/completions');
+    expect(f.mock.calls[0][1].headers.Authorization).toBe('Bearer kunci-kimi');
+    expect(f.mock.calls[0][1].body).not.toContain('0170R0111225V003433');
+  });
+
+  test('putuskan_pending terdaftar dan fallback ke model env tanpa perubahan default', async () => {
+    const r = await router.resolve(dbTiruan(), 'putuskan_pending');
+    expect(r).toMatchObject({ penyedia: 'openai_compat', model: 'gpt-6-luna', sumber: 'env' });
+    expect(r.peringatan).toBeNull();
+  });
 });
 
 describe('routerModelService — baris router_model', () => {

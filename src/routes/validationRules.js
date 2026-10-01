@@ -188,7 +188,7 @@ recordsRouter.post('/:recordId/audit', authenticate, async (req, res) => {
     for (const field of fields) {
       try {
         const validationError = errorMsgMap[field]?.join('; ') || null;
-        const result = await auditRecordField(record, field, style, validationError);
+        const result = await auditRecordField(record, field, style, validationError, { db });
         const auditId = await logFieldAudit(db, {
           fileId: record.file_id, recordId: record.id, fieldName: field, result,
         });

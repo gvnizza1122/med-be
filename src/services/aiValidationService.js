@@ -1,5 +1,4 @@
-const https = require('https');
-const http = require('http');
+const { panggilModel } = require('./gatewayModelService');
 
 // Map the typescript types statuses to Postgres DB check constraints
 function mapStatusToDb(status) {
@@ -315,79 +314,43 @@ function buildUserMessage(records) {
 }
 
 /**
- * Low-level POST ke endpoint OpenAI-compatible /chat/completions.
- * Reused oleh batch audit (runAiAudit) dan field audit (auditRecordField).
+ * Kompatibilitas bentuk respons lama di atas gateway tersamarkan.
  */
-async function postChatCompletion(bodyObj, apiKey, baseUrl) {
-  const body = JSON.stringify(bodyObj);
-  const url = new URL(`${baseUrl}/chat/completions`);
-  const isLocal = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
-  const transport = url.protocol === 'https:' ? https : http;
-
-  // Resolve DNS first with timeout (skip for localhost)
-  let ip = url.hostname;
-  if (!isLocal) {
-    ip = await new Promise((resolveIp, rejectIp) => {
-      const timer = setTimeout(() => { rejectIp(new Error('DNS timeout')); }, 5000);
-      require('dns').lookup(url.hostname, { family: 4 }, (err, addr) => {
-        clearTimeout(timer);
-        if (err) rejectIp(err);
-        else resolveIp(addr);
-      });
-    });
-  }
-
-  const response = await new Promise((resolve, reject) => {
-    const opts = {
-      hostname: ip,
-      path: url.pathname + (url.search || ''),
-      port: Number(url.port) || (url.protocol === 'https:' ? 443 : 80),
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Length': Buffer.byteLength(body),
-        'Host': url.hostname,
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      },
-      timeout: 30000,
-    };
-    if (url.protocol === 'https:') opts.rejectUnauthorized = true;
-    const req = transport.request(opts, (res) => {
-      let data = '';
-      res.on('data', chunk => data += chunk);
-      res.on('end', () => resolve({ status: res.statusCode, body: data }));
-    });
-    req.on('error', reject);
-    req.on('timeout', () => { req.destroy(); reject(new Error('Request timeout')); });
-    req.write(body);
-    req.end();
-  });
-
-  if (response.status !== 200) {
-    throw new Error(`AI API error ${response.status}: ${response.body.substring(0, 200)}`);
-  }
-
-  return JSON.parse(response.body);
+async function postChatCompletion(bodyObj, dikenal = {}, db = null) {
+  const messages = bodyObj.messages || [];
+  const gateway = await panggilModel('audit_berkas_field', {
+    system: messages.find(m => m.role === 'system')?.content,
+    prompt: messages.find(m => m.role === 'user')?.content || '',
+    dikenal,
+    json: !!bodyObj.response_format,
+    maxTokens: bodyObj.max_completion_tokens || 3000,
+  }, { db });
+  if (!gateway.ok) throw new Error(`[AI Audit] ${gateway.error || 'Model gagal'}`);
+  return {
+    choices: [{ message: { content: gateway.teks } }],
+    usage: gateway.penggunaan || {},
+  };
 }
 
-async function callAiApi(records, apiKey, baseUrl, model, errorFieldsByRecord = null) {
+async function callAiApi(records, errorFieldsByRecord = null, db = null) {
   // Use field-specific audit if error fields provided, else fallback to generic
   const userMessage = errorFieldsByRecord
     ? buildFieldAuditMessage(records, errorFieldsByRecord)
     : buildUserMessage(records);
 
+  const dikenal = {
+    nama: records.map(r => r.nama_pasien || r.nama_peserta).filter(Boolean),
+    nomor_kartu: records.map(r => r.nokartu).filter(Boolean),
+    no_rm: records.map(r => r.mrn || r.no_rm).filter(Boolean),
+    sep: records.map(r => r.sep).filter(Boolean),
+  };
   const data = await postChatCompletion({
-    model,
     messages: [
       { role: 'system', content: SYSTEM_PROMPT },
       { role: 'user', content: userMessage },
     ],
-    // max_completion_tokens (bukan max_tokens) & tanpa temperature custom —
-    // lihat catatan sama di aiReviewService.js.
     max_completion_tokens: 4096,
-  }, apiKey, baseUrl);
-
+  }, dikenal, db);
   const msg = data?.choices?.[0]?.message || {};
   let content = msg.content || msg.reasoning_content || '';
 
@@ -459,21 +422,8 @@ function _resetTotalUsage() {
  * @param {Object} [errorFieldsByRecord] - Optional map of record ID to error field names for field-specific audit
  * @returns {Promise<Array>}
  */
-async function runAiAudit(records, onBatchComplete, errorFieldsByRecord = null) {
+async function runAiAudit(records, onBatchComplete, errorFieldsByRecord = null, opsi = {}) {
   _resetTotalUsage();
-  const apiKey = process.env.AI_PROVIDER_API_KEY;
-  const baseUrl = process.env.AI_PROVIDER_BASE_URL || 'https://api.openai.com/v1';
-  const model = process.env.AI_MODEL || 'gpt-4o-mini';
-
-  // No API key configured — use rule-based fallback
-  if (!apiKey || apiKey === '') {
-    console.warn('[AI Audit] No API key configured, using rule-based fallback');
-    const results = runRuleBasedAudit(records);
-    if (onBatchComplete) {
-      await onBatchComplete(results, records.length);
-    }
-    return results;
-  }
 
   const BATCH_SIZE = 10;
   const allResults = [];
@@ -490,7 +440,7 @@ async function runAiAudit(records, onBatchComplete, errorFieldsByRecord = null) 
       batchResults = runRuleBasedAudit(batch);
     } else {
       try {
-        batchResults = await callAiApi(batch, apiKey, baseUrl, model, batchErrorFields);
+        batchResults = await callAiApi(batch, batchErrorFields, opsi.db || null);
         _aiApiAvailable = true;
         if (_lastUsage.total_tokens > 0) {
           _totalUsage.prompt_tokens += _lastUsage.prompt_tokens;
@@ -521,8 +471,8 @@ async function runAiAudit(records, onBatchComplete, errorFieldsByRecord = null) 
  * @param {Object} record 
  * @returns {Promise<{status: string, reason: string, suggestion: string}>}
  */
-async function validateRecordWithAI(record) {
-  const results = await runAiAudit([record]);
+async function validateRecordWithAI(record, opsi = {}) {
+  const results = await runAiAudit([record], null, null, opsi);
   if (results && results.length > 0) {
     return {
       status: results[0].ai_status,
@@ -601,15 +551,8 @@ function fallbackAuditResponse(fieldName, errorReason = '') {
  * Audit satu field dari satu record via OpenRouter dengan manual JSON parsing.
  * @returns {{field_name, status, error_description, suggestion, confidence_score, style, tokens_used}}
  */
-async function auditRecordField(record, fieldName, style = 'ponytail', validationError = null) {
+async function auditRecordField(record, fieldName, style = 'ponytail', validationError = null, opsi = {}) {
   if (!['ponytail', 'caveman', 'neutral'].includes(style)) style = 'neutral';
-
-  // Baca dari unified AI provider environment variables
-  const apiKey = process.env.AI_PROVIDER_API_KEY;
-  if (!apiKey) throw new Error('[AI Audit] AI_PROVIDER_API_KEY belum dikonfigurasi.');
-
-  const baseUrl = process.env.AI_PROVIDER_BASE_URL || 'https://api.openai.com/v1';
-  const model = process.env.AI_MODEL || 'gpt-4o-mini';
 
   const fieldKey = fieldName.toLowerCase();
   const currentValue = String(record[fieldKey] ?? '');
@@ -626,80 +569,22 @@ async function auditRecordField(record, fieldName, style = 'ponytail', validatio
     style
   );
 
-  // POST ke AI provider API
-  // max_completion_tokens (bukan max_tokens) & tanpa temperature custom —
-  // lihat catatan sama di aiReviewService.js.
-  const body = JSON.stringify({
-    model,
+  const data = await postChatCompletion({
     messages: [
       { role: 'system', content: AI_AUDIT_SYSTEM_PROMPT },
       { role: 'user', content: userMessage },
     ],
     max_completion_tokens: 400,
-    response_format: { type: 'json_object' }, // hint ke model untuk JSON output
-  });
-
-  const url = new URL(`${baseUrl}/chat/completions`);
-  const isLocal = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
-  const transport = url.protocol === 'https:' ? https : http;
-
-  let ip = url.hostname;
-  if (!isLocal) {
-    ip = await new Promise((resolveIp, rejectIp) => {
-      const timer = setTimeout(() => { rejectIp(new Error('DNS timeout')); }, 5000);
-      require('dns').lookup(url.hostname, { family: 4 }, (err, addr) => {
-        clearTimeout(timer);
-        if (err) rejectIp(err);
-        else resolveIp(addr);
-      });
-    });
-  }
-
-  const response = await new Promise((resolve, reject) => {
-    const opts = {
-      hostname: ip,
-      path: url.pathname + (url.search || ''),
-      port: Number(url.port) || 443,
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Length': Buffer.byteLength(body),
-        'Host': url.hostname,
-      },
-      timeout: 30000,
-    };
-    if (url.protocol === 'https:') opts.rejectUnauthorized = true;
-
-    const req = transport.request(opts, (res) => {
-      let data = '';
-      res.on('data', chunk => data += chunk);
-      res.on('end', () => resolve({ status: res.statusCode, body: data }));
-    });
-    req.on('error', reject);
-    req.on('timeout', () => { req.destroy(); reject(new Error('Request timeout')); });
-    req.write(body);
-    req.end();
-  });
-
-  if (response.status !== 200) {
-    throw new Error(`[AI Audit] HTTP ${response.status}: ${response.body.substring(0, 150)}`);
-  }
-
-  let data;
-  try {
-    data = JSON.parse(response.body);
-  } catch (e) {
-    throw new Error(`[AI Audit] Invalid JSON response: ${e.message}`);
-  }
-
+    response_format: { type: 'json_object' },
+  }, {
+    nama: record.nama_pasien || record.nama_peserta,
+    nomor_kartu: record.nokartu,
+    no_rm: record.mrn || record.no_rm,
+    sep: record.sep,
+  }, opsi.db || null);
   const usage = data?.usage || {};
   const content = data?.choices?.[0]?.message?.content || '';
-
-  if (!content) {
-    throw new Error('[AI Audit] Empty response content');
-  }
-
+  if (!content) throw new Error('[AI Audit] Empty response content');
   // Manual JSON parsing dari content (fallback dari markdown blocks)
   let auditResult;
   try {
