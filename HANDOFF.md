@@ -153,3 +153,5 @@ Suite penuh backend terakhir: **59 suite lulus, 12 gagal; 1.137 tes lulus, 49 ga
 
 ## Perubahan sesi 2026-10-01 lanjutan: ringkasan valid
 Frontend commit lokal d4be105 (belum push/deploy): RingkasanTemuanCard kini menerima validation_status dan menyembunyikan status hijau tidak_ditemukan_alasan bila rekam berstatus valid. Status berisiko/perlu dicek tetap ditampilkan. npm run build lulus setelah perubahan. Baseline backend sebelum perubahan frontend pada sesi ini: 60 suite lulus, 11 gagal; 1.138 tes lulus, 48 gagal. Kegagalan yang tampak mencakup mismatch ekspektasi versi fixture/API, kredensial integrasi, dan worker manual; tidak ada tes backend sesudahnya karena backend tidak diubah.
+Perubahan lanjutan tampilan hasil audit: frontend commit lokal eff3e1b memperjelas checklist saran AI menjadi Cocokkan saran kode yang belum tercantum dengan isi berkas; ini menandai selisih saran-vs-klaim, bukan mengklaim field kosong. Field kosong aktual tetap dilaporkan oleh baris Lengkapi ... field kosong. 
+pm run build lulus lagi setelah perubahan ini.
