@@ -2782,7 +2782,7 @@ async function reprocessExistingRecord(db, { fileId, recordId, filePath, jenisKl
         recordKnowledge(db, aiReview.knowledge_updates).catch(kbErr =>
           console.warn(`[reread] Gagal simpan knowledge base: ${kbErr.message}`));
       } else {
-        await db.prepare('UPDATE claim_records SET ai_review = NULL WHERE id = ?').run(recordId);
+        await simpanAiReview(db, recordId, { analisis_tidak_tersedia: true });
       }
     } catch (aiErr) {
       console.warn(`[reread] AI review gagal untuk record ${recordId}: ${aiErr.message}`);
