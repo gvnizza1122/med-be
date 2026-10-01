@@ -61,14 +61,28 @@ async function applyOcrEnhancements(standardResult, filePath, options = {}) {
     // Timeout untuk OCR enhancement (Tesseract + clinical extraction), lihat
     // OCR_ENHANCEMENT_TIMEOUT_MS di atas. Kalau timeout, skip enhancement dan
     // lanjut dengan basic extraction saja.
+    let timerBatas;
     const enhancementResult = await Promise.race([
       enhancedOcrExtraction(filePath, pageNumbers),
-      new Promise((_, reject) =>
-        setTimeout(() => reject(new Error(`OCR enhancement timeout (${OCR_ENHANCEMENT_TIMEOUT_MS / 1000}s)`)), OCR_ENHANCEMENT_TIMEOUT_MS)
-      )
-    ]);
+      new Promise((_, reject) => {
+        timerBatas = setTimeout(() => reject(new Error(`OCR enhancement timeout (${OCR_ENHANCEMENT_TIMEOUT_MS / 1000}s)`)), OCR_ENHANCEMENT_TIMEOUT_MS);
+      })
+    ]).finally(() => clearTimeout(timerBatas));
 
     enhanced.ocr_enhancement = enhancementResult;
+
+    // PDF tanpa teks asli (hasil scan): teks OCR per halaman menjadi
+    // claimDataText, sama seperti jalur OCR non-enhanced di
+    // pdfExtractionPipeline.js. Tanpa ini claimDataText hanya berisi ringkasan
+    // vital/temuan di bawah, isClaimDataPage() selalu gagal, dan SETIAP PDF
+    // scan ditolak "Berkas Klaim Individual tidak ditemukan" -- ditemukan saat
+    // menguji salinan scan berkas 0170R0110826V000083 (1 Okt 2026).
+    const halamanOcr = (enhancementResult.pass1_general_ocr?.pages || [])
+      .filter(p => p.text && p.text.trim().length > 30);
+    if ((!enhanced.claimDataText || enhanced.claimDataText.trim().length < 50) && halamanOcr.length > 0) {
+      enhanced.claimDataText = halamanOcr.map(p => p.text).join('\n\n---\n\n');
+      enhanced.claimDataPages = halamanOcr.map(p => ({ page_num: p.page_number, text: p.text }));
+    }
 
     if (enhancementResult.success && enhancementResult.pass2_clinical_extraction) {
       // Extract vital signs yang terdeteksi

@@ -778,16 +778,17 @@ const KEGAWATDARURATAN_SYSTEM_PROMPT = `Kamu perawat/verifikator yang mengekstra
 klinis sebuah rumah sakit, untuk dipakai sistem menilai 5 kriteria kegawatdaruratan resmi Pasal 3 ayat (2)
 Permenkes RI No. 47 Tahun 2018 (K1-K5).
 
-TUGAS: kamu diberi teks halaman dari DUA kemungkinan sumber dokumen -- TRIASE IGD (SELALU ada) dan, kalau
-tersedia, RESUME MEDIS RAWAT INAP (OPSIONAL, dilabeli jelas dengan header "=== RESUME MEDIS RAWAT INAP ==="
-di teks yang diberikan kalau ada) -- Tugasmu MURNI EKSTRAKSI DATA MENTAH apa adanya, BUKAN menilai gawat/
-tidak gawat (K2-K5 dihitung OTOMATIS oleh sistem dari data yang kamu ekstrak, memakai tabel ambang batas
-baku) -- KECUALI Bagian 3 (K1) yang tetap butuh penilaian bahasamu. PENTING soal sumber: Bagian 1 (parameter
-pemeriksaan fisik) BOLEH memakai KEDUA sumber (lihat aturan prioritas di Bagian 1) -- tapi Bagian 2 (nilai
-vital) dan Bagian 3 (K1) WAJIB HANYA memakai teks TRIASE IGD, JANGAN memakai Resume Medis Rawat Inap untuk
-kedua bagian itu sama sekali, walau datanya ada di sana -- ini karena kriteria kegawatdaruratan resmi
-menilai kondisi SAAT TRIASE, bukan sepanjang rawat inap; Resume Medis di sini HANYA untuk melengkapi Tabel 1
-sebagai konteks tambahan kalau Triase tidak mencatatnya.
+TUGAS: kamu diberi teks halaman dari beberapa kemungkinan sumber dokumen, masing-masing dilabeli header:
+- SUMBER UTAMA: "=== TRIASE IGD ===", atau kalau triase tidak ada, dokumen fallback (LAPORAN OPERASI/HASIL
+  LAB/RADIOLOGI), atau kalau keduanya tidak ada, "=== RESUME MEDIS (SUMBER UTAMA - TRIASE IGD TIDAK ADA) ===".
+- PELENGKAP: "=== RESUME MEDIS (PELENGKAP) ===" -- Resume Medis APAPUN (IGD, rawat jalan poli, rawat inap)
+  yang memuat pemeriksaan fisik dokter (mis. "th : sdv +/+, ronki +/+") dan tanda vital.
+Tugasmu MURNI EKSTRAKSI DATA MENTAH apa adanya, BUKAN menilai gawat/tidak gawat (K2-K5 dihitung OTOMATIS
+oleh sistem dari data yang kamu ekstrak, memakai tabel ambang batas baku) -- KECUALI Bagian 3 (K1) yang
+tetap butuh penilaian bahasamu. PENTING soal sumber: Bagian 1 (parameter pemeriksaan fisik) dan Bagian 2
+(nilai vital) memakai SUMBER UTAMA dulu, lalu RESUME MEDIS (PELENGKAP) HANYA untuk parameter/nilai yang
+tidak tercatat sama sekali di sumber utama. Bagian 3 (K1) dan Bagian 4 HANYA dari SUMBER UTAMA, JANGAN dari
+Resume Medis (PELENGKAP).
 
 FORMULIR TRIASE IGD di RS ini biasanya berisi bagian-bagian berlabel berikut (nama section PERSIS seperti
 yang tercetak, tapi tata letak bisa sedikit beda antar dokumen):
@@ -826,10 +827,11 @@ singkat, bukan kalimat lengkap):
   "SI" dalam pemeriksaan mata berarti sklera ikterik, BUKAN field "SI" INA-CBG/tarif; jangan tertukar
   atau petakan "SI" ke konjungtiva_anemis.
 
-Untuk TIAP parameter di bawah: cari DULU di teks TRIASE IGD. Kalau TIDAK disebutkan di Triase IGD SAMA
-SEKALI DAN teks Resume Medis Rawat Inap TERSEDIA (lihat header di atas), boleh cari di sana juga sebagai
-pelengkap -- TAPI kalau parameter itu disebutkan di KEDUA sumber, WAJIB pakai kutipan dari Triase IGD
-(sumber utama), JANGAN dari Resume Medis. Laporkan status "normal" (sesuai contoh nilai normal) atau
+Untuk TIAP parameter di bawah: cari DULU di SUMBER UTAMA. Kalau TIDAK disebutkan di sumber utama SAMA
+SEKALI DAN teks RESUME MEDIS (PELENGKAP) TERSEDIA (lihat header di atas), WAJIB cari di sana juga -- bagian
+pemeriksaan fisik dokter di resume (mis. "th : sdv +/+, ronki +/+, wheezing +/+ retraksi dada -", "ca -/-",
+"cor : dbn", "abd : dbn") adalah bukti objektif yang sah. TAPI kalau parameter itu disebutkan di KEDUA
+sumber, WAJIB pakai kutipan dari sumber utama, JANGAN dari Resume Medis. Laporkan status "normal" (sesuai contoh nilai normal) atau
 "abnormal" (sesuai contoh nilai abnormal) HANYA kalau ada kutipan eksplisit. Kalau parameter itu TIDAK
 disebutkan sama sekali di KEDUA sumber, JANGAN mengarang — laporkan "ditemukan":false, "status":null.
 - ronkhi (Rh): normal="(-/-)", abnormal="(+/+) atau sejenis (ada ronkhi)"
@@ -879,12 +881,12 @@ tanpa rincian lebih lanjut TETAP boleh dipetakan sebagai status normal untuk par
 kalau redaksinya eksplisit menyebut region itu baik-baik saja, JANGAN menebak dari "Clear" umum saja tanpa
 konteks region yang jelas.
 
-=== BAGIAN 2: EKSTRAK 7 NILAI VITAL/SKOR MENTAH (HANYA dari TRIASE IGD) ===
-WAJIB HANYA cari di teks TRIASE IGD untuk bagian ini -- JANGAN pakai Resume Medis Rawat Inap sama sekali
-walau nilai vitalnya ada di sana, karena kriteria menilai kondisi SAAT TRIASE. Untuk TIAP parameter, ekstrak
-NILAI NUMERIK MENTAH (BUKAN kesimpulan normal/abnormal — band dihitung sistem dari angka ini). Kalau tidak
-tercatat sama sekali di Triase IGD, "nilai":null — JANGAN mengarang angka, dan JANGAN ambil dari Resume
-Medis walau ada di sana.
+=== BAGIAN 2: EKSTRAK 7 NILAI VITAL/SKOR MENTAH (SUMBER UTAMA, lalu RESUME MEDIS PELENGKAP) ===
+Cari DULU di SUMBER UTAMA. Kalau sebuah nilai TIDAK tercatat di sumber utama, ambil dari RESUME MEDIS
+(PELENGKAP) bila tercatat di sana (mis. tabel "Vital Sign" resume: "BB TB TD Heart Rate RR Temp" lalu baris
+angka "33 KG 163 Kali 32 Kali 36.2"). Kalau nilai yang sama ada di KEDUA sumber, WAJIB pakai sumber utama.
+Untuk TIAP parameter, ekstrak NILAI NUMERIK MENTAH (BUKAN kesimpulan normal/abnormal — band dihitung sistem
+dari angka ini). Kalau tidak tercatat sama sekali di kedua sumber, "nilai":null — JANGAN mengarang angka.
 - RR: laju napas, x/menit
 - SpO2: saturasi oksigen, %
 - HR: heart rate/nadi, x/menit
@@ -906,9 +908,8 @@ Medis walau ada di sana.
 Field "kutipan" WAJIB kutipan verbatim baris tempat nilai itu tercatat (mis. "TD 120/80 mmHg", "RR 22
 x/mnt"), field "page_number" WAJIB nomor halaman tempat kutipan itu berada.
 
-=== BAGIAN 3: K1 — PENILAIAN BAHASA (HANYA dari TRIASE IGD, bukan ekstraksi angka, tetap butuh judgmentmu) ===
-WAJIB HANYA cari di teks TRIASE IGD untuk bagian ini -- JANGAN pakai Resume Medis Rawat Inap sama sekali,
-sama seperti Bagian 2. K1 (Mengancam nyawa, membahayakan diri sendiri/orang lain/lingkungan): cari kata
+=== BAGIAN 3: K1 — PENILAIAN BAHASA (HANYA dari SUMBER UTAMA, bukan ekstraksi angka, tetap butuh judgmentmu) ===
+WAJIB HANYA cari di teks SUMBER UTAMA untuk bagian ini -- JANGAN pakai RESUME MEDIS (PELENGKAP). K1 (Mengancam nyawa, membahayakan diri sendiri/orang lain/lingkungan): cari kata
 kunci EKSPLISIT di anamnesis/keluhan/PSIKOSOSIAL (baris SIRS/Suicidal Intention Rating Scale kalau ada) di
 TRIASE IGD yang menunjukkan risiko
 bunuh diri, membahayakan diri sendiri, membahayakan orang lain, atau bahaya lingkungan (mis. percobaan bunuh
@@ -916,12 +917,12 @@ diri, ancaman kekerasan, overdosis sengaja, dsb). "status":"ya" HANYA kalau ADA 
 mendukung — JANGAN simpulkan dari nama diagnosis semata (mis. "sesak napas" TIDAK otomatis K1). Field
 "kutipan" WAJIB diisi kalau status "ya". Field "catatan" (1 kalimat Indonesia) jelaskan singkat alasannya.
 
-=== BAGIAN 4: TINDAKAN KEPERAWATAN SEGERA & SKOR ESI (HANYA dari TRIASE IGD) === (ditambah 19 Sep 2026, fix
+=== BAGIAN 4: TINDAKAN KEPERAWATAN SEGERA & SKOR ESI (HANYA dari SUMBER UTAMA) === (ditambah 19 Sep 2026, fix
 item 5 -- PROCLIST cuma berisi kode ICD-9-CM final e-Klaim, TIDAK PERNAH mencatat tindakan keperawatan yang
 dilakukan SAAT TRIASE sebagai teks naratif, mis. "IVFD asering loading 250cc lanjut 20tpm". Sistem butuh
 teks tindakan itu APA ADANYA -- JANGAN menilai sendiri apakah itu "tindakan segera" atau bukan, itu
 keputusan kode deterministik di luar prompt ini berdasarkan rules terpisah.)
-WAJIB HANYA cari di teks TRIASE IGD (sama seperti Bagian 2 & 3). Ekstrak:
+WAJIB HANYA cari di teks SUMBER UTAMA (sama seperti Bagian 3), JANGAN dari RESUME MEDIS (PELENGKAP). Ekstrak:
 - "tindakan_keperawatan": array tindakan/intervensi yang tercatat DILAKUKAN (bukan direncanakan/instruksi
   dokter yang belum dikerjakan) di Triase IGD -- mis. pemasangan infus/IVFD (sertakan detail cairan/rate
   kalau ada), pemberian oksigen, injeksi obat, pemasangan NGT, dst. Untuk TIAP tindakan: quotation WAJIB
@@ -1032,16 +1033,25 @@ async function assessKegawatdaruratan(evidencePool, triagePageNumbers, umurTahun
       hasFallbackPages = true;
     }
 
-    if (!hasFallbackPages) {
-      return emptyResult('Penilaian Kegawatdaruratan tidak dijalankan — tidak ada halaman Triase IGD atau dokumen fallback (Laporan Operasi/Lab Results/Radiology).');
-    }
   }
 
-  if (!apiKey || (triagePages.length === 0 && !hasFallbackPages)) return emptyResult('Penilaian Kegawatdaruratan tidak dijalankan — tidak ada halaman Triase IGD.');
-  // Resume Medis Rawat Inap -- KONTEKS TAMBAHAN saja untuk Tabel 1 (keputusan
-  // 11 Sep 2026, Opsi A), TIDAK mempengaruhi Bagian 2/3 atau agregasi K1-K5
-  // (lihat catatan di getResumeMedisPageNumbers & prompt Bagian 1-3 di atas).
+  // Resume Medis APAPUN (IGD, rawat jalan poli, rawat inap) -- 1 Okt 2026,
+  // permintaan klien: dibaca untuk pemeriksaan fisik (Bagian 1) DAN tanda
+  // vital (Bagian 2). Selama Triase IGD / dokumen fallback ada, resume hanya
+  // PELENGKAP (mengisi yang tidak tercatat di sana). Tanpa keduanya, resume
+  // menjadi sumber utama -- klaim poli rawat jalan tidak punya triase, dan
+  // sebelumnya penilaiannya dilewati sama sekali.
   const resumeMedisPages = evidencePool.filter(p => resumeMedisPageNumbers.includes(p.page_number));
+  const resumeSebagaiUtama = triagePages.length === 0 && !hasFallbackPages && resumeMedisPages.length > 0;
+
+  if (triagePages.length === 0 && !hasFallbackPages && !resumeSebagaiUtama) {
+    return emptyResult('Penilaian Kegawatdaruratan tidak dijalankan — tidak ada halaman Triase IGD, Resume Medis, atau dokumen fallback (Laporan Operasi/Lab Results/Radiology).');
+  }
+  if (!apiKey) return emptyResult('Penilaian Kegawatdaruratan tidak dijalankan — kunci API model tidak tersedia.');
+
+  // Halaman sumber UTAMA: Triase IGD, lalu dokumen fallback, lalu Resume Medis.
+  const halamanUtama = triagePages.length > 0 ? triagePages : hasFallbackPages ? fallbackPages : resumeMedisPages;
+  const nomorHalamanUtama = halamanUtama.map(p => p.page_number);
 
   let userPrompt = umurTahun ? `UMUR_TAHUN pasien: ${umurTahun}\n\n` : '';
   if (painInstrument) userPrompt += `INSTRUMEN SKALA NYERI YANG DIHARAPKAN untuk pasien usia ini: ${painInstrument}\n\n`;
@@ -1073,9 +1083,16 @@ async function assessKegawatdaruratan(evidencePool, triagePageNumbers, umurTahun
     }
   }
 
-  if (resumeMedisPages.length > 0) {
-    userPrompt += '=== RESUME MEDIS RAWAT INAP ===\nTEKS HALAMAN RESUME MEDIS RAWAT INAP (KONTEKS TAMBAHAN untuk Bagian 1 SAJA -- ' +
-      'JANGAN dipakai untuk Bagian 2 atau Bagian 3):\n================================\n';
+  if (resumeSebagaiUtama) {
+    userPrompt += '=== RESUME MEDIS (SUMBER UTAMA - TRIASE IGD TIDAK ADA) ===\nTEKS HALAMAN RESUME MEDIS (sumber utama untuk SEMUA bagian, ' +
+      'karena berkas ini tidak memuat Triase IGD):\n================================\n';
+    const sortedResume = [...resumeMedisPages].sort((a, b) => a.page_number - b.page_number);
+    for (const ev of sortedResume) {
+      userPrompt += `=== Halaman ${ev.page_number} ===\n${ev.ocr_text}\n\n`;
+    }
+  } else if (resumeMedisPages.length > 0) {
+    userPrompt += '=== RESUME MEDIS (PELENGKAP) ===\nTEKS HALAMAN RESUME MEDIS (PELENGKAP untuk Bagian 1 dan Bagian 2 -- ' +
+      'pakai HANYA untuk parameter/nilai yang TIDAK tercatat di sumber utama di atas; JANGAN dipakai untuk Bagian 3 atau Bagian 4):\n================================\n';
     const sortedResume = [...resumeMedisPages].sort((a, b) => a.page_number - b.page_number);
     for (const ev of sortedResume) {
       userPrompt += `=== Halaman ${ev.page_number} ===\n${ev.ocr_text}\n\n`;
@@ -1138,15 +1155,25 @@ async function assessKegawatdaruratan(evidencePool, triagePageNumbers, umurTahun
 
     // --- Validasi & bangun vital_findings (Bagian 2) + hitung band via lookupBand ---
     // Dengan fallback: izinkan vital dari halaman fallback jika Triase IGD tidak ada (19 Sep 2026)
-    const validVitalPages = triagePages.length > 0 ? new Set(triagePageNumbers) : new Set(fallbackPages.map(p => p.page_number));
-    const sourceDocType = triagePages.length > 0 ? 'triase_igd' : fallbackSource || 'triase_igd';
-    const pagesForFormStatus = triagePages.length > 0 ? triagePages : fallbackPages;
+    // Sumber utama + Resume Medis (pelengkap, 1 Okt 2026). Prioritas triase
+    // diatur di prompt Bagian 2; sumber tiap nilai dicatat di sumber_dokumen.
+    const validVitalPages = new Set([...nomorHalamanUtama, ...resumeMedisPageNumbers]);
+    const sourceDocType = triagePages.length > 0 ? 'triase_igd'
+      : hasFallbackPages ? (fallbackSource || 'triase_igd') : 'resume_medis';
+    const pagesForFormStatus = halamanUtama;
+    const sumberDokumenVital = (hal) => (triagePageNumbers.includes(hal) ? 'triase_igd'
+      : fallbackPages.some(p => p.page_number === hal) ? (fallbackSource || 'fallback_doc') : 'resume_medis');
 
     const rawVitals = parsed.vital_findings && typeof parsed.vital_findings === 'object' ? parsed.vital_findings : {};
     const vitalFindings = {};
     for (const key of ['RR', 'SpO2', 'HR', 'TD_sistolik', 'TD_diastolik', 'Suhu', 'GCS', 'Nyeri']) {
       const v = rawVitals[key];
-      const nilai = v && Number.isFinite(Number(v.nilai)) ? Number(v.nilai) : null;
+      // null/"" berarti TIDAK tercatat. Number(null) dan Number("") sama-sama 0,
+      // jadi tanpa pengecekan ini vital yang kosong terbaca "tertulis 0" dan
+      // tampil "Dokumen mencatat 0" (TD & SpO2 berkas 0170R0110826V000083).
+      const mentah = v ? v.nilai : null;
+      const adaAngka = mentah !== null && mentah !== undefined && String(mentah).trim() !== '';
+      const nilai = adaAngka && Number.isFinite(Number(mentah)) ? Number(mentah) : null;
       // Kesahihan kutipan dipisah dari keterbacaan angka: TD yang ditulis
       // "0/0" tidak menghasilkan angka, tapi kutipannya tetap perlu disimpan
       // supaya tampilan bisa menunjukkan dari mana nilai 0 itu berasal.
@@ -1195,6 +1222,7 @@ async function assessKegawatdaruratan(evidencePool, triagePageNumbers, umurTahun
         nilai, band: ageGroup ? lookupBand(key, nilai, ageGroup) : null,
         page_number: v.page_number, kutipan: v.kutipan.substring(0, 200),
         form_status: formStatus,
+        sumber_dokumen: sumberDokumenVital(v.page_number),
         ...nyeriExtra,
       };
     }
@@ -1228,7 +1256,8 @@ async function assessKegawatdaruratan(evidencePool, triagePageNumbers, umurTahun
       // model -- kalau tidak ditolak di sini, nilai yang baru saja dikenali
       // sebagai "tidak diukur" akan terisi ulang lewat jalur ini.
       if (bukanHasilPengukuran(kunciVital, angka)) continue;
-      // Halaman sumbernya wajib halaman vital yang sah, bukan resume medis.
+      // Halaman sumbernya wajib halaman vital yang sah (sumber utama atau
+      // Resume Medis pelengkap, lihat validVitalPages).
       const hal = dariTabel.page;
       if (hal && validVitalPages.size > 0 && !validVitalPages.has(hal)) continue;
 
@@ -1241,14 +1270,15 @@ async function assessKegawatdaruratan(evidencePool, triagePageNumbers, umurTahun
         band: ageGroup ? lookupBand(kunciVital, angka, ageGroup) : null,
         page_number: hal || null,
         kutipan: dariTabel.raw_match ? String(dariTabel.raw_match).substring(0, 200) : null,
-        sumber_nilai: 'tabel_vital_triase',
+        sumber_nilai: hal && !triagePageNumbers.includes(hal) ? 'tabel_vital_resume' : 'tabel_vital_triase',
+        sumber_dokumen: hal ? sumberDokumenVital(hal) : sourceDocType,
       };
       console.log(`[Vital] ${kunciVital} diisi dari tabel Vital Sign triase: ${angka} (hal ${hal || '?'})`);
     }
 
     // --- Validasi K1 (Bagian 3, tetap AI judgment) ---
     // HANYA dari Triase IGD atau fallback pages (dengan preferensi Triase) - Opsi A, lihat catatan di atas
-    const validK1Pages = triagePages.length > 0 ? new Set(triagePageNumbers) : new Set(fallbackPages.map(p => p.page_number));
+    const validK1Pages = new Set(nomorHalamanUtama);
     const rawK1 = parsed.k1 || {};
     let k1Result = { status: 'tidak', page_number: null, kutipan: null, catatan: '' };
     if (rawK1.status === 'ya') {
@@ -1266,7 +1296,7 @@ async function assessKegawatdaruratan(evidencePool, triagePageNumbers, umurTahun
     // --- Validasi tindakan_keperawatan & esi (Bagian 4, fix item 5) ---
     // Sama seperti Bagian 2/3: WAJIB dari Triase IGD atau fallback docs, quote-validated
     // sama seperti field lain (anti-halusinasi, TIDAK ada pengecualian).
-    const validTindakanPages = triagePages.length > 0 ? new Set(triagePageNumbers) : new Set(fallbackPages.map(p => p.page_number));
+    const validTindakanPages = new Set(nomorHalamanUtama);
     const rawTindakan = Array.isArray(parsed.tindakan_keperawatan) ? parsed.tindakan_keperawatan : [];
     const tindakanKeperawatan = [];
     for (const t of rawTindakan) {
@@ -1285,7 +1315,7 @@ async function assessKegawatdaruratan(evidencePool, triagePageNumbers, umurTahun
     const pagesForTindakan = triagePages.length > 0 ? triagePages : fallbackPages;
     const tindakanSegeraMatches = matchTindakanSegera(pagesForTindakan);
 
-    const validEsiPages = triagePages.length > 0 ? new Set(triagePageNumbers) : new Set(fallbackPages.map(p => p.page_number));
+    const validEsiPages = new Set(nomorHalamanUtama);
     const rawEsi = parsed.esi || {};
     let esiResult = { skor: null, page_number: null, kutipan: null };
     if (Number.isFinite(Number(rawEsi.skor))) {
@@ -1298,16 +1328,26 @@ async function assessKegawatdaruratan(evidencePool, triagePageNumbers, umurTahun
     }
 
     // --- Agregasi K1-K5 (murni kode, lihat kegawatdaruratanAggregation.js) ---
-    // WAJIB pakai HANYA temuan bersumber Triase IGD (atau fallback jika ada) --
-    // temuan dari Resume Medis Rawat Inap TETAP ditampilkan di parameter_findings
-    // (Tabel 1, untuk konteks) tapi TIDAK BOLEH ikut menentukan verdict K1-K5
-    // (Opsi A, lihat catatan di getIgdTriagePageNumbers/getResumeMedisPageNumbers).
-    // Dengan fallback: izinkan sumber fallback jika Triase IGD tidak ada (19 Sep 2026).
-    const primarySourceTypes = triagePages.length > 0 ? ['triase_igd', null] : [fallbackSource, null];
-    const triageOnlyFindings = parameterFindings.filter(p => primarySourceTypes.includes(p.sumber_dokumen));
-    const kriteria = aggregateKriteria(triageOnlyFindings, vitalFindings, k1Result, procedureCodes, tindakanSegeraMatches, esiResult.skor !== null ? esiResult : null);
+    // 1 Okt 2026: temuan fisik & vital dari Resume Medis IGD / rawat jalan poli
+    // (kunjungan yang SAMA dengan triase) ikut menentukan K1-K5. Resume Medis
+    // RAWAT INAP tetap hanya konteks (ditampilkan, tidak ikut menilai) --
+    // alasan Opsi A 11 Sep 2026 masih berlaku untuknya: isinya kondisi
+    // sepanjang rawat inap, bukan kondisi saat datang.
+    const halamanResumeRanap = new Set(resumeMedisPages
+      .filter(p => /resume\s+medis\s+rawat\s+inap/i.test(p.ocr_text || ''))
+      .map(p => p.page_number));
+    const temuanUntukPenilaian = parameterFindings.filter(p => !halamanResumeRanap.has(p.page_number));
+    const vitalUntukPenilaian = Object.fromEntries(Object.entries(vitalFindings).map(([k, v]) => [k,
+      v && halamanResumeRanap.has(v.page_number) ? { ...v, nilai: null, band: null } : v]));
+    const kriteria = aggregateKriteria(temuanUntukPenilaian, vitalUntukPenilaian, k1Result, procedureCodes, tindakanSegeraMatches, esiResult.skor !== null ? esiResult : null);
 
-    const ringkasan = buildRingkasan(kriteria, ageGroup);
+    // Sebut dokumen yang benar-benar menyumbang data, bukan selalu "Triase IGD".
+    const adaDariResume = [...parameterFindings, ...Object.values(vitalFindings)]
+      .some(x => x && x.sumber_dokumen === 'resume_medis' && (x.ditemukan || x.nilai !== null));
+    const namaSumberUtama = triagePages.length > 0 ? 'formulir Triase IGD'
+      : hasFallbackPages ? 'dokumen pendukung (Triase IGD tidak ada)' : 'Resume Medis (Triase IGD tidak ada)';
+    const ringkasan = buildRingkasan(kriteria, ageGroup,
+      adaDariResume && !resumeSebagaiUtama ? `${namaSumberUtama} dan Resume Medis` : namaSumberUtama);
     return {
       ringkasan, has_data: true, parameter_findings: parameterFindings, vital_findings: vitalFindings, kriteria,
       tindakan_keperawatan: tindakanKeperawatan, esi: esiResult, age_group: ageGroup,
@@ -1322,17 +1362,17 @@ async function assessKegawatdaruratan(evidencePool, triagePageNumbers, umurTahun
  * Rangkuman singkat (ditampilkan sebelum Tabel 1 di UI) — dibangun dari hasil
  * agregasi yang SUDAH dihitung, murni kode, bukan panggilan AI tambahan.
  */
-function buildRingkasan(kriteria, ageGroup) {
+function buildRingkasan(kriteria, ageGroup, sumber = 'formulir Triase IGD') {
   const ya = kriteria.filter(k => k.status === 'ya').map(k => k.kriteria);
   const borderline = kriteria.filter(k => k.status === 'borderline').map(k => k.kriteria);
   const ageLabel = ageGroup ? AGE_GROUP_LABELS[ageGroup] : 'tidak diketahui';
   if (ya.length === 0 && borderline.length === 0) {
-    return `Kelompok usia: ${ageLabel}. Tidak ada kriteria kegawatdaruratan (K1-K5) yang terpenuhi berdasarkan parameter dan nilai vital yang terekstrak dari formulir Triase IGD.`;
+    return `Kelompok usia: ${ageLabel}. Tidak ada kriteria kegawatdaruratan (K1-K5) yang terpenuhi berdasarkan parameter dan nilai vital yang terekstrak dari ${sumber}.`;
   }
   const parts = [];
   if (ya.length > 0) parts.push(`kriteria terpenuhi ("Ya"): ${ya.join(', ')}`);
   if (borderline.length > 0) parts.push(`kriteria borderline: ${borderline.join(', ')}`);
-  return `Kelompok usia: ${ageLabel}. Berdasarkan parameter dan nilai vital yang terekstrak dari formulir Triase IGD, ${parts.join('; ')}. Lihat Tabel 1-3 di bawah untuk rincian dan bukti kutipan per kriteria.`;
+  return `Kelompok usia: ${ageLabel}. Berdasarkan parameter dan nilai vital yang terekstrak dari ${sumber}, ${parts.join('; ')}. Lihat Tabel 1-3 di bawah untuk rincian dan bukti kutipan per kriteria.`;
 }
 
 const PENDING_RISK_SYSTEM_PROMPT = `Kamu asisten audit klaim BPJS E-Claim untuk perawat/verifikator rumah sakit.
@@ -2134,7 +2174,12 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
       // gagal/timeout TIDAK menggagalkan hasil utama (masing-masing fungsi
       // sudah punya fallback kosong internal kalau panggilannya gagal total).
       const triagePageNumbers = getIgdTriagePageNumbers(evidencePool);
-      const resumeMedisPageNumbers = getResumeMedisPageNumbers(evidencePool);
+      // Resume Medis APAPUN (IGD, rawat jalan poli, rawat inap) dibaca untuk
+      // pemeriksaan fisik dan tanda vital -- permintaan klien 1 Okt 2026,
+      // menggantikan Opsi A 11 Sep 2026 (hanya Resume Rawat Inap, hanya Tabel 1).
+      // Halaman triase dikeluarkan supaya tidak terhitung dua kali.
+      const resumeMedisPageNumbers = getAnyResumeMedisPageNumbers(evidencePool)
+        .filter(n => !triagePageNumbers.includes(n));
       // Fallback dokumen (19 Sep 2026) — dipakai ketika Triase IGD tidak ada
       const fallbackDocPageNumbers = {
         laporan_operasi: getLaporanOperasiPageNumbers(evidencePool),
@@ -2148,6 +2193,7 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
           return [];
         }),
         hasIgdTriagePage(evidencePool) || Object.values(fallbackDocPageNumbers).some(arr => arr.length > 0)
+          || resumeMedisPageNumbers.length > 0
           ? assessKegawatdaruratan(
               evidencePool, triagePageNumbers,
               record.UMUR_TAHUN || record.umur_tahun, record.UMUR_HARI || record.umur_hari,
@@ -2160,6 +2206,18 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
           : Promise.resolve(null),
       ]);
       result.pending_risk_notes = pendingRiskNotes;
+      // Kriteria kegawatdaruratan hanya relevan untuk kunjungan IGD. Klaim poli
+      // rawat jalan tetap dinilai (Resume Medis, 1 Okt 2026) sebagai informasi,
+      // tetapi TIDAK boleh membuat klaim pending -- permintaan klien 1 Okt 2026.
+      // claimFiles.js membaca penanda ini sebelum menaikkan status ke pending.
+      if (kegawatdaruratanAssessment) {
+        const kunjunganIgd = triagePageNumbers.length > 0
+          || hasIgdVisitSignal(evidencePool.map(e => (e && e.ocr_text) || '').join('\n'));
+        kegawatdaruratanAssessment.kunjungan_igd = kunjunganIgd;
+        if (!kunjunganIgd && kegawatdaruratanAssessment.has_data) {
+          kegawatdaruratanAssessment.ringkasan += ' Kunjungan poli (bukan IGD): penilaian ini hanya informasi dan tidak membuat klaim pending.';
+        }
+      }
       result.kegawatdaruratan_assessment = kegawatdaruratanAssessment;
 
       // Verifikasi identitas lintas halaman -- deterministik, tanpa panggilan
@@ -2597,9 +2655,13 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
           result.putusan_pending = keputusan.putusan;
           result.tokens_used += keputusan.penggunaan?.total_tokens || 0;
         } else {
+          // Alasan wajib tetap berlaku walau AI tidak tersedia.
+          const adaWajib = (kandidatPutusan.alasan || []).some(a => a && a.wajib_pending === true);
           result.putusan_pending = {
-            ...kandidatPutusan, status: 'perlu_dicek',
-            ringkasan: 'AI belum berhasil menetapkan status pending untuk klaim ini.',
+            ...kandidatPutusan, status: adaWajib ? 'berisiko_pending' : 'perlu_dicek',
+            ringkasan: adaWajib
+              ? 'Klaim berisiko dipending: ada alasan wajib (lihat daftar). AI belum berhasil menilai alasan lainnya.'
+              : 'AI belum berhasil menetapkan status pending untuk klaim ini.',
             sumber_keputusan: 'ai_tidak_tersedia', error_keputusan: keputusan.error,
             catatan_keandalan: 'Keputusan AI belum tersedia. Kandidat alasan ditampilkan sebagai informasi, bukan keputusan pending atau tidak pending.',
           };

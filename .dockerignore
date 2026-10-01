@@ -9,3 +9,4 @@ uploads
 .gitignore
 .DS_Store
 ocr-paddle
+ocr-rapid

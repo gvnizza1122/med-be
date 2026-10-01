@@ -228,4 +228,16 @@ function buildCatatanK3(gcs, kesadaran, status) {
   return partsSummary;
 }
 
-module.exports = { aggregateKriteria, KRITERIA_LABELS };
+/**
+ * Apakah hasil penilaian kegawatdaruratan membuat klaim pending: kunjungan IGD
+ * yang penilaiannya dijalankan tetapi TIDAK ada kriteria K1-K5 berstatus "ya"
+ * (borderline belum dianggap terpenuhi). BPJS mempending klaim IGD tanpa
+ * kriteria gawat darurat. Klaim poli rawat jalan tidak pernah pending karena
+ * kriteria ini (permintaan klien 1 Okt 2026); penilaiannya hanya informasi.
+ */
+function kegawatdaruratanMemicuPending(assessment) {
+  if (!assessment || assessment.kunjungan_igd !== true || assessment.has_data !== true || !Array.isArray(assessment.kriteria)) return false;
+  return !assessment.kriteria.some(k => k && (k.status === 'ya' || k.status === 'TERPENUHI'));
+}
+
+module.exports = { aggregateKriteria, kegawatdaruratanMemicuPending, KRITERIA_LABELS };

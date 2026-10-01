@@ -25,6 +25,8 @@ const { galatKamusRecord, periksaKode, tandaiStatusKamusEvidence } = require('..
 const { validasiRecordDenganKamus } = require('../services/validasiRecordKamusService');
 const { simpanAiReview } = require('../services/simpanAiReviewService');
 
+const { kegawatdaruratanMemicuPending } = require('../services/kegawatdaruratanAggregation');
+
 const router = express.Router();
 
 // UI uses the same age-specific reference as lookupBand, including existing records.
@@ -2746,8 +2748,7 @@ async function reprocessExistingRecord(db, { fileId, recordId, filePath, jenisKl
       if (aiReview) {
         // Update validation_status to PENDING jika:
         // 1. Ada pending_risk_notes dari AI review, ATAU
-        // 2. Ada kriteria kegawatdaruratan dengan status 'ya' atau 'TERPENUHI' (critical), ATAU
-        // 3. Ada parameter findings dengan status abnormal
+        // 2. Kunjungan IGD tidak memenuhi kriteria kegawatdaruratan.
         let finalStatus = validationStatus;
         let shouldSetPending = false;
 
@@ -2755,15 +2756,11 @@ async function reprocessExistingRecord(db, { fileId, recordId, filePath, jenisKl
           shouldSetPending = true;
         }
 
-        // Check kegawatdaruratan criteria untuk findings yang critical/abnormal
-        if (aiReview.kegawatdaruratan_assessment && aiReview.kegawatdaruratan_assessment.kriteria) {
-          const kriteria = aiReview.kegawatdaruratan_assessment.kriteria;
-          for (const k of kriteria) {
-            if (k.status === 'ya' || k.status === 'TERPENUHI' || k.status === 'borderline') {
-              shouldSetPending = true;
-              break;
-            }
-          }
+        // Kunjungan IGD yang TIDAK memenuhi kriteria kegawatdaruratan -> pending.
+        // Klaim poli rawat jalan tidak pernah pending karena kriteria ini
+        // (permintaan klien 1 Okt 2026), lihat kegawatdaruratanMemicuPending.
+        if (kegawatdaruratanMemicuPending(aiReview.kegawatdaruratan_assessment)) {
+          shouldSetPending = true;
         }
 
         if (shouldSetPending) {
