@@ -94,6 +94,12 @@ describe('routerModelService — fallback env', () => {
     expect(r).toMatchObject({ penyedia: 'openai_compat', model: 'gpt-6-luna', sumber: 'env' });
     expect(r.peringatan).toBeNull();
   });
+
+  test('ekstrak_pdf terdaftar dan fallback ke model env tanpa perubahan default', async () => {
+    const r = await router.resolve(dbTiruan(), 'ekstrak_pdf');
+    expect(r).toMatchObject({ penyedia: 'openai_compat', model: 'gpt-6-luna', sumber: 'env' });
+    expect(r.peringatan).toBeNull();
+  });
 });
 
 describe('routerModelService — baris router_model', () => {

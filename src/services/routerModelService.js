@@ -40,6 +40,7 @@ const TUGAS = Object.freeze([
   'audit_berkas_field',
   'ringkas_training_pending',
   'putuskan_pending',
+  'ekstrak_pdf',
 ]);
 
 const PENYEDIA = Object.freeze(['openai_compat', 'kimi']);
