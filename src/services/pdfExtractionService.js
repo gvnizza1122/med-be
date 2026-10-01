@@ -1,4 +1,6 @@
 const { PDF_FIELDS, SYSTEM_FIELDS, buildRecord, toTSV, COLUMNS } = require('./vclaimSchema');
+const { panggilModel } = require('./gatewayModelService');
+const { getDb } = require('../database/init');
 
 /**
  * Ekstrak teks halaman claim-data → 1 record vClaim (60 kolom, format asli vClaim).
@@ -20,11 +22,10 @@ async function extractClaimData(claimDataText, jenisKlaim) {
     errors: [],
   };
 
-  const apiKey = process.env.AI_PROVIDER_API_KEY;
-  const baseUrl = process.env.AI_PROVIDER_BASE_URL || 'https://api.openai.com/v1';
-  const model = process.env.AI_MODEL || 'gpt-4o-mini';
-
-  if (!apiKey) { result.errors.push('AI_PROVIDER_API_KEY tidak diisi di .env'); return result; }
+  if (!process.env.AI_PROVIDER_API_KEY && !process.env.KIMI_API_KEY) {
+    result.errors.push('Kunci penyedia AI belum disetel');
+    return result;
+  }
   if (!claimDataText || !claimDataText.trim()) { result.errors.push('claimDataText kosong'); return result; }
 
   // RAWAT_JALAN (termasuk IGD tanpa lanjut rawat inap)
@@ -123,51 +124,20 @@ JSON:`;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      const ac = new AbortController();
-      const timer = setTimeout(() => ac.abort(), timeoutMs);
-      let respText;
-      try {
-        const response = await fetch(`${baseUrl}/chat/completions`, {
-          method: 'POST',
-          signal: ac.signal,
-          headers: {
-            'Authorization': `Bearer ${apiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model,
-            messages: [
-              { role: 'system', content: 'Kamu mengembalikan HANYA satu JSON object. Dilarang menulis penjelasan, penalaran, atau markdown.' },
-              { role: 'user', content: prompt },
-            ],
-            // max_completion_tokens (bukan max_tokens) & tanpa temperature custom
-            // — lihat catatan sama di aiReviewService.js.
-            max_completion_tokens: 2000,
-            response_format: { type: 'json_object' },
-          }),
-        });
-        respText = await response.text();
-        if (!response.ok) throw new Error(`HTTP ${response.status}: ${respText.slice(0, 160)}`);
-      } finally {
-        clearTimeout(timer);
+      const hasilGateway = await panggilModel('ekstrak_pdf', {
+        system: 'Kamu mengembalikan HANYA satu JSON object. Dilarang menulis penjelasan, penalaran, atau markdown.',
+        prompt,
+        json: true,
+        maxTokens: 2000,
+      }, { db: getDb() });
+      if (!hasilGateway.ok || !hasilGateway.hasil) {
+        throw new Error(hasilGateway.error || 'Gateway ekstraksi tidak menghasilkan JSON');
       }
-
-      const data = JSON.parse(respText);
-      const content = data.choices?.[0]?.message?.content || '';
-      result.tokens.prompt = data.usage?.prompt_tokens || 0;
-      result.tokens.completion = data.usage?.completion_tokens || 0;
+      const extracted = hasilGateway.hasil;
+      result.tokens.prompt = hasilGateway.penggunaan?.prompt_tokens || 0;
+      result.tokens.completion = hasilGateway.penggunaan?.completion_tokens || 0;
       result.tokens.total = result.tokens.prompt + result.tokens.completion;
       result.attempts = attempt;
-
-      // Ambil JSON object dari response (toleran markdown fence / teks pengantar).
-      let extracted;
-      try {
-        extracted = JSON.parse(content);
-      } catch {
-        const m = content.match(/\{[\s\S]*\}/);
-        if (!m) throw new Error(content.trim() ? 'model membalas teks, bukan JSON' : 'model membalas kosong');
-        extracted = JSON.parse(m[0]);
-      }
 
       // Buang field yang bukan milik PDF (kalau model tetap mengarang system field).
       for (const k of SYSTEM_FIELDS) delete extracted[k];

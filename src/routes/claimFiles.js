@@ -2487,7 +2487,7 @@ async function processSinglePdfUpload(db, { filePath, originalName, jenisKlaim: 
       const evidencePool = await gatherEvidencePool(db, recordId, resolvedFilePath);
       const knowledgeEntries = await getRelevantKnowledge(db, validationErrors.map(e => e.rule_id));
       const bpjsExamples = await getRelevantBpjsExamples(db);
-      aiReview = await generateAiReview(extractedData, validationErrors, evidencePool, knowledgeEntries, bpjsExamples);
+      aiReview = await generateAiReview({ ...extractedData, id: recordId }, validationErrors, evidencePool, knowledgeEntries, bpjsExamples);
       if (aiReview) {
         await db.prepare('UPDATE claim_records SET ai_review = ? WHERE id = ?')
           .run(JSON.stringify(aiReview), recordId);
@@ -2636,7 +2636,7 @@ async function reprocessExistingRecord(db, { fileId, recordId, filePath, jenisKl
       const evidencePool = await gatherEvidencePool(db, recordId, path.resolve(filePath));
       const knowledgeEntries = await getRelevantKnowledge(db, validationErrors.map(e => e.rule_id));
       const bpjsExamples = await getRelevantBpjsExamples(db);
-      aiReview = await generateAiReview(extractedData, validationErrors, evidencePool, knowledgeEntries, bpjsExamples);
+      aiReview = await generateAiReview({ ...extractedData, id: recordId }, validationErrors, evidencePool, knowledgeEntries, bpjsExamples);
       if (aiReview) {
         // Update validation_status to PENDING jika:
         // 1. Ada pending_risk_notes dari AI review, ATAU
