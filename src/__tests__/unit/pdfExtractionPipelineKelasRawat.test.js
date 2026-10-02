@@ -44,20 +44,30 @@ describe('applyDeterministicFallback — KELAS_RAWAT rawat jalan/IGD', () => {
     expect(jalankan('IGD', 'SEP tanpa kelas hak')).toBe('');
   });
 
-  test('rawat inap tidak ikut terpengaruh', () => {
-    const record = { KELAS_RAWAT: '-' };
+  test('rawat inap: kelas valid dari AI tidak ditimpa', () => {
+    const record = { KELAS_RAWAT: '2' };
     applyDeterministicFallback(record, TEKS_SEP, 'RAWAT_INAP', 'berkas.pdf');
-    expect(record.KELAS_RAWAT).toBe('-');
+    expect(record.KELAS_RAWAT).toBe('2');
   });
 });
 
-describe('dampak ke tarif PMK 3/2023 (G-4-22-I, kode rawat inap murni)', () => {
-  test('tarif resmi muncul sesuai kelas hasil fallback', () => {
-    expect(getTarifResmi('G-4-22-I', jalankan('-')).tarif).toBe(2601200);
+describe('applyDeterministicFallback — KELAS_RAWAT rawat inap', () => {
+  // YETY NOVIATI (0170R0111225V003427): SEP hasil scan, AI tidak mengisi kelas
+  // -> tarif INA-CBG rawat inap kosong.
+  const SEP_RANAP = 'No.SEP : 0170R0111225V003427\nJns.Rawat : R.Inap\nDokter : GUNAWAN Kls.Hak : Kelas 3\nFaskes Perujuk : RS Lestari Raharja Kls.Rawat : Kelas 2';
+  const jalankanRi = (nilai, teks = SEP_RANAP) => {
+    const record = { KELAS_RAWAT: nilai };
+    applyDeterministicFallback(record, teks, 'RAWAT_INAP', 'berkas.pdf');
+    return record.KELAS_RAWAT;
+  };
+  test('kosong/sampah diisi dari Kls.Rawat, bukan Kls.Hak', () => {
+    expect(jalankanRi('')).toBe('2');
+    expect(jalankanRi('-')).toBe('2');
   });
-
-  test('kelas yang diketahui menentukan tarifnya, bukan diasumsikan kelas 3', () => {
-    expect(getTarifResmi('G-4-22-I', jalankan('1')).tarif).toBe(3459500);
-    expect(getTarifResmi('G-4-22-I', jalankan('2')).tarif).toBe(3030300);
+  test('Kls.Rawat tidak terbaca -> Kls.Hak', () => {
+    expect(jalankanRi('', 'Kls.Hak : Kelas 3')).toBe('3');
+  });
+  test('tidak ada keduanya -> kosong', () => {
+    expect(jalankanRi('-', 'SEP tanpa kelas')).toBe('');
   });
 });

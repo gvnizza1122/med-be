@@ -8,6 +8,7 @@
  * berdiri sendiri (tidak import balik ke pdfPageClassifier.js supaya tidak
  * ikut memuat dependency route/service lain yang tidak perlu di worker).
  */
+const { isLembarGrouper } = require('../services/lembarGrouperService');
 const { parentPort } = require('worker_threads');
 const { PDFParse } = require('pdf-parse');
 const fs = require('fs');
@@ -40,7 +41,7 @@ function isCriticalPage(text) {
 
 async function classify(filePath, bufferData) {
   const result = {
-    success: false, pages: [], claimDataPages: [], claimDataText: '',
+    success: false, pages: [], claimDataPages: [], claimDataText: '', grouperPages: [],
     totalPages: 0, summary: { nativeCount: 0, scanCount: 0 }, errors: [],
   };
   try {
@@ -66,15 +67,20 @@ async function classify(filePath, bufferData) {
       const isPrimarySource = text.toLowerCase().includes(PRIMARY_KEYWORD.toLowerCase());
       const isCritical = isCriticalPage(text);
       const pageNum = i + 1;
-      if (hasClaimData) result.claimDataPages.push({ page_num: pageNum, text });
-      result.pages.push({ page_num: pageNum, type, text_length: text.length, has_claim_data: hasClaimData, is_primary_source: isPrimarySource, is_critical: isCritical, text_sample: text.slice(0, 200), text_full: text });
+      // Lembar grouper E-Klaim (hasil kerja casemix) BUKAN bahan bacaan AI --
+      // hanya disimpan sebagai pembanding (lihat lembarGrouperService.js).
+      const isGrouper = isLembarGrouper(text);
+      if (isGrouper) result.grouperPages.push({ page_num: pageNum, text });
+      else if (hasClaimData) result.claimDataPages.push({ page_num: pageNum, text });
+      result.pages.push({ page_num: pageNum, type, text_length: text.length, has_claim_data: hasClaimData, is_primary_source: isPrimarySource, is_lembar_grouper: isGrouper, is_critical: isCritical, text_sample: text.slice(0, 200), text_full: text });
       if (type === 'NATIVE') result.summary.nativeCount++; else result.summary.scanCount++;
     });
     result.totalPages = chunks.length;
 
-    const primary = result.claimDataPages.filter(p => p.text.toLowerCase().includes(PRIMARY_KEYWORD.toLowerCase()));
-    const others = result.claimDataPages.filter(p => !p.text.toLowerCase().includes(PRIMARY_KEYWORD.toLowerCase()));
-    result.claimDataText = [...primary, ...others].map(p => p.text).join('\n\n---\n\n');
+    // Dulu halaman "Berkas Klaim Individual" ditaruh PALING DEPAN di sini,
+    // sehingga DIAGLIST/PROCLIST/INA-CBG/tarif klaim hanyalah salinan lembar
+    // grouper casemix. Sekarang lembar itu tidak ikut sama sekali.
+    result.claimDataText = result.claimDataPages.map(p => p.text).join('\n\n---\n\n');
 
     result.success = true;
   } catch (error) {

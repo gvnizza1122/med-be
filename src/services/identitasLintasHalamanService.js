@@ -161,7 +161,10 @@ function ekstrakNama(teks) {
   // Kata "Nama" paling sering muncul justru sebagai JUDUL KOLOM tabel obat
   // ("Nama Obat Oral", "Nama Obat Injeksi"), bukan sebagai nama pasien. Di
   // data produksi inilah sumber terbesar salah tuduh "pasien berbeda".
-  const BUKAN_ORANG = /^(OBAT|TINDAKAN|BARANG|JENIS|PERAWATAN|RUANG|RUANGAN|PERUSAHAAN|BERKAS|FILE|LAYANAN|PEMERIKSAAN|PRODUK|ALAT|DIAGNOSA|TARIF|KELAS|POLI|KAMAR|INFUS|INTUS|CAIRAN|TERANG|DOKTER|PETUGAS)\b/i;
+  // "Nama Faskes RS ..." (layar aplikasi rujukan/skrining) dan "Nama Ibu/Ayah"
+  // (data bayi baru lahir) bukan nama pasien -- dulu halaman skrining bayi
+  // YETY NOVIATI dituduh milik pasien lain karena "Faskes RS LESTARI RAHARJA".
+  const BUKAN_ORANG = /^(OBAT|TINDAKAN|BARANG|JENIS|PERAWATAN|RUANG|RUANGAN|PERUSAHAAN|BERKAS|FILE|LAYANAN|PEMERIKSAAN|PRODUK|ALAT|DIAGNOSA|TARIF|KELAS|POLI|KAMAR|INFUS|INTUS|CAIRAN|TERANG|DOKTER|PETUGAS|FASKES|RS|RSU|RSUD|RUMAH|PUSKESMAS|KLINIK|INSTANSI|IBU|AYAH|SUAMI|ISTRI|WALI|KELUARGA|PENANGGUNG|DPJP|PERAWAT|BIDAN)\b/i;
   if (BUKAN_ORANG.test(nama)) return null;
 
   // Nama orang yang terbaca utuh selalu punya setidaknya satu kata utuh.
@@ -181,6 +184,20 @@ function ekstrakNama(teks) {
   return nama.length >= 3 ? nama : null;
 }
 
+// --- Bayi baru lahir dari pasien yang diklaim ---
+
+const TANDA_BAYI = /\b(?:by\.?\s*ny|bayi\s+(?:ny|nyonya)|neonatus|neonatal|bayi\s+baru\s+lahir|nama\s+ibu|skrining\s+hipotiroid|telah\s+lahir)\b/i;
+
+function halamanBayiPasien(teks, namaKlaim) {
+  if (!namaKlaim || !TANDA_BAYI.test(teks)) return false;
+  // Nama ibu (= pasien yang diklaim) harus tertulis di halaman itu: semua
+  // kata nama yang >= 3 huruf ada di teks, toleran salah baca satu huruf.
+  const kataTeks = String(teks).toUpperCase().split(/[^A-Z]+/).filter(Boolean);
+  const kataNama = String(namaKlaim).toUpperCase().replace(/\b(NY|NN|TN|AN|BY|SDR|NONA|NYONYA)\b\.?/g, ' ')
+    .split(/[^A-Z]+/).filter(k => k.length >= 3);
+  return kataNama.length > 0 && kataNama.every(k => kataTeks.some(t => kataMirip(k, t)));
+}
+
 // --- Pemeriksaan utama ---
 
 /**
@@ -198,6 +215,10 @@ function verifikasiIdentitas(halaman, klaim) {
   for (const hal of halaman || []) {
     const teks = hal && hal.ocr_text;
     if (!teks) continue;
+    // Bayi yang lahir pada episode ini (assesmen neonatus, skrining bayi baru
+    // lahir, surat kelahiran) memang punya No RM sendiri, tetapi berkasnya
+    // bagian dari klaim persalinan ibunya -- bukan halaman pasien lain.
+    if (halamanBayiPasien(teks, namaKlaim)) continue;
     const namaHal = ekstrakNama(teks);
     const rmHal = ekstrakNoRm(teks);
     const cocokNama = namaHal && namaKlaim ? namaCocok(namaKlaim, namaHal) : null;

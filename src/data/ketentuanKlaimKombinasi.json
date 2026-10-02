@@ -92,15 +92,7 @@
       "sumber": "keduanya", "kutipan_sumber": "HF/HHD + Pulmonary oedema: J81 tidak perlu dikoding lagi",
       "diverifikasi": true
     },
-    {
-      "kode": "KMB-11", "nama": "Oligohidramnion + KPD",
-      "kode_diagnosis": ["O41.0"],
-      "kode_pasangan": ["O42"],
-      "aksi": "ganti_gabungan", "kode_gabungan": "O42",
-      "pesan": "Oligohidramnion dengan KPD jadi satu kode O42.-",
-      "sumber": "casemix_rs", "kutipan_sumber": "Oligohidramnion + KPD: jadi satu kode O42.-",
-      "diverifikasi": false, "alasan_belum": "Dokumen menulis O42.- (kategori), subkode pastinya perlu ditentukan koder."
-    },
+    {"kode": "KMB-11", "nama": "Oligohidramnion + KPD", "kode_diagnosis": ["O42"], "kode_pasangan": ["O41.0"], "aksi": "buang_pasangan", "pesan": "Oligohidramnion dengan KPD jadi satu kode O42.- (O41.0 tidak dikode terpisah; subkode O42 yang sudah ada dipertahankan)", "sumber": "casemix_rs", "kutipan_sumber": "Oligohidramnion + KPD: jadi satu kode O42.-", "diverifikasi": false, "alasan_belum": "Bentuk aturan sudah disesuaikan: O41.0 dibuang, subkode O42 (O42.0/O42.1 menurut lama ketuban pecah) dipertahankan -- sama dengan lembar grouper casemix YETY NOVIATI 0170R0111225V003427 (O42.1, tanpa O41.0). Tinggal disahkan koder."},
     {
       "kode": "KMB-12", "nama": "Pneumonia + PPOK",
       "kode_diagnosis": ["J18", "J22"],

@@ -74,6 +74,12 @@ ATURAN KETAT:
 1. Output HANYA JSON object. Tanpa markdown, tanpa backtick, tanpa penjelasan.
 2. Tanggal WAJIB format DD/MM/YYYY (contoh: 09/06/2026).
 3. DIAGLIST & PROCLIST: kode dipisah titik-koma, TANPA spasi (contoh: I13.1;D63.8;L28.2).
+3b. DIAGLIST adalah diagnosis AKHIR episode perawatan: ambil HANYA dari Resume Medis (bagian
+    Diagnosis Utama/Sekunder atau Assessment). JANGAN mengambil "Diagnosa Awal"/"Diag Awal" di SEP
+    maupun "Diagnosa"/"Indikasi Rawat Inap" di Surat Perintah Rawat Inap -- itu diagnosis SAAT MASUK,
+    bukan diagnosis akhir (contoh: SEP "Diagnosa Awal : R06.0 - Dyspnoea" sementara resume menulis
+    "Diagnosis Utama : cardiomegali edem paru" -> R06.0 BUKAN isi DIAGLIST). Kalau resume hanya
+    menulis diagnosis tanpa kode, ikuti aturan 6 (kosongkan).
 4. Angka tarif: digit polos tanpa Rp/titik/koma (contoh: 3287300).
 5. SEX: 1=laki-laki, 2=perempuan. KODE_TARIF: kode singkat saja (TARIF RS KELAS D SWASTA -> DS).
 6. Kalau sebuah field TIDAK ADA di teks, isi string kosong "". JANGAN menebak, JANGAN menyalin dari field lain.

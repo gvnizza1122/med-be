@@ -28,6 +28,10 @@ const gatewayModelService = require('./gatewayModelService');
 
 const POLA_KATEGORI = /^[A-Z]\d{2}$/;
 
+const { JEMBATAN_CM_KE_WHO } = require('./jembatanCmWho');
+// Mendahulukan kandidat yang istilahnya cocok dengan dokumen (D49.2 "kulit,
+// tulang, jaringan lunak" -> D48.0/D48.1/D48.5) dilakukan AI pilih-dari-daftar.
+
 function normal(kode) {
   return String(kode || '').trim().toUpperCase();
 }
@@ -110,7 +114,9 @@ async function pilihDenganAi(kandidat, teksDiagnosis, kodeAsing, dikenal = {}, d
  */
 async function petakanKeKodeWho(kodeAsing, teksDiagnosis, dikenal = {}) {
   const asal = normal(kodeAsing);
-  const kategori = asal.slice(0, 3);
+  const kategoriAsal = asal.slice(0, 3);
+  if (!/^[A-Z]\d[0-9A-Z]$/.test(kategoriAsal)) return null;
+  const kategori = JEMBATAN_CM_KE_WHO[kategoriAsal] || kategoriAsal;
   if (!POLA_KATEGORI.test(kategori)) return null;
 
   const db = getDb();
@@ -149,4 +155,4 @@ async function petakanKeKodeWho(kodeAsing, teksDiagnosis, dikenal = {}) {
   return { kode: dipilih.code, nama: nama(dipilih), dari: 'ai_pilih_dari_daftar' };
 }
 
-module.exports = { petakanKeKodeWho, kunciIstilah };
+module.exports = { petakanKeKodeWho, kunciIstilah, JEMBATAN_CM_KE_WHO };

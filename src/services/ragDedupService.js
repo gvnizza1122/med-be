@@ -40,24 +40,7 @@ async function hasExampleForSepAndCategory(sep, kategoriPending, alasanBpjs) {
 // Find relevant training examples untuk RAG (few-shot learning)
 // Filter by kategori_pending dan jenis_klaim untuk contextual relevance
 async function findRelevantExamples(kategoriPending, jenisKlaim = null, limit = 5) {
-  const db = getDb();
-
-  let query = `
-    SELECT kategori_pending, alasan_bpjs, draft_berhasil, poin_kunci
-    FROM ai_training_examples
-    WHERE kategori_pending = ? AND fingerprint IS NOT NULL
-  `;
-  const params = [kategoriPending];
-
-  if (jenisKlaim) {
-    query += ' AND jenis_klaim = ?';
-    params.push(jenisKlaim);
-  }
-
-  query += ' ORDER BY ctime DESC LIMIT ?';
-  params.push(limit);
-
-  return db.prepare(query).all(...params);
+  return require('./ragReferenceService').getReferences(getDb(), { kategori_pending: kategoriPending, jenis_klaim: jenisKlaim }, limit);
 }
 
 // Get all pending records tanpa draft untuk auto-generate RAG

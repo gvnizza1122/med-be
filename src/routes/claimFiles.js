@@ -13,7 +13,10 @@ const { buatSiapSubmit, namaBerkasSiapSubmit } = require('../services/siapSubmit
 const { logAudit } = require('../services/auditService');
 const konteksAi = require('../services/konteksPenggunaanAiService');
 const { estimatePromptTokens, estimateCompletionTokens } = require('../services/aiValidationService');
-const { generateAiReview, hitungInacbgDanTarif, getAnyResumeMedisPageNumbers } = require('../services/aiReviewService');
+const { generateAiReview, hitungInacbgDanTarif, getAnyResumeMedisPageNumbers, tentukanKunjunganIgd } = require('../services/aiReviewService');
+const { susunPemeriksaanPenunjang } = require('../services/pemeriksaanPenunjangService');
+const { catatPolaBeda, ringkasPola } = require('../services/polaBedaCasemixService');
+const { pelajari: pelajariCasemix } = require('../services/pembelajaranCasemixService');
 const { tinjauDiagnosis } = require('../services/tinjauanDiagnosisService');
 const { tinjauLanjutan } = require('../services/tinjauanLanjutanService');
 const { getRelevantKnowledge, recordKnowledge, getRelevantBpjsExamples } = require('../services/errorKnowledgeService');
@@ -31,6 +34,7 @@ const { simpanAiReview } = require('../services/simpanAiReviewService');
 const { kegawatdaruratanMemicuPending } = require('../services/kegawatdaruratanAggregation');
 const { segarkanAlasanValidasi } = require('../services/putusanPendingService');
 const { susunSaranKoding } = require('../services/saranKodingService');
+const { isLembarGrouper } = require('../services/lembarGrouperService');
 const { perbaruiRisikoTampilan } = require('../services/risikoKlaimTampilanService');
 
 const router = express.Router();
@@ -72,19 +76,20 @@ const ocrJobsInFlight = new Map(); // record_id -> Promise<ocrResult>
 async function saveOcrResultsToDb(db, recordId, ocrResult) {
   if (!ocrResult.success || !ocrResult.pages || ocrResult.pages.length === 0) return;
   const insertOcrResult = db.prepare(`
-    INSERT INTO ocr_results (id, record_id, page_number, ocr_text, confidence, block_count, processing_duration_ms)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO ocr_results (id, record_id, page_number, ocr_text, confidence, block_count, processing_duration_ms, sumber)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(record_id, page_number) DO UPDATE SET
       ocr_text = excluded.ocr_text,
       confidence = excluded.confidence,
       block_count = excluded.block_count,
-      processing_duration_ms = excluded.processing_duration_ms
+      processing_duration_ms = excluded.processing_duration_ms,
+      sumber = excluded.sumber
   `);
   for (const page of ocrResult.pages) {
     await insertOcrResult.run(
       uuidv4(), recordId, page.page_number,
       page.text || '', page.confidence || 0, page.block_count || 0,
-      page.duration_ms || 0
+      page.duration_ms || 0, page.source === 'native_text' ? 'native_text' : 'ocr'
     );
   }
 }
@@ -220,7 +225,7 @@ async function gatherEvidencePool(db, recordId, filePath) {
       // bukti klinis ASLI (diagnosa, tindakan) ikut ter-buang secara tidak
       // sengaja dari evidence pool, padahal bukan sumber sirkular.
       const nativePages = classified.pages
-        .filter(p => p.type === 'NATIVE' && !p.is_primary_source && !scanPageNumbers.has(p.page_num) && p.text_length > 0)
+        .filter(p => p.type === 'NATIVE' && !p.is_primary_source && !p.is_lembar_grouper && !scanPageNumbers.has(p.page_num) && p.text_length > 0)
         .map(p => ({ page_number: p.page_num, ocr_text: p.text_full, confidence: 100 }));
       evidencePool = [...evidencePool, ...nativePages];
       await lampirkanNilaiLabelPosisi(filePath, nativePages);
@@ -244,7 +249,11 @@ async function gatherEvidencePool(db, recordId, filePath) {
     console.warn(`[gatherEvidencePool] Gagal ambil halaman NATIVE: ${classifyErr.message}`);
   }
 
-  return evidencePool;
+  // Lembar grouper E-Klaim (hasil casemix) tidak pernah menjadi bukti, dari
+  // jalur mana pun. Hasil OCR tersimpan juga memuat halaman teks asli (tahap
+  // OCR memakai teks asli PDF lalu menyimpannya), jadi penyaring is_primary_source
+  // di atas saja tidak cukup.
+  return evidencePool.filter(p => !isLembarGrouper(p && p.ocr_text));
 }
 
 // Batasi jumlah panggilan AI review paralel saat upload bulk — evidence
@@ -444,7 +453,7 @@ router.post('/upload', authenticate, upload.single('file'), async (req, res) => 
         try {
           const recordErrors = errorsByRecordId[record.id] || [];
           const knowledgeEntries = await getRelevantKnowledge(db, recordErrors.map(e => e.rule_id));
-          const bpjsExamples = await getRelevantBpjsExamples(db);
+          const bpjsExamples = await getRelevantBpjsExamples(db, { ...record, validationErrors: recordErrors });
           const aiReview = await generateAiReview(record, recordErrors, [], knowledgeEntries, bpjsExamples);
           if (aiReview) {
             totalAiTokens += aiReview.tokens_used || 0;
@@ -729,6 +738,17 @@ router.get('/', authenticate, async (req, res) => {
 /**
  * GET /api/v1/claim-files/:id
  */
+// Ringkasan pola beda aplikasi vs casemix: kategori terbanyak + contoh kode
+// (tanpa identitas pasien) -- daftar aturan yang paling perlu ditambahkan.
+router.get('/pola-beda-casemix', authenticate, async (req, res) => {
+  try {
+    res.json(await ringkasPola(getDb(), { batas: Number(req.query.batas) || 20 }));
+  } catch (error) {
+    console.error('[pola-beda-casemix] gagal:', error);
+    res.status(500).json({ error: 'Ringkasan pola beda belum dapat disusun.' });
+  }
+});
+
 router.get('/:id', authenticate, async (req, res) => {
   try {
     const db = getDb();
@@ -844,6 +864,17 @@ router.get('/:id/records', authenticate, async (req, res) => {
       }, {});
     }
 
+    // Record lama dibuat sebelum penanda kunjungan_igd ada: lengkapi sekali
+    // dari halaman berkas tersimpan (tanpa AI) supaya tanda vital & K1-K5
+    // disembunyikan untuk poli/ranap yang bukan IGD, lalu simpan.
+    for (const rec of records) {
+      try {
+        await lengkapiKunjunganIgd(db, rec);
+      } catch (e) {
+        console.warn(`[kunjungan_igd] gagal melengkapi record ${rec.id}: ${e.message}`);
+      }
+    }
+
     const recordsWithErrors = records.map(rec => {
       const errors = errorsByRecordId[rec.id] || [];
       const review = perbaruiRisikoTampilan(rec, errors);
@@ -856,6 +887,25 @@ router.get('/:id/records', authenticate, async (req, res) => {
     res.status(500).json({ error: 'Terjadi gangguan pada sistem. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' });
   }
 });
+
+async function lengkapiKunjunganIgd(db, rec) {
+  let review = rec.ai_review;
+  const teks = typeof review === 'string';
+  if (teks) { try { review = JSON.parse(review); } catch (_) { return; } }
+  const asesmen = review && review.kegawatdaruratan_assessment;
+  if (!asesmen || Array.isArray(asesmen) || typeof asesmen.kunjungan_igd === 'boolean') return;
+  const pages = await db.prepare('SELECT page_number, ocr_text FROM ocr_results WHERE record_id = ? ORDER BY page_number').all(rec.id);
+  if (!pages.length) return; // tanpa halaman tersimpan tidak bisa dipastikan -- biarkan tampil
+  asesmen.kunjungan_igd = tentukanKunjunganIgd(pages);
+  if (!asesmen.kunjungan_igd && asesmen.has_data && typeof asesmen.ringkasan === 'string'
+    && !/bukan IGD|bukan dari IGD/i.test(asesmen.ringkasan)) {
+    asesmen.ringkasan += /INAP/i.test(String(rec.jenis_klaim || ''))
+      ? ' Rawat inap bukan dari IGD: kriteria kegawatdaruratan dan tanda vital bukan fokus penilaian klaim ini dan tidak membuat klaim pending.'
+      : ' Kunjungan poli (bukan IGD): penilaian ini hanya informasi dan tidak membuat klaim pending.';
+  }
+  await db.prepare('UPDATE claim_records SET ai_review = ? WHERE id = ?').run(JSON.stringify(review), rec.id);
+  rec.ai_review = teks ? JSON.stringify(review) : review;
+}
 
 // Helper to reconstruct fixed file content
 async function getFixedFileContent(fileId, db) {
@@ -1232,7 +1282,7 @@ router.post('/:id/ai-audit', authenticate, async (req, res) => {
         }
         const recordErrors = errorsByRecordId[record.id] || [];
         const knowledgeEntries = await getRelevantKnowledge(db, recordErrors.map(e => e.rule_id));
-        const bpjsExamples = await getRelevantBpjsExamples(db);
+        const bpjsExamples = await getRelevantBpjsExamples(db, { ...record, validationErrors: recordErrors });
         const aiReview = await generateAiReview(record, recordErrors, evidencePool, knowledgeEntries, bpjsExamples);
         if (aiReview) {
           await simpanAiReview(db, record.id, aiReview);
@@ -2016,13 +2066,35 @@ function tandaiEvidenceDiganti(aiReview, penggantian) {
 }
 
 async function isiKodeDariSaranTervalidasi(db, recordId, record, aiReview) {
+  let hasil;
   if (typeof db.transaction === 'function') {
-    return db.transaction(async tx => {
+    hasil = await db.transaction(async tx => {
       await tx.prepare('SELECT id FROM claim_records WHERE id = ? FOR UPDATE').get(recordId);
       return isiKodeDariSaranDalamTransaksi(tx, recordId, record, aiReview);
     });
+  } else {
+    hasil = await isiKodeDariSaranDalamTransaksi(db, recordId, record, aiReview);
   }
-  return isiKodeDariSaranDalamTransaksi(db, recordId, record, aiReview);
+  await catatPolaBedaUntukRecord(db, recordId);
+  return hasil;
+}
+
+// Pola beda hasil aplikasi vs casemix (lembar grouper) -- bahan aturan baru.
+// Best-effort: kegagalan pencatatan tidak boleh menggagalkan review.
+async function catatPolaBedaUntukRecord(db, recordId) {
+  try {
+    const rec = await db.prepare('SELECT id, diagnosa_list, prosedur_list, jenis_klaim, kelas_rawat, ai_review FROM claim_records WHERE id = ?').get(recordId);
+    if (!rec) return;
+    const ai = typeof rec.ai_review === 'string' ? JSON.parse(rec.ai_review) : rec.ai_review;
+    if (!ai || !ai.lembar_grouper) return;
+    const saran = susunSaranKoding(rec, ai, hitungInacbgDanTarif);
+    await catatPolaBeda(db, rec.id, rec.jenis_klaim, saran.casemix);
+    // Belajar: pasangan istilah resume -> kode casemix dari berkas yang sudah diklaim.
+    const pages = await db.prepare('SELECT page_number, ocr_text FROM ocr_results WHERE record_id = ? ORDER BY page_number').all(rec.id);
+    await pelajariCasemix(db, rec.id, rec.jenis_klaim, pages, ai.lembar_grouper);
+  } catch (e) {
+    console.warn(`[PolaBeda] gagal mencatat record ${recordId}: ${e.message}`);
+  }
 }
 
 async function isiKodeDariSaranDalamTransaksi(db, recordId, record, aiReview) {
@@ -2170,7 +2242,29 @@ async function isiKodeDariSaranDalamTransaksi(db, recordId, record, aiReview) {
   }
   if (kosong(record.DIAGLIST || record.diagnosa_list)) {
     const d = ambil('diagnosis');
-    if (d.length > 0) perubahan.diagnosa_list = d.join(';');
+    if (d.length > 0) {
+      perubahan.diagnosa_list = d.join(';');
+    } else {
+      // Cadangan terakhir: belum ada kode WHO, tetapi AI membaca diagnosis
+      // dengan kode yang belum berpadanan WHO (ICD-10-CM). Kode itu DISIMPAN
+      // supaya DIAGLIST tidak kosong dan INA-CBG/tarif tetap terhitung --
+      // DIAGLIST kosong membuat klaim error karena kesalahan aplikasi, bukan
+      // karena berkasnya. Ditandai "perlu dicek koder", bukan pending.
+      const belumWho = [...new Set(saran
+        .filter(s => s && s.type === 'diagnosis' && s.code && s.belum_who === true && s.disangkal !== true && s.boleh_isi_otomatis !== false)
+        .map(s => String(s.code).trim().toUpperCase()))];
+      if (belumWho.length > 0) {
+        perubahan.diagnosa_list = belumWho.join(';');
+        aiReview.kode_belum_who = belumWho.map(kode => ({ kode, waktu: new Date().toISOString() }));
+        aiReview.kode_luar_kamus = [
+          ...(Array.isArray(aiReview.kode_luar_kamus) ? aiReview.kode_luar_kamus.filter(k => !belumWho.includes(String(k.kode).toUpperCase())) : []),
+          ...belumWho.map(kode => ({
+            kode, jenis: 'diagnosis', keparahan: 'sedang', asal: 'saran_aplikasi',
+            pesan: `Kode "${kode}" terbaca dari berkas tetapi belum ada padanan pastinya di ICD-10 WHO. Disimpan sementara supaya data & tarif tetap tampil; pilih kode WHO yang setara sebelum klaim diunggah.`,
+          })),
+        ];
+      }
+    }
   }
   // Tahap KODING (aturanKodingRsService): temuan tindakan + aturan RS opsional
   // -> usulan daftar prosedur. Tanpa aturan RS perilakunya SAMA dengan
@@ -2634,10 +2728,17 @@ async function processSinglePdfUploadDenganKonteks(db, { filePath, originalName,
     // halaman hasil dibuka nanti tidak perlu AI call lagi.
     let aiReview = null;
     try {
+      // OCR dari tahap ekstraksi dipakai ulang -- tidak meng-OCR PDF dua kali.
+      if (result.ocrPages) {
+        await saveOcrResultsToDb(db, recordId, { success: true, pages: result.ocrPages })
+          .catch(e => console.warn(`[upload-pdf] gagal simpan OCR tahap ekstraksi: ${e.message}`));
+      }
       const evidencePool = await gatherEvidencePool(db, recordId, resolvedFilePath);
       const knowledgeEntries = await getRelevantKnowledge(db, validationErrors.map(e => e.rule_id));
-      const bpjsExamples = await getRelevantBpjsExamples(db);
+      const bpjsExamples = await getRelevantBpjsExamples(db, { ...extractedData, validationErrors });
       aiReview = await generateAiReview({ ...extractedData, id: recordId }, validationErrors, evidencePool, knowledgeEntries, bpjsExamples);
+      // Hasil casemix dari lembar grouper E-Klaim: pembanding, bukan bahan bacaan.
+      if (aiReview && result.lembarGrouper) aiReview.lembar_grouper = result.lembarGrouper;
       if (aiReview) {
         await simpanAiReview(db, recordId, aiReview);
         // Kode saran yang sudah terverifikasi kamus ICD-10 langsung mengisi
@@ -2798,10 +2899,17 @@ async function reprocessExistingRecordDenganKonteks(db, { fileId, recordId, file
 
     let aiReview = null;
     try {
+      // Baca ulang = OCR baru; bukti AI review memakai hasil yang sama.
+      if (result.ocrPages) {
+        await saveOcrResultsToDb(db, recordId, { success: true, pages: result.ocrPages })
+          .catch(e => console.warn(`[reread] gagal simpan OCR tahap ekstraksi: ${e.message}`));
+      }
       const evidencePool = await gatherEvidencePool(db, recordId, path.resolve(filePath));
       const knowledgeEntries = await getRelevantKnowledge(db, validationErrors.map(e => e.rule_id));
-      const bpjsExamples = await getRelevantBpjsExamples(db);
+      const bpjsExamples = await getRelevantBpjsExamples(db, { ...extractedData, validationErrors });
       aiReview = await generateAiReview({ ...extractedData, id: recordId }, validationErrors, evidencePool, knowledgeEntries, bpjsExamples);
+      // Hasil casemix dari lembar grouper E-Klaim: pembanding, bukan bahan bacaan.
+      if (aiReview && result.lembarGrouper) aiReview.lembar_grouper = result.lembarGrouper;
       if (aiReview) {
         // Update validation_status to PENDING jika:
         // 1. Ada pending_risk_notes dari AI review, ATAU
@@ -2885,6 +2993,21 @@ router.get('/records/:recordId/saran-koding', authenticate, async (req, res) => 
   } catch (error) {
     console.error('[saran-koding] gagal:', error);
     res.status(500).json({ error: 'Saran koding gagal disusun.' });
+  }
+});
+
+// Tab "Pemeriksaan penunjang": pemeriksaan yang sudah dilakukan + hasil lab
+// per parameter, disusun dari halaman berkas tersimpan (tanpa AI).
+router.get('/records/:recordId/pemeriksaan-penunjang', authenticate, async (req, res) => {
+  try {
+    const db = getDb();
+    const record = await db.prepare('SELECT id FROM claim_records WHERE id = ?').get(req.params.recordId);
+    if (!record) return res.status(404).json({ error: 'Record tidak ditemukan' });
+    const pages = await db.prepare('SELECT page_number, ocr_text FROM ocr_results WHERE record_id = ? ORDER BY page_number').all(record.id);
+    res.json(susunPemeriksaanPenunjang(pages));
+  } catch (error) {
+    console.error('[pemeriksaan-penunjang] gagal:', error);
+    res.status(500).json({ error: 'Pemeriksaan penunjang gagal disusun.' });
   }
 });
 

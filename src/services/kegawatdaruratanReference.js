@@ -59,6 +59,13 @@ const PARAMETER_TABLE = [
   { key: 'nyeri_tekan_epigastrium', label: 'Nyeri tekan epigastrium', sistem_tubuh: 'Abdomen', contoh_normal: 'NT epigastrium (-)', contoh_abnormal: 'NT epigastrium (+)', kriteria_terkait: [] },
   { key: 'bising_usus', label: 'Bising usus (BU)', sistem_tubuh: 'Abdomen', contoh_normal: 'BU (+), terdengar normal', contoh_abnormal: 'BU tidak ada/meningkat/menurun', kriteria_terkait: [] },
   { key: 'timpani', label: 'Perkusi timpani', sistem_tubuh: 'Abdomen', contoh_normal: 'timpani fisiologis', contoh_abnormal: 'timpani patologis dengan distensi', kriteria_terkait: [] },
+  // Status obstetri/ginekologi dipisah dari abdomen: "janin tunggal, preskep,
+  // DJJ 150, ketuban (+), pembukaan (-)" dulu terbaca sebagai "abdomen supel".
+  // Pemeriksaan khusus (status neurologis, status lokalis bedah/kulit/
+  // ortopedi, obstetri/ginekologi): hanya tampil bila tercatat.
+  { key: 'status_neurologis', label: 'Status neurologis', sistem_tubuh: 'Pemeriksaan khusus', contoh_normal: 'refleks fisiologis (+/+), refleks patologis (-/-), kekuatan motorik 5555/5555, nervus kranialis normal', contoh_abnormal: 'lateralisasi/hemiparesis, refleks patologis (+), meningeal sign (+), parese nervus kranialis, defisit sensorik', kriteria_terkait: [] },
+  { key: 'status_lokalis', label: 'Status lokalis', sistem_tubuh: 'Pemeriksaan khusus', contoh_normal: 'regio ... tidak tampak kelainan', contoh_abnormal: 'look: luka/deformitas/edema/eritema; feel: nyeri tekan/krepitasi; move: ROM terbatas; ukuran lesi/luka', kriteria_terkait: [] },
+  { key: 'obstetri_ginekologi', label: 'Status obstetri/ginekologi', sistem_tubuh: 'Pemeriksaan khusus', contoh_normal: 'janin tunggal hidup, preskep, DJJ 120-160 x/menit reguler, perdarahan pervaginam (-)', contoh_abnormal: 'DJJ <110/>160 atau tidak terdengar, perdarahan pervaginam aktif, ketuban hijau/keruh, massa adneksa/nyeri goyang porsio', kriteria_terkait: [] },
 ];
 
 // ===== Kelompok usia =====

@@ -1,7 +1,8 @@
 /**
  * Error Knowledge Base — basis pengetahuan pola error & solusi, dikelompokkan
  * per rule_id. Ini BUKAN riwayat percakapan/memory penuh — cuma pola yang
- * sudah digeneralisasi AI (tanpa data pasien) yang disimpan, dan hanya entri
+ * sudah digeneralisasi AI (tanpa data pasien) yang disimpan. Hanya entri
+ * yang ditinjau manusia dan
  * untuk rule_id yang relevan dengan error record saat ini yang diikutkan ke
  * prompt AI berikutnya. Tujuannya: AI "belajar" dari histori tanpa membuat
  * konteks membengkak tak terbatas (lihat migrations/003-error-knowledge-base.sql).
@@ -33,15 +34,20 @@ async function getRelevantKnowledge(db, ruleIds) {
   // dan aman daripada window function lintas-driver, jumlah rule per record
   // biasanya kecil (<10) jadi tidak masalah query terpisah.
   const results = [];
-  for (const ruleId of uniqueRuleIds) {
-    const rows = await db.prepare(`
-      SELECT rule_id, field_name, pattern_summary, solution
-      FROM error_knowledge_base
-      WHERE rule_id = ?
-      ORDER BY hit_count DESC, created_at DESC
-      LIMIT ?
-    `).all(ruleId, ENTRIES_PER_RULE_IN_PROMPT);
-    results.push(...rows);
+  try {
+    for (const ruleId of uniqueRuleIds) {
+      const rows = await db.prepare(`
+        SELECT rule_id, field_name, pattern_summary, solution
+        FROM error_knowledge_base
+        WHERE rule_id = ? AND verification_status = 'verified'
+        ORDER BY hit_count DESC, created_at DESC
+        LIMIT ?
+      `).all(ruleId, ENTRIES_PER_RULE_IN_PROMPT);
+      results.push(...rows);
+    }
+  } catch (error) {
+    console.warn('[RAG] Pengetahuan terverifikasi belum tersedia:', error.message);
+    return [];
   }
   return results;
 }
@@ -69,9 +75,9 @@ async function recordKnowledge(db, entries) {
   for (const ruleId of affectedRuleIds) {
     await db.prepare(`
       DELETE FROM error_knowledge_base
-      WHERE rule_id = ? AND id NOT IN (
+      WHERE rule_id = ? AND verification_status != 'verified' AND id NOT IN (
         SELECT id FROM error_knowledge_base
-        WHERE rule_id = ?
+        WHERE rule_id = ? AND verification_status != 'verified'
         ORDER BY hit_count DESC, created_at DESC
         LIMIT ?
       )
@@ -82,7 +88,7 @@ async function recordKnowledge(db, entries) {
 const BPJS_EXAMPLES_IN_PROMPT = 5;
 
 /**
- * Ambil klarifikasi pending BPJS yang PERNAH terbukti diterima (RAG, lihat
+ * Ambil kasus pending BPJS dengan hasil terverifikasi dan konteks sesuai (RAG, lihat
  * routes/bpjsPending.js) untuk diselipkan ke prompt AI review klaim BARU —
  * supaya AI review proaktif mengenali pola yang sebelumnya bikin BPJS
  * mempending klaim (mis. kode tindakan tertentu, kriteria kegawatan) SEBELUM
@@ -90,23 +96,8 @@ const BPJS_EXAMPLES_IN_PROMPT = 5;
  * @param {Object} db
  * @returns {Promise<Array<{kategori_pending, alasan_bpjs, draft_berhasil}>>}
  */
-async function getRelevantBpjsExamples(db) {
-  try {
-    // Tidak lagi mensyaratkan outcome = 'approved' — training sekarang
-    // mencatat OTOMATIS setiap draft jawaban dibuat (lihat routes/bpjsPending.js
-    // generate-draft), tanpa menunggu staf menandai status approved (di
-    // lapangan gerbang klik itu jarang dipakai konsisten). Urutkan dari yang
-    // paling meyakinkan (confidence_score, diisi Kimi K3) supaya contoh yang
-    // lebih jelas/lengkap diprioritaskan meski tidak difilter status lagi.
-    return await db.prepare(`
-      SELECT kategori_pending, alasan_bpjs, draft_berhasil
-      FROM ai_training_examples
-      ORDER BY confidence_score DESC NULLS LAST, created_at DESC LIMIT ?
-    `).all(BPJS_EXAMPLES_IN_PROMPT);
-  } catch (e) {
-    // Tabel belum ada di deployment lama / query gagal — jangan gagalkan AI review utama karena ini.
-    return [];
-  }
+async function getRelevantBpjsExamples(db, context = {}) {
+  return require('./ragReferenceService').getReferences(db, context, BPJS_EXAMPLES_IN_PROMPT);
 }
 
 module.exports = { getRelevantKnowledge, recordKnowledge, getRelevantBpjsExamples, MAX_ENTRIES_PER_RULE };

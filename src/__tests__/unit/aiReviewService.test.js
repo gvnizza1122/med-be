@@ -57,12 +57,15 @@ describe('generateAiReview — dengan AI dikonfigurasi (fetch dimock)', () => {
     process.env.AI_PROVIDER_API_KEY = 'test-key';
     process.env.AI_PROVIDER_BASE_URL = 'https://api.openai.com/v1';
     process.env.AI_MODEL = 'gpt-4o-mini';
+    // Agen tinjau diuji tersendiri (agenTinjau.test.js); di sini jumlah panggilan AI dihitung.
+    process.env.AGEN_TINJAU_ENABLED = 'false';
   });
 
   afterEach(() => {
     delete process.env.AI_PROVIDER_API_KEY;
     delete process.env.AI_PROVIDER_BASE_URL;
     delete process.env.AI_MODEL;
+    delete process.env.AGEN_TINJAU_ENABLED;
     jest.restoreAllMocks();
   });
 

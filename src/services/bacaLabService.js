@@ -52,7 +52,28 @@ const PARAMETER = {
   sgpt: { baku: 'SGPT (ALT)', satuan: 'u/l', satuanDiterima: ['u/l'], mustahil: [1, 10000], inti: [10, 35] },
   albumin: { baku: 'Albumin', satuan: 'g/dl', satuanDiterima: ['g/dl'], mustahil: [0.5, 7], inti: [3.8, 5.0] },
   hba1c: { baku: 'HbA1c', satuan: '%', satuanDiterima: ['%'], mustahil: [3, 20], inti: [4.5, 5.6] },
+  // Hitung jenis & indeks eritrosit (darah lengkap otomatis) -- dibaca supaya
+  // syarat penunjang seperti leukositosis/neutrofilia/anemia mikrositik dapat
+  // diperiksa dari hasil lab, bukan hanya "DL" di resume.
+  neutrofil_persen: { baku: 'Neutrofil %', satuan: '%', satuanDiterima: ['%'], mustahil: [0, 100], inti: [50, 70] },
+  limfosit_persen: { baku: 'Limfosit %', satuan: '%', satuanDiterima: ['%'], mustahil: [0, 100], inti: [20, 40] },
+  monosit_persen: { baku: 'Monosit %', satuan: '%', satuanDiterima: ['%'], mustahil: [0, 100], inti: [2, 8] },
+  eosinofil_persen: { baku: 'Eosinofil %', satuan: '%', satuanDiterima: ['%'], mustahil: [0, 100], inti: [1, 3] },
+  basofil_persen: { baku: 'Basofil %', satuan: '%', satuanDiterima: ['%'], mustahil: [0, 100], inti: [0, 1] },
+  neutrofil_absolut: { baku: 'Neutrofil absolut', satuan: 'ribu/ul', satuanDiterima: ['ribu/ul', '/ul'], mustahil: [0, 300], inti: [1.5, 7] },
+  limfosit_absolut: { baku: 'Limfosit absolut', satuan: 'ribu/ul', satuanDiterima: ['ribu/ul', '/ul'], mustahil: [0, 300], inti: [1, 3.7] },
+  monosit_absolut: { baku: 'Monosit absolut', satuan: 'ribu/ul', satuanDiterima: ['ribu/ul', '/ul'], mustahil: [0, 100], inti: [0.2, 1] },
+  eosinofil_absolut: { baku: 'Eosinofil absolut', satuan: 'ribu/ul', satuanDiterima: ['ribu/ul', '/ul'], mustahil: [0, 100], inti: [0, 0.5] },
+  basofil_absolut: { baku: 'Basofil absolut', satuan: 'ribu/ul', satuanDiterima: ['ribu/ul', '/ul'], mustahil: [0, 50], inti: [0, 0.2] },
+  nlr: { baku: 'Neutrophil-lymphocyte ratio', satuan: null, satuanDiterima: [], mustahil: [0, 200], inti: [1, 3.13] },
+  mcv: { baku: 'MCV', satuan: 'fl', satuanDiterima: ['fl'], mustahil: [40, 160], inti: [80, 94] },
+  mch: { baku: 'MCH', satuan: 'pg', satuanDiterima: ['pg'], mustahil: [10, 60], inti: [26, 32] },
+  mchc: { baku: 'MCHC', satuan: 'g/dl', satuanDiterima: ['g/dl', '%'], mustahil: [20, 45], inti: [32, 36] },
+  rdw: { baku: 'RDW', satuan: '%', satuanDiterima: ['%'], mustahil: [5, 40], inti: [11, 16] },
 };
+
+// Nama dengan akhiran % / # (alat hematologi otomatis): persen vs absolut.
+const HITUNG_JENIS = { neutrofil: 'neutrofil', neutrophil: 'neutrofil', segmen: 'neutrofil', limfosit: 'limfosit', lymphocyte: 'limfosit', lymph: 'limfosit', monosit: 'monosit', monocyte: 'monosit', eosinofil: 'eosinofil', eosinophil: 'eosinofil', basofil: 'basofil', basophil: 'basofil' };
 
 // Alias nama (bentuk rapikan) untuk parameter yang di kamus bergabung atau
 // tidak ada. Hanya dicocokkan terhadap SELURUH nama (atau isi kurung).
@@ -65,12 +86,39 @@ const ALIAS = {
   kreatinin: 'kreatinin', creatinin: 'kreatinin', creatinine: 'kreatinin', 'serum creatinin': 'kreatinin', 'serum kreatinin': 'kreatinin',
   ureum: 'ureum', urea: 'ureum', bun: 'ureum',
   gds: 'gula_darah_sewaktu', 'gula darah sewaktu': 'gula_darah_sewaktu', 'gula darah acak': 'gula_darah_sewaktu',
+  'glukosa darah sewaktu': 'gula_darah_sewaktu', 'glukosa sewaktu': 'gula_darah_sewaktu', 'glukosa darah puasa': 'gula_darah_puasa', 'glukosa puasa': 'gula_darah_puasa',
+  lekosit: 'leukosit', lokosit: 'leukosit', leucosit: 'leukosit',
   gdp: 'gula_darah_puasa', 'gula darah puasa': 'gula_darah_puasa',
   natrium: 'natrium', sodium: 'natrium', na: 'natrium',
   kalium: 'kalium', potassium: 'kalium', k: 'kalium',
   sgot: 'sgot', ast: 'sgot', sgpt: 'sgpt', alt: 'sgpt',
   albumin: 'albumin', hba1c: 'hba1c', a1c: 'hba1c',
+  nlr: 'nlr', mcv: 'mcv', mch: 'mch', mchc: 'mchc', 'rdw cv': 'rdw', rdw: 'rdw',
 };
+
+// Salah baca OCR yang lazim pada nama parameter ("Lokosit", "Enitrosit",
+// "Umfosit#" -- hasil lab YETY NOVIATI). Dicocokkan ke nama baku dengan jarak
+// edit kecil, hanya bila tepat satu kandidat terdekat.
+const NAMA_BAKU_OCR = ['hemoglobin', 'hematokrit', 'trombosit', 'leukosit', 'eritrosit', 'kreatinin', 'ureum', 'albumin', 'natrium', 'kalium',
+  'neutrofil', 'limfosit', 'monosit', 'eosinofil', 'basofil'];
+function jarakEdit(a, b) {
+  const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
+  for (let j = 1; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    }
+  }
+  return d[a.length][b.length];
+}
+function namaBakuOcr(nama) {
+  const n = String(nama || '').toLowerCase().replace(/[^a-z]/g, '');
+  if (n.length < 6) return null;
+  const batas = n.length >= 7 ? 2 : 1;
+  const skor = NAMA_BAKU_OCR.map(b => [b, jarakEdit(n, b)]).filter(([, j]) => j <= batas).sort((x, y) => x[1] - y[1]);
+  if (skor.length === 0 || (skor[1] && skor[1][1] === skor[0][1])) return null;
+  return skor[0][0];
+}
 
 // istilah_id kamusPenunjang yang berpadanan 1-1 dengan satu parameter.
 const KAMUS_KE_PARAMETER = {
@@ -98,11 +146,13 @@ function normalisasiSatuan(satuan) {
 }
 
 // ── tanggal ─────────────────────────────────────────────────────────────────
-const RE_TANGGAL = /(?<!\d)(\d{1,2})[/.\-](\d{1,2})[/.\-](\d{2,4})(?!\d)|(?<!\d)(\d{4})-(\d{1,2})-(\d{1,2})(?!\d)/;
+// Pemisah tanggal harus sama di kedua posisi ("31-12-2025", "31/12/25").
+// Dulu rujukan "4.5-11" (leukosit) terbaca sebagai tanggal 4 Mei 2011.
+const RE_TANGGAL = /(?<![\d.])(\d{1,2})([/.\-])(\d{1,2})\2(\d{2,4})(?![\d.])|(?<!\d)(\d{4})-(\d{1,2})-(\d{1,2})(?!\d)/;
 
 function ubahTanggal(m) {
   let d, bln, th;
-  if (m[4]) { th = +m[4]; bln = +m[5]; d = +m[6]; } else { d = +m[1]; bln = +m[2]; th = +m[3]; if (th < 100) th += 2000; }
+  if (m[5]) { th = +m[5]; bln = +m[6]; d = +m[7]; } else { d = +m[1]; bln = +m[3]; th = +m[4]; if (th < 100) th += 2000; }
   if (bln < 1 || bln > 12 || d < 1 || d > 31) return null;
   return `${String(th).padStart(4, '0')}-${String(bln).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 }
@@ -140,12 +190,28 @@ function bacaAngka(token, { ribuanBolehTitik = false } = {}) {
 }
 
 // ── nama parameter ──────────────────────────────────────────────────────────
-function kunciParameter(nama) {
+function kunciParameter(nama, sisaBaris = '') {
   const asli = String(nama || '').trim();
   if (!asli) return { key: null, istilah_id: null, ambigu: false };
   const dalamKurung = [...asli.matchAll(/\(([^)]+)\)/g)].map(m => m[1]);
   const tanpaKurung = asli.replace(/\([^)]*\)/g, ' ').replace(/\s+/g, ' ').trim();
   const kandidat = [asli, tanpaKurung, ...dalamKurung].filter(Boolean);
+
+  // Hitung jenis: "Neutrofil%" / "Neutrofil#" / "Neutrofil (%)".
+  // Bila akhiran tak terbaca (OCR membaca "#" sebagai "a"), satuan di baris
+  // yang menentukan: "%" persen, "sel/mm3"/"10^3/uL" absolut.
+  const akhiran = /#\s*$|\(\s*#\s*\)|\babs(?:olut)?\b/i.test(asli) ? 'absolut'
+    : /%\s*$|\(\s*%\s*\)/.test(asli) ? 'persen'
+      : /(?:^|\s)%(?:\s|$)/.test(sisaBaris) ? 'persen'
+        : /sel|mm|\/\s*[uµμ]l|10\s*\^?\s*3/i.test(sisaBaris) ? 'absolut' : null;
+  const dasarNama = asli.replace(/[#%()]/g, ' ').replace(/\babs(?:olut)?\b/i, ' ').replace(/\s+/g, ' ').trim();
+  const dasarTanpaA = /a$/i.test(dasarNama) ? dasarNama.slice(0, -1) : dasarNama;
+  const jenisHitung = HITUNG_JENIS[rapikan(dasarNama)] || HITUNG_JENIS[rapikan(dasarTanpaA)] || HITUNG_JENIS[namaBakuOcr(dasarNama)];
+  if (jenisHitung) {
+    const key = `${jenisHitung}_${akhiran || 'persen'}`;
+    if (PARAMETER[key]) return { key, istilah_id: 'hitung_jenis', ambigu: false, koreksi_ocr: !HITUNG_JENIS[rapikan(dasarNama)] };
+    return { key: null, istilah_id: 'hitung_jenis', ambigu: false };
+  }
 
   let istilahId = null;
   let ambigu = false;
@@ -159,6 +225,8 @@ function kunciParameter(nama) {
       return { key: KAMUS_KE_PARAMETER[kamus.istilah_id], istilah_id: kamus.istilah_id, ambigu: false };
     }
   }
+  const tebakan = !istilahId && !ambigu ? namaBakuOcr(tanpaKurung) : null;
+  if (tebakan && ALIAS[tebakan]) return { key: ALIAS[tebakan], istilah_id: null, ambigu: false, koreksi_ocr: true };
   return { key: null, istilah_id: istilahId, ambigu };
 }
 
@@ -300,8 +368,18 @@ function tanggalJudul(baris) {
  * Baca SATU baris. Kembalikan null bila bukan baris hasil lab.
  * Tidak pernah mengintip baris lain.
  */
+// Salah baca OCR pada satuan ("ribulut", "juia/ui", "g/dt") -> bentuk baku.
+function rapikanSatuanOcr(teks) {
+  return teks
+    .replace(/\bribu\s*[\/l1|]?\s*[uµμ][lt1|]\b\.?/gi, 'ribu/uL')
+    .replace(/\bju[it1l]a\s*\/\s*[uµμ][il1|]\b\.?/gi, 'juta/uL')
+    .replace(/\bg\s*\/\s*d[tl1|]\b\.?/gi, 'g/dL')
+    // "U/L" terbaca "L/L"/"1/L" -- huruf L di depan dulu dianggap flag rendah (SGPT YETY).
+    .replace(/(?<![A-Za-z])[Ll1|]\s*\/\s*L\b/g, 'U/L');
+}
+
 function bacaSatuBaris(baris, { tanggal = null, tanggalDari = null } = {}) {
-  const teks = String(baris || '').replace(/\r/g, '');
+  const teks = rapikanSatuanOcr(String(baris || '').replace(/\r/g, ''));
   if (!teks.trim()) return null;
   const token = pecahToken(teks);
   if (token.length < 2) return null;
@@ -317,7 +395,9 @@ function bacaSatuBaris(baris, { tanggal = null, tanggalDari = null } = {}) {
   if (idx === -1) return null;
 
   const nama = token.slice(0, idx).join(' ');
-  const { key, istilah_id: istilahId, ambigu } = kunciParameter(nama);
+  const { key, istilah_id: istilahKamus, ambigu, koreksi_ocr: koreksiNama } = kunciParameter(nama, token.slice(idx + 1).join(' '));
+  // "PCT 0.257 %" pada darah lengkap = plateletcrit, bukan prokalsitonin.
+  const istilahId = istilahKamus === 'penanda_radang' && /^pct$/i.test(nama.trim()) && /%/.test(teks) ? null : istilahKamus;
   const bolehRibuan = key === 'trombosit' || key === 'leukosit';
   const angka = bacaAngka(token[idx], { ribuanBolehTitik: bolehRibuan }) || bacaAngka(token[idx], { ribuanBolehTitik: true });
   if (!angka) return null;
@@ -365,6 +445,7 @@ function bacaSatuBaris(baris, { tanggal = null, tanggalDari = null } = {}) {
     tanggal: barisTanggal || tanggal,
     tanggal_dari: barisTanggal ? 'baris' : (tanggal ? (tanggalDari || 'judul') : null),
     kutipan: teks.trim().slice(0, 200),
+    ...(koreksiNama ? { nama_dikoreksi_ocr: true } : {}),
     kewajaran: {
       status: wajar.status,
       nilai_dinormalkan: wajar.nilai_dinormalkan,

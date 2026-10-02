@@ -30,6 +30,7 @@
  * sini.
  */
 
+const { isLembarGrouper, cariLembarGrouper } = require('./lembarGrouperService');
 const { classifyPdfPages, detectJenisKlaim, hasBpjsPageSignal, hasLaporanOperasiSignal, hasHasilPaSignal, hasLaporanOperasiVitalSigns, hasLabResultsData, hasRadiologyData } = require('./pdfPageClassifier');
 const { extractClaimData } = require('./pdfExtractionService');
 const { parsePhysicalExam, translateClinicalText } = require('./notasiMedisParser');
@@ -91,6 +92,20 @@ function applyDeterministicFallback(record, allPagesText, jenisKlaim, originalNa
       console.log('[Pipeline] Fallback regex mengisi KELAS_RAWAT dari Kelas Hak (rawat jalan/IGD).');
     } else if (record.KELAS_RAWAT) {
       console.log('[Pipeline] KELAS_RAWAT ' + JSON.stringify(record.KELAS_RAWAT) + ' bukan 1/2/3 dan Kls Hak tidak terbaca -- dikosongkan supaya tidak menutupi nilai tervalidasi di hilir.');
+      record.KELAS_RAWAT = '';
+    }
+  }
+  if (!kelasRawatSudahValid && !isOutpatientLike) {
+    // Rawat inap: kelas tarif = "Kls.Rawat" di SEP (naik kelas tidak menaikkan
+    // tarif INA-CBG di atas hak, jadi Kls.Hak dipakai bila Kls.Rawat tak
+    // terbaca). Tanpa ini tarif INA-CBG rawat inap kosong padahal SEP hasil
+    // scan jelas tertulis "Kls.Rawat : Kelas 3" (YETY NOVIATI).
+    const m = /(?:kelas|kls\.?)\s*rawat\s*:?\s*(?:kelas\s*)?([123])\b/i.exec(allPagesText)
+      || /(?:kelas|kls\.?)\s*hak\s*:?\s*(?:kelas\s*)?([123])\b/i.exec(allPagesText);
+    if (m) {
+      record.KELAS_RAWAT = m[1];
+      console.log('[Pipeline] Fallback regex mengisi KELAS_RAWAT rawat inap dari SEP.');
+    } else if (record.KELAS_RAWAT) {
       record.KELAS_RAWAT = '';
     }
   }
@@ -215,6 +230,10 @@ async function extractFromPDF(filePath, options = {}) {
     metadata: { processingTimeMs: 0, pagesProcessed: 0, claimDataPagesFound: 0 },
     errors: [],
     jenisKlaimDetection: null,
+    // Isi lembar grouper E-Klaim (hasil casemix), dibaca tanpa AI. Pembanding,
+    // BUKAN sumber data klaim -- lihat lembarGrouperService.js.
+    lembarGrouper: null,
+    ocrPages: null,
   };
 
   try {
@@ -250,8 +269,12 @@ async function extractFromPDF(filePath, options = {}) {
           } else {
             const ocrResult = await ocrPdfPages(filePath, 'all');
             if (ocrResult.success && ocrResult.pages.length > 0) {
+              const halamanGrouperOcr = ocrResult.pages.filter(p => isLembarGrouper(p.text));
+              if (halamanGrouperOcr.length > 0) {
+                classification.grouperPages = halamanGrouperOcr.map(p => ({ page_num: p.page_number, text: p.text }));
+              }
               const ocrTexts = ocrResult.pages
-                .filter(p => p.text && p.text.trim().length > 30)
+                .filter(p => p.text && p.text.trim().length > 30 && !isLembarGrouper(p.text))
                 .map(p => p.text);
               if (ocrTexts.length > 0) {
                 const { isClaimDataPage } = require('./pdfPageClassifier');
@@ -318,7 +341,7 @@ async function extractFromPDF(filePath, options = {}) {
     // kategori) — jadi urutannya wajib klasifikasi -> deteksi -> ekstraksi.
     let jenisKlaim = fixedJenisKlaim;
     if (!jenisKlaim && Array.isArray(allowedJenisKlaim) && allowedJenisKlaim.length > 0) {
-      const allPagesTextForDetection = classification.pages.map(p => p.text_full).join('\n\n');
+      const allPagesTextForDetection = classification.pages.filter(p => !p.is_lembar_grouper).map(p => p.text_full).join('\n\n');
       const detected = detectJenisKlaim(allPagesTextForDetection);
       if (detected && allowedJenisKlaim.includes(detected)) {
         jenisKlaim = detected;
@@ -360,11 +383,29 @@ async function extractFromPDF(filePath, options = {}) {
       return result;
     }
 
-    const allPagesText = classification.pages.map(p => p.text_full).join('\n\n');
+    // Tanpa lembar grouper: kata "Electrocardiogram"/"chest x-ray" di lembar itu
+    // tidak boleh terbaca sebagai bukti ada hasil penunjang, dan isiannya tidak
+    // boleh mengisi kolom klaim lewat fallback deterministik.
+    // Halaman scan ikut lewat teks OCR (pass 1 enhancement, sudah tanpa lembar
+    // grouper) -- tanpa ini SEP hasil scan tidak pernah terbaca sebagai sinyal.
+    const nomorScan = new Set(classification.pages.filter(p => p.type === 'SCAN').map(p => p.page_num));
+    const teksOcrScan = ((classification.ocr_enhancement && classification.ocr_enhancement.pass1_general_ocr
+      && classification.ocr_enhancement.pass1_general_ocr.pages) || [])
+      .filter(p => nomorScan.has(p.page_number) && p.text && !isLembarGrouper(p.text))
+      .map(p => p.text);
+    const allPagesText = [
+      ...classification.pages.filter(p => !p.is_lembar_grouper).map(p => p.text_full),
+      ...teksOcrScan,
+    ].join('\n\n');
     result.record = applyDeterministicFallback(extraction.record, allPagesText, jenisKlaim, originalName);
     // Dipakai RV-01/RV-02 (ruleEngine.js) buat bedakan "AI gagal ekstrak
     // NOKARTU dari dokumen BPJS asli" vs "dokumen ini memang bukan klaim BPJS".
-    result.record.has_bpjs_page = hasBpjsPageSignal(allPagesText);
+    // Lembar grouper E-Klaim JKN tetap sah sebagai TANDA klaim BPJS (sinyal
+    // administrasi, bukan bukti klinis): tanpa ini berkas yang SEP-nya hasil
+    // scan tercatat has_bpjs_page=false dan halaman detail frontend crash
+    // (YETY NOVIATI, 0170R0111225V003427).
+    result.record.has_bpjs_page = hasBpjsPageSignal(allPagesText)
+      || (Array.isArray(classification.grouperPages) && classification.grouperPages.length > 0);
     // Dipakai RV-12 (BA 1247/2024, diagnosis tumor + eksisi) -- SEBELUM ini
     // RV-12 selalu fire begitu kode cocok, tanpa cek dokumen ini sendiri sudah
     // menyertakan lampiran wajibnya atau belum (lihat 18 Sep 2026).
@@ -421,6 +462,16 @@ async function extractFromPDF(filePath, options = {}) {
         ...(result.record._ocr_clinical_findings_notation || {})
       }
     };
+
+    result.lembarGrouper = cariLembarGrouper(classification.grouperPages);
+    // Hasil OCR pass 1 (sudah tanpa lembar grouper) disimpan pemanggil ke
+    // ocr_results, supaya kumpulan bukti AI review tidak meng-OCR ulang PDF
+    // yang sama (dulu setiap upload di-OCR dua kali).
+    const pass1 = classification.ocr_enhancement && classification.ocr_enhancement.pass1_general_ocr;
+    result.ocrPages = pass1 && Array.isArray(pass1.pages) && pass1.pages.length > 0 ? pass1.pages : null;
+    if (result.lembarGrouper) {
+      console.log(`[Pipeline] Lembar grouper E-Klaim (hal. ${result.lembarGrouper.halaman}) disimpan sebagai pembanding casemix, tidak dibaca AI.`);
+    }
 
     result.success = true;
   } catch (error) {

@@ -240,18 +240,30 @@ function classifyPageDocumentType(text) {
   if (!text) return 'lainnya';
   const t = text.toLowerCase();
 
-  // Spesifik dokumen terlebih dahulu (urutan terpenting ke kurang penting)
+  // JUDUL dokumen dulu, baru kata isi. Sebelumnya kata isi ("ekg",
+  // "hematologi", "x-ray") diperiksa lebih dulu, sehingga resume yang menulis
+  // "ekg :LVH" dikenali sebagai 'ekg' dan pembaca tindakannya melewatkan
+  // "Tindakan/Prosedur : 1. ro thorax"; lembar grouper yang menulis "chest
+  // x-ray" dikenali sebagai 'radiology' (berkas KHOIRIYAH 0170R0111225V003293).
   if (/rincian\s*biaya/i.test(t)) return 'rincian_biaya';
   if (/triage\s+igd|skrining\s+awal\s+pasien\s+igd/i.test(t)) return 'triase_igd';
-  if (/laporan\s+operasi|laporan\s+tindakan\s+operatif/i.test(t)) return 'laporan_operasi';
-  if (/hasil\s+pemeriksaan\s+radiologi|radiologi\s+hasil|laporan\s+radiologi|ct\s+scan|x[\s-]?ray|mri|ultrasound|sonografi/i.test(t)) return 'radiology';
-  if (/hasil\s+pemeriksaan\s+laboratorium|pemeriksaan\s+laboratorium|hasil\s+lab|laboratorium\s+hasil|hematologi|kimia\s+darah|urinalisis|patologi\s*klinik/i.test(t)) return 'lab_results';
-  if (/ekg|elektrokardiogram|electrocardiogram|rekam\s+jantung/i.test(t)) return 'ekg';
-
-  if (/surat\s*perintah\s*rawat\s*inap/i.test(t)) return 'spri';
   if (/berkas\s*klaim\s*individual/i.test(t)) return 'berkas_eklaim';
-  if (/surat\s*eligibilitas\s*peserta|no\.?\s*sep\b|nomor\s*sep\b/i.test(t)) return 'sep';
   if (/resume\s*medis/i.test(t)) return 'resume_medis';
+  if (/surat\s*perintah\s*rawat\s*inap/i.test(t)) return 'spri';
+  if (/surat\s*eligibilitas\s*peserta/i.test(t)) return 'sep';
+  if (/laporan\s+operasi|laporan\s+tindakan\s+operatif|lembar\s+anest|catatan\s+anest/i.test(t)) return 'laporan_operasi';
+  // Jawaban patologi anatomi (histopatologi/sitologi) -- dasar kode neoplasma
+  // (jinak/ganas, jenis jaringan). Dulu terbaca 'lainnya' (ANNISA NUR CHASANAH).
+  if (/(?:jawaban|hasil)\s+pemeriksaan\s+(?:histopatolog|sitolog|patologi)|laboratorium\s+patologi\s+anatomi?k?|histopatologi|patologi\s+anatomi/i.test(t)
+    && /kesimpulan|diagnosa?\s+(?:pa|patologi)|mikroskopi/i.test(t)) return 'patologi_anatomi';
+
+  // Kata isi -- hanya untuk halaman tanpa judul dokumen yang dikenali.
+  if (/hasil\s+pemeriksaan\s+radiologi|radiologi\s+hasil|laporan\s+radiologi|\bct\s+scan|\bx[\s-]?ray\b|\bmri\b|\bultrasound|\bsonografi/i.test(t)) return 'radiology';
+  if (/hasil\s+pemeriksaan\s+laboratorium|pemeriksaan\s+laboratorium|hasil\s+lab|laboratorium\s+hasil|hematologi|kimia\s+darah|urinalisis|patologi\s*klinik/i.test(t)) return 'lab_results';
+  // Cetakan mesin EKG jarang menulis "EKG"; yang tercetak "ECG", "QTc",
+  // "P/QRS/T Axes", "Sinus tachycardia" (hal. 7 berkas KHOIRIYAH).
+  if (/ekg|\becg\b|elektrokardiogram|electrocardiogram|rekam\s+jantung|\bqtc\b|p\s*\/?\s*qrs|sinus\s+(?:rhythm|tachycardia|bradycardia|arrhythmia)/i.test(t)) return 'ekg';
+  if (/no\.?\s*sep\b|nomor\s*sep\b/i.test(t)) return 'sep';
   // Resep. Sebelumnya tidak dikenali sama sekali dan jatuh ke 'lainnya' —
   // padahal di situlah bukti tindakan sering tercatat (mis. "Masker Nebul",
   // "Ventasal NEBUL" pada berkas 0170R0110926V001943). Penanda "R/" adalah

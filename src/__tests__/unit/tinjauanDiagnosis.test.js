@@ -71,3 +71,18 @@ test('model gagal -> status belum dinilai, bukan diagnosis tunggal rekaan', asyn
   expect(hasil.status).toBe('belum_dinilai');
   expect(hasil.kode_rekomendasi).toEqual([]);
 });
+
+test('jawaban Luna tidak lolos verifikasi diulang sekali sebelum diserahkan ke Sol', async () => {
+  const { tinjauDiagnosis: tinjau } = require('../../services/tinjauanDiagnosisService');
+  const kandidat = buatKandidat(record, ai, pages, [2]);
+  const benar = { ringkasan: 'Didukung resume.', kode_rekomendasi: kandidat.map(c => c.kode), klarifikasi: [],
+    kandidat: kandidat.map(c => ({ kode: c.kode, status: 'didukung', alasan: 'Tertulis di resume.', bukti: [{ halaman: 2, kutipan: c.diagnosis_resume[0]?.kutipan }] })) };
+  const panggilModel = jest.fn()
+    .mockResolvedValueOnce({ ok: true, hasil: { ringkasan: 'x', kode_rekomendasi: [], kandidat: [], klarifikasi: [] }, penggunaan: { total_tokens: 10 } })
+    .mockResolvedValueOnce({ ok: true, hasil: benar, penggunaan: { total_tokens: 12 } });
+  const hasil = await tinjau(record, ai, pages, [2], { gateway: { panggilModel } });
+  expect(panggilModel).toHaveBeenCalledTimes(2);
+  expect(panggilModel.mock.calls[1][1].prompt).toMatch(/TIDAK LOLOS VERIFIKASI/);
+  expect(hasil.status).toBe('ada_saran');
+  expect(hasil.tokens_used).toBe(22);
+});

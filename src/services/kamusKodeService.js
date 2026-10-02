@@ -23,6 +23,23 @@ function cari(kamus, kodeMentah, posisiTitik) {
 }
 
 const deskripsiDiagnosis = (kode) => cari(DIAGNOSIS, kode, 3);
+
+// Kategori 3 karakter ICD-10 WHO yang punya subkode (mis. J45 -> J45.0..J45.9).
+const PUNYA_SUBKODE = new Set([...DIAGNOSIS.keys()].filter(k => k.includes('.')).map(k => k.split('.')[0]));
+
+/**
+ * Padanan ICD-10 WHO untuk kode yang tidak ada di kamus WHO (umumnya kode
+ * ICD-10-CM Amerika). Hanya pemetaan yang PASTI: kode X.Y dipetakan ke
+ * kategori X bila X ada di kamus WHO dan TIDAK punya subkode -- mis. J81.0
+ * (CM) -> J81 "Pulmonary oedema". Kategori yang punya subkode (J45.3 -> J45.?)
+ * tidak ditebak. Mengembalikan null bila tidak ada padanan pasti.
+ */
+function padananWho(kode) {
+  const k = String(kode || '').trim().toUpperCase();
+  if (!k.includes('.') || deskripsiDiagnosis(k)) return null;
+  const kategori = k.split('.')[0];
+  return deskripsiDiagnosis(kategori) && !PUNYA_SUBKODE.has(kategori) ? kategori : null;
+}
 const deskripsiProsedur = (kode) => cari(PROSEDUR, kode, 2);
 
-module.exports = { deskripsiDiagnosis, deskripsiProsedur };
+module.exports = { deskripsiDiagnosis, deskripsiProsedur, padananWho };

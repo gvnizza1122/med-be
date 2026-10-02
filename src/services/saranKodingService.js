@@ -16,7 +16,8 @@
  *    BUKAN grouper resmi E-Klaim.
  */
 const { evaluasiKombinasiKode, normalisasiKode, pecahDaftarKode } = require('./ketentuanKlaimService');
-const { deskripsiDiagnosis, deskripsiProsedur } = require('./kamusKodeService');
+const { deskripsiDiagnosis, deskripsiProsedur, padananWho } = require('./kamusKodeService');
+const { groupCodesToInaCBG } = require('./inacbgGroupingService');
 const { createHash } = require('crypto');
 
 const SUMBER_TINDAKAN_SAH = new Set(['resume_medis', 'triase_igd']);
@@ -95,6 +96,11 @@ function susunSaranKoding(record, aiReview, hitungInacbgDanTarif) {
   const diaglist = pecahDaftarKode(rec.diagnosa_list || rec.DIAGLIST);
   for (const kode of diaglist) {
     if (!deskripsiDiagnosis(kode)) {
+      const who = padananWho(kode);
+      if (who) {
+        tambahKode(diagnosis, who, { asal: ['diaglist'], catatan: `${kode} bukan kode ICD-10 WHO; padanannya ${who} (kategori tanpa subkode).` });
+        continue;
+      }
       tidakDipakai.push({ kode, jenis: 'diagnosis', alasan: 'Tidak ada di kamus ICD-10 WHO (kemungkinan kode ICD-10-CM). Cari padanan WHO-nya.' });
       continue;
     }
@@ -108,14 +114,25 @@ function susunSaranKoding(record, aiReview, hitungInacbgDanTarif) {
       tidakDipakai.push({ kode: normalisasiKode(s.code), jenis: 'diagnosis', alasan: 'Disangkal berkas atau hanya tertulis di anamnesis, bukan diagnosis.' });
       continue;
     }
+    const bukti = s.quotation ? [{ kutipan: String(s.quotation).slice(0, 200), halaman: s.page_number || null, sumber: 'resume_medis' }] : [];
     if (s.kamus_valid !== true || !deskripsiDiagnosis(s.code)) {
+      // Kode ICD-10-CM yang padanan WHO-nya pasti (mis. J81.0 -> J81) tetap
+      // disarankan dalam bentuk WHO; selebihnya tidak ditebak.
+      const who = padananWho(s.code);
+      if (who) {
+        tambahKode(diagnosis, who, { asal: ['resume'], bukti, catatan: `${normalisasiKode(s.code)} bukan kode ICD-10 WHO; padanannya ${who} (kategori tanpa subkode).` });
+        continue;
+      }
+      // Kode yang belum berpadanan WHO tetap ditampilkan (bukan dibuang)
+      // supaya saran & tarif tidak kosong; koder memilih kode WHO-nya.
+      if (s.belum_who === true) {
+        tambahKode(diagnosis, s.code, { asal: ['resume'], bukti, catatan: `${normalisasiKode(s.code)} belum ada di ICD-10 WHO dan padanannya belum pasti. Disimpan sementara; pilih kode WHO yang setara sebelum diunggah.` });
+        continue;
+      }
       tidakDipakai.push({ kode: normalisasiKode(s.code), jenis: 'diagnosis', alasan: 'Belum tervalidasi kamus ICD-10 WHO.' });
       continue;
     }
-    tambahKode(diagnosis, s.code, {
-      asal: ['resume'],
-      bukti: s.quotation ? [{ kutipan: String(s.quotation).slice(0, 200), halaman: s.page_number || null, sumber: 'resume_medis' }] : [],
-    });
+    tambahKode(diagnosis, s.code, { asal: ['resume'], bukti, catatan: s.catatan_aturan || null });
   }
 
   // Tinjauan hanya mengubah susunan saran; DIAGLIST/status tersimpan tetap utuh.
@@ -155,6 +172,7 @@ function susunSaranKoding(record, aiReview, hitungInacbgDanTarif) {
     if (s.kamus_valid !== true || !deskripsiProsedur(s.code) || s.disangkal === true) continue;
     tambahKode(prosedur, s.code, {
       asal: ['resume'],
+      catatan: s.catatan_aturan || null,
       bukti: s.quotation ? [{ kutipan: String(s.quotation).slice(0, 200), halaman: s.page_number || null, sumber: 'resume_medis' }] : [],
     });
   }
@@ -168,13 +186,45 @@ function susunSaranKoding(record, aiReview, hitungInacbgDanTarif) {
       bukti: buktiSah.map(b => ({ kutipan: String(b.kutipan || '').slice(0, 200), halaman: b.page_number || null, sumber: b.sumber })),
     });
   }
+  // Pemeriksaan penunjang yang terbaca dari berkas (kamus penunjang: darah
+  // rutin -> 90.59, ro thorax -> 87.44, EKG -> 89.52). Casemix mengodekan
+  // penunjang seperti ini; tanpa langkah ini saran prosedur hanya berisi
+  // tindakan (berkas KHOIRIYAH: casemix 90.59;89.52;87.44, saran AI kosong).
+  for (const t of Array.isArray(ai.temuan_penunjang) ? ai.temuan_penunjang : []) {
+    if (!t || !t.kode_usulan || !deskripsiProsedur(t.kode_usulan)) continue;
+    tambahKode(prosedur, t.kode_usulan, {
+      asal: ['penunjang'],
+      bukti: t.kutipan ? [{ kutipan: String(t.kutipan).slice(0, 200), halaman: t.page_number || null, sumber: 'penunjang' }] : [],
+    });
+  }
+  // Seksio sesarea berjenis (74.0-74.4) sudah mencakup "74.99 unspecified"
+  // yang biasanya datang dari kamus tindakan ("sectio") -- jangan dobel.
+  if (prosedur.some(p => /^74\.[0-4]/.test(p.kode))) {
+    for (const p of prosedur.filter(x => /^74\.9/.test(x.kode))) {
+      tidakDipakai.push({ kode: p.kode, jenis: 'prosedur', alasan: 'Seksio sesarea sudah dikode dengan jenisnya; kode "unspecified type" tidak dipakai bersamaan.' });
+    }
+    prosedur.splice(0, prosedur.length, ...prosedur.filter(x => !/^74\.9/.test(x.kode)));
+  }
+  // Kode "lokasi/jenis tidak disebut" (xx.x0) tidak dipakai bila kode
+  // saudaranya yang spesifik sudah ada (79.30 vs 79.35 ORIF femur).
+  for (const p of prosedur.filter(x => /^\d{2}\.\d0$/.test(x.kode)
+    && prosedur.some(y => y !== x && y.kode.slice(0, 4) === x.kode.slice(0, 4)))) {
+    tidakDipakai.push({ kode: p.kode, jenis: 'prosedur', alasan: `Sudah ada kode yang lebih spesifik (${prosedur.filter(y => y !== p && y.kode.slice(0, 4) === p.kode.slice(0, 4)).map(y => y.kode).join(', ')}).` });
+    prosedur.splice(prosedur.indexOf(p), 1);
+  }
   prosedur.forEach(p => { p.deskripsi = deskripsiProsedur(p.kode) || null; });
 
   // 5. INA-CBG & tarif dari kode saran.
   const jenisKlaim = rec.jenis_klaim || rec.JENIS_KLAIM || null;
   const kelasRawat = rec.kelas_rawat ?? rec.KELAS_RAWAT ?? null;
   let inacbg = null;
-  if (!belumFinal && diagnosis.length > 0 && typeof hitungInacbgDanTarif === 'function') {
+  // Diagnosis belum final: tidak ada estimasi tarif (kombinasi kode bisa
+  // mengubah kelompok), KECUALI kelompoknya ditentukan prosedur bedah/
+  // persalinan (sesar -> O-6-10 apa pun diagnosis utamanya). Itu ditampilkan
+  // sebagai perkiraan sementara.
+  const kelompokProsedur = belumFinal && diagnosis.length > 0
+    && (groupCodesToInaCBG(diagnosis.map(d => d.kode), prosedur.map(p => p.kode), rec.jenis_klaim || rec.JENIS_KLAIM) || {}).berbasis_prosedur === true;
+  if ((!belumFinal || kelompokProsedur) && diagnosis.length > 0 && typeof hitungInacbgDanTarif === 'function') {
     const h = hitungInacbgDanTarif(diagnosis.map(d => d.kode), prosedur.map(p => p.kode), jenisKlaim, kelasRawat, null);
     if (h && h.inacbgResult) {
       inacbg = {
@@ -183,6 +233,8 @@ function susunSaranKoding(record, aiReview, hitungInacbgDanTarif) {
         tarif: h.tarifResult && h.tarifResult.amount != null ? Number(h.tarifResult.amount) : null,
         catatan_tarif: h.tarifResult && h.tarifResult.amount == null ? h.tarifResult.note || null : null,
         sumber: h.tarifResult ? h.tarifResult.source : null,
+        sementara: belumFinal,
+        kelas_asumsi: Boolean(h.tarifResult && h.tarifResult.kelas_asumsi),
       };
     }
   }
@@ -200,11 +252,24 @@ function susunSaranKoding(record, aiReview, hitungInacbgDanTarif) {
     && samaHimpunan(prosedur.map(p => p.kode), klaimSaatIni.prosedur);
 
   const catatan = [];
-  if (belumFinal) catatan.push('Pilihan diagnosis belum final. Kode ditampilkan sebagai kandidat; penggabungan dan tarif saran menunggu klarifikasi.');
+  if (belumFinal) {
+    catatan.push(inacbg
+      ? 'Pilihan diagnosis belum final. Kode ditampilkan sebagai kandidat; INA-CBG/tarif adalah perkiraan sementara dari kelompok prosedur (severity masih bisa berubah menurut diagnosis sekunder final).'
+      : 'Pilihan diagnosis belum final. Kode ditampilkan sebagai kandidat; penggabungan dan tarif saran menunggu klarifikasi.');
+  }
   if (pilihan) catatan.push('Saran mengikuti tinjauan bukti kasus. Pemilihan diagnosis utama dan perubahan data tetap keputusan koder.');
   if (diagnosis.length === 0) catatan.push('Belum ada diagnosis yang terbaca dari berkas maupun DIAGLIST.');
   if (perubahan.length > 0) catatan.push('Kode digabung/dibuang sesuai aturan kombinasi Berita Acara; terapkan ke DIAGLIST bila koder setuju.');
   catatan.push('INA-CBG & tarif adalah perkiraan aplikasi (tabel PMK 3/2023), bukan hasil grouper resmi E-Klaim.');
+
+  const casemix = bandingkanCasemix(ai.lembar_grouper, diagnosis, prosedur, inacbg);
+  if (casemix) {
+    catatan.push(casemix.semua_cocok
+      ? 'Saran AI sama dengan hasil casemix (lembar grouper E-Klaim).'
+      : casemix.inti_cocok
+        ? 'Diagnosis, INA-CBG, dan tarif saran AI sama dengan hasil casemix; ada perbedaan prosedur yang tidak mengubah tarif.'
+        : 'Saran AI berbeda dari hasil casemix (lembar grouper E-Klaim); lihat perbandingan.');
+  }
 
   return {
     versi_data: createHash('sha256').update(JSON.stringify([rec.diagnosa_list || rec.DIAGLIST, rec.prosedur_list || rec.PROCLIST, rec.ai_review || null, rec.jenis_klaim || rec.JENIS_KLAIM, rec.kelas_rawat])).digest('hex'),
@@ -219,7 +284,62 @@ function susunSaranKoding(record, aiReview, hitungInacbgDanTarif) {
     sama_dengan_klaim: samaDenganKlaim,
     selisih_tarif: inacbg && inacbg.tarif != null && klaimSaatIni.tarif != null ? inacbg.tarif - klaimSaatIni.tarif : null,
     catatan,
+    casemix,
   };
 }
 
-module.exports = { susunSaranKoding, terapkanKombinasi };
+/**
+ * Bandingkan saran AI dengan hasil casemix dari lembar grouper E-Klaim
+ * (ai_review.lembar_grouper, dibaca tanpa AI -- lihat lembarGrouperService).
+ * Lembar itu PEMBANDING, bukan rujukan: saran AI disusun tanpa melihatnya.
+ */
+function bandingkanCasemix(lembar, diagnosis, prosedur, inacbg) {
+  if (!lembar || !lembar.inacbg) return null;
+  const kodeAi = diagnosis.map(d => d.kode);
+  const kodeCm = (lembar.diagnosis || []).map(d => normalisasiKode(d.kode));
+  const prosAi = prosedur.map(p => p.kode);
+  const prosCm = (lembar.prosedur || []).map(p => normalisasiKode(p.kode));
+  const himpunan = (ai, cm) => ({
+    sama: ai.filter(k => cm.includes(k)),
+    hanya_ai: ai.filter(k => !cm.includes(k)),
+    hanya_casemix: cm.filter(k => !ai.includes(k)),
+  });
+  const utamaAi = kodeAi[0] || null;
+  const utamaCm = kodeCm[0] || null;
+  const tarifAi = inacbg && inacbg.tarif != null ? inacbg.tarif : null;
+  const tarifCm = lembar.inacbg.tarif != null ? lembar.inacbg.tarif : null;
+
+  const hasil = {
+    sumber: 'Lembar grouper E-Klaim (hasil casemix)',
+    halaman: lembar.halaman || null,
+    versi_eklaim: lembar.versi_eklaim || null,
+    casemix: {
+      diagnosis: (lembar.diagnosis || []).map(d => ({ kode: normalisasiKode(d.kode), deskripsi: d.deskripsi || null, peran: d.peran })),
+      prosedur: (lembar.prosedur || []).map(p => ({ kode: normalisasiKode(p.kode), deskripsi: p.deskripsi || null })),
+      inacbg: lembar.inacbg,
+      total_tarif: lembar.total_tarif,
+    },
+    diagnosis_utama: {
+      ai: utamaAi,
+      casemix: utamaCm,
+      cocok: Boolean(utamaAi && utamaAi === utamaCm),
+      sekategori: Boolean(utamaAi && utamaCm && utamaAi.slice(0, 3) === utamaCm.slice(0, 3)),
+    },
+    diagnosis: himpunan(kodeAi, kodeCm),
+    prosedur: himpunan(prosAi, prosCm),
+    inacbg: { ai: inacbg ? inacbg.kode : null, casemix: lembar.inacbg.kode, cocok: Boolean(inacbg && inacbg.kode === lembar.inacbg.kode) },
+    tarif: { ai: tarifAi, casemix: tarifCm, selisih: tarifAi != null && tarifCm != null ? tarifAi - tarifCm : null },
+  };
+  // Inti: diagnosis & INA-CBG/tarif sama. Prosedur minor tambahan dari AI
+  // (oksigen, injeksi) yang tidak dikode casemix tidak mengubah tarif.
+  hasil.inti_cocok = hasil.diagnosis_utama.cocok
+    && hasil.diagnosis.hanya_ai.length === 0 && hasil.diagnosis.hanya_casemix.length === 0
+    && hasil.inacbg.cocok && hasil.tarif.selisih === 0;
+  hasil.semua_cocok = hasil.diagnosis_utama.cocok
+    && hasil.diagnosis.hanya_ai.length === 0 && hasil.diagnosis.hanya_casemix.length === 0
+    && hasil.prosedur.hanya_ai.length === 0 && hasil.prosedur.hanya_casemix.length === 0
+    && hasil.inacbg.cocok;
+  return hasil;
+}
+
+module.exports = { susunSaranKoding, terapkanKombinasi, bandingkanCasemix };

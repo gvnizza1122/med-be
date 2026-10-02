@@ -14,6 +14,13 @@
  *  4. Cache 30 detik (bisa dimatikan) agar tidak menambah query DB per
  *     panggilan model; setModel() dan hapusCache() menyegarkannya.
  *
+ * SKEMA BIAYA (klien, 2 Okt 2026): semua pembacaan & pengisian data berkas
+ * (ekstrak_pdf, baca_berkas: pemeriksaan fisik, penunjang, tindakan, dst.)
+ * memakai AI_MODEL = gpt-6-luna. Hanya tinjau_kasus_lanjutan (analisis
+ * mendalam: diagnosis/prosedur membingungkan, INA-CBG/tarif belum pasti,
+ * kriteria IGD borderline, alasan pending belum tegas, atau diminta koder)
+ * memakai AI_REVIEW_MODEL = gpt-6.1-sol. Pemicunya: tinjauanLanjutanService.ambilPemicu.
+ *
  * DEFAULT YANG DIRENCANAKAN (dokumentasi saja — TIDAK di-seed):
  *   baca_berkas              -> luna   (openai_compat)
  *   petakan_alasan_pending   -> kimi   (kimi)
@@ -42,6 +49,7 @@ const TUGAS = Object.freeze([
   'putuskan_pending',
   'ekstrak_pdf',
   'tinjau_kasus_lanjutan',
+  'agen_tinjau',
 ]);
 
 const PENYEDIA = Object.freeze(['openai_compat', 'kimi']);
