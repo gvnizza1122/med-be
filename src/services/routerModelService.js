@@ -50,6 +50,7 @@ const TUGAS = Object.freeze([
   'ekstrak_pdf',
   'tinjau_kasus_lanjutan',
   'agen_tinjau',
+  'agen_casemix',
 ]);
 
 const PENYEDIA = Object.freeze(['openai_compat', 'kimi']);

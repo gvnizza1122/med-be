@@ -17,6 +17,12 @@ const { generateAiReview, hitungInacbgDanTarif, getAnyResumeMedisPageNumbers, te
 const { susunPemeriksaanPenunjang } = require('../services/pemeriksaanPenunjangService');
 const { catatPolaBeda, ringkasPola } = require('../services/polaBedaCasemixService');
 const { pelajari: pelajariCasemix } = require('../services/pembelajaranCasemixService');
+const { susunFaktaKlinis } = require('../services/faktaKlinisService');
+const { susunLaporanCasemix } = require('../services/agenCasemixService');
+const { susunKronologi } = require('../services/kronologiService');
+const { tanyaAgenCasemix } = require('../services/agenCasemixInteraktifService');
+const { simpanKeputusan, ambilKeputusan, pelajaranRelevan } = require('../services/keputusanCasemixService');
+const { kodeFinal } = require('../services/pemeriksaKritisService');
 const { tinjauDiagnosis } = require('../services/tinjauanDiagnosisService');
 const { tinjauLanjutan } = require('../services/tinjauanLanjutanService');
 const { getRelevantKnowledge, recordKnowledge, getRelevantBpjsExamples } = require('../services/errorKnowledgeService');
@@ -453,7 +459,7 @@ router.post('/upload', authenticate, upload.single('file'), async (req, res) => 
         try {
           const recordErrors = errorsByRecordId[record.id] || [];
           const knowledgeEntries = await getRelevantKnowledge(db, recordErrors.map(e => e.rule_id));
-          const bpjsExamples = await getRelevantBpjsExamples(db);
+          const bpjsExamples = await getRelevantBpjsExamples(db, { ...record, validationErrors: recordErrors });
           const aiReview = await generateAiReview(record, recordErrors, [], knowledgeEntries, bpjsExamples);
           if (aiReview) {
             totalAiTokens += aiReview.tokens_used || 0;
@@ -1282,7 +1288,7 @@ router.post('/:id/ai-audit', authenticate, async (req, res) => {
         }
         const recordErrors = errorsByRecordId[record.id] || [];
         const knowledgeEntries = await getRelevantKnowledge(db, recordErrors.map(e => e.rule_id));
-        const bpjsExamples = await getRelevantBpjsExamples(db);
+        const bpjsExamples = await getRelevantBpjsExamples(db, { ...record, validationErrors: recordErrors });
         const aiReview = await generateAiReview(record, recordErrors, evidencePool, knowledgeEntries, bpjsExamples);
         if (aiReview) {
           await simpanAiReview(db, record.id, aiReview);
@@ -2309,7 +2315,9 @@ async function isiKodeDariSaranDalamTransaksi(db, recordId, record, aiReview) {
           && (t.bukti || []).some(b => b.sumber === 'resume_medis' || b.sumber === 'triase_igd'))
         .map(t => String(t.kode_usulan).trim());
 
-    const gabungan = [...new Set([...p, ...dariTindakan])];
+    // Konvensi casemix RS: tindakan rutin (injeksi, infus, IV cath, kateter, oksigen) tidak dikode.
+    const { PROSEDUR_RUTIN_TIDAK_DIKODE } = require('../services/konvensiKodingRs');
+    const gabungan = [...new Set([...p, ...dariTindakan])].filter(k => !PROSEDUR_RUTIN_TIDAK_DIKODE.has(k));
     if (gabungan.length > 0) perubahan.prosedur_list = gabungan.join(';');
   }
 
@@ -2408,7 +2416,15 @@ async function isiKodeDariSaranDalamTransaksi(db, recordId, record, aiReview) {
   // Dijalankan SELALU (sebelum "if (Object.keys(perubahan)...) return" di
   // bawah), supaya berlaku juga saat DIAGLIST/PROCLIST sudah lengkap sejak
   // awal dan tidak ada yang perlu diisi otomatis.
-  if (perubahan.diagnosa_list || perubahan.prosedur_list) {
+  // Hasil grouper Agen Casemix dihitung dari kode final rekomendasi; bila kode
+  // yang baru diisi sama persis, hasil agen dipertahankan (tidak dihitung ulang
+  // dengan aturan berbeda).
+  const grouperAgen = aiReview && aiReview.agen_casemix && aiReview.agen_casemix.grouper;
+  const daftarKode = v => String(v || '').split(/[;,]/).map(k => k.trim().toUpperCase()).filter(Boolean).join(';');
+  const samaDenganAgen = Boolean(grouperAgen && grouperAgen.kode && aiReview.inacbg_result
+    && daftarKode(perubahan.diagnosa_list || record.DIAGLIST || record.diagnosa_list) === daftarKode((grouperAgen.dx || []).join(';'))
+    && daftarKode(perubahan.prosedur_list || record.PROCLIST || record.prosedur_list) === daftarKode((grouperAgen.px || []).join(';')));
+  if ((perubahan.diagnosa_list || perubahan.prosedur_list) && !samaDenganAgen) {
     aiReview.inacbg_result = null;
     aiReview.tariff_result = null;
     aiReview.suggested_inacbg = '';
@@ -2735,7 +2751,7 @@ async function processSinglePdfUploadDenganKonteks(db, { filePath, originalName,
       }
       const evidencePool = await gatherEvidencePool(db, recordId, resolvedFilePath);
       const knowledgeEntries = await getRelevantKnowledge(db, validationErrors.map(e => e.rule_id));
-      const bpjsExamples = await getRelevantBpjsExamples(db);
+      const bpjsExamples = await getRelevantBpjsExamples(db, { ...extractedData, validationErrors });
       aiReview = await generateAiReview({ ...extractedData, id: recordId }, validationErrors, evidencePool, knowledgeEntries, bpjsExamples);
       // Hasil casemix dari lembar grouper E-Klaim: pembanding, bukan bahan bacaan.
       if (aiReview && result.lembarGrouper) aiReview.lembar_grouper = result.lembarGrouper;
@@ -2906,7 +2922,7 @@ async function reprocessExistingRecordDenganKonteks(db, { fileId, recordId, file
       }
       const evidencePool = await gatherEvidencePool(db, recordId, path.resolve(filePath));
       const knowledgeEntries = await getRelevantKnowledge(db, validationErrors.map(e => e.rule_id));
-      const bpjsExamples = await getRelevantBpjsExamples(db);
+      const bpjsExamples = await getRelevantBpjsExamples(db, { ...extractedData, validationErrors });
       aiReview = await generateAiReview({ ...extractedData, id: recordId }, validationErrors, evidencePool, knowledgeEntries, bpjsExamples);
       // Hasil casemix dari lembar grouper E-Klaim: pembanding, bukan bahan bacaan.
       if (aiReview && result.lembarGrouper) aiReview.lembar_grouper = result.lembarGrouper;
@@ -2993,6 +3009,80 @@ router.get('/records/:recordId/saran-koding', authenticate, async (req, res) => 
   } catch (error) {
     console.error('[saran-koding] gagal:', error);
     res.status(500).json({ error: 'Saran koding gagal disusun.' });
+  }
+});
+
+// Laporan Agen Casemix (mode otomatis): ringkasan klinis, rekomendasi koding
+// berstatus, persyaratan, klarifikasi, risiko, alternatif koding sah + dampak
+// tarif, jejak kerja. Disusun dari data tersimpan tanpa AI.
+async function muatLaporanCasemix(db, recordId) {
+  const record = await db.prepare('SELECT * FROM claim_records WHERE id = ?').get(recordId);
+  if (!record) return null;
+  let ai = record.ai_review;
+  if (typeof ai === 'string') { try { ai = JSON.parse(ai); } catch (_) { ai = {}; } }
+  ai = ai || {};
+  // Lembar grouper hanya pembanding casemix: tidak pernah dibaca agen.
+  const pages = (await db.prepare('SELECT page_number, ocr_text FROM ocr_results WHERE record_id = ? ORDER BY page_number').all(record.id))
+    .filter(p => !isLembarGrouper(p.ocr_text));
+  const faktaKlinis = susunFaktaKlinis(pages, ai);
+  const saran = susunSaranKoding(record, ai, hitungInacbgDanTarif);
+  const { dx, px } = kodeFinal(record, ai);
+  const [pelajaran, keputusan] = await Promise.all([
+    pelajaranRelevan(db, { dx, px, recordId: record.id, jenisKlaim: record.jenis_klaim }).catch(() => []),
+    ambilKeputusan(db, record.id),
+  ]);
+  const laporan = susunLaporanCasemix({ record, ai, faktaKlinis, saran, hitungInacbgDanTarif, kronologi: susunKronologi(pages), pelajaran, keputusan });
+  return { record, ai, pages, faktaKlinis, saran, laporan };
+}
+
+router.get('/records/:recordId/laporan-casemix', authenticate, async (req, res) => {
+  try {
+    const muat = await muatLaporanCasemix(getDb(), req.params.recordId);
+    if (!muat) return res.status(404).json({ error: 'Record tidak ditemukan' });
+    res.json(muat.laporan);
+  } catch (error) {
+    console.error('[laporan-casemix] gagal:', error);
+    res.status(500).json({ error: 'Laporan casemix belum dapat disusun.' });
+  }
+});
+
+// Keputusan casemix final (casemix RS = keputusan akhir). Disimpan terpisah --
+// DIAGLIST/PROCLIST klaim tidak diubah -- lalu dibandingkan dengan rekomendasi
+// aplikasi dan dipelajari untuk kasus berikutnya.
+router.post('/records/:recordId/keputusan-casemix', authenticate, async (req, res) => {
+  try {
+    const db = getDb();
+    const muat = await muatLaporanCasemix(db, req.params.recordId);
+    if (!muat) return res.status(404).json({ error: 'Record tidak ditemukan' });
+    const hasil = await simpanKeputusan({
+      db, record: muat.record, saran: muat.saran, pages: muat.pages, dx: req.body?.diagnosis, px: req.body?.prosedur,
+      catatan: req.body?.catatan, oleh: req.user?.id || null, hitungInacbgDanTarif,
+    });
+    if (hasil.galat) return res.status(400).json({ error: hasil.galat });
+    res.json(hasil);
+  } catch (error) {
+    console.error('[keputusan-casemix] gagal:', error);
+    res.status(500).json({ error: 'Keputusan casemix belum dapat disimpan. Coba lagi.' });
+  }
+});
+
+// Mode interaktif Agen Casemix: tanya-jawab per berkas. Tidak mengubah data klaim.
+router.post('/records/:recordId/agen-casemix/tanya', authenticate, async (req, res) => {
+  try {
+    const pertanyaan = String(req.body?.pertanyaan || '').trim();
+    if (!pertanyaan) return res.status(400).json({ error: 'Pertanyaan wajib diisi.' });
+    const db = getDb();
+    const muat = await muatLaporanCasemix(db, req.params.recordId);
+    if (!muat) return res.status(404).json({ error: 'Record tidak ditemukan' });
+    const { record, pages, faktaKlinis, laporan } = muat;
+    const hasil = await tanyaAgenCasemix({
+      pertanyaan, riwayat: Array.isArray(req.body?.riwayat) ? req.body.riwayat : [], record, pages, faktaKlinis, laporan, hitungInacbgDanTarif, db,
+      dikenal: { nama: record.nama_pasien, nomor_kartu: record.nokartu, nik: record.nik, no_rm: record.mrn, sep: record.sep },
+    });
+    res.json(hasil);
+  } catch (error) {
+    console.error('[agen-casemix/tanya] gagal:', error);
+    res.status(500).json({ error: 'Agen casemix belum dapat menjawab. Coba lagi.' });
   }
 });
 

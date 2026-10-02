@@ -1,0 +1,82 @@
+{
+  "_tentang": "Registri regulasi & kesepakatan yang dipakai Agen Casemix. Setiap butir aturan di aplikasi wajib menunjuk ke salah satu sumber di sini agar jelas asal, versi, dan masa berlakunya. Tanggal berlaku_sampai null = berlaku sampai dicabut. Bila regulasi diperbarui, tambahkan entri versi baru dan isi berlaku_sampai pada versi lama; jangan menimpa.",
+  "sumber": [
+    {
+      "id": "PMK-3-2023",
+      "jenis": "peraturan_menteri",
+      "judul": "Permenkes No. 3 Tahun 2023 tentang Standar Tarif Pelayanan Kesehatan dalam Penyelenggaraan Program Jaminan Kesehatan",
+      "nomor": "3 Tahun 2023",
+      "versi": "2023",
+      "berlaku_mulai": "2023-01-01",
+      "berlaku_sampai": null,
+      "ringkasan": "Dasar tarif INA-CBG dan Special CMG. Data tarif aplikasi: Regional 1, kelas D, swasta.",
+      "berkas_data": ["tarif_inacbg_pmk3_2023_r1_kelasD_swasta.json", "special_cmg_pmk3_2023.json"],
+      "kata_kunci": ["tarif", "ina-cbg", "inacbg", "special cmg", "grouper", "regional", "kelas rs"]
+    },
+    {
+      "id": "PMK-47-2018",
+      "jenis": "peraturan_menteri",
+      "judul": "Permenkes No. 47 Tahun 2018 tentang Pelayanan Kegawatdaruratan",
+      "nomor": "47 Tahun 2018",
+      "versi": "2018",
+      "berlaku_mulai": "2018-01-01",
+      "berlaku_sampai": null,
+      "ringkasan": "Pasal 3 ayat (2): kriteria kegawatdaruratan K1-K5 (mengancam nyawa/bahaya diri & lingkungan, gangguan jalan napas, gangguan pernapasan, gangguan sirkulasi, penurunan kesadaran). Dasar penilaian kelayakan pelayanan IGD.",
+      "butir": [
+        { "id": "K1", "teks": "Mengancam nyawa, membahayakan diri dan orang lain/lingkungan" },
+        { "id": "K2", "teks": "Adanya gangguan pada jalan napas" },
+        { "id": "K3", "teks": "Adanya gangguan pada pernapasan" },
+        { "id": "K4", "teks": "Adanya gangguan pada sirkulasi" },
+        { "id": "K5", "teks": "Adanya penurunan kesadaran" }
+      ],
+      "kata_kunci": ["igd", "gawat", "darurat", "kegawatdaruratan", "triase", "emergency"]
+    },
+    {
+      "id": "BA-KESEPAKATAN-2018",
+      "jenis": "berita_acara",
+      "judul": "Berita Acara Kesepakatan Kemenkes-BPJS Kesehatan No. JP.02.03/3/2411/2018 & 620/BA/1118",
+      "nomor": "JP.02.03/3/2411/2018; 620/BA/1118",
+      "versi": "2018",
+      "berlaku_mulai": "2018-11-01",
+      "berlaku_sampai": null,
+      "ringkasan": "Kesepakatan penyelesaian kasus dispute koding (kombinasi kode, manifestasi yang tidak dikode terpisah). Dipakai bersama catatan casemix RS sebagai aturan kombinasi.",
+      "berkas_data": ["ketentuanKlaimKombinasi.json"],
+      "kata_kunci": ["kombinasi", "berita acara", "ba kesepakatan", "dispute", "manifestasi"]
+    },
+    {
+      "id": "REKAP-PENDING-RS",
+      "jenis": "kesepakatan_lokal",
+      "judul": "Rekap pending BPJS RS Lestari Raharja (kalimat verifikator)",
+      "nomor": null,
+      "versi": "disahkan tim casemix 2026-09-23",
+      "berlaku_mulai": "2026-09-23",
+      "berlaku_sampai": null,
+      "ringkasan": "Syarat penunjang diagnosis dari kalimat verifikator BPJS setempat. Kesepakatan LOKAL: tidak otomatis berlaku untuk RS lain.",
+      "berkas_data": ["syaratPenunjangDiagnosis.json"],
+      "kata_kunci": ["syarat penunjang", "pending", "verifikator", "hb", "transfusi", "pneumonia", "gram", "kreatinin"]
+    },
+    {
+      "id": "KONVENSI-KODING-RS",
+      "jenis": "konvensi_internal",
+      "judul": "Konvensi koding casemix RS (dipelajari dari koding casemix pada berkas yang sudah diklaim)",
+      "nomor": null,
+      "versi": "2026-10",
+      "berlaku_mulai": "2026-10-01",
+      "berlaku_sampai": null,
+      "ringkasan": "KPD >24 jam = O42.1; persalinan O80-O84 + Z37 sekunder; SC tanpa jenis = 74.1; tumor dikode sesuai PA; diagnosis banding PA tidak dikode; penunjang darah = 90.59.",
+      "kata_kunci": ["konvensi", "kpd", "ketuban", "persalinan", "sectio", "sc", "z37", "neoplasma", "tumor", "pa", "90.59", "lab darah"]
+    },
+    {
+      "id": "ICD-10-WHO-2010",
+      "jenis": "standar_koding",
+      "judul": "ICD-10 WHO versi 2010 dan ICD-9-CM 2010 (standar koding INA-CBG)",
+      "nomor": null,
+      "versi": "2010",
+      "berlaku_mulai": "2014-01-01",
+      "berlaku_sampai": null,
+      "ringkasan": "Kamus diagnosis & prosedur yang dipakai grouper INA-CBG; kode di luar kamus ditolak aplikasi.",
+      "berkas_data": ["icd10_who_dictionary.json", "icd9cm_procedures.json"],
+      "kata_kunci": ["icd", "icd-10", "icd-9", "kamus", "kode", "who"]
+    }
+  ]
+}

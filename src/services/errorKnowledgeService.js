@@ -90,23 +90,10 @@ const BPJS_EXAMPLES_IN_PROMPT = 5;
  * @param {Object} db
  * @returns {Promise<Array<{kategori_pending, alasan_bpjs, draft_berhasil}>>}
  */
-async function getRelevantBpjsExamples(db) {
-  try {
-    // Tidak lagi mensyaratkan outcome = 'approved' — training sekarang
-    // mencatat OTOMATIS setiap draft jawaban dibuat (lihat routes/bpjsPending.js
-    // generate-draft), tanpa menunggu staf menandai status approved (di
-    // lapangan gerbang klik itu jarang dipakai konsisten). Urutkan dari yang
-    // paling meyakinkan (confidence_score, diisi Kimi K3) supaya contoh yang
-    // lebih jelas/lengkap diprioritaskan meski tidak difilter status lagi.
-    return await db.prepare(`
-      SELECT kategori_pending, alasan_bpjs, draft_berhasil
-      FROM ai_training_examples
-      ORDER BY confidence_score DESC NULLS LAST, created_at DESC LIMIT ?
-    `).all(BPJS_EXAMPLES_IN_PROMPT);
-  } catch (e) {
-    // Tabel belum ada di deployment lama / query gagal — jangan gagalkan AI review utama karena ini.
-    return [];
-  }
+async function getRelevantBpjsExamples(db, context = {}) {
+  // Referensi kasus pending sejenis (jenis klaim & istilah), berlabel tingkat
+  // kepercayaannya. [] bila belum ada / skema lama -- tidak pernah melempar.
+  return require('./ragReferenceService').getReferences(db, context, BPJS_EXAMPLES_IN_PROMPT);
 }
 
 module.exports = { getRelevantKnowledge, recordKnowledge, getRelevantBpjsExamples, MAX_ENTRIES_PER_RULE };

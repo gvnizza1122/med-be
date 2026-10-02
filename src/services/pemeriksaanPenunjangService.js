@@ -73,16 +73,43 @@ function bagianUntuk(baris) {
   return cocok ? cocok[1] : null;
 }
 
+/**
+ * Status nilai lab. Nilai yang mustahil/diragukan atau yang tampak kehilangan
+ * titik desimal pada OCR ("512" untuk Ht 51.2, "273" untuk MCH 27.3) TIDAK
+ * ditandai tinggi/rendah -- ditandai perlu_cek supaya tidak menjadi temuan
+ * klinis palsu (berkas KHOIRIYAH).
+ */
 function statusNilai(b) {
+  const r = b.rujukan;
+  const n = Number(b.nilai);
+  const kewajaran = b.kewajaran && b.kewajaran.status;
+  if (kewajaran === 'mustahil' || kewajaran === 'diragukan') return 'perlu_cek';
+  if (r && Number.isFinite(n) && r.max != null && r.max > 0 && n > r.max * 5 && Number.isInteger(n)) {
+    const geser = n / 10;
+    if ((r.min == null || geser >= r.min * 0.5) && geser <= r.max * 2) return 'perlu_cek';
+  }
   const flag = String(b.flag_cetak || '').toUpperCase();
   if (flag === 'H') return 'tinggi';
   if (flag === 'L') return 'rendah';
-  const r = b.rujukan;
-  const n = Number(b.nilai);
-  if (!r || !Number.isFinite(n)) return null;
+  if (!r || !Number.isFinite(n) || !/\d/.test(String(r.teks || ''))) return null;
   if (r.max != null && n > r.max) return 'tinggi';
   if (r.min != null && n < r.min) return 'rendah';
   return 'normal';
+}
+
+/**
+ * Hasil kualitatif terhadap rujukannya. "Negatif" setara "Non Reaktif"
+ * (IgG/IgM anti dengue NEGATIF dengan rujukan Non Reaktif = normal; dulu
+ * terbaca "tinggi"). Positif/reaktif terhadap rujukan negatif = abnormal.
+ */
+function statusKualitatif(hasil, rujukan) {
+  const baku = v => {
+    const t = String(v || '').toLowerCase().replace(/[\s-]/g, '');
+    if (/^(nonreaktif|negatif|negative)$/.test(t)) return 'negatif';
+    if (/^(reaktif|positif|positive)$/.test(t)) return 'positif';
+    return t;
+  };
+  return baku(hasil) === baku(rujukan) ? 'normal' : baku(rujukan) === 'negatif' && baku(hasil) === 'positif' ? 'tinggi' : null;
 }
 
 /** Hasil laboratorium per halaman, dikelompokkan menurut judul bagian. */
@@ -122,7 +149,7 @@ function bacaLaboratorium(halamanLab) {
         const hasil = k[2];
         masuk({
           parameter: k[1].trim(), ditulis: k[1].trim(), hasil, satuan: null, rujukan: k[3] || null, flag: null,
-          status: k[3] ? (hasil.toLowerCase().replace(/[\s-]/g, '') === k[3].toLowerCase().replace(/[\s-]/g, '') ? 'normal' : 'tinggi') : null,
+          status: k[3] ? statusKualitatif(hasil, k[3]) : null,
           perlu_cek: false, dikenali: true, kutipan: isi.trim().slice(0, 200),
         });
       }

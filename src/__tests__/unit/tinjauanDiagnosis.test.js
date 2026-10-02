@@ -23,16 +23,18 @@ test.each([['PPOK saja', ['J44.9'], ['J44.9']], ['pneumonia saja', ['J18.9'], ['
   expect(saran.klaim_saat_ini.diagnosis).toEqual(['J44.9', 'J18.9']);
   expect(JSON.stringify(record)).toBe(sebelum);
 });
-test('belum cukup bukti: tidak memaksakan gabungan atau estimasi tarif', () => {
+test('belum cukup bukti: tidak memaksakan gabungan; agen memberi rekomendasi & tarif SEMENTARA urutan dokter', () => {
   const tinjauan = validasiTinjauan(raw([]), candidates, pages);
-  const hitung = jest.fn();
+  const hitung = jest.fn(() => ({ inacbgResult: { code: 'J-4-16-II' }, tarifResult: { amount: 5000000, source: 'PMK_3_2023' } }));
   const saran = susunSaranKoding(record, { ...ai, tinjauan_diagnosis: tinjauan }, hitung);
   expect(saran.diagnosis.map(d => d.kode)).toEqual(['J44.9', 'J18.9']);
   expect(saran.diagnosis_belum_final).toBe(true);
-  expect(saran.diagnosis.every(d => d.peran === undefined)).toBe(true);
+  expect(saran.diagnosis.map(d => d.peran)).toEqual(['utama', 'sekunder']);
+  expect(saran.diagnosis.every(d => d.status_tinjauan === 'perlu_klarifikasi')).toBe(true);
   expect(saran.perubahan).toEqual([]);
-  expect(saran.inacbg).toBeNull();
-  expect(hitung).not.toHaveBeenCalled();
+  expect(saran.inacbg).toMatchObject({ kode: 'J-4-16-II', tarif: 5000000, sementara: true });
+  expect(hitung.mock.calls[0][0]).toEqual(['J44.9', 'J18.9']);
+  expect(saran.catatan.join(' ')).toMatch(/Rekomendasi sementara Agen Casemix.*J44\.9, J18\.9 perlu klarifikasi/);
 });
 test('berkas lama tanpa tinjauan tidak otomatis dijadikan kode gabungan hanya karena pasangan tercantum', () => {
   const saran = susunSaranKoding(record, ai);

@@ -160,8 +160,10 @@ function gabungDiagnosis(luna, sol) {
 }
 
 async function tinjauLanjutan(record, ai, pages, resumePages, putusanKandidat = null,
-  { gateway = gatewayModelService, db = null, dikenal = {}, paksaSol = false, persenSampel } = {}) {
-  const pemicu = ambilPemicu(record, ai, { paksaSol, persenSampel });
+  { gateway = gatewayModelService, db = null, dikenal = {}, paksaSol = false, persenSampel, pemicuAgen = [], catatanAgen = '' } = {}) {
+  // Pemicu dari Agen Casemix ikut dipertimbangkan, tetap dalam batas Sol aktif & jenis klaim RJ/RI.
+  const solAktif = process.env.AI_HYBRID_SOL_ENABLED !== 'false' && ['RAWAT_JALAN', 'RAWAT_INAP'].includes(record.jenis_klaim || record.JENIS_KLAIM);
+  const pemicu = [...new Set([...ambilPemicu(record, ai, { paksaSol, persenSampel }), ...(solAktif ? pemicuAgen : [])])];
   const awal = { versi: VERSI, status: 'tidak_diperlukan', pemicu, tokens_used: 0 };
   if (!pemicu.length) return { metadata: awal };
   const terbaca = pages.filter(p => String(p.ocr_text || '').trim());
@@ -197,7 +199,7 @@ KANDIDAT_DIAGNOSIS: ${JSON.stringify(candidates)}
 HALAMAN_RESUME: ${JSON.stringify(resumePages)}
 BUKTI_ASLI:\n${pilihan.map(p => `=== Halaman ${p.page_number} ===\n${p.ocr_text}`).join('\n\n')}
 ${putusanKandidat ? buatPrompt(putusanKandidat.alasan) : 'Tidak menilai putusan pending pada pratinjau ini.'}
-HASIL_AWAL_UNTUK_DIBANDINGKAN: ${JSON.stringify({ diagnosis: ai.tinjauan_diagnosis, putusan: ai.putusan_pending,
+${catatanAgen ? `${catatanAgen}\n` : ''}HASIL_AWAL_UNTUK_DIBANDINGKAN: ${JSON.stringify({ diagnosis: ai.tinjauan_diagnosis, putusan: ai.putusan_pending,
   ...(ai.analisis_kritis?.perlu_analisis_mendalam ? { analisis_kritis: (ai.analisis_kritis.temuan || []).filter(t => t.keparahan === 'tinggi').map(t => ({ jenis: t.jenis, pesan: t.pesan, bukti: t.bukti })) } : {}) })}`,
   };
   const kunci = createHash('sha256').update(JSON.stringify([VERSI, process.env.AI_REVIEW_MODEL || 'gpt-6.1-sol', muatan.system, muatan.prompt])).digest('hex');
