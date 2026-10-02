@@ -118,8 +118,12 @@ async function cariPola(db, pages, recordId) {
   const hasil = [];
   for (const i of istilah.filter(x => x.kunci)) {
     try {
+      // Berkas yang sama yang diunggah ulang (SEP sama) bukan "kasus lain".
       const baris = await db.all(`SELECT kode, COUNT(*) AS jumlah FROM pola_casemix_contoh
-        WHERE jenis = ? AND kunci = ? AND record_id <> ? GROUP BY kode ORDER BY COUNT(*) DESC LIMIT 3`, [i.jenis, i.kunci, String(recordId || '')]);
+        WHERE jenis = ? AND kunci = ? AND record_id <> ?
+          AND record_id NOT IN (SELECT c2.id FROM claim_records c1 JOIN claim_records c2 ON c2.sep = c1.sep
+            WHERE c1.id = ? AND COALESCE(c1.sep, '') <> '')
+        GROUP BY kode ORDER BY COUNT(*) DESC LIMIT 3`, [i.jenis, i.kunci, String(recordId || ''), String(recordId || '')]);
       for (const b of baris) hasil.push({ jenis: i.jenis, istilah: i.teks, kode: b.kode, jumlah: Number(b.jumlah) });
     } catch (_) { /* tabel belum ada / DB bermasalah: tanpa petunjuk */ }
   }

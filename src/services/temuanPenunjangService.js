@@ -129,17 +129,21 @@ function bacaTemuanPenunjang(halaman) {
   const dipakai = new Set();
   if (!aktif()) return { temuan, tidak_dikenali: tidakDikenali };
 
+  // Jenis halaman sumber dicatat: penunjang dari lembar HASIL (lab, radiologi,
+  // EKG, CTG) adalah bukti pemeriksaan dilakukan -- dipakai pengisian PROCLIST.
+  let jenisAktif = null;
   const dorong = (hasilCocok, pageNumber, kutipan) => {
     const kunci = kunciTemuan(hasilCocok, pageNumber);
     if (dipakai.has(kunci)) return;
     dipakai.add(kunci);
-    temuan.push({ ...hasilCocok, page_number: pageNumber, kutipan });
+    temuan.push({ ...hasilCocok, page_number: pageNumber, kutipan, jenis_halaman: jenisAktif });
   };
 
   for (const hal of halaman || []) {
     const teks = hal && (hal.ocr_text != null ? hal.ocr_text : hal.text);
     if (!teks) continue;
     const jenis = classifyPageDocumentType(teks);
+    jenisAktif = jenis;
     const pageNumber = hal.page_number || null;
 
     // 1. Halaman lab_results: baris tabel dibaca dulu oleh bacaBarisLab
@@ -165,6 +169,14 @@ function bacaTemuanPenunjang(halaman) {
         if (!b.trim()) continue;
         for (const t of temukanDalamTeks(b, { bagian: 'radiologi' })) {
           dorong(t, pageNumber, b.trim().slice(0, 160));
+        }
+        // Lembar hasil radiologi menulis jenisnya polos: "Pemeriksaan : Thorax"
+        // (MUSTAKIMAH: casemix 87.44, sebelumnya tidak terbaca). Hanya foto
+        // polos -- CT/MSCT/USG tetap lewat kamus di atas.
+        const jenisFoto = /^\s*pemeriksaan\s*:\s*(.+)$/i.exec(b);
+        if (jenisFoto && /\b(?:thorax|thoraks|toraks|dada)\b/i.test(jenisFoto[1]) && !/\b(?:ct|msct|hrct|usg|mri)\b/i.test(jenisFoto[1])) {
+          const hasilCocok = cocokkan('Ro thorax', { bagian: 'radiologi' });
+          if (hasilCocok.status === 'dikenali') dorong(hasilCocok, pageNumber, b.trim().slice(0, 160));
         }
       }
     }

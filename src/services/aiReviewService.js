@@ -70,6 +70,7 @@ const { petakanBagian } = require('./bagianTemuanService');
 const { periksaKode: periksaKodeKamus, tandaiStatusKamusEvidence, STATUS: STATUS_KAMUS } = require('./validasiKamusService');
 const { TAHAP_PEMBACAAN, simpanTahapPembacaan } = require('./claimReadingStageService');
 const { mulaiSesiAgen } = require('./agenCasemixOrkestrator');
+const { lengkapiKodeLukaBakar } = require('./kodingLukaBakarService');
 
 async function simpanJejakEnamTahap(record, evidencePool, result, codes) {
   if (!record || !record.id || !Array.isArray(evidencePool) || evidencePool.length === 0) return;
@@ -2610,8 +2611,18 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
       } catch (neoErr) {
         console.warn(`[AI-REVIEW] Koding neoplasma gagal: ${neoErr.message}`);
       }
+      // Luka bakar: T31 luas + T20-T25 lokasi & derajat + penyebab luar (casemix RS).
+      try {
+        const bakar = lengkapiKodeLukaBakar(result.suggested_codes, evidencePool);
+        if (bakar.perubahan.length > 0) {
+          result.suggested_codes = bakar.saran;
+          result.koding_luka_bakar = bakar.perubahan;
+        }
+      } catch (bakarErr) {
+        console.warn(`[AI-REVIEW] Koding luka bakar gagal: ${bakarErr.message}`);
+      }
       if (sesiAgen) {
-        const aturanRs = [...(result.koding_obstetri || []), ...(result.koding_bedah || []), ...(result.koding_neoplasma || [])];
+        const aturanRs = [...(result.koding_obstetri || []), ...(result.koding_bedah || []), ...(result.koding_neoplasma || []), ...(result.koding_luka_bakar || [])];
         const saranKode = (result.suggested_codes || []).filter(x => x && x.code);
         sesiAgen.catat('Verifikasi kode: kamus WHO/ICD-9 & aturan koding RS', aturanRs.length ? 'mengubah' : 'selesai',
           { keterangan: `${saranKode.length} saran kode, ${saranKode.filter(x => x.kamus_valid === true).length} sah di kamus${aturanRs.length ? `; aturan RS: ${aturanRs.map(a => `${a.aksi || ''} ${a.kode || ''}`.trim()).join(', ')}` : ''}` });

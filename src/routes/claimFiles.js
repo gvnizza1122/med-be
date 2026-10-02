@@ -744,6 +744,18 @@ router.get('/', authenticate, async (req, res) => {
 /**
  * GET /api/v1/claim-files/:id
  */
+// Didaftarkan sebelum GET /:id agar tidak tertangkap sebagai id berkas.
+// Status proses unggah RS ini (aktif + baru selesai yang belum ditutup) beserta perkiraan sisa waktu.
+router.get('/proses-unggah', authenticate, async (req, res) => {
+  try {
+    res.set('Cache-Control', 'no-store');
+    res.json(await require('../services/prosesUnggahService').daftar(getDb(), { hospitalCode: req.user.hospital_code, batasParalel: BATCH_AI_CONCURRENCY }));
+  } catch (error) {
+    console.error('[proses-unggah] gagal:', error);
+    res.status(500).json({ error: 'Status unggahan belum dapat dimuat.' });
+  }
+});
+
 // Ringkasan pola beda aplikasi vs casemix: kategori terbanyak + contoh kode
 // (tanpa identitas pasien) -- daftar aturan yang paling perlu ditambahkan.
 router.get('/pola-beda-casemix', authenticate, async (req, res) => {
@@ -2103,6 +2115,8 @@ async function catatPolaBedaUntukRecord(db, recordId) {
   }
 }
 
+const { penunjangBerhasil } = require('../services/konvensiKodingRs');
+
 async function isiKodeDariSaranDalamTransaksi(db, recordId, record, aiReview) {
   aiReview = aiReview && typeof aiReview === 'object' ? aiReview : {};
   const saran = Array.isArray(aiReview && aiReview.suggested_codes) ? aiReview.suggested_codes : [];
@@ -2315,9 +2329,14 @@ async function isiKodeDariSaranDalamTransaksi(db, recordId, record, aiReview) {
           && (t.bukti || []).some(b => b.sumber === 'resume_medis' || b.sumber === 'triase_igd'))
         .map(t => String(t.kode_usulan).trim());
 
+    // Penunjang yang punya LEMBAR HASIL di berkas (lab -> 90.59, rontgen ->
+    // 87.44, EKG -> 89.52, CTG -> 75.32) ikut diisi: hasilnya bukti pemeriksaan
+    // benar dilakukan, dan casemix RS mengodekannya (KHOIRIYAH, YETY, ANNISA,
+    // MUSTAKIMAH). Penunjang yang hanya disebut di resume/resep tidak ikut.
+    const dariPenunjang = penunjangBerhasil(aiReview);
     // Konvensi casemix RS: tindakan rutin (injeksi, infus, IV cath, kateter, oksigen) tidak dikode.
     const { PROSEDUR_RUTIN_TIDAK_DIKODE } = require('../services/konvensiKodingRs');
-    const gabungan = [...new Set([...p, ...dariTindakan])].filter(k => !PROSEDUR_RUTIN_TIDAK_DIKODE.has(k));
+    const gabungan = [...new Set([...p, ...dariTindakan, ...dariPenunjang])].filter(k => !PROSEDUR_RUTIN_TIDAK_DIKODE.has(k));
     if (gabungan.length > 0) perubahan.prosedur_list = gabungan.join(';');
   }
 
@@ -2545,8 +2564,11 @@ function processSinglePdfUpload(db, options) {
     () => processSinglePdfUploadDenganKonteks(db, options));
 }
 
-async function processSinglePdfUploadDenganKonteks(db, { filePath, originalName, jenisKlaim: fixedJenisKlaim, allowedJenisKlaim, userId, hospitalCode, isTesting = false }) {
+async function processSinglePdfUploadDenganKonteks(db, { filePath, originalName, jenisKlaim: fixedJenisKlaim, allowedJenisKlaim, userId, hospitalCode, isTesting = false, onTahap = null }) {
+  // Pencatat tahap (status proses unggah tersimpan); kegagalannya tidak pernah menghentikan proses.
+  const tahap = (nama, info) => { if (typeof onTahap === 'function') Promise.resolve().then(() => onTahap(nama, info)).catch(() => {}); };
   try {
+    tahap('membaca_berkas');
     const { extractFromPDF } = require('../services/pdfExtractionPipeline');
     const result = await extractFromPDF(filePath, { jenisKlaim: fixedJenisKlaim, allowedJenisKlaim, originalName: isTesting ? 'berkas-klaim.pdf' : originalName });
 
@@ -2565,6 +2587,7 @@ async function processSinglePdfUploadDenganKonteks(db, { filePath, originalName,
 
     const fileId = uuidv4();
     const recordId = uuidv4();
+    tahap('menyimpan', { jumlah_halaman: Array.isArray(result.ocrPages) ? result.ocrPages.length : null, file_id: fileId, record_id: recordId });
     const resolvedFilePath = path.resolve(filePath);
 
     // Record vClaim lengkap 60 kolom (urutan & format sesuai output vClaim asli).
@@ -2752,10 +2775,12 @@ async function processSinglePdfUploadDenganKonteks(db, { filePath, originalName,
       const evidencePool = await gatherEvidencePool(db, recordId, resolvedFilePath);
       const knowledgeEntries = await getRelevantKnowledge(db, validationErrors.map(e => e.rule_id));
       const bpjsExamples = await getRelevantBpjsExamples(db, { ...extractedData, validationErrors });
+      tahap('review_ai');
       aiReview = await generateAiReview({ ...extractedData, id: recordId }, validationErrors, evidencePool, knowledgeEntries, bpjsExamples);
       // Hasil casemix dari lembar grouper E-Klaim: pembanding, bukan bahan bacaan.
       if (aiReview && result.lembarGrouper) aiReview.lembar_grouper = result.lembarGrouper;
       if (aiReview) {
+        tahap('mengisi_kode');
         await simpanAiReview(db, recordId, aiReview);
         // Kode saran yang sudah terverifikasi kamus ICD-10 langsung mengisi
         // DIAGLIST/PROCLIST yang masih kosong -- koder tidak perlu mengetik
@@ -3214,6 +3239,79 @@ const pdfUploadBatch = multer({
  * kebanjiran request paralel. Progress per file di-emit lewat socket supaya
  * FE bisa tampilkan status real-time tanpa polling.
  */
+// ---------------------------------------------------------------------------
+// Unggah berantrean: berkas diterima, server langsung membalas (202) dengan id
+// proses, lalu pembacaan berjalan di latar belakang. Status & perkiraan waktu
+// tersimpan (prosesUnggahService) sehingga refresh/pindah halaman/menutup tab
+// tidak memengaruhi pembacaan; halaman cukup memantau GET /proses-unggah.
+// ---------------------------------------------------------------------------
+const prosesUnggah = require('../services/prosesUnggahService');
+const antreanUnggah = prosesUnggah.buatAntrean(BATCH_AI_CONCURRENCY);
+
+router.post('/upload-pdf-antre', authenticate, pdfUploadBatch.array('files', MAX_BATCH_PDF_FILES), async (req, res) => {
+  let diterima = false;
+  try {
+    if (!req.files || req.files.length === 0) return res.status(400).json({ error: 'Belum ada berkas yang dipilih. Silakan pilih minimal satu berkas PDF.' });
+    let allowedJenisKlaim = [];
+    try {
+      const parsed = req.body?.allowed_jenis_klaim ? JSON.parse(req.body.allowed_jenis_klaim) : null;
+      if (Array.isArray(parsed)) allowedJenisKlaim = parsed.filter(v => JENIS_KLAIM_OPTIONS.includes(v));
+    } catch { /* fallback di bawah */ }
+    if (allowedJenisKlaim.length === 0 && JENIS_KLAIM_OPTIONS.includes(req.body?.jenis_klaim)) allowedJenisKlaim = [req.body.jenis_klaim];
+    if (allowedJenisKlaim.length === 0) return res.status(400).json({ error: 'Pilih minimal satu kategori pelayanan yang mungkin ada di unggahan ini.' });
+
+    const db = getDb();
+    const io = req.app.get('io');
+    const batchId = uuidv4();
+    const daftarProses = [];
+    for (const file of req.files) {
+      const id = await prosesUnggah.buat(db, { batchId, hospitalCode: req.user.hospital_code, userId: req.user.id, fileName: file.originalname });
+      daftarProses.push({ id, file });
+    }
+    diterima = true;
+    const userId = req.user.id; const hospitalCode = req.user.hospital_code;
+    for (const { id, file } of daftarProses) {
+      antreanUnggah.tambah(async () => {
+        const catat = prosesUnggah.pencatat(db, id);
+        let rantai = Promise.resolve();
+        const onTahap = (t, info) => { rantai = rantai.then(() => catat(t, info)).catch(() => {}); if (io) io.emit('proses-unggah:update', { id, tahap: t }); return rantai; };
+        let hasil;
+        try {
+          hasil = await processSinglePdfUpload(db, {
+            filePath: file.path, originalName: file.originalname,
+            jenisKlaim: allowedJenisKlaim.length === 1 ? allowedJenisKlaim[0] : undefined,
+            allowedJenisKlaim, userId, hospitalCode, onTahap,
+          });
+        } catch (err) {
+          console.error(`[upload-antre] ${file.originalname} gagal:`, err && err.message);
+          hasil = { success: false, error: 'Terjadi gangguan saat memproses berkas. Silakan coba lagi.' };
+        }
+        await rantai;
+        await prosesUnggah.selesai(db, id, hasil);
+        if (io) io.emit('proses-unggah:update', { id, status: hasil && hasil.success ? 'selesai' : 'gagal' });
+      });
+    }
+    const status = await prosesUnggah.daftar(db, { hospitalCode, batasParalel: BATCH_AI_CONCURRENCY });
+    const milikBatch = status.proses.filter(p => p.batch_id === batchId);
+    res.status(202).json({ batch_id: batchId, proses: milikBatch, perkiraan_selesai_detik: Math.max(0, ...milikBatch.map(p => p.sisa_detik)) });
+  } catch (error) {
+    console.error('[upload-antre] gagal menerima berkas:', error);
+    res.status(500).json({ error: 'Berkas belum dapat diterima. Silakan coba lagi.' });
+  } finally {
+    if (!diterima) for (const f of req.files || []) fs.promises.unlink(f.path).catch(() => {});
+  }
+});
+
+// Tutup (sembunyikan) proses yang sudah selesai/gagal dari panel progres.
+router.post('/proses-unggah/tutup', authenticate, async (req, res) => {
+  try {
+    const ids = Array.isArray(req.body?.ids) ? req.body.ids.map(String).slice(0, 400) : [];
+    res.json({ ditutup: await prosesUnggah.tutup(getDb(), { ids, hospitalCode: req.user.hospital_code }) });
+  } catch (error) {
+    res.status(500).json({ error: 'Status unggahan belum dapat diperbarui.' });
+  }
+});
+
 router.post('/upload-pdf-batch', authenticate, pdfUploadBatch.array('files', MAX_BATCH_PDF_FILES), async (req, res) => {
   const io = req.app.get('io');
   try {

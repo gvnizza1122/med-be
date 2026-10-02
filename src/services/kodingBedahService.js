@@ -55,7 +55,7 @@ const ISTILAH = [
   [/\b(?:hemoroidektomi|haemorrhoidectomy|hemorrhoidectomy)\b/i, '49.46', 'Hemoroidektomi'],
   [/\b(?:fistulektomi|fistulectomy)\b/i, '49.12', 'Fistulektomi ani'],
   [/\b(?:insisi\s+(?:dan\s+)?drainase\s+abses\s+perianal|insisi\s+abses\s+perianal)\b/i, '49.01', 'Insisi abses perianal'],
-  [/\b(?:debridement|debridemen|necrotomi|nekrotomi)\b/i, '86.22', 'Debridemen eksisional'],
+  [/\b(?:debridement|debridem[ae]n|debrid[ae]man|necrotomi|nekrotomi)\b/i, '86.22', 'Debridemen eksisional'],
   [/\b(?:eksisi|ekstirpasi|excision)\s+(?:fam|fibroadenoma|tumor\s+mamm\w*|benjolan\s+payudara)\b/i, '85.21', 'Eksisi lesi payudara'],
   [/\b(?:eksisi|ekstirpasi|excision)\s+(?:lipoma|kista|atheroma|ateroma|tumor\s+jaringan\s+lunak|soft\s+tissue\s+tumor|clavus|kalus|nevus|keloid)\b/i, '86.3', 'Eksisi lesi kulit/subkutis'],
   [/\b(?:sirkumsisi|circumcisi\w*|khitan)\b/i, '64.0', 'Sirkumsisi'],

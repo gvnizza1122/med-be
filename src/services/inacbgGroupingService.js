@@ -251,6 +251,15 @@ const PROSEDUR_PERSALINAN_VAGINAL = /^(?:72\.|73\.[0-9]|75\.[3-6])/;
 // hasil persalinan (Z37), bayi lahir (Z38), cara persalinan (O80-O84). Casemix
 // YETY: O42.1 + Z37.0 + O82.1 -> severity I.
 const BUKAN_KOMORBID = /^(?:Z37|Z38|O8[0-4])/;
+// Kode yang tidak menaikkan severity (dipelajari dari lembar grouper casemix
+// MUSTAKIMAH 0170R0111225V003200: T31.1 + T20.2/T22.2/T23.2/T24.2 + X09.5 + I10
+// tetap S-4-16-I): penyebab luar cedera (V01-Y98), dan hipertensi esensial I10.
+const BUKAN_KOMORBID_UMUM = /^(?:[VWXY]\d|I10)/;
+/** Diagnosis sekunder yang termasuk kelompok yang sama dengan diagnosis utama (lokasi luka bakar untuk T31). */
+function satuKelompokCedera(utama, sekunder) {
+  const bakar = k => /^T(?:2\d|3[0-2])/.test(k);
+  return bakar(utama) && bakar(sekunder);
+}
 
 function kelompokProsedurRawatInap(kodeIcd, procedureCodes) {
   const prosedur = procedureCodes.map(p => String(p || '').trim()).filter(Boolean);
@@ -260,6 +269,8 @@ function kelompokProsedurRawatInap(kodeIcd, procedureCodes) {
     if (!kena) continue;
     const kategori = typeof pola === 'function' ? pola(kena) : tetap;
     if (kategori === 'L-1-30' && /^T(?:2\d|3[0-2])/.test(kodeIcd)) return { kategori: 'L-1-20', prosedur: kena }; // tandur kulit luka bakar
+    // Debridemen luka bakar tetap kelompok luka bakar medis S-4-16 (lembar grouper casemix MUSTAKIMAH: 86.22 -> S-4-16-I).
+    if (kategori === 'L-1-40' && /^86\.2/.test(kena) && /^T(?:2\d|3[0-2])/.test(kodeIcd)) continue;
     if (kategori === 'W-1-12' && /^O/.test(kodeIcd)) return { kategori: 'O-6-11', prosedur: kena };
     if (kategori === 'W-1-11' && /^O0/.test(kodeIcd)) return { kategori: 'W-1-10', prosedur: kena };
     if (kategori === 'W-1-11' && /^O(?:[6-7]|8[0-4])/.test(kodeIcd)) return { kategori: 'O-6-11', prosedur: kena };
@@ -354,7 +365,8 @@ function groupCodesToInaCBG(diagnosisCodes, procedureCodes = [], jenisKlaim = 'R
   // III tidak ditebak (butuh komplikasi berat yang tidak bisa disimpulkan dari
   // jumlah kode saja).
   const adaSekunder = diagnosisCodes.slice(1)
-    .some(k => !BUKAN_KOMORBID.test(String(k || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '')));
+    .map(k => String(k || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, ''))
+    .some(k => !BUKAN_KOMORBID.test(k) && !BUKAN_KOMORBID_UMUM.test(k) && !satuKelompokCedera(kodeIcd, k));
   const severity = adaSekunder ? 'II' : 'I';
   const confidence = adaSekunder ? 0.55 : 0.5;
 

@@ -145,8 +145,12 @@ async function pelajaranRelevan(db, { dx = [], px = [], recordId = null, jenisKl
   if (!db || (!dx.length && !px.length)) return [];
   let baris;
   try {
+    // Unggahan ulang berkas yang sama (SEP sama) bukan "kasus lain".
     baris = await db.all(`SELECT dx_aplikasi, dx_casemix, px_aplikasi, px_casemix, jenis_klaim FROM pola_beda_casemix
-      WHERE record_id <> ? ORDER BY dibuat DESC LIMIT 2000`, [String(recordId || '')]);
+      WHERE record_id <> ?
+        AND record_id NOT IN (SELECT c2.id FROM claim_records c1 JOIN claim_records c2 ON c2.sep = c1.sep
+          WHERE c1.id = ? AND COALESCE(c1.sep, '') <> '')
+      ORDER BY dibuat DESC LIMIT 2000`, [String(recordId || ''), String(recordId || '')]);
   } catch (_) {
     return []; // tabel belum ada: belum ada yang dipelajari
   }

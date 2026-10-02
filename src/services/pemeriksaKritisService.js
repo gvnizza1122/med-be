@@ -52,8 +52,10 @@ function kodeFinal(record, ai) {
   const dx = pecah(record.DIAGLIST || record.diagnosa_list);
   const px = pecah(record.PROCLIST || record.prosedur_list);
   // Saran prosedur mengikuti konvensi casemix RS (tindakan rutin tidak dikode); PROCLIST koder tidak diubah.
-  const { PROSEDUR_RUTIN_TIDAK_DIKODE } = require('./konvensiKodingRs');
-  return { dx: dx.length ? dx.map(k => k.toUpperCase()) : [...new Set(sah('diagnosis'))], px: px.length ? px : [...new Set(sah('procedure'))].filter(k => !PROSEDUR_RUTIN_TIDAK_DIKODE.has(k)) };
+  // Penunjang berlembar hasil ikut, sama dengan yang diisikan ke PROCLIST.
+  const { PROSEDUR_RUTIN_TIDAK_DIKODE, penunjangBerhasil } = require('./konvensiKodingRs');
+  return { dx: dx.length ? dx.map(k => k.toUpperCase()) : [...new Set(sah('diagnosis'))],
+    px: px.length ? px : [...new Set([...sah('procedure'), ...penunjangBerhasil(ai)])].filter(k => !PROSEDUR_RUTIN_TIDAK_DIKODE.has(k)) };
 }
 
 /** INA-CBG dari kode final (bukan dari isi klaim yang mungkin belum terisi). */
