@@ -21,7 +21,7 @@ const worker = new Worker('ai-review', async (job) => {
 
     // Fetch knowledge entries untuk konteks AI review
     const knowledgeEntries = await getRelevantKnowledge(db, validationErrors.map(e => e.rule_id));
-    const bpjsExamples = await getRelevantBpjsExamples(db, { ...extractedData, validationErrors });
+    const bpjsExamples = await getRelevantBpjsExamples(db);
 
     // Jalankan AI review
     const aiReview = await generateAiReview({ ...extractedData, id: recordId }, validationErrors, evidencePool, knowledgeEntries, bpjsExamples);

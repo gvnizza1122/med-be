@@ -453,7 +453,7 @@ router.post('/upload', authenticate, upload.single('file'), async (req, res) => 
         try {
           const recordErrors = errorsByRecordId[record.id] || [];
           const knowledgeEntries = await getRelevantKnowledge(db, recordErrors.map(e => e.rule_id));
-          const bpjsExamples = await getRelevantBpjsExamples(db, { ...record, validationErrors: recordErrors });
+          const bpjsExamples = await getRelevantBpjsExamples(db);
           const aiReview = await generateAiReview(record, recordErrors, [], knowledgeEntries, bpjsExamples);
           if (aiReview) {
             totalAiTokens += aiReview.tokens_used || 0;
@@ -1282,7 +1282,7 @@ router.post('/:id/ai-audit', authenticate, async (req, res) => {
         }
         const recordErrors = errorsByRecordId[record.id] || [];
         const knowledgeEntries = await getRelevantKnowledge(db, recordErrors.map(e => e.rule_id));
-        const bpjsExamples = await getRelevantBpjsExamples(db, { ...record, validationErrors: recordErrors });
+        const bpjsExamples = await getRelevantBpjsExamples(db);
         const aiReview = await generateAiReview(record, recordErrors, evidencePool, knowledgeEntries, bpjsExamples);
         if (aiReview) {
           await simpanAiReview(db, record.id, aiReview);
@@ -2735,7 +2735,7 @@ async function processSinglePdfUploadDenganKonteks(db, { filePath, originalName,
       }
       const evidencePool = await gatherEvidencePool(db, recordId, resolvedFilePath);
       const knowledgeEntries = await getRelevantKnowledge(db, validationErrors.map(e => e.rule_id));
-      const bpjsExamples = await getRelevantBpjsExamples(db, { ...extractedData, validationErrors });
+      const bpjsExamples = await getRelevantBpjsExamples(db);
       aiReview = await generateAiReview({ ...extractedData, id: recordId }, validationErrors, evidencePool, knowledgeEntries, bpjsExamples);
       // Hasil casemix dari lembar grouper E-Klaim: pembanding, bukan bahan bacaan.
       if (aiReview && result.lembarGrouper) aiReview.lembar_grouper = result.lembarGrouper;
@@ -2906,7 +2906,7 @@ async function reprocessExistingRecordDenganKonteks(db, { fileId, recordId, file
       }
       const evidencePool = await gatherEvidencePool(db, recordId, path.resolve(filePath));
       const knowledgeEntries = await getRelevantKnowledge(db, validationErrors.map(e => e.rule_id));
-      const bpjsExamples = await getRelevantBpjsExamples(db, { ...extractedData, validationErrors });
+      const bpjsExamples = await getRelevantBpjsExamples(db);
       aiReview = await generateAiReview({ ...extractedData, id: recordId }, validationErrors, evidencePool, knowledgeEntries, bpjsExamples);
       // Hasil casemix dari lembar grouper E-Klaim: pembanding, bukan bahan bacaan.
       if (aiReview && result.lembarGrouper) aiReview.lembar_grouper = result.lembarGrouper;

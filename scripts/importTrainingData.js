@@ -76,8 +76,8 @@ async function processOneFile(db, pdfPath, filename) {
 
   await db.prepare(`
     INSERT INTO ai_training_examples
-      (id, kategori_pending, alasan_bpjs, draft_berhasil, poin_kunci, outcome, generated_by, confidence_score, source_kind, source_text)
-    VALUES (?, ?, ?, ?, ?, ?, 'kimi-k3-backfill', ?, 'archive_import', ?)
+      (id, kategori_pending, alasan_bpjs, draft_berhasil, poin_kunci, outcome, generated_by, confidence_score)
+    VALUES (?, ?, ?, ?, ?, ?, 'kimi-k3-backfill', ?)
   `).run(
     uuidv4(),
     result.kategori_pending || 'lainnya',
@@ -86,7 +86,6 @@ async function processOneFile(db, pdfPath, filename) {
     Array.isArray(result.poin_kunci) ? result.poin_kunci.join('; ') : null,
     result.outcome || 'tidak_diketahui',
     Number.isFinite(result.confidence) ? result.confidence : null,
-    text,
   );
 
   return { filename, status: 'done', kategori: result.kategori_pending, confidence: result.confidence };
