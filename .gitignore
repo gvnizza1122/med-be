@@ -56,3 +56,7 @@ coverage/
 # Bulk test upload logs (scripts/bulkTestUpload.js)
 bulk-upload-log-*.json
 nul
+
+# Keluaran penarik E-Klaim (data klaim RS) -- jangan di-commit
+scripts/eklaim/*.jsonl
+scripts/eklaim/*.txt
