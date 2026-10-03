@@ -6,6 +6,7 @@
  */
 
 const { enhancedOcrExtraction } = require('./ocrEnhancement');
+const { OCR_ANGGARAN_MAKS_MS } = require('./ocrService');
 
 // OCR Phase 1 (19 Sep 2026, client approved): batas keras total budget OCR
 // enhancement turun jadi 3 menit/180000ms (sebelumnya hardcode 120000ms) —
@@ -15,6 +16,8 @@ const { enhancedOcrExtraction } = require('./ocrEnhancement');
 // sempat berhenti sendiri (skip halaman non-critical) SEBELUM Promise.race
 // di bawah ini memutus paksa dan membuang seluruh hasil yang sudah selesai.
 const OCR_ENHANCEMENT_TIMEOUT_MS = parseInt(process.env.OCR_ENHANCEMENT_TIMEOUT || '180000', 10);
+// Batas panjang teks berkas yang dikirim ke AI ekstraksi (±30 halaman OCR).
+const BATAS_TEKS_KLAIM = parseInt(process.env.BATAS_TEKS_KLAIM || '90000', 10);
 
 /**
  * Apply OCR enhancements ke hasil standard extraction
@@ -61,15 +64,27 @@ async function applyOcrEnhancements(standardResult, filePath, options = {}) {
     // Timeout untuk OCR enhancement (Tesseract + clinical extraction), lihat
     // OCR_ENHANCEMENT_TIMEOUT_MS di atas. Kalau timeout, skip enhancement dan
     // lanjut dengan basic extraction saja.
+    // Batas keras hanya jaring pengaman: budget internal ocrPdfPages (menurut
+    // jumlah halaman & berkas yang di-OCR bersamaan) berhenti sendiri dan
+    // tidak pernah melebihi OCR_ANGGARAN_MAKS_MS, jadi halaman yang sudah
+    // selesai tidak pernah dibuang oleh batas ini.
+    const batasMs = Math.max(OCR_ENHANCEMENT_TIMEOUT_MS, OCR_ANGGARAN_MAKS_MS + 15000);
     let timerBatas;
     const enhancementResult = await Promise.race([
       enhancedOcrExtraction(filePath, pageNumbers),
       new Promise((_, reject) => {
-        timerBatas = setTimeout(() => reject(new Error(`OCR enhancement timeout (${OCR_ENHANCEMENT_TIMEOUT_MS / 1000}s)`)), OCR_ENHANCEMENT_TIMEOUT_MS);
+        timerBatas = setTimeout(() => reject(new Error(`OCR enhancement timeout (${batasMs / 1000}s)`)), batasMs);
       })
     ]).finally(() => clearTimeout(timerBatas));
 
     enhanced.ocr_enhancement = enhancementResult;
+    // Lembar grouper yang terbaca lewat OCR (PDF scan) -- untuk pembanding.
+    if (Array.isArray(enhancementResult.halaman_grouper) && enhancementResult.halaman_grouper.length > 0) {
+      enhanced.grouperPages = [
+        ...(enhanced.grouperPages || []),
+        ...enhancementResult.halaman_grouper.map(p => ({ page_num: p.page_number, text: p.text })),
+      ];
+    }
 
     // PDF tanpa teks asli (hasil scan): teks OCR per halaman menjadi
     // claimDataText, sama seperti jalur OCR non-enhanced di
@@ -82,6 +97,24 @@ async function applyOcrEnhancements(standardResult, filePath, options = {}) {
     if ((!enhanced.claimDataText || enhanced.claimDataText.trim().length < 50) && halamanOcr.length > 0) {
       enhanced.claimDataText = halamanOcr.map(p => p.text).join('\n\n---\n\n');
       enhanced.claimDataPages = halamanOcr.map(p => ({ page_num: p.page_number, text: p.text }));
+    } else if (halamanOcr.length > 0) {
+      // PDF campuran (sebagian asli, sebagian scan): seluruh berkas milik
+      // pasien, jadi halaman scan (SEP, laporan operasi, lembar anestesi, hasil
+      // lab) ikut dibaca AI. Dulu hanya halaman berteks asli yang masuk, dan
+      // kelas rawat/laporan operasi YETY NOVIATI (0170R0111225V003427) hilang.
+      const sudahAda = new Set((enhanced.claimDataPages || []).map(p => p.page_num));
+      const halamanScan = new Set((enhanced.pages || []).filter(p => p.type === 'SCAN' && !p.is_lembar_grouper).map(p => p.page_num));
+      const tambahan = halamanOcr.filter(p => halamanScan.has(p.page_number) && !sudahAda.has(p.page_number));
+      if (tambahan.length > 0) {
+        enhanced.claimDataPages = [
+          ...(enhanced.claimDataPages || []),
+          ...tambahan.map(p => ({ page_num: p.page_number, text: p.text, dari_ocr: true })),
+        ].sort((a, b) => a.page_num - b.page_num);
+        enhanced.claimDataText = enhanced.claimDataPages
+          .map(p => (p.dari_ocr ? `[Halaman ${p.page_num} - hasil OCR scan]\n${p.text}` : p.text))
+          .join('\n\n---\n\n')
+          .slice(0, BATAS_TEKS_KLAIM);
+      }
     }
 
     if (enhancementResult.success && enhancementResult.pass2_clinical_extraction) {

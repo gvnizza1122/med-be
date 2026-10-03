@@ -4,6 +4,7 @@
  */
 
 const { getTarifResmi, lookupTarifInacbg } = require('./tarifInacbgLookup');
+const { padananGrouper } = require('./jembatanCmWho');
 const { detectSpecialCmg, calculateTotalTopup } = require('./specialCmgService');
 
 // Fix (1 Okt 2026): tarif INA-CBG di server selalu "Tidak ditemukan" walau
@@ -40,6 +41,18 @@ const ATURAN_RAWAT_INAP = [
   ['C51', 'C58', 'W-4-10'], ['C60', 'C63', 'V-4-10'], ['C64', 'C68', 'N-4-10'],
   ['C70', 'C72', 'G-4-11'], ['C81', 'C90', 'C-4-11'], ['C91', 'C95', 'C-4-10'],
   ['C96', 'C96', 'C-4-11'], ['D45', 'D47', 'C-4-14'],
+  // Neoplasma jinak (D10-D36) & sifat tak tentu (D37-D48) per organ -- dulu
+  // tidak dipetakan sama sekali, tumor jinak tanpa operasi tidak punya tarif
+  // (ANNISA NUR CHASANAH D21.3). Subkode D48 dibedakan menurut jaringannya.
+  ['D10', 'D11', 'U-4-10'], ['D12', 'D13', 'K-4-10'], ['D14', 'D15', 'J-4-14'],
+  ['D16', 'D16', 'M-4-13'], ['D17', 'D17', 'M-4-13'], ['D18', 'D18', 'L-4-14'],
+  ['D21', 'D21', 'M-4-13'], ['D22', 'D23', 'L-4-14'], ['D24', 'D24', 'L-4-11'],
+  ['D25', 'D28', 'W-4-10'], ['D29', 'D29', 'V-4-10'], ['D30', 'D30', 'N-4-10'],
+  ['D32', 'D33', 'G-4-11'], ['D37', 'D37', 'K-4-10'], ['D38', 'D38', 'J-4-14'],
+  ['D39', 'D39', 'W-4-10'], ['D40', 'D40', 'V-4-10'], ['D41', 'D41', 'N-4-10'],
+  ['D42', 'D43', 'G-4-11'], ['D480', 'D481', 'M-4-13'], ['D482', 'D482', 'G-4-11'],
+  ['D483', 'D484', 'K-4-10'], ['D485', 'D485', 'L-4-14'], ['D486', 'D486', 'L-4-11'],
+  ['D487', 'D489', 'M-4-13'],
   // D50-D89 Darah
   ['D57', 'D57', 'D-4-12'], ['D50', 'D64', 'D-4-13'], ['D65', 'D69', 'D-4-11'],
   ['D70', 'D70', 'D-4-10'], ['D50', 'D89', 'D-4-14'],
@@ -156,6 +169,127 @@ const PROSEDUR_RAWAT_JALAN = [
   [/^(39\.95|54\.98)$/, 'N-3-15-0'],
 ];
 
+// Rawat inap: prosedur bedah yang menentukan kelompok sendiri (casemix 1
+// bedah, 6 persalinan), dicek SEBELUM diagnosis -- grouper E-Klaim memberi
+// sesar O-6-10 walau diagnosis utamanya O42.1 (YETY NOVIATI,
+// 0170R0111225V003427: casemix O-6-10-I Rp4.656.700; dulu kita memberi
+// W-4-16-II tanpa tarif). Hanya pemetaan yang jelas; urutan = prioritas
+// (operasi besar dulu). Prosedur lain tetap ikut kelompok diagnosis.
+const PROSEDUR_RAWAT_INAP = [
+  [/^74\.(?:[0-4]|9\d?)/, 'O-6-10'], // seksio sesarea
+  // Ortopedi -- besar dulu: amputasi, artroplasti, tulang belakang.
+  [/^84\.(?:0|1[0-9])/, 'M-1-02'], // amputasi
+  [/^81\.(?:0|3)/, 'M-1-07'], // fusi tulang belakang
+  [/^(?:03\.0|80\.5)/, 'G-1-30'], // dekompresi kanal / diskektomi
+  [/^81\.5[123]/, 'M-1-20'], // artroplasti panggul
+  [/^81\.5[4-9]/, 'M-1-04'], // artroplasti lutut/pergelangan kaki
+  [/^81\.(?:8|7[3-9])/, 'M-1-05'], // artroplasti bahu/siku/pergelangan tangan
+  [kelompokTulang, null], // reduksi/fiksasi/eksternal fiksator/eksisi tulang per lokasi
+  [/^78\.6/, 'M-1-40'], // pengangkatan implan (lokasi tak terbaca)
+  [/^80\.(?:2[6]|6)/, 'M-1-04'], // artroskopi lutut, meniskektomi
+  [/^04\.43/, 'G-1-13'], // carpal tunnel release
+  [/^82\./, 'M-1-80'], // jaringan lunak tangan
+  [/^83\./, 'M-1-50'], // otot, tendon, fasia
+  // Bedah umum / digestif -- kompleks dulu.
+  [/^(?:45\.[6-9]|48\.[5-6])/, 'K-1-20'], // reseksi usus halus/kolon/rektum, anastomosis
+  [/^47\.[01]/, 'K-1-13'], // apendektomi
+  [/^51\.23/, 'B-1-14'], // kolesistektomi laparoskopik
+  [/^51\.2[12]/, 'B-1-12'], // kolesistektomi terbuka
+  [/^53\.[0-1]/, 'K-1-14'], // hernia inguinal/femoral
+  [/^53\.[4-9]/, 'K-1-12'], // hernia lain
+  [/^54\.5/, 'K-1-11'], // adhesiolisis
+  [/^(?:43\.|44\.)/, 'K-1-30'], // lambung/duodenum
+  [/^46\./, 'K-1-10'], // stoma/prosedur usus non kompleks
+  [/^(?:54\.1|54\.[0-4]|54\.6)/, 'K-1-40'], // laparotomi eksplorasi, dinding abdomen
+  [/^49\.(?:0[1-4]|1|[2-7])/, 'K-1-50'], // anal: abses, fistel, hemoroid
+  [/^06\.[2-5]/, 'E-1-20'], // tiroidektomi
+  [/^38\.5/, 'I-1-17'], // ligasi/stripping varises
+  [/^85\./, 'L-1-50'], // payudara
+  [/^86\.[67]/, 'L-1-30'], // tandur kulit / flap (tanpa luka bakar)
+  [/^86\.(?:2[1-2]|3|4)/, 'L-1-40'], // debridemen eksisional, eksisi lesi kulit/subkutis
+  // Obstetri-ginekologi, THT, mata, urologi.
+  [/^68\.(?:[3-79])/, 'W-1-20'], // histerektomi
+  [/^60\.2/, 'V-1-14'], // TURP
+  [/^(?:55\.|56\.)/, 'N-1-20'], // ginjal & ureter
+  [/^57\.(?:[0-8]|9[0-3])/, 'N-1-30'], // kandung kemih (bukan kateter 57.94/57.95)
+  [/^58\.(?:[0-6])/, 'N-1-40'], // uretra
+  [/^(?:61\.|62\.|63\.)/, 'V-1-13'], // skrotum, testis
+  [/^64\.0$/, 'V-1-15'], // sirkumsisi
+  [/^64\.[1-9]/, 'V-1-11'], // penis
+  [/^13\.(?:[1-6]|7[01])/, 'H-1-30'], // katarak / lensa intraokuler
+  [/^28\.[2-6]/, 'U-1-15'], // tonsilektomi/adenoidektomi
+  [/^69\.5[12]/, 'W-1-10'], // kuretase aspirasi terminasi
+  [/^69\.0/, 'W-1-11'], // dilatasi & kuretase
+  [/^66\.(?:[2-3])/, 'W-1-12'], // sterilisasi tuba (tanpa persalinan)
+];
+
+// Tulang per lokasi. Digit lokasi 79.x: 1 humerus, 2 radius-ulna, 3 karpal-
+// metakarpal, 4 falang tangan, 5 femur, 6 tibia-fibula, 7 tarsal-metatarsal,
+// 8 falang kaki, 9 lain. Digit 77.x/78.x berbeda: 1 skapula-klavikula-toraks,
+// 2 humerus, 3 radius-ulna, 4 karpal-metakarpal, 5 femur, 6 patela,
+// 7 tibia-fibula, 8 tarsal-metatarsal, 9 lain (diperiksa ke kamus ICD-9-CM).
+const LOKASI_79 = { 1: 'M-1-80', 2: 'M-1-80', 3: 'M-1-80', 4: 'M-1-80', 5: 'M-1-20', 6: 'M-1-70', 7: 'M-1-30', 8: 'M-1-30', 9: 'M-1-60' };
+const LOKASI_78 = { 1: 'M-1-80', 2: 'M-1-80', 3: 'M-1-80', 4: 'M-1-80', 5: 'M-1-20', 6: 'M-1-70', 7: 'M-1-70', 8: 'M-1-30', 9: 'M-1-60' };
+function kelompokTulang(kode) {
+  let m = /^79\.([0-3])([1-9])$/.exec(kode); // reduksi tertutup/terbuka +/- fiksasi interna
+  if (m) return LOKASI_79[m[2]];
+  m = /^79\.([6])([1-9])$/.exec(kode); // debridemen fraktur terbuka
+  if (m) return LOKASI_79[m[2]];
+  m = /^78\.6([1-9])$/.exec(kode); // pengangkatan implan
+  if (m) return 'M-1-40';
+  m = /^77\.6([1-9])$/.exec(kode); // eksisi lokal lesi tulang
+  if (m) return 'M-1-40';
+  m = /^78\.[15]([1-9])$/.exec(kode); // fiksator eksterna / fiksasi interna tanpa reduksi
+  if (m) return LOKASI_78[m[1]];
+  return null;
+}
+// Persalinan per vaginam: O-6-11 (dengan sterilisasi/kuret), O-6-12 (dengan
+// prosedur lain: ekstraksi vakum/forsep, episiotomi), O-6-13 (spontan).
+const PROSEDUR_PERSALINAN_VAGINAL = /^(?:72\.|73\.[0-9]|75\.[3-6])/;
+
+// Diagnosis sekunder yang tidak pernah menjadi komorbiditas/komplikasi:
+// hasil persalinan (Z37), bayi lahir (Z38), cara persalinan (O80-O84). Casemix
+// YETY: O42.1 + Z37.0 + O82.1 -> severity I.
+const BUKAN_KOMORBID = /^(?:Z37|Z38|O8[0-4])/;
+// Kode yang tidak menaikkan severity (dipelajari dari lembar grouper casemix
+// MUSTAKIMAH 0170R0111225V003200: T31.1 + T20.2/T22.2/T23.2/T24.2 + X09.5 + I10
+// tetap S-4-16-I): penyebab luar cedera (V01-Y98), dan hipertensi esensial I10.
+const BUKAN_KOMORBID_UMUM = /^(?:[VWXY]\d|I10)/;
+/** Diagnosis sekunder yang termasuk kelompok yang sama dengan diagnosis utama (lokasi luka bakar untuk T31). */
+function satuKelompokCedera(utama, sekunder) {
+  const bakar = k => /^T(?:2\d|3[0-2])/.test(k);
+  return bakar(utama) && bakar(sekunder);
+}
+
+function kelompokProsedurRawatInap(kodeIcd, procedureCodes) {
+  const prosedur = procedureCodes.map(p => String(p || '').trim()).filter(Boolean);
+  for (const [pola, tetap] of PROSEDUR_RAWAT_INAP) {
+    const cocok = p => (typeof pola === 'function' ? pola(p) : pola.test(p));
+    const kena = prosedur.find(p => cocok(p));
+    if (!kena) continue;
+    const kategori = typeof pola === 'function' ? pola(kena) : tetap;
+    if (kategori === 'L-1-30' && /^T(?:2\d|3[0-2])/.test(kodeIcd)) return { kategori: 'L-1-20', prosedur: kena }; // tandur kulit luka bakar
+    // Debridemen luka bakar tetap kelompok luka bakar medis S-4-16 (lembar grouper casemix MUSTAKIMAH: 86.22 -> S-4-16-I).
+    if (kategori === 'L-1-40' && /^86\.2/.test(kena) && /^T(?:2\d|3[0-2])/.test(kodeIcd)) continue;
+    if (kategori === 'W-1-12' && /^O/.test(kodeIcd)) return { kategori: 'O-6-11', prosedur: kena };
+    if (kategori === 'W-1-11' && /^O0/.test(kodeIcd)) return { kategori: 'W-1-10', prosedur: kena };
+    if (kategori === 'W-1-11' && /^O(?:[6-7]|8[0-4])/.test(kodeIcd)) return { kategori: 'O-6-11', prosedur: kena };
+    return { kategori, prosedur: kena };
+  }
+  if (/^O(?:[3-7]|8[0-4])/.test(kodeIcd) || prosedur.some(p => /^73\.59$/.test(p))) {
+    const lain = prosedur.find(p => PROSEDUR_PERSALINAN_VAGINAL.test(p) && p !== '73.59');
+    if (lain) return { kategori: 'O-6-12', prosedur: lain };
+    const spontan = prosedur.find(p => p === '73.59');
+    if (spontan) return { kategori: 'O-6-13', prosedur: spontan };
+  }
+  return null;
+}
+
+/** Apakah satu kode ICD-9-CM termasuk tindakan operasi (kelompok prosedur INA-CBG). */
+function adalahProsedurBedah(kode) {
+  return Boolean(kelompokProsedurRawatInap('Z00', [String(kode || '').trim()]));
+}
+
 function cocokAturan(kodeIcd, aturan) {
   for (const [dari, sampai, kategori] of aturan) {
     // Bandingkan sepanjang batas aturan saja: "J189" cocok dengan rentang
@@ -190,7 +324,9 @@ function groupCodesToInaCBG(diagnosisCodes, procedureCodes = [], jenisKlaim = 'R
   // Ambil diagnosis utama (kode pertama dari DIAGLIST)
   const primaryDiagnosis = diagnosisCodes[0]?.trim().toUpperCase();
   if (!primaryDiagnosis) return null;
-  const kodeIcd = primaryDiagnosis.replace(/[^A-Z0-9]/g, '');
+  // Kategori khusus ICD-10-CM (mis. D49) dipetakan ke kategori WHO supaya
+  // kode yang belum terpetakan tetap punya kelompok & tarif.
+  const kodeIcd = padananGrouper(primaryDiagnosis).replace(/[^A-Z0-9]/g, '');
   if (!/^[A-Z]\d{2}/.test(kodeIcd)) return null;
 
   procedureCodes = Array.isArray(procedureCodes) ? procedureCodes : [];
@@ -216,43 +352,34 @@ function groupCodesToInaCBG(diagnosisCodes, procedureCodes = [], jenisKlaim = 'R
     };
   }
 
-  const kategori = cocokAturan(kodeIcd, ATURAN_RAWAT_INAP);
+  const bedah = kelompokProsedurRawatInap(kodeIcd, procedureCodes);
+  const kategori = bedah ? bedah.kategori : cocokAturan(kodeIcd, ATURAN_RAWAT_INAP);
   if (!kategori) return null;
 
-  // Tentukan severity berdasarkan ada/tidaknya komplikasi atau prosedur
-  let severity = 'I'; // default: ringan/mild
-  let confidence = 0.5;
-
-  if (procedureCodes.length > 0) {
-    // Jika ada prosedur kompleks, asumsikan kasus lebih berat
-    const complexProcedures = procedureCodes.filter(p => {
-      const code = p?.trim().toUpperCase();
-      // Prosedur kompleks biasanya > 1 tindakan atau tindakan invasif
-      return code && (code.includes('87') || code.includes('89') || code.includes('93') || code.includes('96'));
-    });
-    if (complexProcedures.length > 0) {
-      severity = 'II'; // sedang
-      confidence += 0.1;
-    }
-  }
-
-  // Jika diagnosis lebih dari 1 (ada komorbiditas), tingkatkan severity
-  if (diagnosisCodes.length > 1) {
-    if (severity === 'I') {
-      severity = 'II';
-    } else if (severity === 'II') {
-      severity = 'III';
-    }
-    confidence += 0.05;
-  }
+  // Severity INA-CBG (I/II/III) ditentukan DIAGNOSIS SEKUNDER (komorbiditas/
+  // komplikasi), BUKAN prosedur. Dulu prosedur berkode memuat "87"/"89"/"93"/
+  // "96" ikut menaikkan severity, sehingga rontgen toraks 87.44 saja membuat
+  // I51.7 rawat inap menjadi I-4-24-II Rp4.873.800 padahal grouper E-Klaim
+  // casemix memberi I-4-24-I Rp2.116.600 (KHOIRIYAH, 0170R0111225V003293) --
+  // menyarankan tarif lebih tinggi tanpa dasar. Ada diagnosis sekunder -> II;
+  // III tidak ditebak (butuh komplikasi berat yang tidak bisa disimpulkan dari
+  // jumlah kode saja).
+  const adaSekunder = diagnosisCodes.slice(1)
+    .map(k => String(k || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, ''))
+    .some(k => !BUKAN_KOMORBID.test(k) && !BUKAN_KOMORBID_UMUM.test(k) && !satuKelompokCedera(kodeIcd, k));
+  const severity = adaSekunder ? 'II' : 'I';
+  const confidence = adaSekunder ? 0.55 : 0.5;
 
   const finalCode = `${kategori}-${severity}`;
   if (!lookupTarifInacbg(finalCode)) return null;
 
   return {
     code: finalCode,
+    berbasis_prosedur: Boolean(bedah),
     confidence: Math.min(confidence, 1.0),
-    reasoning: `Pemetaan dari diagnosis utama ${primaryDiagnosis} dengan ${diagnosisCodes.length} diagnosis total, ${procedureCodes.length} prosedur. Severity: ${severity}.`,
+    reasoning: bedah
+      ? `Pemetaan dari prosedur ${bedah.prosedur} ke kelompok prosedur rawat inap, diagnosis utama ${primaryDiagnosis}. Severity: ${severity}.`
+      : `Pemetaan dari diagnosis utama ${primaryDiagnosis} dengan ${diagnosisCodes.length} diagnosis total, ${procedureCodes.length} prosedur. Severity: ${severity}.`,
   };
 }
 
@@ -323,6 +450,7 @@ function simulateGroupingComparison(claimRecord) {
 }
 
 module.exports = {
+  adalahProsedurBedah,
   simulateGroupingComparison,
   groupCodesToInaCBG
 };

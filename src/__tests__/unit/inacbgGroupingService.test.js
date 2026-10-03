@@ -78,3 +78,14 @@ describe('usulan INA-CBG dari AI harus sesuai jenis klaim', () => {
     expect(inacbgCodeForLookup).toBe('Q-5-26-0');
   });
 });
+
+describe('severity hanya dari diagnosis sekunder, bukan prosedur', () => {
+  // KHOIRIYAH (0170R0111225V003293): casemix I51.7 + 90.59;89.52;87.44 -> I-4-24-I.
+  test('prosedur penunjang tidak menaikkan severity', () => {
+    expect(groupCodesToInaCBG(['I51.7'], ['90.59', '89.52', '87.44'], 'RAWAT_INAP').code).toBe('I-4-24-I');
+  });
+  test('diagnosis sekunder menaikkan ke II, tidak pernah ditebak III', () => {
+    expect(groupCodesToInaCBG(['I51.7', 'J81'], [], 'RAWAT_INAP').code).toBe('I-4-24-II');
+    expect(groupCodesToInaCBG(['I51.7', 'J81', 'E11.9'], ['87.44'], 'RAWAT_INAP').code).toBe('I-4-24-II');
+  });
+});

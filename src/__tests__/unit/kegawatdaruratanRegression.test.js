@@ -70,9 +70,9 @@ describe('assessKegawatdaruratan — kasus regresi hyperemesis gravidarum (fixtu
 
   // 16 -> 20: konjungtiva anemis, nyeri tekan epigastrium, bising usus, dan
   // perkusi timpani ditambahkan ke PARAMETER_TABLE (kegawatdaruratanReference.js).
-  test('parameter_findings sekarang 20 entri (bukan 11)', async () => {
+  test('parameter_findings sekarang 23 entri (20 + 3 pemeriksaan khusus)', async () => {
     const result = await assessKegawatdaruratan(evidencePool, triagePageNumbers, umurTahun, null, procedureCodes, resumeMedisPageNumbers);
-    expect(result.parameter_findings).toHaveLength(20);
+    expect(result.parameter_findings).toHaveLength(23);
   });
 
   test('fix item 6: parameter fisik yang benar-benar tercatat naik dari 1 (hanya kesadaran) jadi 7', async () => {

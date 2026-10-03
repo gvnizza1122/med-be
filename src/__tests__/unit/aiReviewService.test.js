@@ -57,12 +57,15 @@ describe('generateAiReview — dengan AI dikonfigurasi (fetch dimock)', () => {
     process.env.AI_PROVIDER_API_KEY = 'test-key';
     process.env.AI_PROVIDER_BASE_URL = 'https://api.openai.com/v1';
     process.env.AI_MODEL = 'gpt-4o-mini';
+    // Agen tinjau diuji tersendiri (agenTinjau.test.js); di sini jumlah panggilan AI dihitung.
+    process.env.AGEN_TINJAU_ENABLED = 'false';
   });
 
   afterEach(() => {
     delete process.env.AI_PROVIDER_API_KEY;
     delete process.env.AI_PROVIDER_BASE_URL;
     delete process.env.AI_MODEL;
+    delete process.env.AGEN_TINJAU_ENABLED;
     jest.restoreAllMocks();
   });
 
@@ -281,7 +284,10 @@ describe('generateAiReview — dengan AI dikonfigurasi (fetch dimock)', () => {
   // valid tapi tidak pernah ada di tabel resmi PMK 3/2023. Pipeline harus
   // memvalidasi dulu, dan degradasi anggun ke grouping fallback -- BUKAN
   // menempelkan tarif fiktif ke kode fiktif itu, dan BUKAN crash.
-  test('AI suggested_inacbg VALID (ada di tabel PMK 3/2023) tetap dipakai apa adanya', async () => {
+  // Sejak Agen Casemix menjadi wasit INA-CBG (2 Okt 2026): tebakan kelompok
+  // medis dari AI yang berbeda dengan pemetaan grouper aplikasi tidak dipakai
+  // (J18.9 pneumonia = J-4-16 "simple pneumonia", bukan J-4-15).
+  test('AI suggested_inacbg VALID tetapi beda kelompok medis -> agen memakai grouper aplikasi', async () => {
     mockFetchOk({
       field_notes: {},
       code_evidence: [],
@@ -298,9 +304,10 @@ describe('generateAiReview — dengan AI dikonfigurasi (fetch dimock)', () => {
     );
 
     expect(result).not.toBeNull();
-    expect(result.inacbg_result.code).toBe('J-4-15-I');
+    expect(result.inacbg_result.code).toBe('J-4-16-I');
     expect(result.inacbg_result.source).toBe('PMK_3_2023');
-    expect(result.suggested_inacbg).toBe('J-4-15-I');
+    expect(result.suggested_inacbg).toBe('J-4-16-I');
+    expect(result.agen_casemix.grouper).toMatchObject({ kode: 'J-4-16-I', tebakan_luna: 'J-4-15-I' });
     expect(result.tariff_result.source).toBe('PMK_3_2023');
   });
 

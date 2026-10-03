@@ -843,6 +843,7 @@ async function migrateSchema(db) {
     // dan layanan terkait sudah tahan terhadap tabel yang belum ada.
     for (const nama of [
       'routerModelService',
+      'tinjauanLanjutanService',
       'catatanPanggilanModelService',
       'testingPendingService',
       'ruleVersiService',
@@ -1122,6 +1123,7 @@ async function migrateSchema(db) {
     } catch (e) {
       console.error('[migration] Gagal backfill claim_record_id pending BPJS:', e.message);
     }
+
 
     // Kolom baru untuk pipeline training RAG (Kimi K3) — generated_by
     // membedakan asal contoh ('kimi-k3-backfill' dari arsip lama vs

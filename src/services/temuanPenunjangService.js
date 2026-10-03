@@ -50,13 +50,19 @@ const { classifyPageDocumentType } = require('./pdfPageClassifier');
 const { cocokkan, temukanDalamTeks } = require('./kamusPenunjangService');
 const { bacaBarisLab } = require('./bacaLabService');
 
-const LABEL_PENUNJANG = /\bPemeriksaan\s+Penunjang\b/i;
+// "Penunjang lain" adalah label formulir Triage IGD RS ini ("Penunjang lain :
+// lab ekg gda 119", berkas KHOIRIYAH 0170R0111225V003293).
+const LABEL_PENUNJANG = /\b(?:Pemeriksaan\s+Penunjang|Penunjang\s+lain)\b/i;
 
 // Awal bagian berikutnya pada resume/triase — dipakai membatasi sampai mana
 // daftar "Pemeriksaan Penunjang" dibaca, supaya pemindaian tidak menelan isi
 // bagian sesudahnya (mis. "Tindakan", "Terapi") dan menautkan istilah ke
 // bagian yang salah.
-const BATAS_BAGIAN = /^(evaluasi|discharge|planning|edukasi|tanda\s*tangan|catatan\s*perkembangan|diagnosa\s*keperawatan|rencana|anjuran|kelanjutan|diagnosa|penyebab|tindakan|terapi|magelang,)/i;
+const BATAS_BAGIAN = /^(evaluasi|discharge|planning|edukasi|tanda\s*tangan|catatan\s*perkembangan|diagnosa\s*keperawatan|rencana|anjuran|kelanjutan|diagnos[ai]s?|penyebab|tindakan|terapi|hasil\s*konsultasi|riwayat|magelang,)/i;
+// Label bagian lain ("Riwayat Penyakit :", "Alergi Obat : Tidak ada") -- akhir daftar penunjang.
+const LABEL_LAIN = /^[A-Za-z][A-Za-z /]{2,40}\s*:/;
+// Butir daftar ("1. Darah rutin", "- Ro thorax", "• EKG").
+const BUTIR = /^(?:\d+[.)]|[-•*])\s*\S/;
 
 function aktif() {
   return process.env.KAMUS_PENUNJANG_PEMBACAAN_AKTIF !== 'false';
@@ -85,14 +91,20 @@ function kumpulkanBarisPenunjang(barisHalaman) {
   const keluar = [];
   for (let i = 0; i < barisHalaman.length; i++) {
     if (!LABEL_PENUNJANG.test(barisHalaman[i])) continue;
-    if (!hanyaLabel(barisHalaman[i])) {
+    const adaNilaiSebaris = !hanyaLabel(barisHalaman[i]);
+    if (adaNilaiSebaris) {
       const nilai = barisHalaman[i].replace(LABEL_PENUNJANG, '').replace(/^[:\s.-]+/, '').trim();
       if (nilai) keluar.push(nilai);
     }
+    // Berhenti di bagian/label lain. Bila nilainya sudah sebaris dengan label
+    // ("Penunjang lain : lab ekg gda 119" di triase), baris sesudahnya hanya
+    // ikut kalau berbentuk butir daftar -- sebelumnya seluruh sisa halaman
+    // triase ikut terbaca sebagai istilah penunjang tak dikenal.
     for (let j = i + 1; j < barisHalaman.length; j++) {
       const b = String(barisHalaman[j]).trim();
       if (!b) continue;
-      if (BATAS_BAGIAN.test(b)) break;
+      if (BATAS_BAGIAN.test(b) || LABEL_LAIN.test(b)) break;
+      if (adaNilaiSebaris && !BUTIR.test(b)) break;
       keluar.push(b);
     }
   }
@@ -117,17 +129,21 @@ function bacaTemuanPenunjang(halaman) {
   const dipakai = new Set();
   if (!aktif()) return { temuan, tidak_dikenali: tidakDikenali };
 
+  // Jenis halaman sumber dicatat: penunjang dari lembar HASIL (lab, radiologi,
+  // EKG, CTG) adalah bukti pemeriksaan dilakukan -- dipakai pengisian PROCLIST.
+  let jenisAktif = null;
   const dorong = (hasilCocok, pageNumber, kutipan) => {
     const kunci = kunciTemuan(hasilCocok, pageNumber);
     if (dipakai.has(kunci)) return;
     dipakai.add(kunci);
-    temuan.push({ ...hasilCocok, page_number: pageNumber, kutipan });
+    temuan.push({ ...hasilCocok, page_number: pageNumber, kutipan, jenis_halaman: jenisAktif });
   };
 
   for (const hal of halaman || []) {
     const teks = hal && (hal.ocr_text != null ? hal.ocr_text : hal.text);
     if (!teks) continue;
     const jenis = classifyPageDocumentType(teks);
+    jenisAktif = jenis;
     const pageNumber = hal.page_number || null;
 
     // 1. Halaman lab_results: baris tabel dibaca dulu oleh bacaBarisLab
@@ -137,6 +153,8 @@ function bacaTemuanPenunjang(halaman) {
     if (jenis === 'lab_results') {
       for (const baris of bacaBarisLab(teks, { halaman: pageNumber })) {
         if (!baris.parameter_ditulis) continue;
+        // "PCT ... %" di darah lengkap = plateletcrit, bukan prokalsitonin.
+        if (/^pct$/i.test(baris.parameter_ditulis.trim()) && /%/.test(baris.kutipan || '')) continue;
         const hasilCocok = cocokkan(baris.parameter_ditulis, { bagian: 'lab' });
         if (hasilCocok.status === 'dikenali' || hasilCocok.status === 'perlu_konfirmasi') {
           dorong(hasilCocok, pageNumber, baris.kutipan);
@@ -152,7 +170,38 @@ function bacaTemuanPenunjang(halaman) {
         for (const t of temukanDalamTeks(b, { bagian: 'radiologi' })) {
           dorong(t, pageNumber, b.trim().slice(0, 160));
         }
+        // Lembar hasil radiologi menulis jenisnya polos: "Pemeriksaan : Thorax"
+        // (MUSTAKIMAH: casemix 87.44, sebelumnya tidak terbaca). Hanya foto
+        // polos -- CT/MSCT/USG tetap lewat kamus di atas.
+        const jenisFoto = /^\s*pemeriksaan\s*:\s*(.+)$/i.exec(b);
+        if (jenisFoto && /\b(?:thorax|thoraks|toraks|dada)\b/i.test(jenisFoto[1]) && !/\b(?:ct|msct|hrct|usg|mri)\b/i.test(jenisFoto[1])) {
+          const hasilCocok = cocokkan('Ro thorax', { bagian: 'radiologi' });
+          if (hasilCocok.status === 'dikenali') dorong(hasilCocok, pageNumber, b.trim().slice(0, 160));
+        }
       }
+    }
+
+    // 1c. Halaman rekaman EKG (cetakan mesin: "Abnormal ECG", "QTc", "P/QRS/T
+    //     Axes"). Keberadaan rekamannya sendiri adalah bukti EKG dilakukan.
+    if (jenis === 'ekg') {
+      const hasilCocok = cocokkan('EKG', { bagian: 'kardiologi' });
+      const barisBukti = teks.split(/\r?\n/).find(b => /\b(?:ecg|ekg)\b|qtc|qrs|sinus\s+(?:rhythm|tachy|brady|arrhythm)/i.test(b));
+      if (hasilCocok.status === 'dikenali') dorong(hasilCocok, pageNumber, (barisBukti || 'Rekaman EKG').trim().slice(0, 160));
+    }
+
+    // 1d. Rekaman CTG (kertas mesin: "FHR 140 bpm", "Kardiotokografi").
+    //     Halaman ini tanpa judul; rekamannya sendiri bukti CTG dilakukan.
+    const barisCtg = teks.split(/\r?\n/).find(b => /\bFHR\b|kardiotokogra|cardiotocogra|\bCTG\b|non\s*stress\s*test/i.test(b));
+    if (barisCtg && jenis !== 'resume_medis' && jenis !== 'triase_igd') {
+      const hasilCocok = cocokkan('CTG', { bagian: 'obstetri' });
+      if (hasilCocok.status === 'dikenali') dorong(hasilCocok, pageNumber, barisCtg.trim().slice(0, 160));
+    }
+
+    // 1e. Lembar jawaban patologi anatomi: hasilnya sendiri bukti PA dilakukan.
+    if (jenis === 'patologi_anatomi') {
+      const hasilCocok = cocokkan('histopatologi', { bagian: 'patologi' });
+      const barisKesimpulan = teks.split(/\r?\n/).find(b => /kesimpulan/i.test(b)) || 'Jawaban pemeriksaan histopatologi';
+      if (hasilCocok.status === 'dikenali') dorong(hasilCocok, pageNumber, barisKesimpulan.trim().slice(0, 160));
     }
 
     // 2. Label "Pemeriksaan Penunjang" pada resume/triase: daftar eksplisit,
@@ -164,6 +213,12 @@ function bacaTemuanPenunjang(halaman) {
           const hasilCocok = cocokkan(item, { sekitar: baris });
           if (hasilCocok.status === 'dikenali' || hasilCocok.status === 'perlu_konfirmasi') {
             dorong(hasilCocok, pageNumber, baris.slice(0, 160));
+            continue;
+          }
+          // Item tanpa pemisah ("lab ekg gda 119"): pindai istilah di dalamnya.
+          const diDalam = temukanDalamTeks(item, { sekitar: baris });
+          if (diDalam.length > 0) {
+            for (const t of diDalam) dorong(t, pageNumber, baris.slice(0, 160));
           } else {
             tidakDikenali.push({ ditulis: item, halaman: pageNumber });
           }

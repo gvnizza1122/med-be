@@ -14,6 +14,7 @@
 const fs = require('fs');
 const path = require('path');
 const { ocrPdfPages } = require('./ocrService');
+const { isLembarGrouper } = require('./lembarGrouperService');
 // Bilateral notation (+/+, −/−, +/−, −/+) SUDAH punya parser dedicated —
 // dipakai lagi di sini (bukan reimplementasi) supaya clinical findings dari
 // OCR dapat detail sisi kanan/kiri, bukan cuma boolean "ditemukan/tidak".
@@ -679,7 +680,12 @@ async function enhancedOcrExtraction(pdfPath, pageNumbers = null) {
   try {
     // PASS 1: Standard OCR text extraction
     console.log('[EnhancedOCR] Pass 1: General text extraction...');
-    const ocrResult = await ocrPdfPages(pdfPath, pageNumbers || 'all');
+    const ocrMentah = await ocrPdfPages(pdfPath, pageNumbers || 'all');
+    // Lembar grouper E-Klaim (hasil casemix) dipisahkan: tidak ikut ekstraksi
+    // klinis maupun teks klaim, hanya disimpan sebagai pembanding.
+    const halamanOcr = (ocrMentah && ocrMentah.pages) || [];
+    result.halaman_grouper = halamanOcr.filter(p => isLembarGrouper(p.text));
+    const ocrResult = { ...ocrMentah, pages: halamanOcr.filter(p => !isLembarGrouper(p.text)) };
     result.pass1_general_ocr = ocrResult;
 
     if (!ocrResult.success || !ocrResult.pages || ocrResult.pages.length === 0) {

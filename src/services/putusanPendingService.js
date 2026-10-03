@@ -81,12 +81,15 @@ function susunPutusan(aiReviewMasuk = {}, validationErrorsMasuk = []) {
   // Kode di luar kamus resmi. Ditaruh lebih dulu karena ini bukan dugaan
   // melainkan fakta yang bisa diperiksa: kodenya ada atau tidak ada di kamus.
   for (const k of aiReview.kode_luar_kamus || []) {
+    // Kode yang DIISI aplikasi sebagai cadangan (belum berpadanan WHO) adalah
+    // tugas koder memilih kode, bukan alasan pending dari berkas.
+    const dariAplikasi = k.asal === 'saran_aplikasi';
     tambah(alasan, {
       sumber_pemeriksaan: 'Kamus kode resmi',
       kode: k.kode,
-      ringkas: `Kode ${k.jenis} "${k.kode}" tidak ada di kamus resmi`,
+      ringkas: dariAplikasi ? `Kode diagnosis "${k.kode}" perlu dipilihkan padanan ICD-10 WHO` : `Kode ${k.jenis} "${k.kode}" tidak ada di kamus resmi`,
       penjelasan: k.pesan,
-      keparahan: 'tinggi',
+      keparahan: dariAplikasi ? 'sedang' : 'tinggi',
       bukti: null,
       tindakan: 'Ganti dengan kode yang ada di kamus, atau hapus kalau keliru',
       diverifikasi: true,

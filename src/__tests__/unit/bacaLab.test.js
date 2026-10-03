@@ -152,12 +152,12 @@ describe('beberapa tanggal', () => {
 });
 
 describe('bacaLabDariHalaman dan nilaiLabDariBaris', () => {
-  const HAL = [{ page_number: 3, ocr_text: 'HEMATOLOGI\nHemoglobin  7,6  g/dL  12.0 - 16.0  L\nHb  76  g/dL\nMCV  85  fL' }];
+  const HAL = [{ page_number: 3, ocr_text: 'HEMATOLOGI\nHemoglobin  7,6  g/dL  12.0 - 16.0  L\nHb  76  g/dL\nPDW  16.8  9 - 17  fL' }];
 
   test('mengembalikan baris dikenal dan daftar tidak dikenali terpisah', () => {
     const r = bacaLabDariHalaman(HAL);
     expect(r.baris.filter(b => b.parameter === 'hemoglobin')).toHaveLength(2);
-    expect(r.tidak_dikenali.map(t => t.nama)).toContain('MCV');
+    expect(r.tidak_dikenali.map(t => t.nama)).toContain('PDW');
   });
 
   test('nilai terendah hanya dari baris yang dapat dipakai (76 diabaikan)', () => {

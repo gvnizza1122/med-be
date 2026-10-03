@@ -23,6 +23,14 @@ const KRITERIA_LABELS = {
   K5: 'Memerlukan tindakan/intervensi segera',
 };
 
+// Number(null) dan Number('') bernilai 0 -- GCS kosong dulu terbaca "GCS 0"
+// dan K3 "Penurunan kesadaran" TERPENUHI (YETY NOVIATI, "GCS null.").
+function angka(v) {
+  if (v === null || v === undefined || (typeof v === 'string' && !v.trim())) return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
 function findParam(parameterFindings, key) {
   return parameterFindings.find(p => p.key === key) || null;
 }
@@ -90,7 +98,7 @@ function aggregateKriteria(parameterFindings, vitalFindings, k1Result, procedure
     let status = 'tidak';
     const kesadaran = findParam(parameterFindings, 'kesadaran_kualitatif');
     const gcs = vitalFindings.GCS;
-    const gcsAbnormal = gcs && Number.isFinite(Number(gcs.nilai)) && Number(gcs.nilai) <= 12;
+    const gcsAbnormal = gcs && angka(gcs.nilai) !== null && angka(gcs.nilai) <= 12;
     const kesadaranAbnormal = kesadaran && kesadaran.status === 'abnormal';
     if (gcsAbnormal || kesadaranAbnormal) {
       status = 'ya';
@@ -151,7 +159,7 @@ function aggregateKriteria(parameterFindings, vitalFindings, k1Result, procedure
       ...freetextMatches.map(t => ({ sumber: 'tindakan_segera', id: t.id, label: t.label, kutipan: t.kutipan, page_number: t.page_number })),
     ];
     let esiSignal = false;
-    if (esi && Number.isFinite(Number(esi.skor))) {
+    if (esi && angka(esi.skor) !== null) {
       esiSignal = Number(esi.skor) <= getEsiSignalThreshold();
       evidence.push({ sumber: 'esi', skor: esi.skor, kutipan: esi.kutipan, page_number: esi.page_number, signal: esiSignal });
     }
@@ -169,7 +177,7 @@ function aggregateKriteria(parameterFindings, vitalFindings, k1Result, procedure
     if (status === 'borderline') {
       catatanParts.push('Status BORDERLINE: tindakan segera hanya ditemukan dari teks bebas (bukan kode resmi PROCLIST) -- verifikator wajib cek manual; aturan default bisa diubah jadi YA otomatis lewat procedure_rules.json kalau dinilai cukup andal.');
     }
-    if (esi && Number.isFinite(Number(esi.skor))) {
+    if (esi && angka(esi.skor) !== null) {
       catatanParts.push(`Skor ESI tercatat: ${esi.skor} (sinyal pendukung${esiSignal ? ', konsisten dengan kegawatan' : ''} -- tidak menentukan status K5 secara otomatis).`);
     }
 
@@ -218,7 +226,7 @@ function buildCatatanK2K4(paramKeys, vitalKeys, parameterFindings, vitalFindings
 
 function buildCatatanK3(gcs, kesadaran, status) {
   const parts = [];
-  if (gcs && Number.isFinite(Number(gcs.nilai))) parts.push(`GCS ${gcs.nilai}`);
+  if (gcs && angka(gcs.nilai) !== null) parts.push(`GCS ${gcs.nilai}`);
   if (kesadaran && kesadaran.nilai) parts.push(`kesadaran: ${kesadaran.nilai}`);
   if (parts.length === 0) return status === 'tidak' ? 'Data GCS/kesadaran tidak tercatat di formulir.' : '';
   const partsSummary = parts.join(', ') + '.';

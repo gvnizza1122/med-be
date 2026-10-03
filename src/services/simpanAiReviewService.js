@@ -17,6 +17,9 @@ async function simpanAiReview(db, recordId, review) {
       seen.add(key); return true;
     });
   review.ekstraksi_kode_asli = old.ekstraksi_kode_asli || review.ekstraksi_kode_asli;
+  // Pembanding hasil casemix (lembar grouper E-Klaim) hanya terbaca saat PDF
+  // diproses; review ulang tanpa PDF tidak boleh menghapusnya.
+  if (!review.lembar_grouper && old.lembar_grouper) review.lembar_grouper = old.lembar_grouper;
   await db.prepare('UPDATE claim_records SET ai_review = ? WHERE id = ?').run(JSON.stringify(review), recordId);
 }
 

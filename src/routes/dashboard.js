@@ -12,10 +12,10 @@ router.get('/summary', authenticate, async (req, res) => {
     const db = getDb();
     const { period } = req.query;
 
-    let where = '';
+    let where = 'WHERE cf.is_testing = FALSE';
     const params = [];
     if (period) {
-      where = 'WHERE cf.period = ?';
+      where += ' AND cf.period = ?';
       params.push(period);
     }
 
@@ -51,8 +51,9 @@ router.get('/summary', authenticate, async (req, res) => {
       JOIN claim_records cr ON ve.record_id = cr.id
       JOIN claim_files cf ON cr.file_id = cf.id
     `;
+    errorByTypeQuery += ' WHERE cf.is_testing = FALSE';
     if (period) {
-      errorByTypeQuery += ' WHERE cf.period = ?';
+      errorByTypeQuery += ' AND cf.period = ?';
     }
     errorByTypeQuery += ' GROUP BY ve.rule_id, vr.rule_name ORDER BY count DESC';
 
@@ -72,6 +73,7 @@ router.get('/summary', authenticate, async (req, res) => {
              u.full_name as uploaded_by_name
       FROM claim_files cf
       LEFT JOIN users u ON cf.uploaded_by = u.id
+      WHERE cf.is_testing = FALSE
       ORDER BY cf.created_at DESC
       LIMIT 5
     `).all();
@@ -86,7 +88,7 @@ router.get('/summary', authenticate, async (req, res) => {
 
     // Available periods
     const periodsRaw = await db.prepare(`
-      SELECT DISTINCT period FROM claim_files WHERE period IS NOT NULL ORDER BY period DESC
+      SELECT DISTINCT period FROM claim_files WHERE is_testing = FALSE AND period IS NOT NULL ORDER BY period DESC
     `).all();
     const periods = periodsRaw.map(p => p.period);
 
@@ -121,7 +123,7 @@ router.get('/error-trends', authenticate, async (req, res) => {
              SUM(cf.error_count) as error,
              SUM(cf.pending_count) as pending
       FROM claim_files cf
-      WHERE cf.period IS NOT NULL AND cf.status IN ('completed', 'approved')
+      WHERE cf.is_testing = FALSE AND cf.period IS NOT NULL AND cf.status IN ('completed', 'approved')
       GROUP BY cf.period
       ORDER BY cf.period ASC
       LIMIT 12
