@@ -34,6 +34,7 @@ const { ekstrakKotakKata } = require('../services/pdfWordBoxService');
 const { bacaLabelHalaman } = require('../services/pasanganLabelPosisiService');
 const { pastikanDiagnosisWho } = require('../services/pastikanDiagnosisWhoService');
 const { galatKamusRecord, periksaKode, tandaiStatusKamusEvidence } = require('../services/validasiKamusService');
+const { susunTarifGanda } = require('../services/tarifGandaService');
 const { validasiRecordDenganKamus } = require('../services/validasiRecordKamusService');
 const { simpanAiReview } = require('../services/simpanAiReviewService');
 
@@ -3034,6 +3035,27 @@ router.get('/records/:recordId/saran-koding', authenticate, async (req, res) => 
   } catch (error) {
     console.error('[saran-koding] gagal:', error);
     res.status(500).json({ error: 'Saran koding gagal disusun.' });
+  }
+});
+
+// Tarif INA-CBG dan iDRG berdampingan + koding versi iDRG. Disusun saat
+// dibaca (tanpa AI) supaya klaim lama pun langsung tampil tanpa Baca Ulang.
+router.get('/records/:recordId/tarif-ganda', authenticate, async (req, res) => {
+  try {
+    const db = getDb();
+    const record = await db.prepare(`
+      SELECT id, raw_data, diagnosa_list, prosedur_list, jenis_klaim, ai_review
+      FROM claim_records WHERE id = ?
+    `).get(req.params.recordId);
+    if (!record) return res.status(404).json({ error: 'Record tidak ditemukan' });
+    let aiReview = record.ai_review;
+    if (typeof aiReview === 'string') {
+      try { aiReview = JSON.parse(aiReview); } catch (_) { aiReview = null; }
+    }
+    res.json(susunTarifGanda(record, aiReview || {}));
+  } catch (error) {
+    console.error('[tarif-ganda] gagal:', error);
+    res.status(500).json({ error: 'Tarif INA-CBG/iDRG gagal disusun.' });
   }
 });
 

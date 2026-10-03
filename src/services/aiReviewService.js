@@ -369,7 +369,8 @@ async function lookupCodesInTable(table, codes) {
     console.warn(`[AI-REVIEW] Kamus ${table} tidak tersedia, kamus_valid diisi null: ${periksa.alasan}`);
     return null;
   }
-  return new Set(Object.keys(periksa.hasil).filter(k => periksa.hasil[k] === STATUS_KAMUS.VALID));
+  // Kode IM iDRG ikut dianggap ada di kamus (sah untuk penagihan iDRG).
+  return new Set(Object.keys(periksa.hasil).filter(k => periksa.hasil[k] === STATUS_KAMUS.VALID || periksa.hasil[k] === STATUS_KAMUS.VALID_IM));
 }
 
 /**

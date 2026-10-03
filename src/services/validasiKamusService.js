@@ -25,7 +25,13 @@ const KAMUS = {
   prosedur: { tabel: 'icd9_cm_procedures', nama: 'ICD-9-CM 2010' },
 };
 
-const STATUS = { VALID: 'valid', TIDAK_ADA: 'not_found', TIDAK_TERSEDIA: 'unavailable' };
+// VALID_IM (4 Okt 2026): kode tidak ada di kamus dasar tetapi ada di daftar
+// Indonesian Modification (IM) yang dipakai iDRG -- mis. J45.3 "Asthma with
+// Exacerbation (IM)" (kasus Eifelin). Sah untuk iDRG, yang sekarang dipakai
+// RS untuk penagihan; karena itu TIDAK diperlakukan sebagai kode salah.
+const STATUS = { VALID: 'valid', VALID_IM: 'valid_im', TIDAK_ADA: 'not_found', TIDAK_TERSEDIA: 'unavailable' };
+
+const { kodeIm } = require('./kamusIdrgService');
 
 function normalKode(kode) {
   return String(kode || '').trim().toUpperCase();
@@ -84,9 +90,13 @@ async function periksaKode(db, kodes, jenis = 'diagnosis') {
     status: 'tersedia',
     alasan: null,
     dataset,
-    hasil: Object.fromEntries(unik.map((k) => [k, ada.has(k) ? STATUS.VALID : STATUS.TIDAK_ADA])),
+    hasil: Object.fromEntries(unik.map((k) => [k, ada.has(k) ? STATUS.VALID
+      : (kodeIm(k, jenis === 'prosedur' ? 'prosedur' : 'diagnosis') ? STATUS.VALID_IM : STATUS.TIDAK_ADA)])),
   };
 }
+
+/** Kode sah untuk ditagihkan: ada di kamus dasar atau kode IM iDRG. */
+const kodeSah = (status) => status === STATUS.VALID || status === STATUS.VALID_IM;
 
 /**
  * Tempelkan status kamus ke setiap entri code_evidence, MEMISAHKAN tiga hal
@@ -179,4 +189,4 @@ async function galatKamusRecord(db, dbRecord, galatAda = []) {
   return galat;
 }
 
-module.exports = { KAMUS, STATUS, periksaKode, tandaiStatusKamusEvidence, galatKamusRecord, normalKode };
+module.exports = { KAMUS, STATUS, periksaKode, tandaiStatusKamusEvidence, galatKamusRecord, normalKode, kodeSah };

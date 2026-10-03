@@ -1,0 +1,7040 @@
+{
+ "_keterangan": {
+  "isi": "Kode tambahan ICD-10 2010 dan ICD-9-CM 2010 Indonesian Modification (IM) yang dipakai grouper iDRG (INA-Grouper) Kemenkes.",
+  "sumber": [
+   "Daftar ICD 10 dan 9CM INA Grouper Indonesia Modification (IM), per MDC -- salinan publik slideshare.net/slideshow/list-icd-indonesian-modification-inagrouper/283677027",
+   "Sosialisasi Sistem iDRG Kemenkes 2025 -- salinan publik slideshare.net/slideshow/sosialisasi-sistem-idrg-kemenkes-2025-pdf/286957358"
+  ],
+  "catatan": "Bukan unduhan resmi kemkes.go.id. Rujukan Kemenkes menyebut +-1.252 kode IM diagnosis dan +-902 kode IM prosedur; daftar prosedur di sini BELUM lengkap. Kode yang tidak ada di sini belum tentu salah.",
+  "diambil": "2026-10-04"
+ },
+ "diagnosis": [
+  {
+   "kode": "A15.00",
+   "deskripsi": "Tuberculosis of lung, with previously treated confirmation sputum microscopy with or without culture (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "A15.10",
+   "deskripsi": "Tuberculosis of lung, with previously treated confirmation culture only (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "A15.11",
+   "deskripsi": "Tuberculosis of lung, confirmed by biomoleculer examination (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "A15.12",
+   "deskripsi": "Tuberculosis of lung, with previously treated confirmed by biomoleculer examination (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "A15.21",
+   "deskripsi": "Tuberculosis of lung, with previously treated confirmed histologically (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "A15.50",
+   "deskripsi": "Tuberculosis of larynx, trachea & bronchus confirmation by biomoleculer examination (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "A15.80",
+   "deskripsi": "Other respiratory tuberculosis, with previously treated with confirmation bacteriology or histologically (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "A15.81",
+   "deskripsi": "Other respiratory tuberculosis confirmation by biomoleculer examination (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "A16.20",
+   "deskripsi": "Tuberculosis of lung, with previously treated without confirmation bacteriology or histologically (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "A16.80",
+   "deskripsi": "Latent Baccili Tuberculosis Infection (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "A16.81",
+   "deskripsi": "Other respiratory tuberculosis, with previously treated without confirmation bacteriology or histologically (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "A91.0",
+   "deskripsi": "Dengue hemorrhagic fever with shock (IM)",
+   "mdc": "28"
+  },
+  {
+   "kode": "A91.1",
+   "deskripsi": "Dengue hemorrhagic fever without shock (IM)",
+   "mdc": "28"
+  },
+  {
+   "kode": "A91.9",
+   "deskripsi": "Dengue hemorrhagic fever, unspecified (IM)",
+   "mdc": "28"
+  },
+  {
+   "kode": "B18.10",
+   "deskripsi": "Chronic viral hepatitis B without delta-agent (IM)",
+   "mdc": "17"
+  },
+  {
+   "kode": "B18.19",
+   "deskripsi": "Chronic hepatitis B, unspecified delta agent status (IM)",
+   "mdc": "17"
+  },
+  {
+   "kode": "B35.7",
+   "deskripsi": "Tinea faciei (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "B37.00",
+   "deskripsi": "Acute pseudomembranous candidal stomatitis (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "B37.01",
+   "deskripsi": "Acute erythematous (atrophic) candidal stomatitis (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "B37.02",
+   "deskripsi": "Chronic hyperplastic candidal stomatitis (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "B37.03",
+   "deskripsi": "Chronic erythematous (atrophic) candidal stomatitis (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "B37.04",
+   "deskripsi": "Mucocutaneous candidiasis (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "B37.05",
+   "deskripsi": "Oral candidal granuloma (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "B37.06",
+   "deskripsi": "Angular cheilitis (IM)",
+   "mdc": null
+  },
+  {
+   "kode": "B37.08",
+   "deskripsi": "Other specified candidal stomatitis (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "B37.09",
+   "deskripsi": "Candidal stomatitis, unspecified (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "B39.6",
+   "deskripsi": "Histoplasma limphadenopathy (IM)",
+   "mdc": "28"
+  },
+  {
+   "kode": "B44.81",
+   "deskripsi": "ABPA (Allergic Broncho Pulmonary Aspergillosis) (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "B69.2",
+   "deskripsi": "Cysticercosis of skin (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "B74.80",
+   "deskripsi": "Filaria limphadenopathy (IM)",
+   "mdc": "28"
+  },
+  {
+   "kode": "B78.8",
+   "deskripsi": "Other strongyloidiasis (IM)",
+   "mdc": "28"
+  },
+  {
+   "kode": "B83.10",
+   "deskripsi": "Gnathostomiasis of central nervous system (IM)",
+   "mdc": "11"
+  },
+  {
+   "kode": "B83.11",
+   "deskripsi": "Gnathostomiasis of eye (IM)",
+   "mdc": "12"
+  },
+  {
+   "kode": "B83.12",
+   "deskripsi": "Gnathostomiasis of skin (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "B83.18",
+   "deskripsi": "Gnathostomiasis of other sites (IM)",
+   "mdc": "28"
+  },
+  {
+   "kode": "B83.19",
+   "deskripsi": "Gnathostomiasis, unspecified (IM)",
+   "mdc": "28"
+  },
+  {
+   "kode": "B86.0",
+   "deskripsi": "Scabies due to Sarcoptes scabiei (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "B86.8",
+   "deskripsi": "Other scabies (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "B86.9",
+   "deskripsi": "Scabies, unspecified (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "C02.10",
+   "deskripsi": "Malignant neoplasm of tip of tongue (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "C02.11",
+   "deskripsi": "Malignant neoplasm of lateral border of tongue (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "C02.19",
+   "deskripsi": "Malignant neoplasm of border of tongue, unspecified (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "C06.10",
+   "deskripsi": "Malignant neoplasm of vestibule mouth: upper labial sulcus (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "C06.11",
+   "deskripsi": "Malignant neoplasm of vestibule mouth: upper buccal sulcus (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "C06.12",
+   "deskripsi": "Malignant neoplasm of vestibule mouth: lower labial sulcus (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "C06.13",
+   "deskripsi": "Malignant neoplasm of vestibule mouth: lower buccal sulcus (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "C06.14",
+   "deskripsi": "Malignant neoplasm of vestibule mouth: upper sulcus, unspecified (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "C06.15",
+   "deskripsi": "Malignant neoplasm of vestibule mouth: lower sulcus, unspecified (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "C06.19",
+   "deskripsi": "Malignant neoplasm of vestibule mouth, unspecified (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "C06.20",
+   "deskripsi": "Malignant neoplasm of mouth: maxillary tuberosity (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "C06.21",
+   "deskripsi": "Malignant neoplasm of mouth: mandibular retromolar area (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "C06.29",
+   "deskripsi": "Malignant neoplasm of mouth: retromolar area, unspecified (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "C41.00",
+   "deskripsi": "Malignant neoplasm of maxilla, sarcoma (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "C41.01",
+   "deskripsi": "Malignant neoplasm of maxilla, malignant odontogenic tumour (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "C41.02",
+   "deskripsi": "Malignant neoplasm of maxilla, malignant intraosseous salivary gland tumour (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "C41.08",
+   "deskripsi": "Malignant neoplasm of other bone of skull and face (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "C41.09",
+   "deskripsi": "Malignant neoplasm of bone of skull and face, unspecified (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "C41.10",
+   "deskripsi": "Malignant neoplasm of mandible, sarcoma (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "C41.11",
+   "deskripsi": "Malignant neoplasm of mandible, malignant odontogenic tumour (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "C41.19",
+   "deskripsi": "Malignant neoplasm of mandible, unspecified (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "C64.1",
+   "deskripsi": "Malignant neoplasm of right kidney, except renal pelvis (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "C64.2",
+   "deskripsi": "Malignant neoplasm of left kidney, except renal pelvis (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "C64.9",
+   "deskripsi": "Malignant neoplasm of unspecified kidney, except renal pelvis (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "C65.1",
+   "deskripsi": "Malignant neoplasm of right renal pelvis (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "C65.2",
+   "deskripsi": "Malignant neoplasm of left renal pelvis (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "C65.9",
+   "deskripsi": "Malignant neoplasm of unspecified renal pelvis (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "C66.1",
+   "deskripsi": "Malignant neoplasm of right ureter (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "C66.2",
+   "deskripsi": "Malignant neoplasm of left ureter (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "C66.9",
+   "deskripsi": "Malignant neoplasm of unspecified ureter (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "D03.30",
+   "deskripsi": "Melanoma in situ: skin of lip (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "D03.38",
+   "deskripsi": "Melanoma in situ: other facial skin (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "D03.39",
+   "deskripsi": "Melanoma in situ: facial skin, unspecified (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "D10.00",
+   "deskripsi": "Benign neoplasm of upper lip, vermilion border (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "D10.01",
+   "deskripsi": "Benign neoplasm of upper lip, labial mucosa (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "D10.02",
+   "deskripsi": "Benign neoplasm of upper lip, vermilion border with mucosa (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "D10.03",
+   "deskripsi": "Benign neoplasm of lower lip, vermilion border (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "D10.04",
+   "deskripsi": "Benign neoplasm of lower lip, labial mucosa (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "D10.05",
+   "deskripsi": "Benign neoplasm of lower lip, vermilion border with mucosa (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "D10.06",
+   "deskripsi": "Benign neoplasm of both lips, vermilion border (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "D10.07",
+   "deskripsi": "Benign neoplasm of both lips, labial mucosa (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "D10.08",
+   "deskripsi": "Benign neoplasm of both lips, vermilion border with mucosa (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "D10.09",
+   "deskripsi": "Benign neoplasm of lip, unspecified (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "D10.10",
+   "deskripsi": "Benign neoplasm of base of tongue (posterior to terminal sulcus) (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "D10.11",
+   "deskripsi": "Benign neoplasm of dorsal surface of tongue (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "D10.12",
+   "deskripsi": "Benign neoplasm of borders and tip of tongue (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "D10.13",
+   "deskripsi": "Benign neoplasm of ventral surface of tongue (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "D10.14",
+   "deskripsi": "Benign neoplasm of lingual tonsil (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "D10.19",
+   "deskripsi": "Benign neoplasm of tongue, unspecified (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "D10.30",
+   "deskripsi": "Benign neoplasm of mouth, buccal mucosa (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "D10.31",
+   "deskripsi": "Benign neoplasm of mouth, buccal mucosal commissure (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "D10.32",
+   "deskripsi": "Benign neoplasm of mouth, buccal sulcus (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "D10.33",
+   "deskripsi": "Benign neoplasm of mouth, gingiva and edentulous alveolar ridge (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "D10.34",
+   "deskripsi": "Benign neoplasm of mouth, hard palate (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "D10.35",
+   "deskripsi": "Benign neoplasm of mouth, soft palate (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "D10.36",
+   "deskripsi": "Benign neoplasm of mouth, vula (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "D10.37",
+   "deskripsi": "Benign neoplasm of mouth, retromolar area (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "D10.38",
+   "deskripsi": "Benign neoplasm of mouth, tuberosity benign (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "D10.39",
+   "deskripsi": "Benign neoplasm of mouth, unspecified (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "D16.40",
+   "deskripsi": "Benign neoplasm of maxilla, bone and articular cartilage (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "D16.41",
+   "deskripsi": "Benign neoplasm of maxilla, odontogenic tissues (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "D16.48",
+   "deskripsi": "Benign neoplasm of other bones of skull and face (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "D16.49",
+   "deskripsi": "Benign neoplasm of maxilla, unspecified (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "D16.50",
+   "deskripsi": "Benign neoplasm of mandible, bone and cartilage (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "D16.51",
+   "deskripsi": "Benign neoplasm of mandible, odontogenic tissue (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "D16.59",
+   "deskripsi": "Benign neoplasm of mandible, unspecified (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "D18.00",
+   "deskripsi": "Haemangioma, skin and subcutaneous tissues (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "D18.01",
+   "deskripsi": "Haemangioma, intracranial structures (IM)",
+   "mdc": "11"
+  },
+  {
+   "kode": "D18.02",
+   "deskripsi": "Haemangioma, liver (IM)",
+   "mdc": "17"
+  },
+  {
+   "kode": "D18.03",
+   "deskripsi": "Haemangioma, intestine (IM)",
+   "mdc": "16"
+  },
+  {
+   "kode": "D18.04",
+   "deskripsi": "Haemangioma, ear, nose, mouth and throat (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "D18.07",
+   "deskripsi": "Haemangioma, multiple sites (IM)",
+   "mdc": "15"
+  },
+  {
+   "kode": "D18.08",
+   "deskripsi": "Haemangioma, other sites (IM)",
+   "mdc": "15"
+  },
+  {
+   "kode": "D18.09",
+   "deskripsi": "Haemangioma, unspecified (IM)",
+   "mdc": "15"
+  },
+  {
+   "kode": "D25.7",
+   "deskripsi": "Leiomyoma of uterus, multiple types (IM)",
+   "mdc": "23"
+  },
+  {
+   "kode": "D29.8",
+   "deskripsi": "Beningn neolasm of other specified male genital organs (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "D40.8",
+   "deskripsi": "Neoplasm of uncertain behavior of other specified male genital organs (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "D49.5",
+   "deskripsi": "Neoplasm of unspecified behavior of other genitourinary organs (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "D59.40",
+   "deskripsi": "Other nonimmune hemolytic anemias, chemical (IM)",
+   "mdc": "26"
+  },
+  {
+   "kode": "D59.41",
+   "deskripsi": "Other nonimmune hemolytic anemias, infectious (IM)",
+   "mdc": "26"
+  },
+  {
+   "kode": "D59.42",
+   "deskripsi": "Other nonimmune hemolytic anemias, microangiopathic (IM)",
+   "mdc": "26"
+  },
+  {
+   "kode": "D59.43",
+   "deskripsi": "Other nonimmune hemolytic anemias, physical (IM)",
+   "mdc": "26"
+  },
+  {
+   "kode": "D59.48",
+   "deskripsi": "Other nonimmune hemolytic anemias, other (IM)",
+   "mdc": "26"
+  },
+  {
+   "kode": "D63.1",
+   "deskripsi": "Anaemia due to liver and endocrine disorders (IM)",
+   "mdc": "26"
+  },
+  {
+   "kode": "E03.6",
+   "deskripsi": "Hypothyroidism from Hashimoto's thyroiditis (IM)",
+   "mdc": "20"
+  },
+  {
+   "kode": "E06.6",
+   "deskripsi": "Transient painless thyroiditis,sporadic (IM)",
+   "mdc": "20"
+  },
+  {
+   "kode": "E66.20",
+   "deskripsi": "Sleep related hypoventilation disorder (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "E66.21",
+   "deskripsi": "Sleep related hypoxemia disorder (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "E74.30",
+   "deskripsi": "Glucose malabsorption (IM)",
+   "mdc": "16"
+  },
+  {
+   "kode": "E74.38",
+   "deskripsi": "Other disorders of intestinal carbohydrate metabolism (IM) 4 K52.20 Allergic and dietetic gastroenteritis and colitis due to cow's milk protein (IM)",
+   "mdc": "16"
+  },
+  {
+   "kode": "F44.88",
+   "deskripsi": "Other specified dissociative [conversion] disorders (IM)",
+   "mdc": "29"
+  },
+  {
+   "kode": "F45.39",
+   "deskripsi": "Somatoform autonomic dysfunction, unspecified organ or system (IM)",
+   "mdc": "29"
+  },
+  {
+   "kode": "F45.80",
+   "deskripsi": "Other somatoform disorders: Dysphagia (psychogenic), including globus hystericus (IM)",
+   "mdc": "29"
+  },
+  {
+   "kode": "F45.81",
+   "deskripsi": "Other somatoform disorders: Torticollis (psychogenic) (IM)",
+   "mdc": "29"
+  },
+  {
+   "kode": "F45.82",
+   "deskripsi": "Other somatoform disorders: Teeth-grinding [bruxism] (IM)",
+   "mdc": "29"
+  },
+  {
+   "kode": "F45.88",
+   "deskripsi": "Other somatoform disorders: Other somatoform disorders (IM)",
+   "mdc": "29"
+  },
+  {
+   "kode": "F60.38",
+   "deskripsi": "Other emotionally unstable personality disorder (IM)",
+   "mdc": "29"
+  },
+  {
+   "kode": "F60.39",
+   "deskripsi": "Emotionally unstable personality disorder, unspecified (IM)",
+   "mdc": "29"
+  },
+  {
+   "kode": "G04.3",
+   "deskripsi": "Viral transverse myelitis, unspecified (IM)",
+   "mdc": "11"
+  },
+  {
+   "kode": "G47.31",
+   "deskripsi": "Central sleep anoea synddrome (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "G47.32",
+   "deskripsi": "Obstructive sleep apnoea syndrome (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "H61.4",
+   "deskripsi": "Hematoma or seroma of external ear (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "H61.5",
+   "deskripsi": "Hematoma of middle ear or paranasal sinus (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "H90.00",
+   "deskripsi": "Conductive hearing loss, bilateral, moderate-severe (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "H90.01",
+   "deskripsi": "Conductive hearing loss, bilateral, mild (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "H90.10",
+   "deskripsi": "Conduct hearing loss, unilateral with unrestricted hearing on the contralateral side, mild (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "H90.11",
+   "deskripsi": "Conduct hearing loss, unilateral with unrestricted hearing on the contralateral side, mod-sev (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "H90.30",
+   "deskripsi": "Sensorineural hearing loss, bilateral, mild (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "H90.31",
+   "deskripsi": "Sensorineural hearing loss, bilateral, mod-sev (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "H90.32",
+   "deskripsi": "Sensorineural hearing loss, bilateral, profound (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "H90.40",
+   "deskripsi": "Sensorineural hear loss unilat unrestricted hearing contralateral side, mild (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "H90.41",
+   "deskripsi": "Sensorineural hear loss unilat unrestricted hearing contralateral side, mod-sev (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "H90.42",
+   "deskripsi": "Sensorineural hear loss unilat unrestricted hearing contralateral side, profoud (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "H90.60",
+   "deskripsi": "Mixed conductive and sensorineural hearing loss, bilateral, mild (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "H90.61",
+   "deskripsi": "Mixed conductive and sensorineural hearing loss, bilateral, mod- sev (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "H90.62",
+   "deskripsi": "Mixed conductive and sensorineural hearing loss, bilateral, profound (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "H90.70",
+   "deskripsi": "Mix conductive and sensorineural hearing loss, unilateral unrestricted hearing on the contralateral side, mild (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "H90.71",
+   "deskripsi": "Mix conductive and sensorineural hearing loss, unilateral unrestricted hearing on the contralateral side, mod-sev (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "H90.72",
+   "deskripsi": "Mix conductive and sensorineural hearing loss, unilateral unrestricted hearing on the contralateral side, profound (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "H91.4",
+   "deskripsi": "Congenital Hearing Loss With Inability to Speak (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "I49.00",
+   "deskripsi": "Ventricular fibrillation and flutter with structural heart diseases (IM)",
+   "mdc": "15"
+  },
+  {
+   "kode": "I49.01",
+   "deskripsi": "Ventricular fibrillation and flutter without structural heart diseases (idiopathic)(Bugrada sy (IM)",
+   "mdc": "15"
+  },
+  {
+   "kode": "I49.09",
+   "deskripsi": "Ventricular fibrillation and flutter, unspecified (IM)",
+   "mdc": "15"
+  },
+  {
+   "kode": "I70.10",
+   "deskripsi": "Atherosclerosis of renal artery without gangrene (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "I70.11",
+   "deskripsi": "Atherosclerosis of renal artery with gangrene (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "I70.3",
+   "deskripsi": "Atherosclerosis of carotid arteries (IM)",
+   "mdc": "15"
+  },
+  {
+   "kode": "I95.3",
+   "deskripsi": "Neural-mediated hypotension (IM)",
+   "mdc": "15"
+  },
+  {
+   "kode": "J15.81",
+   "deskripsi": "Pneumonia due to Rhodococcus equi (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "J15.88",
+   "deskripsi": "Other bacterial pneumonia (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "J37.2",
+   "deskripsi": "Chronic Laryngitis with gastric acid reflux (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "J44.2",
+   "deskripsi": "Wheezing ascociated respiratory illness (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "J44.3",
+   "deskripsi": "Obstruction syndrome post tuberculosis (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "J44.90",
+   "deskripsi": "Asthma COPD Overlap Syndrome (ACOS) (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "J45.2",
+   "deskripsi": "Bronchial hyperresponsiveness (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "J45.3",
+   "deskripsi": "Asthma with Exacerbation (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "J45.4",
+   "deskripsi": "Cough variant asthma (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "J45.5",
+   "deskripsi": "Exercise induced bronchospasm (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "J47.0",
+   "deskripsi": "Stable Bronchiectasis (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "J47.1",
+   "deskripsi": "Bronchiectasis with Exacerbation (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "J95.6",
+   "deskripsi": "Postprocedural chylothorax (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "J98.7",
+   "deskripsi": "Trapped lung (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "K00.00",
+   "deskripsi": "Partial anodontia [hypodontia] [oligodontia] (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K00.01",
+   "deskripsi": "Total anodontia (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K00.09",
+   "deskripsi": "Anodontia, unspecified (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K00.10",
+   "deskripsi": "Incisor and canine regions (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K00.11",
+   "deskripsi": "Premolar region (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K00.12",
+   "deskripsi": "Molar region (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K00.19",
+   "deskripsi": "Supernumerary teeth, unspecified (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K00.20",
+   "deskripsi": "Macrodontia (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K00.21",
+   "deskripsi": "Microdontia (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K00.22",
+   "deskripsi": "Concrescence (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K00.23",
+   "deskripsi": "Fusion and gemination (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K00.24",
+   "deskripsi": "Dens evaginatus, [occlusal tuberculum] (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K00.25",
+   "deskripsi": "Dens invaginatus [dens in dente] [dilated odonoma] and incisor anomalies (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K00.26",
+   "deskripsi": "Premolarization (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K00.27",
+   "deskripsi": "Abnormal tubercula and enamel pearls [enameloma] (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K00.28",
+   "deskripsi": "Taurodontism (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K00.29",
+   "deskripsi": "Other and unspecified abnormalities of size and form of teeth (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K00.30",
+   "deskripsi": "Endemic (fluoride) mottling of enamel [dental fluorosis] (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K00.31",
+   "deskripsi": "Non-endemic mottling of enamel [non-fluoride enamel opacities] (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K00.39",
+   "deskripsi": "Mottled teeth, unspecified (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K00.40",
+   "deskripsi": "Enamel hypoplasia (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K00.41",
+   "deskripsi": "Prenatal enamel hypoplasia (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K00.42",
+   "deskripsi": "Neonatal enamel hypoplasia (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K00.43",
+   "deskripsi": "Aplasia and hypoplasia of cementum (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K00.44",
+   "deskripsi": "Dilaceration (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K00.45",
+   "deskripsi": "Odontodysplasia [regional odontodysplasia] (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K00.46",
+   "deskripsi": "Turner's tooth (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K00.48",
+   "deskripsi": "Other specified disturbances in tooth formation (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K00.49",
+   "deskripsi": "Disturbances in tooth formation, unspecified (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K00.50",
+   "deskripsi": "Amelogenesis imperfecta (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K00.51",
+   "deskripsi": "Dentinogenesis imperfecta (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K00.52",
+   "deskripsi": "Odontogenesis imperfecta (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K00.58",
+   "deskripsi": "Other hereditary disturbances in tooth structure (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K00.59",
+   "deskripsi": "Hereditary disturbances in tooth structure, unspecified (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K00.60",
+   "deskripsi": "Natal teeth (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K00.61",
+   "deskripsi": "Neonatal teeth (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K00.62",
+   "deskripsi": "Premature eruption [dentia praecox] (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K00.63",
+   "deskripsi": "Retained [persistent] primary [deciduous] teeth (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K00.64",
+   "deskripsi": "Late eruption (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K00.65",
+   "deskripsi": "Premature shedding of primary [deciduous] teeth (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K00.68",
+   "deskripsi": "Other specified disturbances in tooth eruption (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K00.69",
+   "deskripsi": "Disturbances in tooth eruption, unspecified (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K00.80",
+   "deskripsi": "Colour changes during tooth formation due to blood type incompatibility (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K00.81",
+   "deskripsi": "Colour changes during tooth formation due to malformation of biliary system (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K00.82",
+   "deskripsi": "Colour changes during tooth formation due to porphyria (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K00.83",
+   "deskripsi": "Colour changes during tooth formation due to tetracyclines (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K00.88",
+   "deskripsi": "Other specified disorders of tooth development (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K01.10",
+   "deskripsi": "Maxillary incisor (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K01.11",
+   "deskripsi": "Mandibular incisor (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K01.12",
+   "deskripsi": "Maxillary canine (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K01.13",
+   "deskripsi": "Mandibular canine (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K01.14",
+   "deskripsi": "Maxillary premolar (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K01.15",
+   "deskripsi": "Mandibular premolar (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K01.16",
+   "deskripsi": "Maxillary molar (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K01.17",
+   "deskripsi": "Mandibular molar (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K01.18",
+   "deskripsi": "Supernumerary tooth (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K01.19",
+   "deskripsi": "Impacted tooth, unspecified (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K03.00",
+   "deskripsi": "Occlusal (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K03.01",
+   "deskripsi": "Approximal (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K03.08",
+   "deskripsi": "Other specified attrition of teeth (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K03.09",
+   "deskripsi": "Attrition of teeth, unspecified (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K03.10",
+   "deskripsi": "Dentrifice (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K03.11",
+   "deskripsi": "Habitual abrasion of teeth (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K03.12",
+   "deskripsi": "Occupational abrasion of teeth (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K03.13",
+   "deskripsi": "Traditioanal abrasion of teeth (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K03.18",
+   "deskripsi": "Other specified abrasion of teeth (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K03.19",
+   "deskripsi": "Abrasion of teeth, unspecified (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K03.20",
+   "deskripsi": "Occupational erosion of teeth (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K03.21",
+   "deskripsi": "Eorsion of teeth due to persistent regurgitating or vomiting (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K03.22",
+   "deskripsi": "Eorsion of teeth due to diet (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K03.23",
+   "deskripsi": "Eorsion of teeth due to drugs and medicaments (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K03.24",
+   "deskripsi": "Idiopathic erosion of teeth (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K03.28",
+   "deskripsi": "Other specified erosion of teeth (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K03.29",
+   "deskripsi": "Erosion of teeth, unspecified (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K03.30",
+   "deskripsi": "External resorption of teeth (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K03.31",
+   "deskripsi": "Internal [internal granuloma] [pink spot] resorption of teeth (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K03.39",
+   "deskripsi": "Pathological resorption of teeth, unspecified (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K03.60",
+   "deskripsi": "Pigmented film (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K03.61",
+   "deskripsi": "Deposits on teeth due to tobacco habit (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K03.62",
+   "deskripsi": "Deposits on teeth due to betel-chewing habit (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K03.63",
+   "deskripsi": "Other gross soft deposits (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K03.64",
+   "deskripsi": "Supragingival calculus (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K03.65",
+   "deskripsi": "Subgingival caluculus (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K03.66",
+   "deskripsi": "Dental plaque (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K03.68",
+   "deskripsi": "Other specified deposits on teeth (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K03.69",
+   "deskripsi": "Deposit [accretions] on teeth, unspecified (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K03.70",
+   "deskripsi": "Posteruptive colour changes of dental hard tissues due to metals and metallic compounds (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K03.71",
+   "deskripsi": "Posteruptive colour changes of dental hard tissues due to pulpal bleeding (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K03.72",
+   "deskripsi": "Posteruptive colour changes of dental hard tissues due to chewing habit (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K03.78",
+   "deskripsi": "Other specified posteruptive colour changes of dental hard tissues (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K03.79",
+   "deskripsi": "Posteruptive colour changes of dental hard tissues, unspecified (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K03.80",
+   "deskripsi": "Sensitive dentine (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K03.81",
+   "deskripsi": "Changes of enamel due to irradiation (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K03.88",
+   "deskripsi": "Other specified diseases of hard tissues of teeth (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K04.80",
+   "deskripsi": "Apical and lateral redicular cyst (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K04.81",
+   "deskripsi": "Residual redicular cyst (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K04.82",
+   "deskripsi": "Inflammatory paradental redicular cyst (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K04.89",
+   "deskripsi": "Radicular cyst, unspecified (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K05.00",
+   "deskripsi": "Acute streoptococcal gingivostomatitis (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K05.08",
+   "deskripsi": "Other specified acute gingivitis (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K05.09",
+   "deskripsi": "Acute gingivitis, unspecified (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K05.10",
+   "deskripsi": "Simple marginal (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K05.11",
+   "deskripsi": "Hyperplastic (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K05.12",
+   "deskripsi": "Ulcerative (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K05.13",
+   "deskripsi": "Desquamative (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K05.18",
+   "deskripsi": "Other specified chronic gingivitis (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K05.19",
+   "deskripsi": "Chronic gingivitis, unspecified (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K05.20",
+   "deskripsi": "Periodontal abscess [parodontal abscess] of gingival origin without sinus (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K05.21",
+   "deskripsi": "Periodontal abscess [parodontal abscess] of gingival origin with sinus (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K05.22",
+   "deskripsi": "Acute pericoronitis (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K05.28",
+   "deskripsi": "Other specified acute periodontitis (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K05.29",
+   "deskripsi": "Acute periodontitis, unspecified (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K05.30",
+   "deskripsi": "Simplex (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K05.31",
+   "deskripsi": "Complex (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K05.32",
+   "deskripsi": "Chronic pericoronitis (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K05.33",
+   "deskripsi": "Thickened follicle (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K05.38",
+   "deskripsi": "Other specified chronic periodontitis (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K05.39",
+   "deskripsi": "Chronic periodontitis,unspecified (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K06.00",
+   "deskripsi": "Localized gingival recession (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K06.01",
+   "deskripsi": "Ceneralized gingival recession (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K06.09",
+   "deskripsi": "Gingival recession, unspecified (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K06.10",
+   "deskripsi": "Gingival fibromatosis (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K06.18",
+   "deskripsi": "Other specified gingival enlargement (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K06.19",
+   "deskripsi": "Gingival enlargement, unspecified (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K06.20",
+   "deskripsi": "Due to traumatic occlusion (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K06.21",
+   "deskripsi": "Due to toothbrushing (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K06.22",
+   "deskripsi": "Frictional [functional] keratosis (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K06.28",
+   "deskripsi": "Other specified gingival and edentulous alveolar ridge lesions associated with trauma (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K06.29",
+   "deskripsi": "Gingival and edentulous alveolar ridge lesions associated with trauma, unspecified (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K06.80",
+   "deskripsi": "Gingival cyst of adult (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K06.81",
+   "deskripsi": "Peripheral giant cell granuloma [giant cell epulis] (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K06.82",
+   "deskripsi": "Fibrous epulis (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K06.83",
+   "deskripsi": "Pyogenic granuloma (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K06.84",
+   "deskripsi": "Flabby ridge (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K06.85",
+   "deskripsi": "Other specified disorders of gingival (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K06.86",
+   "deskripsi": "Other specified disorders of edentulous alveolar ridge (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K07.00",
+   "deskripsi": "Maxillary macrognathism [maxillary hyperplasia] (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K07.01",
+   "deskripsi": "Mandibular macrognathism [mandibular hyperplasia] (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K07.02",
+   "deskripsi": "Macrognathism, both jaws (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K07.03",
+   "deskripsi": "Maxillary micrognathism [maxiliary hypoplasia] (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K07.04",
+   "deskripsi": "Mandibular micrognathism [mandibular hypoplasia] (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K07.05",
+   "deskripsi": "Micrognathism, both jaws (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K07.08",
+   "deskripsi": "Other specified major anomalies of jaw size (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K07.09",
+   "deskripsi": "Anomaly of jaw size, unspecified (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K07.10",
+   "deskripsi": "Asymmetry of jaw (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K07.11",
+   "deskripsi": "Mandibular prognathism (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K07.12",
+   "deskripsi": "Maxillary prognathism (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K07.13",
+   "deskripsi": "Mandibular retrognathism (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K07.14",
+   "deskripsi": "Maxillary retrognathism (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K07.18",
+   "deskripsi": "Other specified anomalies of jaw-cranial base relationship (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K07.19",
+   "deskripsi": "Anomaly of jaw-cranial base relationship, unspecified (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K07.20",
+   "deskripsi": "Disto-occlusion (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K07.21",
+   "deskripsi": "Mesio-occlusion (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K07.22",
+   "deskripsi": "Excessive overjet [horizontal overbite] (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K07.23",
+   "deskripsi": "Excessive overbite [vertical overbite] (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K07.24",
+   "deskripsi": "Openbite (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K07.25",
+   "deskripsi": "Crossbite (anterior, posterior) (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K07.26",
+   "deskripsi": "Midline deviation (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K07.27",
+   "deskripsi": "Posterior lingual occlusion of mandibular arch (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K07.28",
+   "deskripsi": "Other specified anomalies of dental arch relationship (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K07.29",
+   "deskripsi": "Anomaly of dental arch relationship, unspecified (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K07.30",
+   "deskripsi": "Crowding (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K07.31",
+   "deskripsi": "Displacement (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K07.32",
+   "deskripsi": "Rotation (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K07.33",
+   "deskripsi": "Spacing (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K07.34",
+   "deskripsi": "Transposition (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K07.38",
+   "deskripsi": "Other specified anomalies of tooth position (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K07.39",
+   "deskripsi": "Anomaly of tooth position, unspecified (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K07.50",
+   "deskripsi": "Abnormal jaw closure (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K07.51",
+   "deskripsi": "Maloclusion due to abnormal swallowing (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K07.54",
+   "deskripsi": "Malocclusion due to mouth breathing (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K07.55",
+   "deskripsi": "Malocclusion due to tongue, lip or finger habits (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K07.58",
+   "deskripsi": "Other specified dentofacial functional abnormalities (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K07.59",
+   "deskripsi": "Dentofacial functional abnormality, unspecified (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K07.60",
+   "deskripsi": "Temporomandibular joint-pain-dysfunction [Costen's] syndrome (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K07.61",
+   "deskripsi": "Clicking (snapping) jaws (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K07.62",
+   "deskripsi": "Recurrent dislocation and subluxation of temporomandibular joint (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K07.63",
+   "deskripsi": "Pain in temporomandibular joint, not elsewhere classified (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K07.64",
+   "deskripsi": "Stiffness of temporomandibular joint, not elsewhere classified (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K07.65",
+   "deskripsi": "Osteophyte of temporomandibular joint (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K07.68",
+   "deskripsi": "Other specified temporomandibular joint disorders (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K07.69",
+   "deskripsi": "Temporomandibular joint disorder, unspecified (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K08.80",
+   "deskripsi": "Toothache (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K08.81",
+   "deskripsi": "Irregular alveolar process (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K08.82",
+   "deskripsi": "Enlargement of alveolar ridge (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K08.88",
+   "deskripsi": "Other specified disorders of teeth and supporting structures (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K09.00",
+   "deskripsi": "Developmental odontogenic cysts, eruption (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K09.01",
+   "deskripsi": "Developmental odontogenic cysts, gingival (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K09.02",
+   "deskripsi": "Developmental odontogenic cysts, keratocyst [primordial] (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K09.03",
+   "deskripsi": "Developmental odontogenic cysts, follicular [dentigerous] (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K09.04",
+   "deskripsi": "Developmental odontogenic cysts, lateral periodontal (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K09.08",
+   "deskripsi": "Other specified developmental odontogenic cysts (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K09.09",
+   "deskripsi": "Developmental odontogenic cyst, unspecified (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K09.10",
+   "deskripsi": "Developmental (nonodontogenic) cysts of oral region, globulomaxillary (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K09.11",
+   "deskripsi": "Developmental (nonodontogenic) cysts of oral region, median palatal (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K09.12",
+   "deskripsi": "Developmental (nonodontogenic) cysts of oral region, nasopalatine [incisive canal] (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K09.13",
+   "deskripsi": "Developmental (nonodontogenic) cysts of oral region, palatine papilla (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K09.18",
+   "deskripsi": "Other specified developmental (nonodontogenic) cysts of oral origin (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K09.19",
+   "deskripsi": "Developmental cyst of oral region, unspecified (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K09.20",
+   "deskripsi": "Aneurysmal bone cyst (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K09.21",
+   "deskripsi": "Solitary bone [traumatic] [haemorrhagic] cyst of jaw (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K09.22",
+   "deskripsi": "Epithelial jaw cyst not idenifiable as odontogenic or nonodontogenic (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K09.28",
+   "deskripsi": "Other specified cysts of jaw (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K09.29",
+   "deskripsi": "Cyst of jaw, unspecified (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K09.80",
+   "deskripsi": "Dermoid cyst (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K09.81",
+   "deskripsi": "Epidermoid cyst (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K09.82",
+   "deskripsi": "Gingival cyst of newborn (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K09.83",
+   "deskripsi": "Palatal cyst of newborn (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K09.84",
+   "deskripsi": "Nasoalveolar [nasolabial] cyst (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K09.85",
+   "deskripsi": "Lymphoepidermoid cyst (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K09.88",
+   "deskripsi": "Other specified cysts of oral region (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K10.00",
+   "deskripsi": "Torus mandibularis (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K10.01",
+   "deskripsi": "Torus palatinus (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K10.02",
+   "deskripsi": "Latent bone cyst (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K10.08",
+   "deskripsi": "Other specified developmental disorders of jaws (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K10.09",
+   "deskripsi": "Developmental disorder of jaws, unspecified (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K10.20",
+   "deskripsi": "Osteitis of jaw (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K10.21",
+   "deskripsi": "Osteomyelitis of jaw (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K10.22",
+   "deskripsi": "Periostitis of jaw (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K10.23",
+   "deskripsi": "Chronic periostitis of jaw (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K10.24",
+   "deskripsi": "Neonatal osteomyelitis of maxilla [neonatal maxillitis] (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K10.25",
+   "deskripsi": "Sequestrum (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K10.26",
+   "deskripsi": "Osteoradionecrosis (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K10.28",
+   "deskripsi": "Other specified inflammatory conditions of jaws (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K10.29",
+   "deskripsi": "Inflammatory conditions of jaws, unspecified (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K10.80",
+   "deskripsi": "Cherubism (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K10.81",
+   "deskripsi": "Unilateral condylar hyperplasia of mandible (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K10.82",
+   "deskripsi": "Unilateral condylar hypoplasia of mandible (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K10.83",
+   "deskripsi": "Fibrous dysplasia of jaw (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K10.88",
+   "deskripsi": "Other specified disease of jaws (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K11.60",
+   "deskripsi": "Mucous retention cyst (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K11.61",
+   "deskripsi": "Mucous extravasation cyst (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K11.69",
+   "deskripsi": "Mucocele of salivary gland, unspecified (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K11.70",
+   "deskripsi": "Hyposecretion (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K11.71",
+   "deskripsi": "Xerostomia (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K11.72",
+   "deskripsi": "Hypersecretion [ptyalism] (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K11.78",
+   "deskripsi": "Other specified disturbances of salivary secretion (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K11.79",
+   "deskripsi": "Disturbance of salivary secretion, unspecified (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K11.80",
+   "deskripsi": "Benign lymphoepithelial lesion of salivary gland (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K11.81",
+   "deskripsi": "Mikulicz, disease (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K11.82",
+   "deskripsi": "Stenosis [stricture] of salivary duct (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K11.83",
+   "deskripsi": "Sialectasia (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K11.85",
+   "deskripsi": "Necrotizing sialometaplasia (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K11.88",
+   "deskripsi": "Other specified disease of salivary glands (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K12.00",
+   "deskripsi": "Recurrent (minor) aphthae (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K12.01",
+   "deskripsi": "Periadenitis mucosa necrotica recurrens (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K12.02",
+   "deskripsi": "Stomatis herpetiformis [herpetiform eruption] (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K12.03",
+   "deskripsi": "Bednar's aphthae (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K12.04",
+   "deskripsi": "Traumatic ulcer (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K12.08",
+   "deskripsi": "Other specified recurrent oral aphthae (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K12.09",
+   "deskripsi": "Recurrent oral aphthae, unspecified (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K12.10",
+   "deskripsi": "Stomatitis artifacta (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K12.11",
+   "deskripsi": "Geographic stomatitis (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K12.12",
+   "deskripsi": "Denture stomatitis (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K12.13",
+   "deskripsi": "Papillary hyperplasia of palate (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K12.14",
+   "deskripsi": "Contact stomatitis (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K12.18",
+   "deskripsi": "Other specified forms of stomatitis (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K12.19",
+   "deskripsi": "Stomatitis, unspecified (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K12.20",
+   "deskripsi": "Buccal Abscess (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K12.21",
+   "deskripsi": "Submandibular Abscess (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K12.22",
+   "deskripsi": "Anterior-Visceral Abscess (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K13.00",
+   "deskripsi": "Angular cheilitis (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K13.01",
+   "deskripsi": "Cheilitis glandularis apostematosa (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K13.02",
+   "deskripsi": "Cheilitis, exfoliative (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K13.03",
+   "deskripsi": "Cheilitis NOS (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K13.04",
+   "deskripsi": "Cheilodynia (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K13.08",
+   "deskripsi": "Other specified disease of lips (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K13.09",
+   "deskripsi": "Disease of lips, unspecified (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K13.20",
+   "deskripsi": "Leukoplakia, idiopathic (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K13.21",
+   "deskripsi": "Leukoplakia, tobacco-associated (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K13.22",
+   "deskripsi": "Erythroplakia (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K13.23",
+   "deskripsi": "Leukoedema (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K13.24",
+   "deskripsi": "Smoker's palate [leukokeratosis nicotina palati] [nicotina palati] (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K13.28",
+   "deskripsi": "Other specified leukoplakia and disturbances of oral epithelium,including tongue (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K13.29",
+   "deskripsi": "Leukoplakia and disturbances of oral epithelium,unspecified (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K13.41",
+   "deskripsi": "Eosinophilic granuloma of oral mucosa (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K13.42",
+   "deskripsi": "Verrucous xanthoma [histiocytosis Y] (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K13.48",
+   "deskripsi": "Other specified granuloma and granuloma-like lesions of oral mucosa (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K13.49",
+   "deskripsi": "Granuloma and granuloma-like lesions of oral mucosa, unspecified (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K13.70",
+   "deskripsi": "Excessive melanin pigmentation (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K13.71",
+   "deskripsi": "Oral fistula (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K13.72",
+   "deskripsi": "Deliberate tattoo (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K13.73",
+   "deskripsi": "Focal oral mucinosis (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K13.78",
+   "deskripsi": "Other specified lesions of oral mucosa (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K13.79",
+   "deskripsi": "Lesion of oral mucosa, unspecified (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K14.00",
+   "deskripsi": "Abscess of tongue (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K14.01",
+   "deskripsi": "Traumatic ulceration of tongue (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K14.08",
+   "deskripsi": "Other specified glossitis (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K14.09",
+   "deskripsi": "Glossitis, unspecified (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K14.30",
+   "deskripsi": "Coated tongue (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K14.31",
+   "deskripsi": "Hairy tongue (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K14.32",
+   "deskripsi": "Hypertrophy of foliate papillae (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K14.38",
+   "deskripsi": "Other specified hypertrophy of tongue papillae (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K14.39",
+   "deskripsi": "Hypertrophy of tongue papillae, unspecified (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K14.40",
+   "deskripsi": "Atrophy of tongue papillae due to tongue cleaning habit (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K14.41",
+   "deskripsi": "Atrophy of tongue papillae due to systemic disorder (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K14.42",
+   "deskripsi": "Atrophic glossitis NOS (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K14.48",
+   "deskripsi": "Other specified atrophy of tongue papillae (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K14.49",
+   "deskripsi": "Atrophy of tongue papillae, unspecified (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K14.60",
+   "deskripsi": "Glossopyrosis [burning tongue] (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K14.61",
+   "deskripsi": "Glossodynia [painful tongue] (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K14.68",
+   "deskripsi": "Other specified glossodynia (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K14.69",
+   "deskripsi": "Glossodynia, unspecified (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K14.80",
+   "deskripsi": "Crenated tongue [lingua indentata] (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K14.81",
+   "deskripsi": "Hypertrophy of tongue (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K14.82",
+   "deskripsi": "Atrophy of tongue (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K14.88",
+   "deskripsi": "Other specified diesease of tongue (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "K52.20",
+   "deskripsi": "Allergic and dietetic gastroenteritis and colitis due to cow's milk protein (IM)",
+   "mdc": null
+  },
+  {
+   "kode": "K52.28",
+   "deskripsi": "Other allergic and dietetic gastroenteritis and colitis (IM)",
+   "mdc": "16"
+  },
+  {
+   "kode": "K52.29",
+   "deskripsi": "Allergic and dietetic gastroenteritis and colitis, unspecified (IM)",
+   "mdc": "16"
+  },
+  {
+   "kode": "K65.00",
+   "deskripsi": "Primary peritonitis (IM)",
+   "mdc": "16"
+  },
+  {
+   "kode": "K65.01",
+   "deskripsi": "Secondary bacterial peritonitis (IM)",
+   "mdc": "16"
+  },
+  {
+   "kode": "K83.6",
+   "deskripsi": "Stenosis of sphincter of Oddi (IM)",
+   "mdc": "17"
+  },
+  {
+   "kode": "K91.20",
+   "deskripsi": "Post surgical malabsorption, post massive bowel resection (IM)",
+   "mdc": "16"
+  },
+  {
+   "kode": "K91.28",
+   "deskripsi": "Other postsurgical malabsorption (IM)",
+   "mdc": "16"
+  },
+  {
+   "kode": "K91.29",
+   "deskripsi": "Postsurgical malabsorption, unspecified (IM)",
+   "mdc": "16"
+  },
+  {
+   "kode": "L24.80",
+   "deskripsi": "Irritant contact dermatitis due to dyes (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "L24.81",
+   "deskripsi": "Paederus dermatitis (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "L24.88",
+   "deskripsi": "Irritant contact dermatitis due to other agents (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "L27.10",
+   "deskripsi": "Fixed drug eruption (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "L27.18",
+   "deskripsi": "Other specified localized skin eruption due to drugs and medicaments (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "L27.19",
+   "deskripsi": "Localized skin eruption due to drugs and medicaments, unspecified (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "L70.80",
+   "deskripsi": "Acne cosmetica (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "L70.81",
+   "deskripsi": "Acne scar (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "L70.82",
+   "deskripsi": "Steroid acne (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "L70.83",
+   "deskripsi": "Acne fulminans (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "L70.88",
+   "deskripsi": "Other acne (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "L81.80",
+   "deskripsi": "Nevus fuscocaeruleus (Nevus of Hori) (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "L81.81",
+   "deskripsi": "Ochronosis, pigmented colloid milium (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "L81.82",
+   "deskripsi": "Cosmetic tattoo (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "L81.83",
+   "deskripsi": "Traumatic tattoo (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "L81.88",
+   "deskripsi": "Other specified disorders of pigmentation (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "N17.91",
+   "deskripsi": "Acute Kidney Injury Stage 1 (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "N17.92",
+   "deskripsi": "Acute Kidney Injury Stage 2 (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "N17.93",
+   "deskripsi": "Acute Kidney Injury Stage 3 needed renal support (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "N17.94",
+   "deskripsi": "Acute Kidney Injury superimposed on chronic kidney disease (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "N17.95",
+   "deskripsi": "Acute Kidney Injury superimposed on chronic kidney disease needed renal support (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "N18.6",
+   "deskripsi": "End stage renal disease (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "N26.2",
+   "deskripsi": "Page kidney (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "N36.4",
+   "deskripsi": "Urethral functional and muscular disorders (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "N36.5",
+   "deskripsi": "Urethral false passage (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "N40.0",
+   "deskripsi": "Benign prostatic hyperplasia without lower urinary tract symptoms (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "N40.1",
+   "deskripsi": "Benign prostatic hyperplasia with lower urinary tract symptoms (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "N40.2",
+   "deskripsi": "Nodular prostate without lower urinary tract symptoms (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "N40.3",
+   "deskripsi": "Nodular prostate with lower urinary tract symptoms (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "N41.4",
+   "deskripsi": "Granulomatous prostatitis (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "N44.0",
+   "deskripsi": "Torsion of testis (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "N44.1",
+   "deskripsi": "Cyst of tunica albuginea testis (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "N44.2",
+   "deskripsi": "Benign cyst of testis (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "N44.8",
+   "deskripsi": "Other noninflammatory disorders of the testis (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "N45.1",
+   "deskripsi": "Epididymitis (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "N45.2",
+   "deskripsi": "Orchitis (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "N45.3",
+   "deskripsi": "Epididymoorchitis (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "N45.4",
+   "deskripsi": "Abscess of epididymis or testis (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "N46.0",
+   "deskripsi": "Azoospermia (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "N46.1",
+   "deskripsi": "Oligospermia (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "N46.8",
+   "deskripsi": "Other male infertility (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "N46.9",
+   "deskripsi": "Male infertility, unspecified (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "N47.0",
+   "deskripsi": "Adherent prepuce, newborn (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "N47.1",
+   "deskripsi": "Phimosis (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "N47.2",
+   "deskripsi": "paraphimosis (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "N47.3",
+   "deskripsi": "Deficient foreskin (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "N47.4",
+   "deskripsi": "Benign cyst of prepuce (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "N47.5",
+   "deskripsi": "Adhesions of prepuce and glans penis (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "N47.7",
+   "deskripsi": "Other inflammatory diseases of prepuce (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "N47.8",
+   "deskripsi": "Other disorders of prepuce (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "N49.3",
+   "deskripsi": "Fournier gangrene (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "N50.3",
+   "deskripsi": "Cyst of epididymis (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "N52.0",
+   "deskripsi": "Vasculogenic erectile dysfunction (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "N52.1",
+   "deskripsi": "Erectile dysfunction due to diseases classified elsewhere (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "N52.2",
+   "deskripsi": "Drug-induced erectile dysfuntion (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "N52.3",
+   "deskripsi": "Postprocedural erectile dysfunction (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "N52.8",
+   "deskripsi": "Other male erectile dysfunction (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "N52.9",
+   "deskripsi": "Male erectile dysfunction, unspecified (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "N53.1",
+   "deskripsi": "Ejaculatory dysfunction (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "N53.8",
+   "deskripsi": "Other male sexual dysfunction (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "N53.9",
+   "deskripsi": "Unspecified male sexual dysfunction (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "N70.2",
+   "deskripsi": "Tubo-ovarian abscess (IM)",
+   "mdc": "23"
+  },
+  {
+   "kode": "N80.7",
+   "deskripsi": "Pelvic endometriosis (IM)",
+   "mdc": "23"
+  },
+  {
+   "kode": "N81.7",
+   "deskripsi": "Cystorectocele (IM)",
+   "mdc": "23"
+  },
+  {
+   "kode": "N93.00",
+   "deskripsi": "Contact bleeding (IM)",
+   "mdc": "23"
+  },
+  {
+   "kode": "N93.01",
+   "deskripsi": "Postcoital bleeding (IM)",
+   "mdc": "23"
+  },
+  {
+   "kode": "N97.5",
+   "deskripsi": "Female infertility associated with peritoneal factors (IM)",
+   "mdc": "23"
+  },
+  {
+   "kode": "Q38.30",
+   "deskripsi": "Aglossia (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "Q38.31",
+   "deskripsi": "Bifid tongue (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "Q38.32",
+   "deskripsi": "Adhesion of tongue, congenital (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "Q38.33",
+   "deskripsi": "Fissure of tongue, congenital (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "Q38.34",
+   "deskripsi": "Microglossia (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "Q38.38",
+   "deskripsi": "Other specified congenital malformations of tongue (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "Q38.39",
+   "deskripsi": "Congenital malformation of tongue, unspecified (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "Q38.40",
+   "deskripsi": "Absence of salivary gland or duct (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "Q38.41",
+   "deskripsi": "Accessory salivary gland or duct (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "Q38.42",
+   "deskripsi": "Atresia of salivary gland or duct (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "Q38.43",
+   "deskripsi": "Congenital fistula of salivary gland (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "Q38.48",
+   "deskripsi": "Other specified congenital malformations of salivary glands and ducts (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "Q38.49",
+   "deskripsi": "Congenital malformation of salivary glands and ducts, unspecified (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "Q38.59",
+   "deskripsi": "Congenital malformation of palate, unspecified (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "Q40.4",
+   "deskripsi": "Congenital microvillous atrophy (IM)",
+   "mdc": "16"
+  },
+  {
+   "kode": "Q41.00",
+   "deskripsi": "Duodenal web (IM) 14 Q41.08 Other congenital absence, atresia and stenosis of duodenum (IM) 15 Q41.09 Congenital absence, atresia and stenosis of duodenum, unspecified (IM)",
+   "mdc": "16"
+  },
+  {
+   "kode": "Q41.08",
+   "deskripsi": "Other congenital absence, atresia and stenosis of duodenum (IM)",
+   "mdc": null
+  },
+  {
+   "kode": "Q41.09",
+   "deskripsi": "Congenital absence, atresia and stenosis of duodenum, unspecified (IM)",
+   "mdc": null
+  },
+  {
+   "kode": "Q44.70",
+   "deskripsi": "Alagille Syndrome (IM)",
+   "mdc": "17"
+  },
+  {
+   "kode": "Q44.71",
+   "deskripsi": "Progressive familial intrahepatic cholestasis (IM)",
+   "mdc": "17"
+  },
+  {
+   "kode": "Q44.78",
+   "deskripsi": "Other congenital malformations of liver (IM)",
+   "mdc": "17"
+  },
+  {
+   "kode": "Q44.79",
+   "deskripsi": "Congenital malformations of liver, unspecified (IM)",
+   "mdc": "17"
+  },
+  {
+   "kode": "Q67.40",
+   "deskripsi": "Hemifacial atrophy (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "Q67.41",
+   "deskripsi": "Hemifacial hypertrophy (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "Q67.48",
+   "deskripsi": "Other specified congenital deformities of skull, face and jaw (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "Q67.49",
+   "deskripsi": "Congenital deformity of skull, face or jaw, unspecified (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "Q68.80",
+   "deskripsi": "Congenital deformity of clavicle (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "Q68.81",
+   "deskripsi": "Congenital deformity of elbow (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "Q68.82",
+   "deskripsi": "Congenital deformity of forearm (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "Q68.83",
+   "deskripsi": "Congenital deformity of scapula (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "Q68.84",
+   "deskripsi": "Congenital dislocation of elbow (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "Q68.85",
+   "deskripsi": "Congenital dislocation of shoulder (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "Q68.88",
+   "deskripsi": "Other specified congenital musculoskeletal deformities (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "Q71.30",
+   "deskripsi": "Congenital absence of hand (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "Q71.31",
+   "deskripsi": "Congenital absence of finger(s) (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "Q71.32",
+   "deskripsi": "Congenital absence of thumb (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "Q71.33",
+   "deskripsi": "Congenital hypoplastic thumb (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "Q71.38",
+   "deskripsi": "Other congenital absence of hand and finger(s) (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "Q72.30",
+   "deskripsi": "Congenital absence of foot (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "Q72.31",
+   "deskripsi": "Congenital absence of toe(s) (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "Q75.00",
+   "deskripsi": "Acrocephaly (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "Q75.01",
+   "deskripsi": "Imperfect fusion of skull (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "Q75.02",
+   "deskripsi": "Oxycephaly (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "Q75.03",
+   "deskripsi": "Trigonocephaly (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "Q76.20",
+   "deskripsi": "Congenital spondylolisthesis (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "Q76.21",
+   "deskripsi": "Congenital spondylolysis (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "Q87.00",
+   "deskripsi": "Acrocephalosyndactyly [Apert] (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "Q87.01",
+   "deskripsi": "Golddnhar's syndrome (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "Q87.02",
+   "deskripsi": "Moebius' syndrome (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "Q87.03",
+   "deskripsi": "Oro-facial-digital syndrome (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "Q87.05",
+   "deskripsi": "Robin's syndrome (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "Q87.08",
+   "deskripsi": "Other congenital malformation syndrome predominantly affecting facial appearance (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "Q89.20",
+   "deskripsi": "Persistent thyroglossal or thyrolingual duct (IM)",
+   "mdc": "20"
+  },
+  {
+   "kode": "Q89.21",
+   "deskripsi": "Thyroglossal cyst (IM)",
+   "mdc": "20"
+  },
+  {
+   "kode": "Q89.22",
+   "deskripsi": "Thyroglossal fistula (IM)",
+   "mdc": "20"
+  },
+  {
+   "kode": "Q89.23",
+   "deskripsi": "Lingual thyroid (IM)",
+   "mdc": "20"
+  },
+  {
+   "kode": "Q89.28",
+   "deskripsi": "Congenital malformations of other endocrine glands (IM)",
+   "mdc": "20"
+  },
+  {
+   "kode": "R04.20",
+   "deskripsi": "Massive hemoptysis (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "R10.40",
+   "deskripsi": "Idiopathic recurrent abdominal pain of childhood (IM)",
+   "mdc": "16"
+  },
+  {
+   "kode": "R10.48",
+   "deskripsi": "Other abdominal pain (IM)",
+   "mdc": "16"
+  },
+  {
+   "kode": "R10.49",
+   "deskripsi": "Abdominal pain, unspecified (IM)",
+   "mdc": "16"
+  },
+  {
+   "kode": "R11.0",
+   "deskripsi": "Cyclic vomiting (IM)",
+   "mdc": "16"
+  },
+  {
+   "kode": "R11.9",
+   "deskripsi": "Nausea and vomiting, unspecified (IM)",
+   "mdc": "16"
+  },
+  {
+   "kode": "R17.0",
+   "deskripsi": "Cholestatic jaundice (IM)",
+   "mdc": "17"
+  },
+  {
+   "kode": "R17.1",
+   "deskripsi": "Obstructive jaundice (IM)",
+   "mdc": "17"
+  },
+  {
+   "kode": "R17.8",
+   "deskripsi": "Other jaundice (IM)",
+   "mdc": "17"
+  },
+  {
+   "kode": "R17.9",
+   "deskripsi": "Jaundice, unspecified (IM)",
+   "mdc": "17"
+  },
+  {
+   "kode": "R31.0",
+   "deskripsi": "Gross hematuria (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "R31.1",
+   "deskripsi": "Benign essential microscopic hematuria (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "R31.2",
+   "deskripsi": "Other microscopic hematuria (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "R33.0",
+   "deskripsi": "Drug induced retention of urine (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "R36.0",
+   "deskripsi": "Urethral discharge without blood (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "R36.1",
+   "deskripsi": "Hematospermia (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "R37",
+   "deskripsi": "Sexual dysfunction, unspecified (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "R39.9",
+   "deskripsi": "Unspecified symptoms and signs involving the genitourinary (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "R40.9",
+   "deskripsi": "Alteration of consciousness, unspecified (IM)",
+   "mdc": "11"
+  },
+  {
+   "kode": "R51.0",
+   "deskripsi": "Headache, unspecified (IM)",
+   "mdc": "11"
+  },
+  {
+   "kode": "R51.1",
+   "deskripsi": "Facial pain, unspecified (IM)",
+   "mdc": "11"
+  },
+  {
+   "kode": "R73.1",
+   "deskripsi": "Impaired fasting glucose (IM)",
+   "mdc": "30"
+  },
+  {
+   "kode": "R87.60",
+   "deskripsi": "Atypical squamous cells [ASC] (IM)",
+   "mdc": "30"
+  },
+  {
+   "kode": "R87.61",
+   "deskripsi": "Low-grade squamous intraepithelial lesion [LSIL] (IM)",
+   "mdc": "30"
+  },
+  {
+   "kode": "R87.62",
+   "deskripsi": "High-grade squamous intraepithelial lesion [HSIL] (IM)",
+   "mdc": "30"
+  },
+  {
+   "kode": "R87.63",
+   "deskripsi": "Atypical glandular cells [AGC] (IM)",
+   "mdc": "30"
+  },
+  {
+   "kode": "R87.68",
+   "deskripsi": "Other abnormal cytologic finding in specimens from female genital organs (IM)",
+   "mdc": "30"
+  },
+  {
+   "kode": "R87.69",
+   "deskripsi": "Abnormal cytologic finding in specimens from female genital organs, unspecified (IM)",
+   "mdc": "30"
+  },
+  {
+   "kode": "S01.50",
+   "deskripsi": "Open wound of oral cavity (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "S01.51",
+   "deskripsi": "Open wound of lip (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "S01.57",
+   "deskripsi": "Open wound of oral cavity with open wound of lip (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "S02.400",
+   "deskripsi": "Closed Fracture of maxillary alveolar process (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "S02.401",
+   "deskripsi": "Closed Fracture of malar bone [zygoma] (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "S02.402",
+   "deskripsi": "Closed Fracture of maxillary bones (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "S02.407",
+   "deskripsi": "Multiple closed fracture of malar and maxillary bones (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "S02.410",
+   "deskripsi": "Open Fracture of maxillary alveolar process (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "S02.411",
+   "deskripsi": "Open Fracture of malar bone [zygoma] (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "S02.412",
+   "deskripsi": "Open Fracture of maxillary bones (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "S02.417",
+   "deskripsi": "Multiple open fracture of malar and maxillary bones (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "S02.601",
+   "deskripsi": "Closed Fracture of body of mandible (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "S02.602",
+   "deskripsi": "Closed Fracture of condyle (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "S02.603",
+   "deskripsi": "Closed Fracture of coronoid process (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "S02.604",
+   "deskripsi": "Closed Fracture of ramus (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "S02.605",
+   "deskripsi": "Closed Fracture of symphysis (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "S02.606",
+   "deskripsi": "Closed Fracture of angle (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "S02.607",
+   "deskripsi": "Multiple closed fractures of mandible (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "S02.609",
+   "deskripsi": "Closed Fracture of mandible, part unspecified (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "S02.610",
+   "deskripsi": "Open Fracture of alveolar process (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "S02.611",
+   "deskripsi": "Open Fracture of body of mandible (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "S02.612",
+   "deskripsi": "Open Fracture of condyle (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "S02.613",
+   "deskripsi": "Open Fracture of coronoid process (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "S02.614",
+   "deskripsi": "Open Fracture of ramus (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "S02.615",
+   "deskripsi": "Open Fracture of symphysis (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "S02.616",
+   "deskripsi": "Open Fracture of angle (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "S02.617",
+   "deskripsi": "Multiple open fractures of mandible (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "S02.619",
+   "deskripsi": "Open Fracture of mandible, part unspecified (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "S03.20",
+   "deskripsi": "Luxation of tooth (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "S03.21",
+   "deskripsi": "Intrusion or extrusion of tooth (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "S03.22",
+   "deskripsi": "Avulsion of tooth [exarticulation] (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "S03.29",
+   "deskripsi": "Dislocation of tooth, unspecified (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "S04.80",
+   "deskripsi": "Injury of olfactory nerve (IM)",
+   "mdc": "11"
+  },
+  {
+   "kode": "S04.81",
+   "deskripsi": "Injury of glossopharyngeal nerve (IM)",
+   "mdc": "11"
+  },
+  {
+   "kode": "S04.82",
+   "deskripsi": "Injury of vagus nerve (IM)",
+   "mdc": "11"
+  },
+  {
+   "kode": "S04.83",
+   "deskripsi": "Injury of hypoglossal nerve (IM)",
+   "mdc": "11"
+  },
+  {
+   "kode": "S09.00",
+   "deskripsi": "Injury of Anterior Nasal Arteries (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "S09.01",
+   "deskripsi": "Injury of Posterior Nasal Arteries (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "S12.200",
+   "deskripsi": "Closed fracture of 3rd cervical vertebra (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S12.201",
+   "deskripsi": "Closed Fracture of 4th cervical vertebra (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S12.202",
+   "deskripsi": "Closed Fracture of 5th cervical vertebra (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S12.203",
+   "deskripsi": "Closed Fracture of 6th cervical vertebra (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S12.204",
+   "deskripsi": "Closed Fracture of 7th cervical vertebra (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S12.208",
+   "deskripsi": "Closed Fracture of other cervical vertebra (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S12.210",
+   "deskripsi": "Open fracture of 3rd cervical vertebra (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S12.211",
+   "deskripsi": "Open Fracture of 4th cervical vertebra (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S12.212",
+   "deskripsi": "Open Fracture of 5th cervical vertebra (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S12.213",
+   "deskripsi": "Open Fracture of 6th cervical vertebra (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S12.214",
+   "deskripsi": "Open Fracture of 7th cervical vertebra (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S12.218",
+   "deskripsi": "Open Fracture of other cervical vertebra (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S13.10",
+   "deskripsi": "Dislocation of C1/C2 vertebra (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S13.11",
+   "deskripsi": "Dislocation of C2/C3 vertebra (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S13.12",
+   "deskripsi": "Dislocation of C3/C4 vertebra (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S13.13",
+   "deskripsi": "Dislocation of C4/C5 vertebra (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S13.14",
+   "deskripsi": "Dislocation of C5/C6 vertebra (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S13.15",
+   "deskripsi": "Dislocation of C6/C7 vertebra (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S13.16",
+   "deskripsi": "Dislocation of C7/T1 vertebra (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S13.18",
+   "deskripsi": "Dislocation of other,cervical vertebra (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S13.19",
+   "deskripsi": "Dislocation of cervical vertebra, part unspecified (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S22.000",
+   "deskripsi": "Closed Fracture of thoracic vertebra, compression type (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S22.001",
+   "deskripsi": "Closed Fracture of thoracic vertebra, burst type (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S22.002",
+   "deskripsi": "Closed Fracture of thoracic vertebra, seat-belt type (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S22.003",
+   "deskripsi": "Closed Fracture of thoracic vertebra, flexion-rotation type (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S22.004",
+   "deskripsi": "Closed Fracture of thoracic vertebra, shear type (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S22.005",
+   "deskripsi": "Closed Fracture of thoracic vertebra, flexion-distraction type (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S22.009",
+   "deskripsi": "Closed Fracture of thoracic vertebra, mechanism unspecified (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S22.010",
+   "deskripsi": "Open Fracture of thoracic vertebra, compression type (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S22.011",
+   "deskripsi": "Open Fracture of thoracic vertebra, burst type (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S22.012",
+   "deskripsi": "Open Fracture of thoracic vertebra, seat-belt type (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S22.013",
+   "deskripsi": "Open Fracture of thoracic vertebra, flexion-rotation type (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S22.014",
+   "deskripsi": "Open Fracture of thoracic vertebra, shear type (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S22.015",
+   "deskripsi": "Open Fracture of thoracic vertebra, flexion-distraction type (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S22.019",
+   "deskripsi": "Open Fracture of thoracic vertebra, mechanism unspecified (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S22.100",
+   "deskripsi": "Multiple closed fractures of thoracic spine, T1-T6 level (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S22.101",
+   "deskripsi": "Multiple closed fractures of thoracic spine, T7-T12 level (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S22.102",
+   "deskripsi": "Multiple closed fractures of thoracic and lumbar spine [T and L spine] (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S22.108",
+   "deskripsi": "Multiple closed fractures of thoracic spine, other specified (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S22.109",
+   "deskripsi": "Multiple closed fractures of thoracic spine, unspecified (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S22.110",
+   "deskripsi": "Multiple open fractures of thoracic spine, T1-T6 level (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S22.111",
+   "deskripsi": "Multiple open fractures of thoracic spine, T7-T12 level (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S22.112",
+   "deskripsi": "Multiple open fractures of thoracic and lumbar spine [T and L spine] (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S22.118",
+   "deskripsi": "Multiple open fractures of thoracic spine, other specified (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S22.119",
+   "deskripsi": "Multiple open fractures of thoracic spine, unspecified (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S27.32",
+   "deskripsi": "Laceration of lung (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "S27.33",
+   "deskripsi": "Contusio and hematoma of lung (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "S32.000",
+   "deskripsi": "Closed Fracture of lumbar vertebra, compression type (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S32.001",
+   "deskripsi": "Closed Fracture of lumbar vertebra, burst type (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S32.002",
+   "deskripsi": "Closed Fracture of lumbar vertebra, seat-belt type (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S32.003",
+   "deskripsi": "Closed Fracture of lumbar vertebra, flexion-rotation type (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S32.004",
+   "deskripsi": "Closed Fracture of lumbar vertebra, shear type (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S32.005",
+   "deskripsi": "Closed Fracture of lumbar vertebra, flexion-distraction type (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S32.009",
+   "deskripsi": "Closed Fracture of lumbar vertebra, mechanism unspecified (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S32.010",
+   "deskripsi": "Open Fracture of lumbar vertebra, compression type (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S32.011",
+   "deskripsi": "Open Fracture of lumbar vertebra, burst type (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S32.012",
+   "deskripsi": "Open Fracture of lumbar vertebra, seat-belt type (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S32.013",
+   "deskripsi": "Open Fracture of lumbar vertebra, flexion-rotation type (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S32.014",
+   "deskripsi": "Open Fracture of lumbar vertebra, shear type (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S32.015",
+   "deskripsi": "Open Fracture of lumbar vertebra, flexion-distraction type (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S32.019",
+   "deskripsi": "Open Fracture of lumbar vertebra, mechanism unspecified (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S32.600",
+   "deskripsi": "Closed Fracture of pelvis, stable type (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S32.601",
+   "deskripsi": "Closed Fracture of pelvis, rotary unstable type (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S32.602",
+   "deskripsi": "Closed Fracture of pelvis, vertical shear type (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S32.608",
+   "deskripsi": "Closed Fracture of pelvis, other types (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S32.609",
+   "deskripsi": "Closed Fracture of pelvis, unspecified type (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S32.610",
+   "deskripsi": "Open Fracture of pelvis, stable type (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S32.611",
+   "deskripsi": "Open Fracture of pelvis, rotary unstable type (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S32.612",
+   "deskripsi": "Open Fracture of pelvis, vertical shear type (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S32.618",
+   "deskripsi": "Open Fracture of pelvis, other types (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S32.619",
+   "deskripsi": "Open Fracture of pelvis, unspecified type (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S40.80",
+   "deskripsi": "Abrasion of shoulder and arm (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "S40.81",
+   "deskripsi": "Blister of shoulder and arm (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "S40.82",
+   "deskripsi": "Insect bite of shoulder and arm (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "S40.83",
+   "deskripsi": "Superficial foreign body of shoulder and arm (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "S40.88",
+   "deskripsi": "Other superficial injuries of shoulder and arm (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "S42.000",
+   "deskripsi": "Closed Fracture of clavicle, sternal end (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.001",
+   "deskripsi": "Closed Fracture of clavicle, shaft (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.002",
+   "deskripsi": "Closed Fracture of clavicle, acromial end (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.007",
+   "deskripsi": "Closed Fracture of clavicle, multiple fractures (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.009",
+   "deskripsi": "Closed Fracture of clavicle, unspecified part (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.010",
+   "deskripsi": "Open Fracture of clavicle, sternal end (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.011",
+   "deskripsi": "Open Fracture of clavicle, shaft (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.012",
+   "deskripsi": "Open Fracture of clavicle, acromial end (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.017",
+   "deskripsi": "Open Fracture of clavicle, multiple fractures (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.019",
+   "deskripsi": "Open Fracture of clavicle, unspecified part (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.100",
+   "deskripsi": "Closed Fracture of scapula, body (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.101",
+   "deskripsi": "Closed Fracture of scapula, acromion process (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.102",
+   "deskripsi": "Closed Fracture of scapula, coracoid (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.103",
+   "deskripsi": "Closed Fracture of scapula, glenoid and neck of scapula (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.107",
+   "deskripsi": "Closed Fracture of scapula, multiple fractures (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.109",
+   "deskripsi": "Closed Fracture of scapula, unspecified part (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.110",
+   "deskripsi": "Open Fracture of scapula, body (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.111",
+   "deskripsi": "Open Fracture of scapula, acromion process (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.112",
+   "deskripsi": "Open Fracture of scapula, coracoid (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.113",
+   "deskripsi": "Open Fracture of scapula, glenoid and neck of scapula (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.117",
+   "deskripsi": "Open Fracture of scapula, multiple fractures (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.119",
+   "deskripsi": "Open Fracture of scapula, unspecified part (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.200",
+   "deskripsi": "Closed Fracture of proximal humerus, non-displaced (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.201",
+   "deskripsi": "Closed Fracture of proximal humerus, 2 parts (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.202",
+   "deskripsi": "Closed Fracture of proximal humerus, 3 parts (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.203",
+   "deskripsi": "Closed Fracture of proximal humerus, 4 parts (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.204",
+   "deskripsi": "Closed Fracture of proximal humerus, with articular involvement (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.205",
+   "deskripsi": "Closed Fracture of epiphysis of proximal humerus (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.208",
+   "deskripsi": "Closed Fracture of proximal humerus, others (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.209",
+   "deskripsi": "Closed Fracture of proximal humerus, unspecified (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.210",
+   "deskripsi": "Open Fracture of proximal humerus, non-displaced (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.211",
+   "deskripsi": "Open Fracture of proximal humerus, 2 parts (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.212",
+   "deskripsi": "Open Fracture of proximal humerus, 3 parts (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.213",
+   "deskripsi": "Open Fracture of proximal humerus, 4 parts (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.214",
+   "deskripsi": "Open Fracture of proximal humerus, with articular involvement (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.215",
+   "deskripsi": "Open Fracture of epiphysis of proximal humerus (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.218",
+   "deskripsi": "Open Fracture of proximal humerus, others (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.219",
+   "deskripsi": "Open Fracture of proximal humerus, unspecified (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.300",
+   "deskripsi": "Closed Fracture of shaft of humerus, simple fracture (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.301",
+   "deskripsi": "Closed Fracture of shaft of humerus, butterfly fracture (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.302",
+   "deskripsi": "Closed Fracture of shaft of humerus, comminuted fracture (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.307",
+   "deskripsi": "Multiple closed fractures of shaft of humerus (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.309",
+   "deskripsi": "Closed Fracture of shaft of humerus, unspecified (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.310",
+   "deskripsi": "Open Fracture of shaft of humerus, simple fracture (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.311",
+   "deskripsi": "Open Fracture of shaft of humerus, butterfly fracture (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.312",
+   "deskripsi": "Open Fracture of shaft of humerus, comminuted fracture (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.317",
+   "deskripsi": "Multiple open fractures of shaft of humerus (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.319",
+   "deskripsi": "Open Fracture of shaft of humerus, unspecified (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.400",
+   "deskripsi": "Closed Fracture of distal humerus, supracondylar (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.401",
+   "deskripsi": "Closed Fracture of distal humerus, lateral condyle (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.402",
+   "deskripsi": "Closed Fracture of distal humerus, medial condyle (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.403",
+   "deskripsi": "Closed Fracture of distal humerus, other parts of condyle and epicondyle (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.404",
+   "deskripsi": "Closed Fracture of distal humerus, T-shape intraarticular fracture (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.405",
+   "deskripsi": "Closed Fracture of distal humerus, multifragment intraarticular fracture (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.406",
+   "deskripsi": "Closed Fracture of physis and apophysis of distal humerus (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.407",
+   "deskripsi": "Multiple closed fractures of distal humerus (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.408",
+   "deskripsi": "Closed Fracture of distal humerus, others (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.409",
+   "deskripsi": "Closed Fracture of distal humerus, unspecified (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.410",
+   "deskripsi": "Open Fracture of distal humerus, supracondylar (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.411",
+   "deskripsi": "Open Fracture of distal humerus, lateral condyle (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.412",
+   "deskripsi": "Open Fracture of distal humerus, medial condyle (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.413",
+   "deskripsi": "Open Fracture of distal humerus, other parts of condyle and epicondyle (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.414",
+   "deskripsi": "Open Fracture of distal humerus, T-shape intraarticular fracture (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.415",
+   "deskripsi": "Open Fracture of distal humerus, multifragment intraarticular fracture (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.416",
+   "deskripsi": "Open Fracture of physis and apophysis of distal humerus (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.417",
+   "deskripsi": "Multiple open fractures of distal humerus (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.418",
+   "deskripsi": "Open Fracture of distal humerus, others (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S42.419",
+   "deskripsi": "Open Fracture of distal humerus, unspecified (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S43.00",
+   "deskripsi": "Dislocation of shoulder joint, anterior (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S43.01",
+   "deskripsi": "Dislocation of shoulder joint, posterior (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S43.02",
+   "deskripsi": "Dislocation of shoulder joint, inferior (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S43.08",
+   "deskripsi": "Dislocation of shoulder joint, other (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S43.09",
+   "deskripsi": "Dislocation of shoulder joint, unspecified (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S50.80",
+   "deskripsi": "Abrasion of elbow and forearm (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "S50.81",
+   "deskripsi": "Blister of elbow and forearm (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "S50.82",
+   "deskripsi": "Insect bite of elbow and forearm (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "S50.83",
+   "deskripsi": "Superficial foreign body of elbow and forearm (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "S50.88",
+   "deskripsi": "Other superficial injuries of elbow and forearm (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "S51.1",
+   "deskripsi": "Open wound of forearm (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "S52.000",
+   "deskripsi": "Closed Fracture of proximal ulna, olecranon (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.001",
+   "deskripsi": "Closed Fracture of proximal ulna, coronoid process (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.002",
+   "deskripsi": "Closed Fracture of proximal ulna, with dislocation of radial head (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.003",
+   "deskripsi": "Closed Fracture of epiphysis of proximal ulna (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.007",
+   "deskripsi": "Closed Fracture of proximal ulna, multiple fracture (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.008",
+   "deskripsi": "Closed Fracture of proximal ulna, others (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.009",
+   "deskripsi": "Closed Fracture of proximal ulna, unspecified (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.010",
+   "deskripsi": "Open Fracture of proximal ulna, olecranon (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.011",
+   "deskripsi": "Open Fracture of proximal ulna, coronoid process (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.012",
+   "deskripsi": "Open Fracture of proximal ulna, with dislocation of radial head (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.013",
+   "deskripsi": "Open Fracture of epiphysis of proximal ulna (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.017",
+   "deskripsi": "Open Fracture of proximal ulna, multiple fracture (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.018",
+   "deskripsi": "Open Fracture of proximal ulna, others (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.019",
+   "deskripsi": "Open Fracture of proximal ulna, unspecified (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.100",
+   "deskripsi": "Closed Fracture of head of radius (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.101",
+   "deskripsi": "Closed Fracture of neck of radius (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.102",
+   "deskripsi": "Closed Fracture of epiphysis of upper end of radius (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.107",
+   "deskripsi": "Closed Fracture of upper end of radius, multiple fractures (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.108",
+   "deskripsi": "Closed Fracture of upper end of radius, others (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.109",
+   "deskripsi": "Closed Fracture of upper end of radius, unspecified (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.110",
+   "deskripsi": "Open Fracture of head of radius (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.111",
+   "deskripsi": "Open Fracture of neck of radius (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.112",
+   "deskripsi": "Open Fracture of epiphysis of upper end of radius (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.117",
+   "deskripsi": "Open Fracture of upper end of radius, multiple fractures (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.118",
+   "deskripsi": "Open Fracture of upper end of radius, others (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.119",
+   "deskripsi": "Open Fracture of upper end of radius, unspecified (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.200",
+   "deskripsi": "Closed Fracture of shaft of ulna, simple fracture (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.201",
+   "deskripsi": "Closed Fracture of shaft of ulna, butterfly fracture (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.202",
+   "deskripsi": "Closed Fracture of shaft of ulna, comminuted fracture (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.203",
+   "deskripsi": "Closed Fracture of shaft of ulna, with dislocation of radial head (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.207",
+   "deskripsi": "Closed Fracture of shaft of ulna, bifocal and segmental and multiple fractures (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.209",
+   "deskripsi": "Closed Fracture of shaft of ulna, unspecified (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.210",
+   "deskripsi": "Open Fracture of shaft of ulna, simple fracture (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.211",
+   "deskripsi": "Open Fracture of shaft of ulna, butterfly fracture (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.212",
+   "deskripsi": "Open Fracture of shaft of ulna, comminuted fracture (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.213",
+   "deskripsi": "Open Fracture of shaft of ulna, with dislocation of radial head (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.217",
+   "deskripsi": "Open Fracture of shaft of ulna, bifocal and segmental and multiple fractures (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.219",
+   "deskripsi": "Open Fracture of shaft of ulna, unspecified (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.300",
+   "deskripsi": "Closed Fracture of shaft of radius, simple fracture (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.301",
+   "deskripsi": "Closed Fracture of shaft of radius, butterfly fracture (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.302",
+   "deskripsi": "Closed Fracture of shaft of radius, comminuted fracture (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.303",
+   "deskripsi": "Closed Fracture of shaft of radius, with dislocation of head of ulna (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.307",
+   "deskripsi": "Closed fracture of shaft of radius, bifocal and segmental and multiple fractures (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.309",
+   "deskripsi": "Closed Fracture of shaft of radius, unspecified (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.310",
+   "deskripsi": "Open Fracture of shaft of radius, simple fracture (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.311",
+   "deskripsi": "Open Fracture of shaft of radius, butterfly fracture (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.312",
+   "deskripsi": "Open Fracture of shaft of radius, comminuted fracture (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.313",
+   "deskripsi": "Open Fracture of shaft of radius, with dislocation of head of ulna (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.317",
+   "deskripsi": "Open fracture of shaft of radius, bifocal and segmental and multiple fractures (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.319",
+   "deskripsi": "Open Fracture of shaft of radius, unspecified (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.500",
+   "deskripsi": "Closed Fracture of distal radius, extraarticular with dorsal angulation (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.501",
+   "deskripsi": "Closed Fracture of distal radius, extraarticular with volar angulation (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.502",
+   "deskripsi": "Closed Fracture of distal radius, partial intraarticular (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.503",
+   "deskripsi": "Closed Fracture of distal radius, complete intraarticular (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.504",
+   "deskripsi": "Closed Fracture of epiphysis of distal radius (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.507",
+   "deskripsi": "Closed Fracture of distal radius, multiple fractures (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.508",
+   "deskripsi": "Closed Fracture of distal radius, others (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.509",
+   "deskripsi": "Closed Fracture of distal radius, unspecified (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.510",
+   "deskripsi": "Open Fracture of distal radius, extraarticular with dorsal angulation (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.511",
+   "deskripsi": "Open Fracture of distal radius, extraarticular with volar angulation (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.512",
+   "deskripsi": "Open Fracture of distal radius, partial intraarticular (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.513",
+   "deskripsi": "Open Fracture of distal radius, complete intraarticular (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.514",
+   "deskripsi": "Open Fracture of epiphysis of distal radius (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.517",
+   "deskripsi": "Open Fracture of distal radius, multiple fractures (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.518",
+   "deskripsi": "Open Fracture of distal radius, others (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.519",
+   "deskripsi": "Open Fracture of distal radius, unspecified (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.700",
+   "deskripsi": "Closed Fracture both bones of proximal part of radius and ulna (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.708",
+   "deskripsi": "Multiple closed fractures of forearm, others (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.709",
+   "deskripsi": "Multiple closed fractures of forearm, unspecified (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.710",
+   "deskripsi": "Open fracture of proximal part of both ulna and radius (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.718",
+   "deskripsi": "Multiple open fractures of forearm, others (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S52.719",
+   "deskripsi": "Multiple open fractures of forearm, unspecified (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S53.00",
+   "deskripsi": "Dislocation of radial head (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S53.01",
+   "deskripsi": "Subluxation of radial head (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S53.02",
+   "deskripsi": "Pulled elbow in children (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S53.10",
+   "deskripsi": "Dislocation of elbow, anterior (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S53.11",
+   "deskripsi": "Dislocation of elbow, posterior (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S53.12",
+   "deskripsi": "Dislocation of elbow, medial (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S53.13",
+   "deskripsi": "Dislocation of elbow, lateral (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S53.14",
+   "deskripsi": "Dislocation of elbow, divergen (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S53.15",
+   "deskripsi": "Dislocation of elbow, with associated fracture (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S53.18",
+   "deskripsi": "Dislocation of elbow, other (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S53.19",
+   "deskripsi": "Dislocation of elbow, unspecified (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S60.80",
+   "deskripsi": "Abrasion of wrist and hand (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "S60.81",
+   "deskripsi": "Blister of wrist and hand (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "S60.82",
+   "deskripsi": "Insect bite of wrist and hand (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "S60.83",
+   "deskripsi": "Superficial foreign body of wrist and hand (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "S60.88",
+   "deskripsi": "Other superficial injuries of wrist and hand (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "S62.100",
+   "deskripsi": "Closed Fracture of lunate [semilunar] (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S62.101",
+   "deskripsi": "Closed Fracture of triquetrum [cuneiform] (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S62.102",
+   "deskripsi": "Closed Fracture of pisiform (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S62.103",
+   "deskripsi": "Closed Fracture of trapezium [greater multangular] (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S62.104",
+   "deskripsi": "Closed Fracture of trapezoid [lesser multangular] (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S62.105",
+   "deskripsi": "Closed Fracture of capitate [os magnum] (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S62.106",
+   "deskripsi": "Closed Fracture of hamate [unciform] (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S62.107",
+   "deskripsi": "Closed Fracture of other carpal bones, multiple fractures (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S62.109",
+   "deskripsi": "Closed Fracture of other carpal bones, unspecified (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S62.110",
+   "deskripsi": "Open Fracture of lunate [semilunar] (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S62.111",
+   "deskripsi": "Open Fracture of triquetrum [cuneiform] (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S62.112",
+   "deskripsi": "Open Fracture of pisiform (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S62.113",
+   "deskripsi": "Open Fracture of trapezium [greater multangular] (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S62.114",
+   "deskripsi": "Open Fracture of trapezoid [lesser multangular] (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S62.115",
+   "deskripsi": "Open Fracture of capitate [os magnum] (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S62.116",
+   "deskripsi": "Open Fracture of hamate [unciform] (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S62.117",
+   "deskripsi": "Open Fracture of other carpal bones, multiple fractures (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S62.119",
+   "deskripsi": "Open Fracture of other carpal bones, unspecified (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S63.00",
+   "deskripsi": "Dislocation of wrist, distal radioulnar joint (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S63.01",
+   "deskripsi": "Dislocation of wrist, radiocarpal joint (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S63.02",
+   "deskripsi": "Dislocation of wrist, midcarpal joint (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S63.03",
+   "deskripsi": "Dislocation of wrist, carpometacarpal joint (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S63.08",
+   "deskripsi": "Dislocation of wrist, other (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S63.09",
+   "deskripsi": "Dislocation of wrist, unspecified joint (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S63.10",
+   "deskripsi": "Dislocation of metacarpophalangeal joint (MCP) of thumb and fingers (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S63.11",
+   "deskripsi": "Dislocation of interphalangeal joint of thumb and finger (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S63.19",
+   "deskripsi": "Dislocation of thumb and finger, unspecified joint (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S70.80",
+   "deskripsi": "Abrasion of hip and thigh (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "S70.81",
+   "deskripsi": "Blister of hip and thigh (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "S70.82",
+   "deskripsi": "Insect bite of hip and thigh (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "S70.83",
+   "deskripsi": "Superficial foreign body of hip and thigh (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "S70.88",
+   "deskripsi": "Other superficial injuries of hip and thigh (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "S72.000",
+   "deskripsi": "Closed Fracture of neck of femur, undisplaced intracapsular fracture (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S72.001",
+   "deskripsi": "Closed Fracture of neck of femur, displaced intracapsular fracture (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S72.002",
+   "deskripsi": "Closed Fracture of neck of femur, impacted intracapsular fracture (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S72.003",
+   "deskripsi": "Closed Fracture of neck of femur, midcervical shear fracture (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S72.004",
+   "deskripsi": "Closed Fracture of neck of femur, base of neck (cervicotrochanteric) (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S72.005",
+   "deskripsi": "Closed Fracture of head of femur (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S72.006",
+   "deskripsi": "Closed Fracture of epiphysis of upper femur (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S72.007",
+   "deskripsi": "Closed Fracture of neck of femur, multiple (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S72.008",
+   "deskripsi": "Closed Fracture of neck of femur, others (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S72.009",
+   "deskripsi": "Closed Fracture of neck of femur, unspecified (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S72.010",
+   "deskripsi": "Open Fracture of neck of femur, undisplaced intracapsular fracture (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S72.011",
+   "deskripsi": "Open Fracture of neck of femur, displaced intracapsular fracture (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S72.012",
+   "deskripsi": "Open Fracture of neck of femur, impacted intracapsular fracture (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S72.013",
+   "deskripsi": "Open Fracture of neck of femur, midcervical shear fracture (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S72.014",
+   "deskripsi": "Open Fracture of neck of femur, base of neck (cervicotrochanteric) (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S72.015",
+   "deskripsi": "Open Fracture of head of femur (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S72.016",
+   "deskripsi": "Open Fracture of epiphysis of upper femur (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S72.017",
+   "deskripsi": "Open Fracture of neck of femur, multiple (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S72.018",
+   "deskripsi": "Open Fracture of neck of femur, others (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S72.019",
+   "deskripsi": "Open Fracture of neck of femur, unspecified (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S72.100",
+   "deskripsi": "Closed Intertrochanteric fracture of femur, stable type (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S72.101",
+   "deskripsi": "Closed Intertrochanteric fracture of femur, unstable type (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S72.108",
+   "deskripsi": "Closed Fracture of trochanteric region of femur, others (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S72.110",
+   "deskripsi": "Open Intertrochanteric fracture of femur, stable type (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S72.111",
+   "deskripsi": "Open Intertrochanteric fracture of femur, unstable type (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S72.118",
+   "deskripsi": "Open Fracture of trochanteric region of femur, others (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S72.300",
+   "deskripsi": "Closed Fracture of shaft of femur, simple fracture (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S72.301",
+   "deskripsi": "Closed Fracture of shaft of femur, butterfly fracture (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S72.302",
+   "deskripsi": "Closed Fracture of shaft of femur, comminuted fracture (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S72.307",
+   "deskripsi": "Closed Fracture of shaft of femur, bifocal and segmental and (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S72.309",
+   "deskripsi": "Closed Fracture of shaft of femur, unspecified (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S72.310",
+   "deskripsi": "Open Fracture of shaft of femur, simple fracture (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S72.311",
+   "deskripsi": "Open Fracture of shaft of femur, butterfly fracture (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S72.312",
+   "deskripsi": "Open Fracture of shaft of femur, comminuted fracture (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S72.317",
+   "deskripsi": "Open fracture of shaft of femur, bifocal and segmental and multiple (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S72.319",
+   "deskripsi": "Open Fracture of shaft of femur, unspecified (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S72.400",
+   "deskripsi": "Closed Fracture of distal femur, supracondylar (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S72.401",
+   "deskripsi": "Closed Fracture of distal femur, lateral condyle (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S72.402",
+   "deskripsi": "Closed Fracture of distal femur, medial condyle (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S72.403",
+   "deskripsi": "Closed Fracture of distal femur, other parts of condyle and epicondyle (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S72.404",
+   "deskripsi": "Closed Fracture of distal femur, T-shape intraarticular fracture (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S72.405",
+   "deskripsi": "Closed Fracture of distal femur, multifragment intraarticular fracture (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S72.406",
+   "deskripsi": "Closed Fracture of distal femur, multiple fractures (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S72.407",
+   "deskripsi": "Closed Fracture of distal femoral epiphysis (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S72.408",
+   "deskripsi": "Closed Fracture of distal femur, others (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S72.409",
+   "deskripsi": "Closed Fracture of distal femur, unspecified (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S72.410",
+   "deskripsi": "Open Fracture of distal femur, supracondylar (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S72.411",
+   "deskripsi": "Open Fracture of distal femur, lateral condyle (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S72.412",
+   "deskripsi": "Open Fracture of distal femur, medial condyle (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S72.413",
+   "deskripsi": "Open Fracture of distal femur, other parts of condyle and epicondyle (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S72.414",
+   "deskripsi": "Open Fracture of distal femur, T-shape intraarticular fracture (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S72.415",
+   "deskripsi": "Open Fracture of distal femur, multifragment intraarticular fracture (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S72.416",
+   "deskripsi": "Open Fracture of distal femur, multiple fractures (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S72.417",
+   "deskripsi": "Open Fracture of distal femoral epiphysis (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S72.418",
+   "deskripsi": "Open Fracture of distal femur, others (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S72.419",
+   "deskripsi": "Open Fracture of distal femur, unspecified (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S73.00",
+   "deskripsi": "Dislocation of hip, anterior (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S73.01",
+   "deskripsi": "Dislocation of hip, posterior type with or without minor fracture (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S73.02",
+   "deskripsi": "Dislocation of hip, posterior type with large single fracture (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S73.03",
+   "deskripsi": "Dislocation of hip, posterior type with comminution of rim (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S73.04",
+   "deskripsi": "Dislocation of hip, posterior type with fracture of the acetabular (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S73.05",
+   "deskripsi": "Dislocation of hip, posterior type with fracture of head of femur (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S73.08",
+   "deskripsi": "Dislocation of hip, other (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S73.09",
+   "deskripsi": "Dislocation of hip, unspecified (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S80.80",
+   "deskripsi": "Abrasion of knee and leg (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "S80.81",
+   "deskripsi": "Blister of knee and leg (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "S80.82",
+   "deskripsi": "Insect bite of knee and leg (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "S80.83",
+   "deskripsi": "Superficial foreign body of knee and leg (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "S80.88",
+   "deskripsi": "Other superficial injuries of knee and leg (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "S81.1",
+   "deskripsi": "Open wound of leg (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "S82.100",
+   "deskripsi": "Closed Fracture of proximal tibia, extraarticular (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S82.101",
+   "deskripsi": "Closed Fracture of proximal tibia, medial condyle (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S82.102",
+   "deskripsi": "Closed Fracture of proximal tibia, lateral condyle [split] (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S82.103",
+   "deskripsi": "Closed Fracture of proximal tibia, bicondyle (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S82.104",
+   "deskripsi": "Closed Fracture of proximal tibia, with ligamentous injury (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S82.105",
+   "deskripsi": "Closed Isolated fracture of tibial spine and intercondylar eminence (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S82.106",
+   "deskripsi": "Closed Fracture of epiphysis of proximal tibia (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S82.107",
+   "deskripsi": "Closed Fracture of proximal tibia, multiple fractures (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S82.108",
+   "deskripsi": "Closed Fracture of proximal tibia, others (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S82.109",
+   "deskripsi": "Closed Fracture of proximal tibia, unspecified (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S82.110",
+   "deskripsi": "Open Fracture of proximal tibia, extraarticular (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S82.111",
+   "deskripsi": "Open Fracture of proximal tibia, medial condyle (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S82.112",
+   "deskripsi": "Open Fracture of proximal tibia, lateral condyle [split] (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S82.113",
+   "deskripsi": "Open Fracture of proximal tibia, bicondyle (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S82.114",
+   "deskripsi": "Open Fracture of proximal tibia, with ligamentous injury (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S82.115",
+   "deskripsi": "Open Isolated fracture of tibial spine and intercondylar eminence (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S82.116",
+   "deskripsi": "Open Fracture of epiphysis of proximal tibia (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S82.117",
+   "deskripsi": "Open Fracture of proximal tibia, multiple fractures (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S82.118",
+   "deskripsi": "Open Fracture of proximal tibia, others (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S82.119",
+   "deskripsi": "Open Fracture of proximal tibia, unspecified (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S82.200",
+   "deskripsi": "Closed Fracture of shaft of tibia with intact fibula (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S82.201",
+   "deskripsi": "Closed Fracture of shaft of tibia with fracture of fibula at same level (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S82.202",
+   "deskripsi": "Closed Fracture of shaft of tibia with fracture of fibula at different level (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S82.207",
+   "deskripsi": "Closed Fracture of shaft of tibia, bifocal and segmental and multiple (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S82.208",
+   "deskripsi": "Closed Fracture of shaft of tibia, others (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S82.209",
+   "deskripsi": "Closed Fracture of shaft of tibia, unspecified (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S82.210",
+   "deskripsi": "Open Fracture of shaft of tibia with intact fibula (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S82.211",
+   "deskripsi": "Open Fracture of shaft of tibia with fracture of fibula at same level (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S82.212",
+   "deskripsi": "Open Fracture of shaft of tibia with fracture of fibula at different level (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S82.217",
+   "deskripsi": "Open Fracture of shaft of tibia, bifocal and segmental and multiple (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S82.218",
+   "deskripsi": "Open Fracture of shaft of tibia, others (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S82.219",
+   "deskripsi": "Open Fracture of shaft of tibia, unspecified (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S82.300",
+   "deskripsi": "Closed Fracture of distal tibia, extraarticular (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S82.301",
+   "deskripsi": "Closed Fracture of distal tibia, nondisplaced intraarticular (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S82.302",
+   "deskripsi": "Closed Fracture of distal tibia, displaced intraarticular (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S82.303",
+   "deskripsi": "Closed Fracture of epiphysis of distal tibia (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S82.307",
+   "deskripsi": "Closed Fracture of distal tibia, multiple fractures (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S82.308",
+   "deskripsi": "Closed Fracture of distal tibia, others (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S82.309",
+   "deskripsi": "Closed Fracture of distal tibia, unspecified (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S82.310",
+   "deskripsi": "Open Fracture of distal tibia, extraarticular (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S82.311",
+   "deskripsi": "Open Fracture of distal tibia, nondisplaced intraarticular (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S82.312",
+   "deskripsi": "Open Fracture of distal tibia, displaced intraarticular (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S82.313",
+   "deskripsi": "Open Fracture of epiphysis of distal tibia (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S82.317",
+   "deskripsi": "Open Fracture of distal tibia, multiple fractures (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S82.318",
+   "deskripsi": "Open Fracture of distal tibia, others (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S82.319",
+   "deskripsi": "Open Fracture of distal tibia, unspecified (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S83.50",
+   "deskripsi": "Avulsion of anterior cruciate ligament (ACL) (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S83.51",
+   "deskripsi": "Avulsion of posterior cruciate ligament (PCL) (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S83.59",
+   "deskripsi": "Sprain and strain involving cruciate ligament of knee, unspecified (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S87.9",
+   "deskripsi": "Crushing injury of unspecified parts of knee and leg (IM)",
+   "mdc": "33"
+  },
+  {
+   "kode": "S90.80",
+   "deskripsi": "Abrasion of ankle and foot (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "S90.81",
+   "deskripsi": "Blister of ankle and foot (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "S90.82",
+   "deskripsi": "Insect bite of ankle and foot (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "S90.83",
+   "deskripsi": "Superficial foreign body of ankle and foot (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "S90.88",
+   "deskripsi": "Other superficial injuries of ankle and foot (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "S91.9",
+   "deskripsi": "Open wound of ankle and foot, unspecified (IM)",
+   "mdc": "33"
+  },
+  {
+   "kode": "S92.300",
+   "deskripsi": "Closed Metatarsal fracture, one metatarsal (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S92.301",
+   "deskripsi": "Closed Metatarsal fracture, two metatarsals (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S92.302",
+   "deskripsi": "Closed Metatarsal fracture, three or more metatarsals (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S92.309",
+   "deskripsi": "Closed Metatarsal fracture, unspecified number of metatarsals (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S92.310",
+   "deskripsi": "Open Metatarsal fracture, one metatarsal (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S92.311",
+   "deskripsi": "Open Metatarsal fracture, two metatarsals (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S92.312",
+   "deskripsi": "Open Metatarsal fracture, three or more metatarsals (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "S92.319",
+   "deskripsi": "Open Metatarsal fracture, unspecified number of metatarsals (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "T19.4",
+   "deskripsi": "Foreign body in penis (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "T21.06",
+   "deskripsi": "Burn of unspecifeid degree of male genital region (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "T21.16",
+   "deskripsi": "Burn of first degree of male genital region (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "T21.26",
+   "deskripsi": "Burn of second degree of male genital region (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "T21.36",
+   "deskripsi": "Burn of third degree of male genital region (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "T21.46",
+   "deskripsi": "Corrosion of unspecified degree of male genital region (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "T63.00",
+   "deskripsi": "Toxic effect of snake venom, haematotoxin (IM)",
+   "mdc": "33"
+  },
+  {
+   "kode": "T63.01",
+   "deskripsi": "Toxic effect of snake venom, neurotoxin (IM)",
+   "mdc": "33"
+  },
+  {
+   "kode": "T63.02",
+   "deskripsi": "Toxic effect of snake venom, muscular toxin (IM)",
+   "mdc": "33"
+  },
+  {
+   "kode": "T63.03",
+   "deskripsi": "Toxic effect of snake venom, mixed haematomuscular and neurotoxin (IM)",
+   "mdc": "33"
+  },
+  {
+   "kode": "T63.08",
+   "deskripsi": "Toxic effect of other specified snake venom (IM)",
+   "mdc": "33"
+  },
+  {
+   "kode": "T63.09",
+   "deskripsi": "Toxic effect of snake venom, unspecified (IM)",
+   "mdc": "33"
+  },
+  {
+   "kode": "T79.70",
+   "deskripsi": "Subcutaneous emphysema without trauma (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "T81.50",
+   "deskripsi": "Amalgam tattoo (IM)",
+   "mdc": "33"
+  },
+  {
+   "kode": "T81.58",
+   "deskripsi": "Other specified foreign body accidentally left in body cavity or operation wound following a procedure (IM)",
+   "mdc": "33"
+  },
+  {
+   "kode": "T81.59",
+   "deskripsi": "Unspecified foreign body accidentally left in body cavity or operation wound following a procedure (IM)",
+   "mdc": "33"
+  },
+  {
+   "kode": "U08",
+   "deskripsi": "Tuberculoma of Lung (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "U82.20",
+   "deskripsi": "Respiratory diseases with resistance of betalactamase (ESBL) resistance (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "U82.80",
+   "deskripsi": "Respiratory diseases with resistance of betalactam antibiotics (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "U83.3",
+   "deskripsi": "Respiratory diseases with Resistance to other antibiotics (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "U84.10",
+   "deskripsi": "Respiratory diseases with resistance to antifungal drugs (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "U84.20",
+   "deskripsi": "Respiratory diseases with resistance to antiviral drugs (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "U84.31",
+   "deskripsi": "Tuberculosis with multidrug resistance (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "U84.32",
+   "deskripsi": "Tuberculosis with pre extreme drug resistance (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "U84.33",
+   "deskripsi": "Tuberculosis with extreme drug resistance (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "U84.34",
+   "deskripsi": "Tuberculosis with poly drug resistance (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "U84.35",
+   "deskripsi": "Tuberculosis with mono drug resistance (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "U85.0",
+   "deskripsi": "Respiratory diseases with resistance to antineoplastic drugs (IM)",
+   "mdc": "14"
+  }
+ ],
+ "prosedur": [
+  {
+   "kode": "02.20",
+   "deskripsi": "Endoscopic ventriculostomy (IM)",
+   "mdc": "11"
+  },
+  {
+   "kode": "04.420",
+   "deskripsi": "Decompression of optic nerve (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "04.421",
+   "deskripsi": "Decompression of facial nerve with or without graft (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "06.32",
+   "deskripsi": "Endoscopic thyroidectomy (IM)",
+   "mdc": "20"
+  },
+  {
+   "kode": "06.96",
+   "deskripsi": "Percutaneous ablation of thyroid lesion or tissue (IM)",
+   "mdc": "20"
+  },
+  {
+   "kode": "12.75",
+   "deskripsi": "Glaucoma implant (IM)",
+   "mdc": "12"
+  },
+  {
+   "kode": "17.25",
+   "deskripsi": "Laparoscopic repair inguinal hernia (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "18.13",
+   "deskripsi": "Microscopic examination of external ear (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "18.14",
+   "deskripsi": "Endoscopic examination of external ear (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "18.22",
+   "deskripsi": "Extraction of external cholesteatoma (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "20.33",
+   "deskripsi": "Electrical evoked auditory brain stem response (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "20.34",
+   "deskripsi": "Electrical compound action potential (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "20.35",
+   "deskripsi": "Electrical stapedial reflex threshold (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "20.73",
+   "deskripsi": "Temporal bone resection (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "21.23",
+   "deskripsi": "Nasoendoskopi (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "21.290",
+   "deskripsi": "Peak nasal inspiratory flowmetry (PNIF) (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "21.291",
+   "deskripsi": "Smell test (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "21.292",
+   "deskripsi": "Blue light fluorescein test (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "21.50",
+   "deskripsi": "Functional septoplasty (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "22.20",
+   "deskripsi": "Uncinectomy (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "22.200",
+   "deskripsi": "Uncinectomy sinistra (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "22.201",
+   "deskripsi": "Uncinectomy dextra (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "22.410",
+   "deskripsi": "Frontal sinusotomy sinistra (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "22.411",
+   "deskripsi": "Frontal sinusotomy dextra (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "22.420",
+   "deskripsi": "Frontal sinusectomy sinistra (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "22.421",
+   "deskripsi": "Frontal sinusectomy dextra (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "22.510",
+   "deskripsi": "Ethmoidotomy sinistra (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "22.511",
+   "deskripsi": "Ethmoidotomy dextra (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "22.520",
+   "deskripsi": "Sphenoidotomy sinistra (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "22.521",
+   "deskripsi": "Sphenoidotomy dextra (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "22.630",
+   "deskripsi": "Ethmoidectomy sinistra (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "22.631",
+   "deskripsi": "Ethmoidectomy dextra (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "22.640",
+   "deskripsi": "Sphenoidectomy sinistra (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "22.641",
+   "deskripsi": "Sphenoidectomy dextra (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "23.12",
+   "deskripsi": "Odontectomy NOS (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "23.13",
+   "deskripsi": "Removal of impacted tooth (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "23.14",
+   "deskripsi": "Tooth extraction with elevationof mucoperiosteal flap (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "27.74",
+   "deskripsi": "Uvuloplasty (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "29.13",
+   "deskripsi": "Flexible endoscopic evaluation of swallowing (FEES) (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "29.910",
+   "deskripsi": "Repair of choanal atresia intranasal (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "29.911",
+   "deskripsi": "Repair of choanal atresia transpalatal (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "31.420",
+   "deskripsi": "Stroboscopy (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "31.50",
+   "deskripsi": "Excision tracheal stenosis and anastomosis; cervical (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "31.51",
+   "deskripsi": "Excision tracheal stenosis and anastomosis; cervicothoracic (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "31.52",
+   "deskripsi": "Excision of tracheal tumor or carcinoma; cervical (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "31.53",
+   "deskripsi": "Excision of tracheal tumor or carcinoma; thoracic (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "31.711",
+   "deskripsi": "Suture of tracheal wound or injury; cervical (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "31.712",
+   "deskripsi": "Suture of tracheal wound or injury; intrathoracic (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "31.76",
+   "deskripsi": "Tracheoplasty; intrathoracic (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "33.230",
+   "deskripsi": "Rigid bronchoscopy procedure (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "33.240",
+   "deskripsi": "Endobronchoscopy ultrasound during bronchoscopic theurapetic intervention or diagnostic (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "33.481",
+   "deskripsi": "Carinal reconstruction (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "33.94",
+   "deskripsi": "Bronchial dilatation with bronchoscopy (rigid) with or without baloon (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "33.95",
+   "deskripsi": "Insertion or replacement of bronchial stent using bronchoscopy (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "34.281",
+   "deskripsi": "Thoracoscopy, surgical; with removal of intrapleural foreign body or fibrin deposit (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "34.282",
+   "deskripsi": "Thoracoscopy, surgical; with thoracic sympathectomy (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "34.283",
+   "deskripsi": "Thoracoscopy, surgical; with pleurodesis (e.g., mechanical or chemical) (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "34.284",
+   "deskripsi": "Thoracoscopy, surgical; with control of traumatic hemorrhage (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "34.285",
+   "deskripsi": "Thoracoscopy, diagnostic; mediastinal space, with biopsy (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "34.286",
+   "deskripsi": "Thoracoscopy, surgical; with excision of mediastinal cyst, tumor, or mass (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "34.291",
+   "deskripsi": "Mediastinotomy with exploration or biopsy; cervical approach (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "34.292",
+   "deskripsi": "Mediastinotomy with exploration or biopsy; transthoracic approach (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "34.41",
+   "deskripsi": "Radical resection of sternum (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "34.75",
+   "deskripsi": "Reconstructive repair of pectus, minimally invasive approach (nuss procedure), with thoracoscopy (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "35.29",
+   "deskripsi": "Multiple valve repair / replacement (IM)",
+   "mdc": "15"
+  },
+  {
+   "kode": "36.050",
+   "deskripsi": "Insertion Of Drug eluting or coated Balloon of Coronary (IM)",
+   "mdc": null
+  },
+  {
+   "kode": "36.100",
+   "deskripsi": "Aortocoronary bypass for heart revascularization with surgical ventricular restoration (IM)",
+   "mdc": "15"
+  },
+  {
+   "kode": "36.101",
+   "deskripsi": "Aortocoronary bypass for heart revascularization with IVS Rupture Repair (IM)",
+   "mdc": "15"
+  },
+  {
+   "kode": "36.18",
+   "deskripsi": "Aortocoronary bypass for heart revascularization with valve procedure (IM)",
+   "mdc": "15"
+  },
+  {
+   "kode": "37.342",
+   "deskripsi": "Catheter based invasive electrophysiologic cryo-ablation (IM)",
+   "mdc": null
+  },
+  {
+   "kode": "38.850",
+   "deskripsi": "PDA stenting/PDA closure with device (IM)",
+   "mdc": "15"
+  },
+  {
+   "kode": "39.270",
+   "deskripsi": "Insertion of temporary central dialysis catheter (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "39.271",
+   "deskripsi": "Insertion of permanent central dialysis catheter (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "39.590",
+   "deskripsi": "Direct anastomosis for renal artery repair (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "39.591",
+   "deskripsi": "Direct anastomosis for renal vein repair (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "39.951",
+   "deskripsi": "Prolonged intermitent renal replacement therapy (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "39.952",
+   "deskripsi": "Continuous renal replacement therapy (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "40.55",
+   "deskripsi": "Modified radical neck dissection, unilateral (IM)",
+   "mdc": "20"
+  },
+  {
+   "kode": "40.56",
+   "deskripsi": "Modified radical neck dissection, bilateral (IM)",
+   "mdc": "20"
+  },
+  {
+   "kode": "48.631",
+   "deskripsi": "Laparoscopic anterior resection of rectum (IM)",
+   "mdc": "16"
+  },
+  {
+   "kode": "48.632",
+   "deskripsi": "Laparoscopic low anterior resection of rectum (IM)",
+   "mdc": "16"
+  },
+  {
+   "kode": "50.40",
+   "deskripsi": "Laparoscopic liver resection (IM)",
+   "mdc": "17"
+  },
+  {
+   "kode": "51.120",
+   "deskripsi": "Laparoscopic biopsy gonad (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "52.50",
+   "deskripsi": "Laparoscopic partial pancreatectomy (IM)",
+   "mdc": "17"
+  },
+  {
+   "kode": "52.60",
+   "deskripsi": "Laparoscopic total pancreatectomy (IM)",
+   "mdc": "17"
+  },
+  {
+   "kode": "52.70",
+   "deskripsi": "Laparoscopic pancreaticoduodenectomy (IM) Connective Tissue",
+   "mdc": "17"
+  },
+  {
+   "kode": "54.980",
+   "deskripsi": "Insertion of peritoneal dialysis catheter with laparoscopy technique (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "54.981",
+   "deskripsi": "Laparoscopic replacement of indwelling peritoneal catheter for dialysis (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "54.982",
+   "deskripsi": "Insertion of peritoneal dialysis catheter: peritoneoscopy technique (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "54.983",
+   "deskripsi": "Insertion of peritoneal dialysis catheter: percutaneous technique (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "54.984",
+   "deskripsi": "Insertion of peritoneal dialysis catheter: open technique (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "55.38",
+   "deskripsi": "Renal cyst laparoscopic excision (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "55.40",
+   "deskripsi": "Laparoscopic partial nephrectomy (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "55.510",
+   "deskripsi": "Laparoscopic nephroureterectomy (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "55.511",
+   "deskripsi": "Laparoscopic complete (radical) nephrectomy (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "55.520",
+   "deskripsi": "Living donor nephrectomy (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "55.521",
+   "deskripsi": "Deceased donor nephrectomy (cadaver) (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "55.70",
+   "deskripsi": "Laparoscopic nephropexy (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "55.88",
+   "deskripsi": "Laparoscopic pyeloplasty (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "56.20",
+   "deskripsi": "Laparoscopic ureterolithotomy or ureteral exploration (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "56.21",
+   "deskripsi": "Laparoscopic ureterolithotomy with previous ureteral surgery (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "56.22",
+   "deskripsi": "Open ureteral exploration (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "56.23",
+   "deskripsi": "Open ureterolithotomy with previous ureteral surgery (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "56.36",
+   "deskripsi": "Semi rigid ureterorenoscopy without stone fragmentation (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "56.37",
+   "deskripsi": "Flexible ureterorenoscopy without stone fragmentation (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "56.410",
+   "deskripsi": "Laparoscopic partial ureterectomy (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "56.420",
+   "deskripsi": "Laparoscopic complete ureterectomy (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "56.43",
+   "deskripsi": "Endoscopy ureterocele resection (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "56.510",
+   "deskripsi": "Laparoscopic ureter transplantation ino intestine (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "56.610",
+   "deskripsi": "Laparoscopic ureter transplantation into skin (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "56.620",
+   "deskripsi": "Laparoscopic ureterostomy revision (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "56.740",
+   "deskripsi": "Laparoscopic ureteroneocystostomy (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "56.750",
+   "deskripsi": "Laparascopic ureteral transplantation into other ureter (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "56.751",
+   "deskripsi": "Laparoscopic ureteral re-implantation into bladder (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "56.752",
+   "deskripsi": "Open ureteral re-implantation into bladder (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "56.753",
+   "deskripsi": "Ureteral re-implantation into bladder with psoas hitch (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "56.87",
+   "deskripsi": "Laparoscopic divided ureteral repair (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "56.870",
+   "deskripsi": "Open divided ureteral repair (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "56.910",
+   "deskripsi": "Endoscopic ureteral dilation (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "56.911",
+   "deskripsi": "Endoscopic destruction of bladder lesion / tissue (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "56.912",
+   "deskripsi": "Endoscopic laser destruction of bladder lesion / tissue (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "56.950",
+   "deskripsi": "Laparoscopic ligation of ureter (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "56.96",
+   "deskripsi": "Endoscopic incision of external urethral sphincter (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "56.97",
+   "deskripsi": "Endoscopic ureteric stent replacement (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "57.00",
+   "deskripsi": "Endoscopic blood clots evacuation from bladder (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "57.13",
+   "deskripsi": "Endoscopic bladder neck incision (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "57.190",
+   "deskripsi": "Laparoscopic cystostomy or cystolithotomy (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "57.60",
+   "deskripsi": "Laparoscopic partial cystectomy (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "57.710",
+   "deskripsi": "Laparoscopic cystectomy (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "57.72",
+   "deskripsi": "Cystectomy with formation of cutaneous uretero-ileostomy (incontinent intestinal urine reservoir formation) (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "57.73",
+   "deskripsi": "Cystectomy with laparoscopic ureter transplantation into intestine (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "57.74",
+   "deskripsi": "Cystectomy with intestinal urinary diversion (continent intestinal urine reservoir formation) (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "57.75",
+   "deskripsi": "Cystectomy with continent valve formation (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "57.76",
+   "deskripsi": "Cystectomy with orthotopic neobladder (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "57.77",
+   "deskripsi": "Repair of bladder exstrophy with osteotomy for bladder exstrophy (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "57.790",
+   "deskripsi": "Laparoscopic other total cystectomy (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "57.820",
+   "deskripsi": "Laparoscopic vesicointestinal fistula closure (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "57.821",
+   "deskripsi": "Laparoscopic vesicovaginal fistula closure (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "57.822",
+   "deskripsi": "Open vesicointestinal fistula closure (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "57.823",
+   "deskripsi": "Open cutaneous vesical fistula closure (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "57.824",
+   "deskripsi": "Abdominal vesicovaginal fistula closure (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "57.825",
+   "deskripsi": "Laparoscopic cutaneous vesical fistula closure (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "57.850",
+   "deskripsi": "Other laparoscopic bladder neck repair (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "57.860",
+   "deskripsi": "Bladder exstrophy repair with ureteral re-implantation (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "57.861",
+   "deskripsi": "Cloacal exstrophy repair (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "57.870",
+   "deskripsi": "Laparoscopic bladder enlargement (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "57.871",
+   "deskripsi": "Open bladder enlargement (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "57.890",
+   "deskripsi": "Laparoscopic ruptured bladder repair (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "57.940",
+   "deskripsi": "Open replacement of indwelling peritoneal catheter for dialysis (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "57.960",
+   "deskripsi": "Stimulation of bladder (non-implant) (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "58.390",
+   "deskripsi": "Complete urethrectomy (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "58.391",
+   "deskripsi": "Partial urethrectomy (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "58.450",
+   "deskripsi": "Single stage repair for hypospadias or epispadias (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "58.451",
+   "deskripsi": "First stage of hypospadias or epispadias staged repair (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "58.452",
+   "deskripsi": "Second stage of hypospadias or epispadias staged repair (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "58.453",
+   "deskripsi": "Hypospadias repair post urethral fistula operation (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "58.454",
+   "deskripsi": "Redo repair for hypospadia or epispadias (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "58.455",
+   "deskripsi": "Repair of epispadias with ureteric re-implantation (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "58.456",
+   "deskripsi": "Granuloplasty for hypospadias (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "58.490",
+   "deskripsi": "Urethroplasty with graft (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "58.491",
+   "deskripsi": "Urethroplasty with flap (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "58.492",
+   "deskripsi": "Urethroplasty with pubectomy (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "59.80",
+   "deskripsi": "Endoscopic urethral stent insertion (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "60.22",
+   "deskripsi": "Transurethral needle ablation prostate (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "60.23",
+   "deskripsi": "Cryoablation of prostate (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "60.24",
+   "deskripsi": "Transurethral electric vaporization prostate (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "60.25",
+   "deskripsi": "High intensity focused ultrasound prostate (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "60.290",
+   "deskripsi": "Transurethral resection of ejaculatory duct (TURED) (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "60.50",
+   "deskripsi": "Laparoscopic radical prostatectomy (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "62.00",
+   "deskripsi": "Exploration scrotal contents and testis, unilateral (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "62.30",
+   "deskripsi": "Orchidectomy with insertion testicular prosthesis unilateral (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "62.31",
+   "deskripsi": "Laparoscopic orchiectomy (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "62.410",
+   "deskripsi": "Orchidectomy with insertion testicular prosthesis bilateral (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "62.411",
+   "deskripsi": "Radical orchidectomy (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "62.43",
+   "deskripsi": "Subcapsular orchidectomy (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "62.50",
+   "deskripsi": "Laparoscopic orchidopexy (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "62.51",
+   "deskripsi": "Revision orchidopexy for undescended testis (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "62.52",
+   "deskripsi": "Laparoscopic orchidopexy fowler stephen (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "62.93",
+   "deskripsi": "Artifical erection of penis with injection (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "63.02",
+   "deskripsi": "Percutaneous epididymal sperm aspiration (PESA) (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "63.03",
+   "deskripsi": "Microsurgical epididymal sperm aspiration (MESA) (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "63.04",
+   "deskripsi": "Excision of spermatocele (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "63.10",
+   "deskripsi": "Microligation for varicocele (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "63.11",
+   "deskripsi": "Laparoscopic varicocele ligation (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "63.12",
+   "deskripsi": "Penile dorsal vein ligation (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "63.96",
+   "deskripsi": "Testicular sperm aspiration (TESA) (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "63.97",
+   "deskripsi": "Testicular sperm extraction (TESE) (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "64.20",
+   "deskripsi": "Excision of sclerofibromatosis penis (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "64.30",
+   "deskripsi": "Partial amputation of penis (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "64.440",
+   "deskripsi": "Reconstruction of buried penis (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "64.46",
+   "deskripsi": "Repair fracture penis (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "64.490",
+   "deskripsi": "Phalloplasty (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "64.940",
+   "deskripsi": "Correction of chordee of penis with graft (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "64.970",
+   "deskripsi": "Revision artificial erection device (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "65.96",
+   "deskripsi": "Transposition of ovarium (IM)",
+   "mdc": "23"
+  },
+  {
+   "kode": "65.97",
+   "deskripsi": "Laparoscopy, transposition of ovarium (IM)",
+   "mdc": "23"
+  },
+  {
+   "kode": "65.98",
+   "deskripsi": "Laparoscopy ovarian drilling (IM)",
+   "mdc": "23"
+  },
+  {
+   "kode": "66.03",
+   "deskripsi": "Laparoscopy salpingotomy (IM)",
+   "mdc": "23"
+  },
+  {
+   "kode": "66.04",
+   "deskripsi": "Laparoscopy salpingostomy (IM)",
+   "mdc": "23"
+  },
+  {
+   "kode": "66.18",
+   "deskripsi": "Laparoscopy, other diagnostic procedures on fallopian tubes (IM)",
+   "mdc": "23"
+  },
+  {
+   "kode": "66.40",
+   "deskripsi": "Laparoscopy, total unilateral salpingectomy (IM)",
+   "mdc": "23"
+  },
+  {
+   "kode": "66.50",
+   "deskripsi": "Laparoscopy, removal of both fallopian tubes at same operative episode (IM)",
+   "mdc": "23"
+  },
+  {
+   "kode": "66.60",
+   "deskripsi": "Laparoscopy, salpingectomy with removal of tubal pregnancy (IM)",
+   "mdc": "23"
+  },
+  {
+   "kode": "66.68",
+   "deskripsi": "Laparoscopy, other partial salpingectomy (IM)",
+   "mdc": "23"
+  },
+  {
+   "kode": "69.40",
+   "deskripsi": "Laparoscopic reconstructive surgery of uterus (IM)",
+   "mdc": "23"
+  },
+  {
+   "kode": "69.90",
+   "deskripsi": "Uterine compression suture (B-Lynch) (IM) Perinatal Period",
+   "mdc": "24"
+  },
+  {
+   "kode": "70.70",
+   "deskripsi": "Laparoscopic reconstructive surgery of pelvic floor (IM)",
+   "mdc": "23"
+  },
+  {
+   "kode": "76.32",
+   "deskripsi": "Partial maxillectomy/open medial maxillectomy (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "76.33",
+   "deskripsi": "Total maxillectomy (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "76.34",
+   "deskripsi": "Endoscopic medial maxillectomy (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "80.55",
+   "deskripsi": "Microdissectomy (endoscopic/microscopic) (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "83.15",
+   "deskripsi": "Escharotomy (IM)",
+   "mdc": "18"
+  },
+  {
+   "kode": "85.110",
+   "deskripsi": "MR-guided stereotactic biopsy/localization of lesion or tissue of breast (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "85.111",
+   "deskripsi": "Mammography-guided stereotactic biopsy/localization of lesion or tissue of breast (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "85.701",
+   "deskripsi": "Superomedial thigh flap (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "85.702",
+   "deskripsi": "Lateral arm free (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "85.703",
+   "deskripsi": "Superficial Inferior Epigastric Arteri (SIEA) flap, free (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "85.704",
+   "deskripsi": "Fibular flap, free (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "85.705",
+   "deskripsi": "Lymph node transfer flap, free (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "85.706",
+   "deskripsi": "Lymphovenous anastomosis (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "85.707",
+   "deskripsi": "Groin flap, free (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "85.708",
+   "deskripsi": "Jejunal flap, free (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "85.709",
+   "deskripsi": "Dorsalis pedis flap, free (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "85.710",
+   "deskripsi": "Latissimus dorsi myocutaneous flap (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "86.060",
+   "deskripsi": "Lnsertion prostatic stent/coil with ultrasound control (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "86.061",
+   "deskripsi": "Lnsertion prostatic stent/coil with visual (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "86.090",
+   "deskripsi": "Other incision of skin and subcutaneous tissue (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "86.12",
+   "deskripsi": "Skin prick test (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "86.13",
+   "deskripsi": "Skin end-point titration test (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "86.630",
+   "deskripsi": "Full thickness skin graft of genitals (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "86.631",
+   "deskripsi": "Small split skin graft of genitals (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "86.710",
+   "deskripsi": "Tongue flap (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "86.740",
+   "deskripsi": "Cross leg flap (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "86.741",
+   "deskripsi": "Deltopectoral flap (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "86.742",
+   "deskripsi": "Omental flap (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "86.743",
+   "deskripsi": "Simple & small local skin flap, genitals (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "86.87",
+   "deskripsi": "Fat graft of skin and subcutaneous tissue (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "88.70",
+   "deskripsi": "Videourodynamic (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "88.760",
+   "deskripsi": "Doppler scrotal ultrasound (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "88.761",
+   "deskripsi": "Transrectal ultra sound (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "88.790",
+   "deskripsi": "Diagnostic doppler ultrasound of breast (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "88.791",
+   "deskripsi": "Diagnostic elastography ultrasound of breast (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "88.792",
+   "deskripsi": "Diagnostic grayscale ultrasound of breast (IM)",
+   "mdc": "19"
+  },
+  {
+   "kode": "88.793",
+   "deskripsi": "Saline infusion sonography (IM)",
+   "mdc": "23"
+  },
+  {
+   "kode": "89.070",
+   "deskripsi": "Other Spesialist Pre-operative Consultation (IM)",
+   "mdc": null
+  },
+  {
+   "kode": "89.370",
+   "deskripsi": "Six minute walking test (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "89.380",
+   "deskripsi": "Cardio pulmonary exercise test (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "89.381",
+   "deskripsi": "Difusion lung capacity test (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "89.382",
+   "deskripsi": "Peak expiratory flow rate examination (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "89.383",
+   "deskripsi": "Bronchodilator (reversibility) examination (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "89.384",
+   "deskripsi": "Thoracic gas volume examination (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "89.385",
+   "deskripsi": "Residual lung volume examination (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "89.390",
+   "deskripsi": "Bronchial provocation test (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "89.391",
+   "deskripsi": "Exhaled substance breath test (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "92.150",
+   "deskripsi": "Lung perfusion scan (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "93.390",
+   "deskripsi": "Vestibular rehabilitation therapy (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "93.391",
+   "deskripsi": "Canalith repositioning therapy (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "93.960",
+   "deskripsi": "High flow nasal canule oxygenation (IM)",
+   "mdc": "14"
+  },
+  {
+   "kode": "94.270",
+   "deskripsi": "Electroconvulsive therapy (ECT), conventional (IM)",
+   "mdc": "29"
+  },
+  {
+   "kode": "94.271",
+   "deskripsi": "Electroconvulsive therapy (ECT), with premedication (IM)",
+   "mdc": "29"
+  },
+  {
+   "kode": "94.28",
+   "deskripsi": "Transcranial magnetic stimulation (TMS) (IM)",
+   "mdc": "29"
+  },
+  {
+   "kode": "95.410",
+   "deskripsi": "Pure tone audiometry (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "95.411",
+   "deskripsi": "Speech audiometry (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "95.412",
+   "deskripsi": "Impedance audiometry/tympanometry (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "95.413",
+   "deskripsi": "Stapedial reflex response (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "95.414",
+   "deskripsi": "Eustachian tube function test (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "95.415",
+   "deskripsi": "Free field test (visual reinforcement audiometry, behavioral observational audiometry, play audiometry) (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "95.418",
+   "deskripsi": "Other audiometry test (SISI test, ABLB test, tinnitogram, decay) (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "95.440",
+   "deskripsi": "Simple vestibular test (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "95.441",
+   "deskripsi": "Dix-halpike test/positional nystagmus test (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "95.442",
+   "deskripsi": "Visual head impulse test (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "95.460",
+   "deskripsi": "Oto acoustic emission (OAE) (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "95.461",
+   "deskripsi": "Automatic BERA (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "95.462",
+   "deskripsi": "Brainstem evoked response audiometry/auditory potential (BERA/BAEP) for hearing assessment (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "95.463",
+   "deskripsi": "Auditory steady state response (ASSR) (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "95.464",
+   "deskripsi": "Late latency auditory evoked potential (P300, N100) (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "95.465",
+   "deskripsi": "Vestibular evoked myogenic potential (IM)",
+   "mdc": "13"
+  },
+  {
+   "kode": "96.010",
+   "deskripsi": "Surfactant administration (IM)",
+   "mdc": "25"
+  },
+  {
+   "kode": "97.66",
+   "deskripsi": "Endoscopic ureteric stent removal (IM)",
+   "mdc": "21"
+  },
+  {
+   "kode": "99.960",
+   "deskripsi": "Microsurgical testicular sperm extraction (micro-TESE) (IM)",
+   "mdc": "22"
+  },
+  {
+   "kode": "99.980",
+   "deskripsi": "Early initiation of breast feeding (IM)",
+   "mdc": "25"
+  },
+  {
+   "kode": "99.981",
+   "deskripsi": "Kangaroo care (IM) Immunological Disorders",
+   "mdc": "25"
+  }
+ ]
+}

@@ -1,5 +1,5 @@
 const { petakanKeKodeWho } = require('./kodeDiagnosisWhoService');
-const { periksaKode, STATUS } = require('./validasiKamusService');
+const { periksaKode, kodeSah } = require('./validasiKamusService');
 
 /**
  * Pastikan setiap kode DIAGLIST ada di kamus WHO; kode tanpa padanan tetap ditandai.
@@ -40,7 +40,8 @@ async function pastikanDiagnosisWho(db, diaglist, teksDiagnosis = '', opsi = {})
   const penggantian = [];
 
   for (const kode of kodeAsli) {
-    if (periksa.hasil[kode] === STATUS.VALID) {
+    // Kode IM iDRG (J45.3 dsb.) sah untuk penagihan iDRG -- tidak diganti.
+    if (kodeSah(periksa.hasil[kode])) {
       hasil.push(kode);
       continue;
     }
@@ -59,7 +60,7 @@ async function pastikanDiagnosisWho(db, diaglist, teksDiagnosis = '', opsi = {})
       return { diaglist: String(diaglist || ''), kodeLuarKamus: [], penggantian: [],
         statusKamus: 'tidak_tersedia', alasanKamus: cekBaru.alasan, dataset: cekBaru.dataset };
     }
-    if (kodeBaru && cekBaru && cekBaru.hasil[kodeBaru] === STATUS.VALID) {
+    if (kodeBaru && cekBaru && kodeSah(cekBaru.hasil[kodeBaru])) {
       hasil.push(kodeBaru);
       penggantian.push({
         kode_asal: kode,
