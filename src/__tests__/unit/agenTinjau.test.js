@@ -54,7 +54,10 @@ test('jawaban di luar protokol menghentikan agen, tidak menghabiskan langkah', a
 });
 
 test('masalah terdeteksi tanpa AI: operasi tanpa kode & INA-CBG tidak terhitung', () => {
-  const m = temukanMasalah({ saran: [{ code: 'P07.3', type: 'diagnosis', kamus_valid: true }], record, operasiTanpaKode: { nama: 'Ada operasi, tetapi kode tindakan operasi belum ada', yang_ditemukan: { kutipan: 'Operasi Kecil', page_number: 13 } }, hitungInacbgDanTarif });
+  // U09.9 (kondisi pasca COVID-19) belum ada di tabel resmi -> INA-CBG tidak
+  // terhitung. (P07.3 kini terpetakan resmi ke P-8-17, jadi tidak lagi cocok
+  // sebagai contoh "tak terhitung".)
+  const m = temukanMasalah({ saran: [{ code: 'U09.9', type: 'diagnosis', kamus_valid: true }], record, operasiTanpaKode: { nama: 'Ada operasi, tetapi kode tindakan operasi belum ada', yang_ditemukan: { kutipan: 'Operasi Kecil', page_number: 13 } }, hitungInacbgDanTarif });
   expect(m.join(' ')).toMatch(/kode tindakan operasi/);
   expect(m.join(' ')).toMatch(/INA-CBG tidak terhitung/);
 });

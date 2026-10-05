@@ -319,9 +319,10 @@ describe('isiKodeDariSaranTervalidasi (regresi)', () => {
       ai,
     );
     expect(ai.inacbg_result).not.toBeNull();
-    // Rawat jalan memakai kode ambulatori bertarif tunggal (dulu J-4-16-II
-    // rawat inap, tarifnya null karena kelas rawat kosong).
-    expect(ai.inacbg_result.code).toBe('Q-5-26-0');
+    // Rawat jalan memakai kode ambulatori bertarif tunggal. J45.9 -> Q-5-44-0
+    // (kolom Outpatient tabel resmi alt_diagnosis); nebulisasi 93.94 adalah
+    // penunjang/terapi, tidak menggerakkan kelompok prosedur.
+    expect(ai.inacbg_result.code).toBe('Q-5-44-0');
     expect(ai.tariff_result.amount).toBeGreaterThan(0);
     const tulisAiReview = db.tulis.filter(t => /SET ai_review/.test(t.sql));
     expect(tulisAiReview.some(t => JSON.parse(t.a[0]).inacbg_result)).toBe(true);

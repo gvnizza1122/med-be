@@ -18,7 +18,7 @@ describe('groupCodesToInaCBG', () => {
   test.each([
     ['J18.9', 'J-4-16-I'], // pneumonia, bukan "peradangan pernafasan"
     ['I10', 'I-4-17-I'], // hipertensi, bukan infark miokard
-    ['A09', 'K-4-16-I'], // gastroenteritis infeksi, bukan HIV
+    ['A09', 'K-4-17-I'], // gastroenteritis (resmi: A09 -> K-4-17, dulu heuristik K-4-16)
     ['J45.9', 'J-4-18-I'], // asma
     ['R10.4', 'K-4-17-I'], // nyeri abdomen (dulu R-4-18, tidak ada di PMK)
     ['S06.0', 'G-4-25-I'], // gegar otak
@@ -28,10 +28,10 @@ describe('groupCodesToInaCBG', () => {
 
   test.each([
     ['R10.4', 'Q-5-25-0'],
-    ['A09', 'Q-5-25-0'],
-    ['J45.9', 'Q-5-26-0'],
+    ['A09', 'Q-5-42-0'], // resmi (kolom Outpatient alt_diagnosis)
+    ['J45.9', 'Q-5-44-0'], // resmi (dulu heuristik Q-5-26)
     ['I10', 'Q-5-44-0'],
-    ['Z09.8', 'Q-5-18-0'],
+    ['Z09.8', 'Q-5-44-0'], // resmi (dulu heuristik Q-5-18)
   ])('rawat jalan %s -> kode ambulatori %s', (dx, kode) => {
     expect(groupCodesToInaCBG([dx], [], 'RAWAT_JALAN').code).toBe(kode);
   });
@@ -45,9 +45,20 @@ describe('groupCodesToInaCBG', () => {
   });
 
   test('tanpa pemetaan resmi -> null, bukan kode karangan', () => {
-    expect(groupCodesToInaCBG(['P07.3'], [], 'RAWAT_INAP')).toBeNull();
+    // U09.9 (kondisi pasca COVID-19) belum ada di tabel resmi alt_diagnosis
+    // maupun heuristik -> null. (P07.3 kini terpetakan resmi ke P-8-17, lihat
+    // tes di bawah, jadi bukan lagi contoh "tak terpetakan".)
+    expect(groupCodesToInaCBG(['U09.9'], [], 'RAWAT_INAP')).toBeNull();
     expect(groupCodesToInaCBG(['V01'], [], 'RAWAT_JALAN')).toBeNull();
     expect(groupCodesToInaCBG(['bukan-kode'], [], 'RAWAT_INAP')).toBeNull();
+  });
+
+  test('base CBG kini dari tabel resmi E-Klaim (alt_diagnosis/alt_procedures)', () => {
+    // P07.3 (bayi prematur) -> P-8-17 di tabel resmi; dulu heuristik tak punya
+    // bab P sehingga tanpa tarif.
+    expect(groupCodesToInaCBG(['P07.3'], [], 'RAWAT_INAP').code).toBe('P-8-17-I');
+    // A09 (diare) -> K-4-17 (resmi), bukan K-4-16 (tebakan heuristik lama).
+    expect(groupCodesToInaCBG(['A09'], [], 'RAWAT_INAP').code).toBe('K-4-17-I');
   });
 });
 
@@ -65,7 +76,8 @@ describe('usulan INA-CBG dari AI harus sesuai jenis klaim', () => {
   // Dada" (rawat inap, Rp3.276.500) dan dulu langsung dipakai.
   test('kode rawat inap usulan AI ditolak untuk rawat jalan', () => {
     const { inacbgCodeForLookup } = hitungInacbgDanTarif(['R06.0', 'J45.3'], [], 'RAWAT_JALAN', '2', 'J-4-13-I');
-    expect(inacbgCodeForLookup).toBe('Q-5-42-0');
+    // R06.0 -> Q-5-44 (kolom Outpatient tabel resmi alt_diagnosis).
+    expect(inacbgCodeForLookup).toBe('Q-5-44-0');
   });
 
   test('kode rawat jalan usulan AI ditolak untuk rawat inap', () => {

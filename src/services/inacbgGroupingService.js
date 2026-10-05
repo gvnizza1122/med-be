@@ -6,6 +6,10 @@
 const { getTarifResmi, lookupTarifInacbg } = require('./tarifInacbgLookup');
 const { padananGrouper } = require('./jembatanCmWho');
 const { detectSpecialCmg, calculateTotalTopup } = require('./specialCmgService');
+const { grouperResmi, tentukanBase: tentukanBaseResmi } = require('./inacbgGrouperResmi');
+const DX_RESMI = require('../data/inacbg/grouperDiagnosis.json');
+const CC_RESMI = require('../data/inacbg/cc.json');
+const CC_EXCL_RESMI = require('../data/inacbg/ccExclusion.json');
 
 // Fix (1 Okt 2026): tarif INA-CBG di server selalu "Tidak ditemukan" walau
 // DIAGLIST/PROCLIST sudah terbaca. Berkas RS ini tidak pernah memuat lembar
@@ -324,6 +328,17 @@ function groupCodesToInaCBG(diagnosisCodes, procedureCodes = [], jenisKlaim = 'R
   // Ambil diagnosis utama (kode pertama dari DIAGLIST)
   const primaryDiagnosis = diagnosisCodes[0]?.trim().toUpperCase();
   if (!primaryDiagnosis) return null;
+
+  // Base CBG dari GROUPER RESMI (tabel alt_diagnosis/alt_procedures E-Klaim):
+  // akurasi base ~99,7% vs ~34,5% heuristik rentang di bawah. Hanya BASE yang
+  // diambil dari tabel resmi; SEVERITY (I/II/III) tetap dari logika heuristik
+  // di bawah (matriks CC resmi ada di berkas terenkripsi, tidak dipakai).
+  // Bila tabel resmi tidak mengenali kode primer, base jatuh ke heuristik.
+  let baseResmi = null;
+  try {
+    const b = tentukanBaseResmi(diagnosisCodes, procedureCodes, jenisKlaim !== 'RAWAT_JALAN');
+    if (b) baseResmi = b;
+  } catch (_) { /* cadangan: heuristik di bawah */ }
   // Kategori khusus ICD-10-CM (mis. D49) dipetakan ke kategori WHO supaya
   // kode yang belum terpetakan tetap punya kelompok & tarif.
   const kodeIcd = padananGrouper(primaryDiagnosis).replace(/[^A-Z0-9]/g, '');
@@ -332,6 +347,21 @@ function groupCodesToInaCBG(diagnosisCodes, procedureCodes = [], jenisKlaim = 'R
   procedureCodes = Array.isArray(procedureCodes) ? procedureCodes : [];
 
   if (jenisKlaim === 'RAWAT_JALAN') {
+    // Base rawat jalan dari tabel resmi (kolom Outpatient) lebih dulu.
+    if (baseResmi) {
+      const kodeRjResmi = /-0$/.test(baseResmi.base) ? baseResmi.base : `${baseResmi.base}-0`;
+      if (lookupTarifInacbg(kodeRjResmi)) {
+        return {
+          code: kodeRjResmi,
+          berbasis_prosedur: baseResmi.via === 'prosedur',
+          confidence: baseResmi.via === 'prosedur' ? 0.75 : 0.65,
+          sumber: 'grouper_resmi_tabel_eklaim',
+          reasoning: baseResmi.via === 'prosedur'
+            ? `Base rawat jalan ${baseResmi.base} dari prosedur ${baseResmi.prosedur} (tabel resmi alt_procedures), diagnosis utama ${primaryDiagnosis}.`
+            : `Base rawat jalan ${baseResmi.base} dari diagnosis utama ${primaryDiagnosis} (tabel resmi alt_diagnosis).`,
+        };
+      }
+    }
     for (const p of procedureCodes) {
       const kodeProsedur = String(p || '').trim();
       const aturan = PROSEDUR_RAWAT_JALAN.find(([pola]) => pola.test(kodeProsedur));
@@ -352,8 +382,27 @@ function groupCodesToInaCBG(diagnosisCodes, procedureCodes = [], jenisKlaim = 'R
     };
   }
 
+  // Prioritas base rawat inap:
+  //  1. base resmi dari PROSEDUR (tabel alt_procedures) -- paling otoritatif;
+  //  2. heuristik bedah -- memuat logika yang TIDAK ada di tabel (sub-kelompok
+  //     persalinan O-6-11/12/13 dari 72-75, tandur kulit luka bakar, dll.);
+  //  3. base resmi dari DIAGNOSIS (tabel alt_diagnosis);
+  //  4. heuristik rentang diagnosis (cadangan terakhir).
   const bedah = kelompokProsedurRawatInap(kodeIcd, procedureCodes);
-  const kategori = bedah ? bedah.kategori : cocokAturan(kodeIcd, ATURAN_RAWAT_INAP);
+  let kategori, berbasisProsedur, sumberBase, prosedurPemicu;
+  if (baseResmi && baseResmi.via === 'prosedur') {
+    ({ base: kategori, prosedur: prosedurPemicu } = baseResmi);
+    berbasisProsedur = true; sumberBase = 'grouper_resmi_tabel_eklaim';
+  } else if (bedah) {
+    kategori = bedah.kategori; prosedurPemicu = bedah.prosedur;
+    berbasisProsedur = true; sumberBase = 'heuristik_prosedur';
+  } else if (baseResmi) {
+    kategori = baseResmi.base; prosedurPemicu = null;
+    berbasisProsedur = false; sumberBase = 'grouper_resmi_tabel_eklaim';
+  } else {
+    kategori = cocokAturan(kodeIcd, ATURAN_RAWAT_INAP); prosedurPemicu = null;
+    berbasisProsedur = false; sumberBase = 'heuristik_rentang';
+  }
   if (!kategori) return null;
 
   // Severity INA-CBG (I/II/III) ditentukan DIAGNOSIS SEKUNDER (komorbiditas/
@@ -364,9 +413,19 @@ function groupCodesToInaCBG(diagnosisCodes, procedureCodes = [], jenisKlaim = 'R
   // menyarankan tarif lebih tinggi tanpa dasar. Ada diagnosis sekunder -> II;
   // III tidak ditebak (butuh komplikasi berat yang tidak bisa disimpulkan dari
   // jumlah kode saja).
+  // Daftar CC resmi E-Klaim (cclist) dan pengecualiannya per diagnosis utama
+  // (c51ccex) hanya bisa MENURUNKAN perkiraan: diagnosis sekunder yang di tabel
+  // resmi bukan CC, atau dikecualikan untuk diagnosis utama ini, tidak
+  // menaikkan severity (YETY: O41.0 bukan CC -> tetap O-6-10-I). Kode yang tak
+  // dikenal tabel resmi (mis. ICD-10-CM) tetap memakai aturan lama.
+  const bukanCcResmi = (k) => {
+    if (!DX_RESMI[k]) return false;
+    if (!CC_RESMI[k]) return true;
+    return (CC_EXCL_RESMI[k] || []).includes(kodeIcd);
+  };
   const adaSekunder = diagnosisCodes.slice(1)
     .map(k => String(k || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, ''))
-    .some(k => !BUKAN_KOMORBID.test(k) && !BUKAN_KOMORBID_UMUM.test(k) && !satuKelompokCedera(kodeIcd, k));
+    .some(k => !BUKAN_KOMORBID.test(k) && !BUKAN_KOMORBID_UMUM.test(k) && !satuKelompokCedera(kodeIcd, k) && !bukanCcResmi(k));
   const severity = adaSekunder ? 'II' : 'I';
   const confidence = adaSekunder ? 0.55 : 0.5;
 
@@ -375,11 +434,13 @@ function groupCodesToInaCBG(diagnosisCodes, procedureCodes = [], jenisKlaim = 'R
 
   return {
     code: finalCode,
-    berbasis_prosedur: Boolean(bedah),
+    berbasis_prosedur: berbasisProsedur,
     confidence: Math.min(confidence, 1.0),
-    reasoning: bedah
-      ? `Pemetaan dari prosedur ${bedah.prosedur} ke kelompok prosedur rawat inap, diagnosis utama ${primaryDiagnosis}. Severity: ${severity}.`
-      : `Pemetaan dari diagnosis utama ${primaryDiagnosis} dengan ${diagnosisCodes.length} diagnosis total, ${procedureCodes.length} prosedur. Severity: ${severity}.`,
+    sumber: sumberBase,
+    severity_estimasi: true, // base dari tabel resmi; severity I/II masih heuristik
+    reasoning: prosedurPemicu
+      ? `Base CBG ${kategori} dari prosedur ${prosedurPemicu} (${sumberBase === 'grouper_resmi_tabel_eklaim' ? 'tabel resmi' : 'heuristik'}), diagnosis utama ${primaryDiagnosis}. Severity: ${severity} (estimasi).`
+      : `Base CBG ${kategori} dari diagnosis utama ${primaryDiagnosis} (${sumberBase === 'grouper_resmi_tabel_eklaim' ? 'tabel resmi' : 'heuristik'}), ${diagnosisCodes.length} diagnosis total. Severity: ${severity} (estimasi).`,
   };
 }
 

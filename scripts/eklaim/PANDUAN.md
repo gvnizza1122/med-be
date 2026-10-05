@@ -44,3 +44,29 @@ E-Klaim: method selain baca ditolak oleh kodenya sendiri.
 | `Tanda tangan respons tidak cocok` | Key salah |
 | `ECONNREFUSED` / `timeout` | Alamat `EKLAIM_URL` salah atau komputer tidak di jaringan RS |
 | `HTTP 404` | Alamat benar tetapi tanpa folder `/E-Klaim/` -- periksa alamat E-Klaim di browser |
+
+## Memperbarui kamus & tarif INA-CBG (dari patch resmi)
+
+Dipakai bila Kemenkes merilis patch E-Klaim / PMK tarif baru. Tidak butuh key,
+tidak butuh E-Klaim terpasang, dan **tidak membuka berkas terenkripsi** (iDRG
+`.iccdb`, grouper ber-ionCube) -- hanya tabel MyISAM terbuka di patch.
+
+1. Unduh patch resmi dari https://inacbg.kemkes.go.id (menu Download).
+2. Bongkar bagian data saja (tanpa menjalankan installer):
+   ```
+   innoextract -s -d x --include app/data --include tmp Patch_E-Klaim_*.exe
+   ```
+3. Buka tabelnya di MariaDB sementara (Docker) dan ekspor ke TSV:
+   tabel `inacbg5.tariff_20230124`, `inacbg5.cclist`, `inacbg5.c51ccex` (salin
+   `x/app/data/inacbg5` ke datadir, lalu `REPAIR TABLE` bila ditandai crashed) dan
+   `casemix.alt_diagnosis`, `alt_procedures`, `alt_hierarchy1`, `alt_unucbg` (impor
+   `x/tmp/casemix_myisam_*.sql`). Ekspor masing-masing dengan
+   `mariadb --batch -e "select * from <tabel>" > <tabel>.tsv`.
+4. Jalankan importer (profil tarif bisa diganti):
+   ```
+   node scripts/eklaim/imporReferensiInacbg.js <folder_tsv> --regional reg1 --kodeTarif DS
+   ```
+5. Jalankan `npm test`, lalu hapus container MariaDB sementara.
+
+Kode tarif: `AP/AS/BP/BS/CP/CS/DP/DS` = kelas RS A–D, P = pemerintah, S = swasta;
+`RSAB/RSCM/RSD/RSJP/RSPON` = RS khusus. Regional `reg1`–`reg5`.
