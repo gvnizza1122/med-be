@@ -337,7 +337,7 @@ describe('generateAiReview — dengan AI dikonfigurasi (fetch dimock)', () => {
     // Reasoning harus berasal dari grouping heuristik (bukti kode AI yang
     // invalid benar2 diabaikan dan diganti hasil fallback, terlepas dari
     // apakah kode fallback itu kebetulan match tabel resmi atau tidak).
-    expect(result.inacbg_result.reasoning).toContain('Pemetaan dari diagnosis utama');
+    expect(result.inacbg_result.reasoning).toContain('dari diagnosis utama');
   });
 
   test('AI suggested_inacbg tidak valid & grouping tidak punya pemetaan resmi → tanpa kode & tanpa tarif (bukan angka fiktif)', async () => {
@@ -348,13 +348,13 @@ describe('generateAiReview — dengan AI dikonfigurasi (fetch dimock)', () => {
       suggested_inacbg: 'ZZ-9-99-XYZ-HALU',
     });
 
-    // Diagnosis perinatal (P07) -- grup neonatal INA-CBG tidak dipetakan
-    // heuristik grouping, dan grouping tidak lagi mengarang kode yang tidak
-    // ada di tabel PMK 3/2023 (dulu: 'Z-4-21-I' dkk.).
-    const evidencePool = [{ page_number: 1, ocr_text: 'Diagnosa: BBLR', confidence: 100 }];
+    // U09.9 (kondisi pasca COVID-19) belum ada di tabel resmi alt_diagnosis
+    // maupun heuristik -> grouping mengembalikan null (tidak mengarang kode).
+    // (P07.3 kini terpetakan resmi ke P-8-17, jadi tidak lagi contoh yang tepat.)
+    const evidencePool = [{ page_number: 1, ocr_text: 'Diagnosa: kondisi pasca COVID-19', confidence: 100 }];
 
     const result = await generateAiReview(
-      { sep: 'ABC', DIAGLIST: 'P07.3', PROCLIST: '', KELAS_RAWAT: '3', JENIS_KLAIM: 'RAWAT_INAP' },
+      { sep: 'ABC', DIAGLIST: 'U09.9', PROCLIST: '', KELAS_RAWAT: '3', JENIS_KLAIM: 'RAWAT_INAP' },
       [],
       evidencePool
     );

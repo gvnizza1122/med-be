@@ -1,0 +1,11 @@
+{
+  "sumber": "Patch/installer E-Klaim INA-CBG (tabel MyISAM terbuka, inacbg.kemkes.go.id)",
+  "tarif": "PMK No. 3 Tahun 2023 (tabel tariff_20230124)",
+  "profil": {
+    "regional": "reg1",
+    "kode_tarif": "DS"
+  },
+  "icc_version": "0.2.1831.202606291712",
+  "diambil": "2026-10-04",
+  "catatan": "Base group & tarif = tabel resmi E-Klaim (terbuka). Severity I/II/III belum memakai matriks CC resmi (berkas iDRG terenkripsi); tetap estimasi. Lembar grouper casemix otoritas final."
+}

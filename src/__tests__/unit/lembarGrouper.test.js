@@ -197,7 +197,7 @@ describe('INA-CBG kelompok prosedur & tarif rawat inap', () => {
   test('persalinan & bedah umum lain', () => {
     expect(groupCodesToInaCBG(['O80.0', 'Z37.0'], ['73.59'], 'RAWAT_INAP').code).toBe('O-6-13-I');
     expect(groupCodesToInaCBG(['K35.8'], ['47.09'], 'RAWAT_INAP').code).toBe('K-1-13-I');
-    expect(groupCodesToInaCBG(['O03.4'], ['69.02'], 'RAWAT_INAP').code).toBe('W-1-10-I');
+    expect(groupCodesToInaCBG(['O03.4'], ['69.02'], 'RAWAT_INAP').code).toBe('W-1-11-I'); // 69.02 -> W-1-11 (tabel resmi; dulu heuristik W-1-10)
   });
   test('kelas rawat inap kosong -> tarif kelas 3 ditandai asumsi', () => {
     const { tarifResult } = hitungInacbgDanTarif(['O42.1'], ['74.1'], 'RAWAT_INAP', '', null);
@@ -250,15 +250,15 @@ describe('INA-CBG bedah ortopedi & bedah umum', () => {
     [['S82.2'], ['79.36'], 'M-1-70-I'],
     [['S52.5'], ['79.32'], 'M-1-80-I'],
     [['Z47.0'], ['78.65'], 'M-1-40-I'],
-    [['M17.1'], ['81.54'], 'M-1-04-I'],
-    [['E11.5', 'I70.2'], ['84.15'], 'M-1-02-II'],
-    [['K35.8'], ['47.09', '54.11'], 'K-1-13-I'],
+    [['M17.1'], ['81.54'], 'M-1-01-I'], // 81.54 -> M-1-01,M-1-04 (tabel resmi); hierarki pilih M-1-01 (prioritas lebih tinggi)
+    [['E11.5', 'I70.2'], ['84.15'], 'M-1-02-I'], // I70.2 bukan CC di daftar CC resmi (cclist) -> severity tetap I
+    [['K35.8'], ['47.09', '54.11'], 'K-1-40-I'], // 2 prosedur: 54.11->K-1-40 (rank40) mengalahkan 47.09->K-1-13 (rank61) per hierarki resmi
     [['K56.6'], ['54.11', '45.62'], 'K-1-20-I'],
     [['K61.0'], ['49.01'], 'K-1-50-I'],
     [['D24'], ['85.21'], 'L-1-50-I'],
     [['D17.1'], ['86.3'], 'L-1-40-I'],
     [['T24.3'], ['86.69'], 'L-1-20-I'],
-    [['M51.1'], ['80.51'], 'G-1-30-I'],
+    [['M51.1'], ['80.51'], 'M-1-60-I'], // 80.51 eksisi diskus -> M-1-60 (grup tunggal tabel resmi alt_procedures)
   ])('%s + %s -> %s', (dx, px, kode) => {
     expect(groupCodesToInaCBG(dx, px, 'RAWAT_INAP').code).toBe(kode);
   });
@@ -443,7 +443,9 @@ describe('DIAGLIST & tarif tidak pernah kosong karena kode ICD-10-CM', () => {
     expect(padananGrouper('J18.9')).toBe('J18.9');
   });
   test('grouper memberi kelompok & tarif untuk kode CM dan neoplasma jinak', () => {
-    for (const [dx, kode] of [['D49.2', 'M-4-13-I'], ['D21.3', 'M-4-13-I'], ['D24', 'L-4-11-I'], ['D25.9', 'W-4-10-I'], ['R10.84', 'K-4-17-I']]) {
+    // Nilai = tabel resmi alt_diagnosis (D21.3->M-4-21, D24->L-4-14, D25.9->W-4-12);
+    // D49.2 & R10.84 (kode ICD-10-CM, tak ada di tabel) via heuristik padanan WHO.
+    for (const [dx, kode] of [['D49.2', 'M-4-13-I'], ['D21.3', 'M-4-21-I'], ['D24', 'L-4-14-I'], ['D25.9', 'W-4-12-I'], ['R10.84', 'K-4-17-I']]) {
       const r = hitungInacbgDanTarif([dx], [], 'RAWAT_INAP', '3', null);
       expect([dx, r.inacbgCodeForLookup]).toEqual([dx, kode]);
       expect(r.tarifResult.amount).toBeGreaterThan(0);

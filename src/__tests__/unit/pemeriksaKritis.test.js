@@ -17,7 +17,7 @@ test('hasil yang beres: tanpa temuan aturan', () => {
 });
 
 test('severity naik karena diagnosis sekunder di luar resume -> potensi upcoding (tinggi)', () => {
-  const t = periksaAturan({ record, ai: { suggested_codes: [s('D21.3', 'diagnosis'), s('L91.0', 'diagnosis', 12), s('86.3', 'procedure')] }, pages: [resume, tagihan], hitungInacbgDanTarif });
+  const t = periksaAturan({ record, ai: { suggested_codes: [s('D21.3', 'diagnosis'), s('D64.9', 'diagnosis', 12), s('86.3', 'procedure')] }, pages: [resume, tagihan], hitungInacbgDanTarif });
   expect(t.map(x => [x.jenis, x.keparahan])).toContainEqual(['potensi_upcoding', 'tinggi']);
 });
 

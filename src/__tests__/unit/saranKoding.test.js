@@ -17,7 +17,9 @@ describe('saran koding — kasus PPOK + pneumonia rawat jalan', () => {
         { sumber: 'resep', page_number: 3, kutipan: 'Ventasal NEBUL' },
       ],
     }],
-    inacbg_result: { code: 'Q-5-43-0' }, tariff_result: { amount: 264100 },
+    // J44.0 (hasil gabung KMB-12) -> Q-5-38-0 di tabel resmi alt_diagnosis
+    // (Rp245.100); dulu heuristik menebak Q-5-43-0/264100.
+    inacbg_result: { code: 'Q-5-38-0' }, tariff_result: { amount: 245100 },
   };
 
   test('J44.9 + J18.9 digabung menjadi J44.0 (KMB-12) beserta bukti asalnya', () => {
@@ -38,8 +40,8 @@ describe('saran koding — kasus PPOK + pneumonia rawat jalan', () => {
 
   test('INA-CBG & tarif dihitung dari kode saran, dibandingkan dengan klaim', () => {
     const h = susun(record, ai);
-    expect(h.inacbg).toMatchObject({ kode: 'Q-5-43-0', tarif: 264100 });
-    expect(h.klaim_saat_ini).toMatchObject({ diagnosis: ['J44.9', 'J18.9'], tarif: 264100 });
+    expect(h.inacbg).toMatchObject({ kode: 'Q-5-38-0', tarif: 245100 });
+    expect(h.klaim_saat_ini).toMatchObject({ diagnosis: ['J44.9', 'J18.9'], tarif: 245100 });
     expect(h.selisih_tarif).toBe(0);
   });
 });
