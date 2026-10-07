@@ -26,8 +26,6 @@ router.post('/upload', (req, res, next) => {
   let started = false;
   try {
     if (!req.file) return res.status(400).json({ error: 'Pilih PDF klaim untuk diuji.' });
-    if (!['RAWAT_JALAN','RAWAT_INAP'].includes(req.body.jenis_klaim))
-      return res.status(400).json({ error: 'Pilih rawat jalan atau rawat inap.' });
     const label = validasiInput({ ...req.body, reason_match: 'belum_dinilai' });
     if (!['pending','diterima'].includes(label.actual_result))
       return res.status(400).json({ error: 'Pilih hasil yang sudah diketahui: ACC atau pending.' });
@@ -38,7 +36,7 @@ router.post('/upload', (req, res, next) => {
     // Ground truth never enters extraction/review options or model messages.
     const result = await require('./claimFiles').processSinglePdfUpload(db, {
       filePath: req.file.path, originalName: req.file.originalname,
-      jenisKlaim: req.body.jenis_klaim, userId: req.user.id,
+      jenisKlaim: undefined, allowedJenisKlaim: ['RAWAT_JALAN','RAWAT_INAP'], userId: req.user.id,
       hospitalCode: req.user.hospital_code, isTesting: true,
     });
     if (!result.success) return res.status(422).json({ error: result.error });
@@ -80,9 +78,7 @@ router.post('/upload-batch', (req, res, next) => {
     if (!req.files?.length) return res.status(400).json({ error: 'Pilih minimal satu PDF untuk testing.' });
     let categories;
     try { categories = JSON.parse(req.body.allowed_jenis_klaim); } catch { categories = []; }
-    if (!Array.isArray(categories) || !categories.length || categories.some(c => !['RAWAT_JALAN','RAWAT_INAP'].includes(c)))
-      return res.status(400).json({ error: 'Pilih kategori rawat jalan, rawat inap, atau keduanya.' });
-    categories = [...new Set(categories)];
+    categories = ['RAWAT_JALAN','RAWAT_INAP'];
     const db = getDb();
     const storage = await aksesPenyimpanan(db);
     if (!storage.read || !storage.write) return res.status(503).json({ error: 'Penyimpanan testing belum tersedia.' });
@@ -102,7 +98,7 @@ router.post('/upload-batch', (req, res, next) => {
       let result;
       try {
         result = await processSinglePdfUpload(db, { filePath: file.path, originalName: file.originalname,
-          jenisKlaim: categories.length === 1 ? categories[0] : undefined, allowedJenisKlaim: categories,
+          jenisKlaim: undefined, allowedJenisKlaim: categories,
           userId: req.user.id, hospitalCode: req.user.hospital_code, isTesting: true });
       } catch { result = { success: false, error: 'Analisis belum berhasil.' }; }
       job.statuses[index] = { fileName: file.originalname, status: result.success ? 'done' : 'failed',

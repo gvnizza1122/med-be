@@ -24,14 +24,14 @@ beforeEach(()=>{
 });
 test.each(['RAWAT_JALAN','RAWAT_INAP'])('upload khusus %s menyimpan label sesudah prediksi tanpa memberi jawaban kepada AI',async category=>{
   const res=await upload('pending',category);expect(res.status).toBe(200);expect(res.body.label_saved).toBe(true);
-  const options=mockProcess.mock.calls[0][1];expect(options).toEqual({filePath:undefined,originalName:'uji.pdf',jenisKlaim:category,userId:'tester',hospitalCode:'RS-A',isTesting:true});
+  const options=mockProcess.mock.calls[0][1];expect(options).toEqual({filePath:undefined,originalName:'uji.pdf',jenisKlaim:undefined,allowedJenisKlaim:['RAWAT_JALAN','RAWAT_INAP'],userId:'tester',hospitalCode:'RS-A',isTesting:true});
   expect(JSON.stringify(options)).not.toMatch(/rahasia|actual_result|actual_reason|notes|reference_source/);
   const [sql,values]=mockDb.run.mock.calls[0];expect(sql).toContain('INSERT INTO testing_pending');expect(values[2]).toBe('pending');expect(values[4]).toBe('pending');
 });
 test('ACC tetap menghasilkan patokan pending jika analisis menemukan risiko',async()=>{
   const res=await upload('diterima');expect(res.body.prediction.status).toBe('pending');expect(mockDb.run.mock.calls[0][1][4]).toBe('diterima');
 });
-test.each([['belum_diketahui','RAWAT_JALAN'],['pending','IGD']])('input %s/%s ditolak sebelum analisis',async(outcome,category)=>{
+test.each([['belum_diketahui','RAWAT_JALAN']])('input %s/%s ditolak sebelum analisis',async(outcome,category)=>{
  expect((await upload(outcome,category)).status).toBe(400);expect(mockProcess).not.toHaveBeenCalled();expect(mockDb.run).not.toHaveBeenCalled();
 });
 test('kegagalan analisis tidak menyimpan hasil acuan atau prediksi palsu',async()=>{
@@ -57,8 +57,10 @@ test('batch campur tanpa hasil acuan, progres dua nama sama dipisahkan per indek
  expect(state.body.statuses.map(s=>s.status)).toEqual(['done','failed']);
  for (const [,options] of mockProcess.mock.calls) {expect(options.isTesting).toBe(true);expect(options.allowedJenisKlaim).toEqual(['RAWAT_JALAN','RAWAT_INAP']);expect(options.jenisKlaim).toBeUndefined();expect(JSON.stringify(options)).not.toContain('JANGAN');}
 });
-test('kategori batch invalid ditolak tanpa AI',async()=>{
- expect((await batch(['IGD'])).status).toBe(400);expect(mockProcess).not.toHaveBeenCalled();
+test('pilihan kategori klien lama tidak mengunci deteksi dokumen',async()=>{
+ expect((await batch(['IGD'])).status).toBe(202);
+ await new Promise(resolve=>setImmediate(resolve));
+ expect(mockProcess.mock.calls.every(([,o])=>o.jenisKlaim===undefined&&o.allowedJenisKlaim.length===2)).toBe(true);
 });
 test('progres tetap processing sampai analisis selesai, bukan dianggap berhasil ketika HTTP selesai',async()=>{
  let finish; mockProcess.mockImplementation(()=>new Promise(resolve=>{finish=resolve}));

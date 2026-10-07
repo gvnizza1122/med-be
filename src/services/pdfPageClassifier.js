@@ -111,58 +111,11 @@ function hasIgdVisitSignal(fullText) {
   return false;
 }
 
-/**
- * Deteksi kategori pelayanan (jenis_klaim) dari ISI dokumen — dipakai buat
- * upload batch kategori-campur, supaya verifikator tidak perlu pilih
- * kategori satu-satu per file (lihat detectAndAssignJenisKlaim di
- * pdfExtractionPipeline.js untuk pemanggilnya).
- *
- * Urutan prioritas (dari yang paling pasti ke paling lemah), diverifikasi
- * terhadap 150+ sampel PDF produksi asli RS Lestari Raharja (Jun-Jul 2026):
- * 1. Penanda IGD eksplisit ("RESUME MEDIS IGD", "TRIAGE IGD", klinik
- *    "INSTALASI GAWAT DARURAT"/"UGD") — paling reliabel, selalu ada
- *    kata-kata khas ini di berkas IGD. Sejak 21 Sep 2026 hasilnya
- *    RAWAT_JALAN (kategori IGD dihapus), lihat hasIgdVisitSignal().
- * 2. Field "Jns Rawat" di halaman SEP — dicetak resmi oleh sistem BPJS,
- *    isinya literal "Rawat Jalan" atau "Rawat Inap". CATATAN: field ini
- *    TIDAK membedakan IGD vs rawat jalan biasa (keduanya sama-sama bisa
- *    "Rawat Jalan" di SEP) — makanya cek IGD (poin 1) HARUS didahulukan.
- * 3. Fallback kata kunci umum ("Resume Medis Rawat Inap", "Laporan
- *    Operasi" utk rawat inap; "Resume Medis RJ" utk rawat jalan) —
- *    dipakai kalau field SEP tidak ketemu/tidak terbaca.
- *
- * @param {string} fullText - gabungan teks semua halaman (bukan cuma
- *   claimDataText, supaya penanda IGD di halaman Triage tetap kena walau
- *   halaman itu tidak lolos klasifikasi claim-data).
- * @returns {'RAWAT_JALAN'|'RAWAT_INAP'|null} null = tidak yakin.
+/** Deteksi dari dokumen perawatan: SEP/resume/SPRI sebelum penanda kunjungan IGD.
+ * null bila bukti tidak tersedia atau bertentangan. Hasil grouper harus disaring pemanggil.
  */
 function detectJenisKlaim(fullText) {
-  if (!fullText) return null;
-
-  // Kunjungan IGD dihitung RAWAT_JALAN (21 Sep 2026): aplikasi ini cuma
-  // mengenal dua kategori klaim. Berkas IGD selama ini dikategorikan
-  // tersendiri, itulah sebabnya kategori rawat jalan nyaris tak pernah
-  // terisi. Penandanya tidak dibuang -- lihat hasIgdVisitSignal() di atas.
-  if (hasIgdVisitSignal(fullText)) return 'RAWAT_JALAN';
-
-  // Field resmi SEP — WAJIB pakai [ \t]* (bukan \s*) sebelum capture group:
-  // \s* melahap newline kalau field-nya kosong, jadi nyerempet ke baris
-  // berikutnya (bug nyata yang pernah ditemukan & diperbaiki di sesi ini).
-  const jnsRawatMatch = fullText.match(/Jns[ \t]*Rawat[ \t]*:[ \t]*([^\n]*)/i);
-  if (jnsRawatMatch) {
-    const val = jnsRawatMatch[1].trim().toLowerCase();
-    if (val.includes('rawat inap')) return 'RAWAT_INAP';
-    if (val.includes('rawat jalan')) return 'RAWAT_JALAN';
-  }
-
-  if (/resume medis rawat inap|ringkasan pasien pulang|resume pasien pulang|laporan operasi/i.test(fullText)) {
-    return 'RAWAT_INAP';
-  }
-  if (/resume medis rj\b|resume medis rawat jalan/i.test(fullText)) {
-    return 'RAWAT_JALAN';
-  }
-
-  return null;
+  return require('./jenisLayananKlaimService').deteksiJenisDariHalaman([{text_full:fullText}]).value;
 }
 
 // Penanda dokumen ini benar-benar punya halaman SEP/BPJS asli (bukan cuma
@@ -320,6 +273,8 @@ const CRITICAL_PAGE_MARKERS = [
   /triage\s+igd/i,
   /skrining\s+awal\s+pasien\s+igd/i,
   /resume\s*medis/i,
+  /surat\s*(?:perintah|pengantar)\s*rawat\s*inap|\bSPRI\b/i,
+  /surat\s*eligibilitas\s*peserta/i,
 ];
 
 function isCriticalPage(text) {
@@ -343,7 +298,7 @@ function isCriticalPage(text) {
 // terbuang duluan. Halaman critical TIDAK PERNAH dianggap SEP.
 function isSepPage(text) {
   if (!text) return false;
-  if (isCriticalPage(text)) return false;
+  if (/triage\s+igd|triase\s+igd|resume\s*medis|skrining\s+awal\s+pasien\s+igd/i.test(text)) return false;
   return classifyPageDocumentType(text) === 'sep';
 }
 
