@@ -10,7 +10,7 @@ const { determineStatus } = require('../services/ruleEngine');
 const { generateExcel } = require('../services/exportService');
 const { buatDaftarKerja, namaBerkasDaftarKerja } = require('../services/daftarKerjaExportService');
 const { buatSiapSubmit, namaBerkasSiapSubmit } = require('../services/siapSubmitExportService');
-const { buatEksporPendingMix, namaBerkasPendingMix, satuPerSep } = require('../services/eksporPendingMixService');
+const { buatEksporPendingBulanan, namaBerkasPendingBulanan, satuPerSep } = require('../services/eksporPendingBulananService');
 const { logAudit } = require('../services/auditService');
 const konteksAi = require('../services/konteksPenggunaanAiService');
 const { estimatePromptTokens, estimateCompletionTokens } = require('../services/aiValidationService');
@@ -1199,8 +1199,9 @@ router.get('/export/daftar-kerja', authenticate, authorize('admin', 'verifikator
 });
 
 /**
- * Ekspor klaim PENDING satu bulan ke Excel berstruktur sama dengan ekspor MIX
- * E-Klaim (93 kolom) + lembar alasan pending & saran. ?periode=YYYY-MM wajib.
+ * Ekspor klaim PENDING satu bulan ke Excel: judul, tabel alasan pending &
+ * saran dengan kolom Jawaban Rumah Sakit (diisi casemix), dan keterangan.
+ * ?periode=YYYY-MM wajib.
  */
 router.get('/export/pending-bulanan', authenticate, authorize('admin', 'verifikator'), async (req, res) => {
   try {
@@ -1222,12 +1223,12 @@ router.get('/export/pending-bulanan', authenticate, authorize('admin', 'verifika
       for (const r of records) r.errors = per[r.id] || [];
     }
 
-    const buffer = await buatEksporPendingMix(records, { periode, diexportOleh: req.user.email });
-    const namaBerkas = namaBerkasPendingMix(records, periode);
+    const buffer = await buatEksporPendingBulanan(records, { periode, diexportOleh: req.user.email });
+    const namaBerkas = namaBerkasPendingBulanan(records, periode);
     // Berisi nama pasien, nomor kartu, dan diagnosis -- setiap ekspor dicatat.
     logAudit({
       userId: req.user.id, userEmail: req.user.email, action: 'export',
-      resourceType: 'pending_bulanan_mix', resourceId: null,
+      resourceType: 'pending_bulanan', resourceId: null,
       details: { format: 'excel', periode, jumlah_klaim: satuPerSep(records).length },
       ipAddress: req.ip,
     });
