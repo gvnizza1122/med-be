@@ -10,6 +10,7 @@ const { determineStatus } = require('../services/ruleEngine');
 const { generateExcel } = require('../services/exportService');
 const { buatDaftarKerja, namaBerkasDaftarKerja } = require('../services/daftarKerjaExportService');
 const { buatSiapSubmit, namaBerkasSiapSubmit } = require('../services/siapSubmitExportService');
+const { buatEksporPendingMix, namaBerkasPendingMix, satuPerSep } = require('../services/eksporPendingMixService');
 const { logAudit } = require('../services/auditService');
 const konteksAi = require('../services/konteksPenggunaanAiService');
 const { estimatePromptTokens, estimateCompletionTokens } = require('../services/aiValidationService');
@@ -1193,6 +1194,48 @@ router.get('/export/daftar-kerja', authenticate, authorize('admin', 'verifikator
     res.send(Buffer.from(buffer));
   } catch (err) {
     console.error('[daftar-kerja] error:', err);
+    res.status(500).json({ error: 'Terjadi gangguan pada sistem. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' });
+  }
+});
+
+/**
+ * Ekspor klaim PENDING satu bulan ke Excel berstruktur sama dengan ekspor MIX
+ * E-Klaim (93 kolom) + lembar alasan pending & saran. ?periode=YYYY-MM wajib.
+ */
+router.get('/export/pending-bulanan', authenticate, authorize('admin', 'verifikator'), async (req, res) => {
+  try {
+    const periode = String(req.query.periode || '').trim();
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(periode)) {
+      return res.status(400).json({ error: 'Pilih bulan klaim (format YYYY-MM).' });
+    }
+    const db = getDb();
+    const syarat = ["cr.validation_status <> 'valid'", 'cf.is_testing = FALSE', 'cr.periode = ?'];
+    syarat.push(req.query.arsip === '1' ? 'cf.diarsipkan_pada IS NOT NULL' : 'cf.diarsipkan_pada IS NULL');
+    const records = await db.prepare(
+      `SELECT cr.* FROM claim_records cr JOIN claim_files cf ON cf.id = cr.file_id WHERE ${syarat.join(' AND ')} ORDER BY cr.created_at DESC`,
+    ).all(periode);
+
+    if (records.length) {
+      const ids = records.map(r => r.id);
+      const errors = await db.prepare(`SELECT * FROM validation_errors WHERE record_id IN (${ids.map(() => '?').join(',')})`).all(...ids);
+      const per = errors.reduce((acc, e) => ((acc[e.record_id] ||= []).push(e), acc), {});
+      for (const r of records) r.errors = per[r.id] || [];
+    }
+
+    const buffer = await buatEksporPendingMix(records, { periode, diexportOleh: req.user.email });
+    const namaBerkas = namaBerkasPendingMix(records, periode);
+    // Berisi nama pasien, nomor kartu, dan diagnosis -- setiap ekspor dicatat.
+    logAudit({
+      userId: req.user.id, userEmail: req.user.email, action: 'export',
+      resourceType: 'pending_bulanan_mix', resourceId: null,
+      details: { format: 'excel', periode, jumlah_klaim: satuPerSep(records).length },
+      ipAddress: req.ip,
+    });
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename=${namaBerkas}`);
+    res.send(Buffer.from(buffer));
+  } catch (err) {
+    console.error('[pending-bulanan] error:', err);
     res.status(500).json({ error: 'Terjadi gangguan pada sistem. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' });
   }
 });
