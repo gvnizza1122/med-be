@@ -10,7 +10,7 @@ const { determineStatus } = require('../services/ruleEngine');
 const { generateExcel } = require('../services/exportService');
 const { buatDaftarKerja, namaBerkasDaftarKerja } = require('../services/daftarKerjaExportService');
 const { buatSiapSubmit, namaBerkasSiapSubmit } = require('../services/siapSubmitExportService');
-const { buatEksporPendingBulanan, namaBerkasPendingBulanan, satuPerSep } = require('../services/eksporPendingBulananService');
+const { buatEksporPendingBulanan, namaBerkasPendingBulanan, pilihKlaimPending } = require('../services/eksporPendingBulananService');
 const { logAudit } = require('../services/auditService');
 const konteksAi = require('../services/konteksPenggunaanAiService');
 const { estimatePromptTokens, estimateCompletionTokens } = require('../services/aiValidationService');
@@ -1210,10 +1210,17 @@ router.get('/export/pending-bulanan', authenticate, authorize('admin', 'verifika
       return res.status(400).json({ error: 'Pilih bulan klaim (format YYYY-MM).' });
     }
     const db = getDb();
-    const syarat = ["cr.validation_status <> 'valid'", 'cf.is_testing = FALSE', 'cr.periode = ?'];
+    // SEMUA unggahan periode ini, termasuk yang valid: berkas yang sama sering
+    // diunggah berkali-kali, dan yang menentukan adalah unggahan terakhir tiap
+    // kunjungan (lihat pilihKlaimPending). Menyaring "bukan valid" di SQL
+    // membuat unggahan lama yang bermasalah ikut terekspor walau unggahan
+    // terbarunya sudah valid.
+    const syarat = ['cf.is_testing = FALSE', 'cr.periode = ?'];
     syarat.push(req.query.arsip === '1' ? 'cf.diarsipkan_pada IS NOT NULL' : 'cf.diarsipkan_pada IS NULL');
+    // Cakupan sama dengan Riwayat Upload (tanpa saringan kode RS), supaya isi
+    // Excel cocok dengan yang dilihat pengguna di layar.
     const records = await db.prepare(
-      `SELECT cr.* FROM claim_records cr JOIN claim_files cf ON cf.id = cr.file_id WHERE ${syarat.join(' AND ')} ORDER BY cr.created_at DESC`,
+      `SELECT cr.*, cf.file_name, cf.created_at AS uploaded_at FROM claim_records cr JOIN claim_files cf ON cf.id = cr.file_id WHERE ${syarat.join(' AND ')} ORDER BY cr.created_at DESC`,
     ).all(periode);
 
     if (records.length) {
@@ -1223,13 +1230,14 @@ router.get('/export/pending-bulanan', authenticate, authorize('admin', 'verifika
       for (const r of records) r.errors = per[r.id] || [];
     }
 
-    const buffer = await buatEksporPendingBulanan(records, { periode, diexportOleh: req.user.email });
-    const namaBerkas = namaBerkasPendingBulanan(records, periode);
+    const kodeRs = req.user.hospital_code || null;
+    const buffer = await buatEksporPendingBulanan(records, { periode, diexportOleh: req.user.email, kodeRs });
+    const namaBerkas = namaBerkasPendingBulanan(records, periode, kodeRs);
     // Berisi nama pasien, nomor kartu, dan diagnosis -- setiap ekspor dicatat.
     logAudit({
       userId: req.user.id, userEmail: req.user.email, action: 'export',
       resourceType: 'pending_bulanan', resourceId: null,
-      details: { format: 'excel', periode, jumlah_klaim: satuPerSep(records).length },
+      details: { format: 'excel', periode, jumlah_klaim: pilihKlaimPending(records).length },
       ipAddress: req.ip,
     });
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -1845,7 +1853,7 @@ async function detectAndFlagInternalEpisodes(db, { hospitalCode, nokartu, admiss
   if (!nokartu || !admissionDate) return;
   try {
     const siblings = await db.prepare(`
-      SELECT cr.id, cr.klinik_poli, cr.jenis_konsultasi, cr.raw_data, cr.kode_rs, cr.sep,
+      SELECT cr.id, cr.file_id, cr.klinik_poli, cr.jenis_konsultasi, cr.raw_data, cr.kode_rs, cr.sep,
              cr.nokartu, cr.nama_pasien, cr.mrn, cr.birth_date, cr.gender, cr.kelas_rawat,
              cr.admission_date, cr.discharge_date, cr.discharge_status, cr.diagnosa_list,
              cr.prosedur_list, cr.dpjp_name, cr.tarif_rs, cr.jenis_klaim
@@ -1901,6 +1909,11 @@ async function detectAndFlagInternalEpisodes(db, { hospitalCode, nokartu, admiss
         }
       });
     }
+    // Status klaim di BERKAS LAIN ikut berubah di atas -- hitungan berkas-berkas
+    // itu harus ikut diperbarui, kalau tidak Riwayat Upload menampilkan angka
+    // basi (ditemukan 7 Okt 2026: 4 upload MUNAWIR tampil "perlu dikerjakan"
+    // padahal klaimnya sudah valid).
+    await perbaruiHitunganBerkas(db, siblings.map(s => s.file_id));
   } catch (err) {
     // Cross-check ini tambahan (best-effort) — kegagalannya TIDAK BOLEH
     // menggagalkan upload utama, cukup log.
@@ -1985,6 +1998,17 @@ async function recomputeFileCounts(db, fileId) {
     UPDATE claim_files SET valid_count = ?, error_count = ?, pending_count = ?
     WHERE id = ?
   `).run(Number(counts?.valid_count || 0), Number(counts?.error_count || 0), Number(counts?.pending_count || 0), fileId);
+}
+
+/** Perbarui hitungan beberapa berkas sekaligus (unik, best-effort per berkas). */
+async function perbaruiHitunganBerkas(db, fileIds) {
+  for (const fileId of new Set((fileIds || []).filter(Boolean))) {
+    try {
+      await recomputeFileCounts(db, fileId);
+    } catch (err) {
+      console.warn(`[perbaruiHitunganBerkas] berkas ${fileId}: ${err.message}`);
+    }
+  }
 }
 
 /** claim_records.admission_date tersimpan "YYYY-MM-DD" (lihat vclaimDateToISO) -> "MM/YYYY". */
@@ -2116,6 +2140,8 @@ async function detectAndFlagPRB(db, { hospitalCode, mrn, nokartu, admissionDate,
         }
       });
     }
+    // Record periode lain milik pasien ini bisa berada di berkas lain.
+    await perbaruiHitunganBerkas(db, fullRows.map(r => r.file_id));
   } catch (err) {
     console.warn(`[detectAndFlagPRB] gagal untuk nokartu=${nokartu}: ${err.message}`);
   }
@@ -4321,6 +4347,9 @@ module.exports.vclaimDateToISO = vclaimDateToISO;
 module.exports.resolvePdfPath = resolvePdfPath;
 module.exports.RESOLVED_UPLOAD_DIR = RESOLVED_UPLOAD_DIR;
 module.exports.isiKodeDariSaranTervalidasi = isiKodeDariSaranTervalidasi;
+// Diekspor untuk test: validasi ulang lintas berkas wajib memperbarui hitungan berkas.
+module.exports.detectAndFlagInternalEpisodes = detectAndFlagInternalEpisodes;
+module.exports.detectAndFlagPRB = detectAndFlagPRB;
 
 module.exports.processSinglePdfUpload = processSinglePdfUpload;
 module.exports.lanjutkanAnalisisTersimpan = lanjutkanAnalisisTersimpan;

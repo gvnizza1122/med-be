@@ -69,15 +69,74 @@ function alasanDanSaran(record) {
   return { ringkasan, alasan: bernomor(alasan), saran: bernomor(saran) };
 }
 
-/** Satu klaim per SEP: berkas yang sama sering diunggah ulang -- ambil yang terbaru. */
-function satuPerSep(records) {
-  const peta = new Map();
-  for (const r of records || []) {
-    const kunci = String(r.sep || '').trim().toUpperCase() || `tanpa-sep:${r.id}`;
-    const lama = peta.get(kunci);
-    if (!lama || new Date(r.created_at || 0) > new Date(lama.created_at || 0)) peta.set(kunci, r);
+const bersih = (v) => String(v || '').trim().toUpperCase();
+// Tanggal masuk bisa datang sebagai Date (kolom DATE) atau teks "YYYY-MM-DD".
+// Komponen lokal dipakai, bukan toISOString(), yang menggeser tanggal satu
+// hari di zona WIB (tengah malam lokal = 17:00 UTC hari sebelumnya).
+const tanggal = (v) => {
+  if (!v) return '';
+  if (v instanceof Date) {
+    if (isNaN(v)) return '';
+    return `${v.getFullYear()}-${String(v.getMonth() + 1).padStart(2, '0')}-${String(v.getDate()).padStart(2, '0')}`;
   }
-  return [...peta.values()].sort((a, b) => String(a.sep || '').localeCompare(String(b.sep || '')));
+  return String(v).slice(0, 10);
+};
+const waktuUnggah = (r) => new Date(r.created_at || r.uploaded_at || 0).getTime() || 0;
+
+/**
+ * Kelompokkan upload menjadi KUNJUNGAN dan ambil upload TERAKHIR tiap kunjungan.
+ *
+ * Berkas klaim yang sama sering diunggah berkali-kali (7 Okt 2026: satu
+ * pasien 5x, satu lagi 6x). Yang mewakili keadaan klaim adalah unggahan
+ * terakhir -- unggahan lama yang dulu bermasalah tidak relevan bila unggahan
+ * terbarunya sudah valid.
+ *
+ * Kunci kunjungan: SEP. Unggahan yang SEP-nya tidak terbaca digabung ke
+ * kunjungan ber-SEP dengan MRN + tanggal masuk yang sama bila padanannya
+ * tepat satu; bila tidak ada padanan, MRN + tanggal masuk menjadi kuncinya;
+ * bila itu pun kosong, unggahan berdiri sendiri.
+ */
+function kelompokkanKunjungan(records) {
+  const grup = new Map();
+  const tambah = (kunci, r) => { if (!grup.has(kunci)) grup.set(kunci, []); grup.get(kunci).push(r); };
+  const sepPerMrnTanggal = new Map();
+  for (const r of records || []) {
+    if (!bersih(r.sep)) continue;
+    tambah(`sep:${bersih(r.sep)}`, r);
+    if (bersih(r.mrn) && tanggal(r.admission_date)) {
+      const k = `${bersih(r.mrn)}|${tanggal(r.admission_date)}`;
+      if (!sepPerMrnTanggal.has(k)) sepPerMrnTanggal.set(k, new Set());
+      sepPerMrnTanggal.get(k).add(bersih(r.sep));
+    }
+  }
+  for (const r of records || []) {
+    if (bersih(r.sep)) continue;
+    const mrnTanggal = bersih(r.mrn) && tanggal(r.admission_date) ? `${bersih(r.mrn)}|${tanggal(r.admission_date)}` : null;
+    const padanan = mrnTanggal ? sepPerMrnTanggal.get(mrnTanggal) : null;
+    if (padanan && padanan.size === 1) tambah(`sep:${[...padanan][0]}`, r);
+    else if (mrnTanggal) tambah(`kunjungan:${mrnTanggal}`, r);
+    else tambah(`unggahan:${r.id}`, r);
+  }
+  return [...grup.values()].map(daftar => {
+    const urut = [...daftar].sort((a, b) => waktuUnggah(b) - waktuUnggah(a));
+    const terbaru = urut[0];
+    // SEP diambil dari unggahan mana pun di kunjungan ini bila yang terbaru
+    // tidak terbaca, supaya baris Excel tetap bisa dicocokkan.
+    const sep = bersih(terbaru.sep) ? terbaru.sep : (urut.find(x => bersih(x.sep)) || {}).sep || '';
+    return { ...terbaru, sep, jumlah_unggahan: daftar.length };
+  });
+}
+
+/** Kunjungan yang unggahan terakhirnya berstatus bukan valid, urut SEP. */
+function pilihKlaimPending(records) {
+  return kelompokkanKunjungan(records)
+    .filter(r => String(r.validation_status || '').toLowerCase() !== 'valid')
+    .sort((a, b) => String(a.sep || a.nama_pasien || '').localeCompare(String(b.sep || b.nama_pasien || '')));
+}
+
+/** Satu klaim per SEP (dipakai pemanggil lama): unggahan terbaru per kunjungan. */
+function satuPerSep(records) {
+  return kelompokkanKunjungan(records).sort((a, b) => String(a.sep || '').localeCompare(String(b.sep || '')));
 }
 
 /** "07/10/2026 22:19 WIB" -- WIB tetap UTC+7, tanpa bergantung zona waktu server. */
@@ -87,7 +146,7 @@ function waktuWib(d = new Date()) {
   return `${dua(w.getUTCDate())}/${dua(w.getUTCMonth() + 1)}/${w.getUTCFullYear()} ${dua(w.getUTCHours())}:${dua(w.getUTCMinutes())} WIB`;
 }
 
-const kodeRsDari = (records) => (records || []).map(r => r.kode_rs || parseJson(r.raw_data).KODE_RS).find(Boolean) || null;
+const kodeRsDari = (records, cadangan = null) => (records || []).map(r => r.kode_rs || parseJson(r.raw_data).KODE_RS).find(Boolean) || cadangan || null;
 
 const GARIS = { style: 'thin', color: { argb: 'FFB7B7B7' } };
 const BINGKAI = { top: GARIS, left: GARIS, bottom: GARIS, right: GARIS };
@@ -101,14 +160,17 @@ function satuBarisPenuh(ws, baris, nilai, gaya = {}) {
 }
 
 /**
- * @param {Array} records klaim (claim_records + errors) satu periode
- * @param {{periode: string, diexportOleh?: string, namaRs?: string, waktu?: Date}} cakupan
+ * @param {Array} records SEMUA unggahan klaim satu periode (claim_records +
+ *   errors + file_name), termasuk yang valid: pengelompokan per kunjungan
+ *   butuh unggahan valid untuk tahu bahwa unggahan lama yang bermasalah
+ *   sudah digantikan.
+ * @param {{periode: string, diexportOleh?: string, namaRs?: string, kodeRs?: string, waktu?: Date}} cakupan
  */
 async function buatEksporPendingBulanan(records, cakupan = {}) {
-  const daftar = satuPerSep(records);
+  const daftar = pilihKlaimPending(records);
   const periode = cakupan.periode ? labelPeriode(cakupan.periode) : '-';
   const namaRs = cakupan.namaRs || 'RS Lestari Raharja';
-  const kodeRs = kodeRsDari(records);
+  const kodeRs = kodeRsDari(records, cakupan.kodeRs);
 
   const wb = new ExcelJS.Workbook();
   wb.created = cakupan.waktu || new Date();
@@ -140,7 +202,7 @@ async function buatEksporPendingBulanan(records, cakupan = {}) {
     const a = alasanDanSaran(r);
     const row = ws.getRow(baris);
     row.values = {
-      no: i + 1, sep: r.sep || '', nama: r.nama_pasien || '',
+      no: i + 1, sep: r.sep || `(SEP tidak terbaca${r.file_name ? ` — berkas ${r.file_name}` : ''})`, nama: r.nama_pasien || '',
       status: LABEL_STATUS[r.validation_status] || String(r.validation_status || '').toUpperCase(),
       ringkasan: a.ringkasan, alasan: a.alasan, saran: a.saran, jawaban: '',
     };
@@ -167,6 +229,7 @@ async function buatEksporPendingBulanan(records, cakupan = {}) {
   const keterangan = [
     ['Periode', periode],
     ['Isi', 'Klaim berstatus pending menurut medaudit (bukan keputusan BPJS)'],
+    ['Cara hitung', 'Satu baris per kunjungan (SEP). Bila berkas yang sama diunggah berkali-kali, yang dipakai unggahan terakhir.'],
     ['Jumlah klaim', daftar.length],
     ['Tanggal ekspor', waktuWib(cakupan.waktu || new Date())],
     ['Diekspor oleh', cakupan.diexportOleh || '-'],
@@ -191,11 +254,11 @@ async function buatEksporPendingBulanan(records, cakupan = {}) {
 }
 
 /** <KODE_RS>_<YYYYMM>_PENDING.xlsx */
-function namaBerkasPendingBulanan(records, periode) {
-  return `${kodeRsDari(records) || 'RS'}_${String(periode || '').replace('-', '')}_PENDING.xlsx`;
+function namaBerkasPendingBulanan(records, periode, kodeRsCadangan = null) {
+  return `${kodeRsDari(records, kodeRsCadangan) || 'RS'}_${String(periode || '').replace('-', '')}_PENDING.xlsx`;
 }
 
 module.exports = {
-  KOLOM, BARIS_JUDUL_TABEL, alasanDanSaran, satuPerSep, waktuWib, labelKolom,
+  KOLOM, BARIS_JUDUL_TABEL, alasanDanSaran, satuPerSep, kelompokkanKunjungan, pilihKlaimPending, waktuWib, labelKolom,
   buatEksporPendingBulanan, namaBerkasPendingBulanan,
 };

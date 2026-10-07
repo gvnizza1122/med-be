@@ -5,7 +5,7 @@
  */
 const ExcelJS = require('exceljs');
 const {
-  KOLOM, BARIS_JUDUL_TABEL, alasanDanSaran, satuPerSep, waktuWib, labelKolom,
+  KOLOM, BARIS_JUDUL_TABEL, alasanDanSaran, satuPerSep, kelompokkanKunjungan, pilihKlaimPending, waktuWib, labelKolom,
   buatEksporPendingBulanan, namaBerkasPendingBulanan,
 } = require('../../services/eksporPendingBulananService');
 
@@ -83,15 +83,30 @@ describe('bentuk berkas', () => {
     expect(ket).toEqual({
       Periode: 'Agustus 2026',
       Isi: 'Klaim berstatus pending menurut medaudit (bukan keputusan BPJS)',
+      'Cara hitung': 'Satu baris per kunjungan (SEP). Bila berkas yang sama diunggah berkali-kali, yang dipakai unggahan terakhir.',
       'Jumlah klaim': 2,
       'Tanggal ekspor': '07/10/2026 22:19 WIB',
       'Diekspor oleh': 'uji@medaudit',
     });
   });
 
-  test('periode tanpa klaim pending: tabel tetap ada dengan keterangan kosong', async () => {
-    const ws = (await bacaLembar([])).worksheets[0];
+  test('periode tanpa klaim pending: tabel tetap ada, kode RS dari akun tetap tampil', async () => {
+    const ws = (await bacaLembar([], { kodeRs: '3371084' })).worksheets[0];
     expect(ws.getCell(BARIS_JUDUL_TABEL + 1, 1).value).toBe('Tidak ada klaim pending pada periode ini.');
+    expect(ws.getCell('A2').value).toBe('RS Lestari Raharja (3371084) · Periode Agustus 2026');
+    expect(namaBerkasPendingBulanan([], '2026-10', '3371084')).toBe('3371084_202610_PENDING.xlsx');
+  });
+
+  test('periode yang semua klaimnya valid: tidak ada baris pending', async () => {
+    const valid = [{ id: 'v1', sep: 'S1', validation_status: 'valid', created_at: '2026-10-01', ai_review: '{}', errors: [] }];
+    const ws = (await bacaLembar(valid)).worksheets[0];
+    expect(ws.getCell(BARIS_JUDUL_TABEL + 1, 1).value).toBe('Tidak ada klaim pending pada periode ini.');
+  });
+
+  test('SEP tidak terbaca: ditandai dengan nama berkas, bukan dibiarkan kosong', async () => {
+    const tanpaSep = [{ id: 't1', sep: '', file_name: '178677.pdf', nama_pasien: 'PASIEN UJI', validation_status: 'error', created_at: '2026-09-01', ai_review: '{}', errors: [] }];
+    const ws = (await bacaLembar(tanpaSep)).worksheets[0];
+    expect(ws.getCell(BARIS_JUDUL_TABEL + 1, 2).value).toBe('(SEP tidak terbaca — berkas 178677.pdf)');
   });
 });
 
@@ -111,6 +126,66 @@ describe('alasan pending & saran', () => {
   test('label kolom', () => {
     expect(labelKolom('dpjp_name')).toBe('DPJP');
     expect(labelKolom('kolom_lain')).toBe('KOLOM_LAIN');
+  });
+});
+
+describe('satu baris per kunjungan, unggahan terakhir menentukan (kasus 7 Okt 2026)', () => {
+  // Meniru data September: pasien A diunggah 5x (terakhir pending), pasien B
+  // diunggah 6x -- 4 unggahan lama SEP tidak terbaca & bermasalah, 2 unggahan
+  // terakhir ber-SEP dan valid -- pasien C sekali, valid.
+  const u = (id, o) => ({ id, ai_review: '{}', errors: [], ...o });
+  const A = (id, st, t) => u(id, { sep: '0170R0110926V001943', mrn: '105088', admission_date: '2026-09-17', validation_status: st, created_at: t });
+  const B = (id, st, t, sep = '') => u(id, { sep, mrn: '178677', admission_date: '2026-09-15', validation_status: st, created_at: t, file_name: '178677.pdf' });
+  const DATA = [
+    A('a1', 'valid', '2026-09-23T07:39'), A('a2', 'valid', '2026-09-25T09:07'), A('a3', 'valid', '2026-09-25T19:59'),
+    A('a4', 'valid', '2026-09-25T20:26'), A('a5', 'pending', '2026-09-25T20:46'),
+    B('b1', 'valid', '2026-09-22T01:04'), B('b2', 'error', '2026-09-23T08:21'), B('b3', 'valid', '2026-09-23T15:17'),
+    B('b4', 'error', '2026-09-25T08:57'), B('b5', 'valid', '2026-10-04T01:30', '0170R0110926V001733'),
+    B('b6', 'valid', '2026-10-04T03:05', '0170R0110926V001733'),
+    u('c1', { sep: '0170R0110926V002984', mrn: '178894', admission_date: '2026-09-26', validation_status: 'valid', created_at: '2026-10-06' }),
+  ];
+
+  test('12 unggahan = 3 kunjungan', () => {
+    const k = kelompokkanKunjungan(DATA);
+    expect(k).toHaveLength(3);
+    expect(Object.fromEntries(k.map(x => [x.sep, [x.id, x.jumlah_unggahan]]))).toEqual({
+      '0170R0110926V001943': ['a5', 5],
+      '0170R0110926V001733': ['b6', 6],
+      '0170R0110926V002984': ['c1', 1],
+    });
+  });
+
+  test('hanya kunjungan yang unggahan terakhirnya pending yang diekspor', () => {
+    expect(pilihKlaimPending(DATA).map(x => x.id)).toEqual(['a5']);
+  });
+
+  test('unggahan lama pending tidak terekspor bila unggahan terbaru valid', () => {
+    const d = [A('lama', 'pending', '2026-09-01'), A('baru', 'valid', '2026-09-02')];
+    expect(pilihKlaimPending(d)).toEqual([]);
+  });
+
+  test('tanpa SEP & tanpa padanan: kunjungan berdiri sendiri per MRN + tanggal masuk', () => {
+    const d = [B('x1', 'error', '2026-09-01'), B('x2', 'error', '2026-09-02')];
+    const k = pilihKlaimPending(d);
+    expect(k.map(x => [x.id, x.jumlah_unggahan])).toEqual([['x2', 2]]);
+  });
+
+  test('dua SEP berbeda di MRN + tanggal yang sama: unggahan tanpa SEP tidak ditebak masuk salah satunya', () => {
+    const d = [
+      u('s1', { sep: 'SEP-POLI-A', mrn: 'M1', admission_date: '2026-09-10', validation_status: 'valid', created_at: '2026-09-10T08:00' }),
+      u('s2', { sep: 'SEP-POLI-B', mrn: 'M1', admission_date: '2026-09-10', validation_status: 'valid', created_at: '2026-09-10T09:00' }),
+      u('s3', { sep: '', mrn: 'M1', admission_date: '2026-09-10', validation_status: 'error', created_at: '2026-09-11' }),
+    ];
+    expect(kelompokkanKunjungan(d)).toHaveLength(3);
+    expect(pilihKlaimPending(d).map(x => x.id)).toEqual(['s3']);
+  });
+
+  test('tanggal masuk berupa Date tidak bergeser zona waktu', () => {
+    const d = [
+      u('d1', { sep: 'S9', mrn: 'M9', admission_date: new Date(2026, 8, 15), validation_status: 'valid', created_at: '2026-09-20' }),
+      u('d2', { sep: '', mrn: 'M9', admission_date: '2026-09-15', validation_status: 'error', created_at: '2026-09-16' }),
+    ];
+    expect(kelompokkanKunjungan(d)).toHaveLength(1);
   });
 });
 
