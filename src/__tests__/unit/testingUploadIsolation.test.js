@@ -1,6 +1,6 @@
 let mockDb;
 jest.mock('../../database/init',()=>({getDb:()=>mockDb}));
-jest.mock('../../services/pdfExtractionPipeline',()=>({extractFromPDF:jest.fn(async()=>({success:true,record:{SEP:'123',MRN:'rm',NOKARTU:'kartu',DIAGLIST:'J44.9;J18.9',KELAS_RS:'D',KELAS_RAWAT:'',DISCHARGE_STATUS:'',TARIF_RS:'',ADMISSION_DATE:'01/09/2026'}}))}));
+jest.mock('../../services/pdfExtractionPipeline',()=>({extractFromPDF:jest.fn(async()=>({success:true,jenisKlaimDetection:{value:'RAWAT_JALAN',confident:true,source:'jenis_pelayanan_sep'},record:{SEP:'123',MRN:'rm',NOKARTU:'kartu',DIAGLIST:'J44.9;J18.9',KELAS_RS:'D',KELAS_RAWAT:'',DISCHARGE_STATUS:'',TARIF_RS:'',ADMISSION_DATE:'01/09/2026'}}))}));
 jest.mock('../../services/validasiRecordKamusService',()=>({validasiRecordDenganKamus:jest.fn(async()=>[])}));
 jest.mock('../../services/aiReviewService',()=>({generateAiReview:jest.fn(async()=>({knowledge_updates:[{text:'test'}]}))}));
 jest.mock('../../services/simpanAiReviewService',()=>({simpanAiReview:jest.fn(async()=>{})}));

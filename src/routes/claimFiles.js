@@ -2706,12 +2706,9 @@ async function processSinglePdfUploadDenganKonteks(db, { filePath, originalName,
         dapat_diulang: !result.error_code && (!result.pesan || /coba lagi|tidak dapat dibaca/i.test(result.pesan)) };
     }
 
-    // jenisKlaim final: dipilih manual (upload 1 file) ATAU hasil deteksi
-    // otomatis dari isi dokumen (upload batch kategori-campur, lihat
-    // detectJenisKlaim di pdfPageClassifier.js + resolusinya di
-    // extractFromPDF). Semua pemakaian jenisKlaim di bawah ini otomatis
-    // pakai nilai final ini.
-    const jenisKlaim = fixedJenisKlaim || result.jenisKlaimDetection?.value || 'RAWAT_INAP';
+    // Kategori akhir mengikuti bukti dokumen yang sudah dibaca, termasuk OCR.
+    const jenisKlaim = result.jenisKlaimDetection?.value;
+    if(!JENIS_KLAIM_OPTIONS.includes(jenisKlaim))return {success:false,error:'Jenis pelayanan belum dapat dipastikan dari dokumen.',error_code:'jenis_layanan_perlu_ditinjau'};
 
     const fileId = plannedFileId || uuidv4();
     fileIdDibuat = fileId;
@@ -3372,7 +3369,7 @@ router.post('/upload-pdf', authenticate, pdfUpload.single('file'), async (req, r
     return res.status(400).json({ error: 'Belum ada berkas yang dipilih. Silakan pilih berkas PDF terlebih dahulu.' });
   }
 
-  const jenisKlaim = JENIS_KLAIM_OPTIONS.includes(req.body?.jenis_klaim) ? req.body.jenis_klaim : 'RAWAT_INAP';
+  const jenisKlaim = undefined; // Dokumen menentukan kategori, pilihan klien lama tidak mengunci.
   const db = getDb();
 
   const result = await processSinglePdfUpload(db, {
@@ -3459,7 +3456,7 @@ async function jalankanProsesUnggah(db, io, id, muatan) {
       }
       hasil = await processSinglePdfUpload(db, {
         filePath, originalName,
-        jenisKlaim: allowedJenisKlaim.length === 1 ? allowedJenisKlaim[0] : undefined,
+        jenisKlaim: undefined,
         allowedJenisKlaim, userId, hospitalCode, onTahap,
         fileId:muatan.fileId,recordId:muatan.recordId,
       });
@@ -3505,7 +3502,7 @@ router.post('/upload-pdf-antre', authenticate, pdfUploadBatch.array('files', MAX
       if (Array.isArray(parsed)) allowedJenisKlaim = parsed.filter(v => JENIS_KLAIM_OPTIONS.includes(v));
     } catch { /* fallback di bawah */ }
     if (allowedJenisKlaim.length === 0 && JENIS_KLAIM_OPTIONS.includes(req.body?.jenis_klaim)) allowedJenisKlaim = [req.body.jenis_klaim];
-    if (allowedJenisKlaim.length === 0) return res.status(400).json({ error: 'Pilih minimal satu kategori pelayanan yang mungkin ada di unggahan ini.' });
+    allowedJenisKlaim = [...JENIS_KLAIM_OPTIONS];
 
     const db = getDb();
     const io = req.app.get('io');
@@ -3569,9 +3566,7 @@ router.post('/upload-pdf-batch', authenticate, pdfUploadBatch.array('files', MAX
     } catch { /* biarkan kosong, jatuh ke fallback di bawah */ }
     const fallbackJenisKlaim = JENIS_KLAIM_OPTIONS.includes(req.body?.jenis_klaim) ? req.body.jenis_klaim : null;
     if (allowedJenisKlaim.length === 0 && fallbackJenisKlaim) allowedJenisKlaim = [fallbackJenisKlaim];
-    if (allowedJenisKlaim.length === 0) {
-      return res.status(400).json({ error: 'Pilih minimal satu kategori pelayanan yang mungkin ada di batch ini.' });
-    }
+    allowedJenisKlaim = [...JENIS_KLAIM_OPTIONS];
 
     const db = getDb();
     const batchId = uuidv4();
@@ -3624,10 +3619,8 @@ router.post('/upload-pdf-batch', authenticate, pdfUploadBatch.array('files', MAX
       const uploadPromise = processSinglePdfUpload(db, {
         filePath: file.path,
         originalName: file.originalname,
-        // jenisKlaim TIDAK diisi manual di sini — biarkan processSinglePdfUpload
-        // & extractFromPDF mendeteksi otomatis dari allowedJenisKlaim, KECUALI
-        // cuma 1 kategori yang ditoggle (tidak ambigu, langsung pasti).
-        jenisKlaim: allowedJenisKlaim.length === 1 ? allowedJenisKlaim[0] : undefined,
+        // Kedua kategori selalu dinilai dari dokumen, tanpa kunci pilihan klien.
+        jenisKlaim: undefined,
         allowedJenisKlaim,
         userId: req.user.id,
         hospitalCode: req.user.hospital_code,

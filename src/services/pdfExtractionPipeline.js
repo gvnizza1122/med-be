@@ -315,7 +315,7 @@ function parseDDMMYYYY(str) {
 // Pesan untuk pengguna akhir (perawat/verifikator) — tanpa istilah teknis.
 const PESAN = {
   tidakTerbaca: 'Dokumen tidak dapat dibaca. Pastikan berkas PDF tidak rusak, lalu unggah ulang.',
-  bukanBerkasKlaim: 'Halaman "Berkas Klaim Individual" tidak ditemukan di dokumen ini. Periksa apakah berkas yang diunggah sudah benar.',
+  bukanBerkasKlaim: 'Isi dokumen belum berhasil dibaca. Periksa layanan pembacaan PDF/OCR dan kelengkapan berkas.',
   dataKurang: 'Data pada dokumen terlalu sedikit untuk diproses. Periksa kembali kelengkapan berkas.',
   ekstraksiGagal: 'Data belum berhasil dibaca otomatis. Silakan coba lagi beberapa saat, atau isi manual bila tetap gagal.',
   belumDisetel: 'Layanan pembacaan otomatis belum aktif. Hubungi petugas IT rumah sakit.',
@@ -324,14 +324,8 @@ const PESAN = {
 /**
  * @param {string|Buffer} filePath - path PDF atau Buffer
  * @param {{skipAI?: boolean, jenisKlaim?: string, allowedJenisKlaim?: string[], originalName?: string}} options
- *   - jenisKlaim: kategori SUDAH PASTI (dipilih manual, mis. upload 1 file) —
- *     dipakai apa adanya, TIDAK ada deteksi otomatis.
- *   - allowedJenisKlaim: dipakai kalau kategori BELUM PASTI dan perlu
- *     dideteksi dari isi dokumen (upload batch kategori-campur) — daftar
- *     kategori yang verifikator toggle di awal sebagai "kemungkinan ada di
- *     batch ini". Hasil deteksi divalidasi terhadap daftar ini (lihat
- *     result.jenisKlaimDetection di bawah); kalau jenisKlaim juga diisi,
- *     jenisKlaim menang (allowedJenisKlaim diabaikan).
+ *   - jenisKlaim/allowedJenisKlaim: parameter klien lama diterima untuk kompatibilitas;
+ *     kategori akhir selalu ditentukan dari dokumen native/OCR, tanpa kunci manual.
  *   - originalName: nama file asli sebelum multer rename — dipakai fallback
  *     SEP (lihat applyDeterministicFallback) karena di dataset RS ini nama
  *     file adalah SEP-nya sendiri.
@@ -402,6 +396,7 @@ async function extractFromPDF(filePath, options = {}) {
             });
           } else {
             const ocrResult = await ocrPdfPages(filePath, 'all');
+            classification.ocr_enhancement = {pass1_general_ocr:ocrResult};
             if (ocrResult.success && ocrResult.pages.length > 0) {
               const halamanGrouperOcr = ocrResult.pages.filter(p => isLembarGrouper(p.text));
               if (halamanGrouperOcr.length > 0) {
@@ -472,33 +467,24 @@ async function extractFromPDF(filePath, options = {}) {
       }
     }
 
-    // Resolusi kategori pelayanan — jenisKlaim TETAP (dipilih manual) menang
-    // kalau diisi; kalau tidak, deteksi otomatis dari isi dokumen (upload
-    // batch kategori-campur) dibatasi ke allowedJenisKlaim yang verifikator
-    // toggle di awal. Dilakukan di sini (setelah klasifikasi, sebelum
-    // ekstraksi AI) karena butuh teks dokumen tapi ekstraksi AI sendiri
-    // butuh tau jenisKlaim dulu (aturan KELAS_RAWAT/tanggal beda per
-    // kategori) — jadi urutannya wajib klasifikasi -> deteksi -> ekstraksi.
-    let jenisKlaim = fixedJenisKlaim;
-    if (!jenisKlaim && Array.isArray(allowedJenisKlaim) && allowedJenisKlaim.length > 0) {
-      const allPagesTextForDetection = classification.pages.filter(p => !p.is_lembar_grouper).map(p => p.text_full).join('\n\n');
-      const detected = detectJenisKlaim(allPagesTextForDetection);
-      if (detected && allowedJenisKlaim.includes(detected)) {
-        jenisKlaim = detected;
-        result.jenisKlaimDetection = { value: detected, source: 'auto', confident: true };
-      } else if (allowedJenisKlaim.length === 1) {
-        // Cuma 1 kategori ditoggle -> tidak ambigu sama sekali biarpun
-        // deteksi konten gagal/kosong, langsung pakai itu tanpa tanda ragu.
-        jenisKlaim = allowedJenisKlaim[0];
-        result.jenisKlaimDetection = { value: jenisKlaim, source: 'single-allowed', confident: true };
-      } else {
-        // Terdeteksi tapi di luar daftar yang ditoggle, ATAU gagal terdeteksi
-        // sama sekali, DAN ada >1 kandidat — jangan menebak, pakai kandidat
-        // pertama tapi tandai TIDAK yakin supaya verifikator diberi tahu
-        // untuk cek manual (bukan disembunyikan sebagai hasil pasti).
-        jenisKlaim = allowedJenisKlaim[0];
-        result.jenisKlaimDetection = { value: jenisKlaim, source: detected ? 'detected-not-in-allowed-list' : 'undetected', confident: false };
-      }
+    // SEP/resume/SPRI dari native dan OCR menentukan kategori. Halaman IGD tidak
+    // mengganti bukti rawat inap; pilihan tunggal klien lama tidak mengunci hasil.
+    const { deteksiJenisDariHalaman } = require('./jenisLayananKlaimService');
+    const grouperNums=new Set([...(classification.grouperPages||[]).map(p=>p.page_num),...(classification.pages||[]).filter(p=>p.is_lembar_grouper).map(p=>p.page_num)]);
+    const ocr=((classification.ocr_enhancement?.pass1_general_ocr?.pages)||[])
+      .filter(p=>!grouperNums.has(p.page_number)&&!isLembarGrouper(p.text||''));
+    const ocrNums=new Set(ocr.filter(p=>String(p.text||'').trim().length>30).map(p=>p.page_number));
+    const pagesJenis=[...(classification.pages||[]).filter(p=>!p.is_lembar_grouper&&!ocrNums.has(p.page_num)),...ocr];
+    result.classification=classification;
+    result.jenisKlaimDetection=deteksiJenisDariHalaman(pagesJenis);
+    const jenisKlaim=result.jenisKlaimDetection.value;
+    if(!jenisKlaim&&!skipAI){
+      result.error_code='jenis_layanan_perlu_ditinjau';
+      result.errors.push(result.jenisKlaimDetection.source);
+      result.pesan=result.jenisKlaimDetection.konflik
+        ? 'Jenis pelayanan berbeda antar dokumen. Periksa SEP dan dokumen perawatan; berkas tersimpan tanpa menebak kategori.'
+        : 'Jenis pelayanan belum terbaca. Periksa halaman SEP atau surat perintah rawat inap; berkas tersimpan tanpa menebak kategori.';
+      return result;
     }
 
     if (skipAI) {

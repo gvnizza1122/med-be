@@ -12,6 +12,10 @@ function objek(value) {
 
 function perbaruiRisikoTampilan(record = {}, errors = [], options = {}) {
   const ai = { ...objek(record.ai_review) };
+  if(ai.kegawatdaruratan_assessment&&!Array.isArray(ai.kegawatdaruratan_assessment)) {
+    ai.kegawatdaruratan_assessment={...ai.kegawatdaruratan_assessment,
+      dokumentasi:require('./dokumentasiKegawatanService').nilaiDokumentasiKegawatan(ai.kegawatdaruratan_assessment)};
+  }
   // Hasil lama ikut aturan grouper terkini tanpa OCR/AI ulang. Ini hanya
   // perkiraan untuk tampilan; tidak menulis hasil resmi maupun kode pasien.
   if (ai.inacbg_result && ['RAWAT_INAP', 'RAWAT_JALAN'].includes(record.jenis_klaim || record.JENIS_KLAIM)) {

@@ -1045,13 +1045,14 @@ Field "kutipan" WAJIB kutipan verbatim baris tempat nilai itu tercatat (mis. "TD
 x/mnt"), field "page_number" WAJIB nomor halaman tempat kutipan itu berada.
 
 === BAGIAN 3: K1 — PENILAIAN BAHASA (HANYA dari SUMBER UTAMA, bukan ekstraksi angka, tetap butuh judgmentmu) ===
-WAJIB HANYA cari di teks SUMBER UTAMA untuk bagian ini -- JANGAN pakai RESUME MEDIS (PELENGKAP). K1 (Mengancam nyawa, membahayakan diri sendiri/orang lain/lingkungan): cari kata
-kunci EKSPLISIT di anamnesis/keluhan/PSIKOSOSIAL (baris SIRS/Suicidal Intention Rating Scale kalau ada) di
-TRIASE IGD yang menunjukkan risiko
-bunuh diri, membahayakan diri sendiri, membahayakan orang lain, atau bahaya lingkungan (mis. percobaan bunuh
-diri, ancaman kekerasan, overdosis sengaja, dsb). "status":"ya" HANYA kalau ADA kutipan eksplisit yang
-mendukung — JANGAN simpulkan dari nama diagnosis semata (mis. "sesak napas" TIDAK otomatis K1). Field
-"kutipan" WAJIB diisi kalau status "ya". Field "catatan" (1 kalimat Indonesia) jelaskan singkat alasannya.
+WAJIB HANYA cari di teks SUMBER UTAMA untuk bagian ini -- JANGAN pakai RESUME MEDIS (PELENGKAP).
+K1 (Mengancam nyawa, membahayakan diri sendiri/orang lain/lingkungan) dinilai dari kondisi klinis yang
+tercatat, termasuk ancaman nyawa akut atau risiko membahayakan diri/orang lain (mis. percobaan bunuh diri,
+ancaman kekerasan, overdosis). TIDAK wajib ada kalimat dokter “mengancam nyawa” atau “gawat darurat”.
+Status “ya” harus didukung kutipan kondisi nyata di sumber dan alasan yang menjelaskan kaitannya;
+jangan simpulkan dari nama diagnosis atau kunjungan IGD semata. Kutipan dan page_number WAJIB bila “ya”.
+K1 yang tidak terpenuhi tidak membatalkan K2–K5: satu kriteria yang didukung bukti sudah dapat mendukung
+penilaian dokumentasi kegawatdaruratan, tanpa menjamin ACC atau menggantikan penetapan klinis DPJP.
 
 === BAGIAN 4: TINDAKAN KEPERAWATAN SEGERA & SKOR ESI (HANYA dari SUMBER UTAMA) === (ditambah 19 Sep 2026, fix
 item 5 -- PROCLIST cuma berisi kode ICD-9-CM final e-Klaim, TIDAK PERNAH mencatat tindakan keperawatan yang

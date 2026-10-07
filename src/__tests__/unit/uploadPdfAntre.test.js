@@ -78,7 +78,7 @@ test('multipart 300 PDF diterima lengkap dengan muatan tersimpan sebelum pekerja
   expect(persisted).toHaveLength(300);
   for (const p of persisted) {
     const payload = JSON.parse(p.muatan);
-    expect(payload).toMatchObject({ originalName: p.file_name, allowedJenisKlaim: ['RAWAT_INAP'], hospitalCode: 'BULK_TEST' });
+    expect(payload).toMatchObject({ originalName: p.file_name, allowedJenisKlaim: ['RAWAT_JALAN','RAWAT_INAP'], hospitalCode: 'BULK_TEST' });
     expect(fs.existsSync(payload.filePath)).toBe(true);
   }
   expect(response.body.proses.every(p => !('muatan' in p) && !('filePath' in p))).toBe(true);
