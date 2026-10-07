@@ -1,4 +1,4 @@
-const { rentangBulan, ringkasanBulanan, gabung, bulanKini } = require('../../services/penggunaanAiService');
+const { rentangBulan, ringkasanBulanan, gabung, bulanKini, biayaBerkas } = require('../../services/penggunaanAiService');
 const konteks = require('../../services/konteksPenggunaanAiService');
 const catatan = require('../../services/catatanPanggilanModelService');
 
@@ -60,6 +60,23 @@ test('catatan hanya menyimpan metadata token dan rumah sakit, tanpa prompt/pasie
   expect(await catatan.catat(db, { tugas: 'baca_berkas', ok: false, hospital_code: 'RS-A', record_id: 'rec', penggunaan: { total_tokens: 123 }, prompt: 'RAHASIA', nama_pasien: 'RAHASIA' })).toBe(true);
   const [sql, params] = db.run.mock.calls[0];
   expect(sql).toContain("timezone('UTC', CURRENT_TIMESTAMP)");
-  expect(params.slice(-3)).toEqual([123, 'RS-A', 'rec']);
+  expect(params.slice(-4)).toEqual([123, 'RS-A', 'rec',null]);
   expect(params).not.toContain('RAHASIA');
+});
+
+test('biaya per berkas dibatasi RS dan dipaginasi tanpa mengubah catatan biaya',async()=>{
+ const db={all:jest.fn(async()=>[{file_id:'f',file_name:'simulasi.pdf',calls:'3',priced_calls:'2',total_tokens:'1000',estimated_idr:'216',total_files:'30',target_idr:'500',batas_idr:'600',terpakai_idr:'250',dicadangkan_idr:'5',belum_pasti_idr:'7',gagal_idr:'10',tambahan_alasan:[]}])};
+ const r=await biayaBerkas(db,'RS-A','2026-10',2);
+ expect(r).toMatchObject({page:2,page_size:25,total_files:30,files:[{file_id:'f',calls:3,priced_calls:2,estimated_idr:216,budget:{terpakai_idr:250,dicadangkan_idr:5,belum_pasti_idr:7,gagal_idr:10}}]});
+ expect(db.all.mock.calls[0][1]).toEqual(['RS-A','2026-09-30 17:00:00','2026-10-31 17:00:00','RS-A','2026-09-30 17:00:00','2026-10-31 17:00:00',25,25]);
+});
+test('biaya lama tanpa estimasi dan tanpa anggaran tidak dianggap gratis',async()=>{
+ const db={all:async()=>[{file_id:'f',file_name:'simulasi.pdf',calls:2,priced_calls:0,total_tokens:null,estimated_idr:null,total_files:1}]};
+ expect((await biayaBerkas(db,'RS','2026-10')).files[0]).toMatchObject({estimated_idr:null,budget:null,total_tokens:null});
+});
+test('biaya berkas tidak membuka scope global untuk akun tanpa RS',async()=>{
+ const db={all:jest.fn()};await expect(biayaBerkas(db,null,'2026-10')).rejects.toMatchObject({status:403});expect(db.all).not.toHaveBeenCalled();
+});
+test.each([0,-1,'x','1 OR 1=1',100001])('paginasi biaya menolak %s',async page=>{
+ const db={all:jest.fn()};await expect(biayaBerkas(db,'RS','2026-10',page)).rejects.toMatchObject({status:400});expect(db.all).not.toHaveBeenCalled();
 });

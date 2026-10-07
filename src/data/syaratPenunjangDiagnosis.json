@@ -1,6 +1,6 @@
 {
-  "_tentang": "Syarat penunjang diagnosis — Tipe 2 (tindakan ada) & Tipe 1 (hasilnya mendukung). Kelima aturan di bawah berasal dari kalimat verifikator BPJS pada rekap pending RS Lestari Raharja sendiri, bukan dari pedoman klinis umum. RS ini pernah benar-benar kehilangan klaim karena alasan-alasan itu.",
-  "_peringatan_penting": "Nilai ambang di sini (Hb < 8, kenaikan kreatinin 1,5-1,9) berasal dari kalimat verifikator BPJS pada rekap pending RS ini, dan sebagian menyebut \"sesuai dengan BA Kesepakatan\" — kesepakatan lokal dengan BPJS setempat. Tim casemix RS Lestari Raharja mengesahkan kelimanya pada 23 Sep 2026, sehingga aturan ini AKTIF untuk RS ini. Kalau sistem dipakai RS lain, seluruh ambang wajib ditelaah ulang: kesepakatan lokal tidak berlaku otomatis di tempat lain.",
+  "_tentang": "Persyaratan penunjang klaim BPJS: pelaksanaan pemeriksaan dan bukti hasil/pemenuhan ambang dinilai terpisah. Rujukan dalam berkas ini berasal dari catatan verifikator BPJS pada rekap pending RS Lestari Raharja; bukan aturan internal rumah sakit.",
+  "_peringatan_penting": "Sumber dan cakupan setiap persyaratan harus dipertahankan sesuai dokumen rujukan. Rekap pending merupakan rujukan verifikasi klaim BPJS, bukan bukti bahwa setiap ambang berlaku nasional. Status diverifikasi menunjukkan rujukan telah ditelaah untuk digunakan aplikasi. Adaptasi ketersediaan layanan RS, seperti tidak tersedianya rehabilitasi medis, tidak otomatis menghapus atau memenuhi persyaratan klaim BPJS.",
   "_kode_prosedur": "Seluruh kode ICD-9-CM di bawah diperiksa ke kamus icd9_cm_procedures di basis data sistem ini, bukan dari ingatan. 87.44 Routine chest x-ray · 87.03 CT of head · 90.41 Bacterial smear sputum · 91.39 Microscopic examination of urine · 90.59 Microscopic examination of blood.",
   "aturan": [
     {
@@ -39,8 +39,8 @@
           "nama": "Antibiotik intravena minimal 72 jam",
           "kode_prosedur": [],
           "tingkat_risiko": "wajib",
-          "dapat_diperiksa_sistem": false,
-          "catatan_batasan": "Tidak dapat diperiksa sistem. Daftar obat di berkas klaim RS ini berbentuk tabel berkolom yang nyaris tidak terbaca OCR — diperiksa pada 6 klaim J18 di server, yang tersisa hanya potongan seperti 'Lwopexarin'. Melaporkannya sebagai 'tidak ada' akan berarti menuduh pasien pneumonia tidak diberi antibiotik, padahal yang gagal adalah pembacaannya. Lama pemberian 72 jam pun tidak tercatat dalam bentuk yang bisa dihitung. Perlu diperiksa manusia pada berkas aslinya."
+          "catatan_batasan": "Durasi antibiotik IV memerlukan catatan pemberian bertanggal dan rute yang jelas. Resep, tagihan, atau lama rawat saja tidak membuktikan pemberian selama 72 jam.",
+          "jenis_pemeriksaan": "antibiotik_iv_72_jam"
         }
       ],
       "disahkan_oleh": "Tim casemix RS Lestari Raharja",
@@ -84,7 +84,8 @@
           ],
           "parameter_lab": "kreatinin",
           "tingkat_risiko": "wajib",
-          "catatan_batasan": "Syaratnya KENAIKAN 1,5-1,9 kali dari baseline, sedangkan berkas klaim tidak memuat nilai baseline pasien. Yang bisa diperiksa sistem hanya apakah nilai kreatinin tercatat; perbandingan dengan baseline tetap perlu dilakukan manusia."
+          "catatan_batasan": "Nilai kreatinin perlu dibandingkan dengan baseline serta waktu perubahannya. Satu nilai tidak otomatis memenuhi syarat AKI.",
+          "memerlukan_baseline": true
         }
       ],
       "disahkan_oleh": "Tim casemix RS Lestari Raharja",

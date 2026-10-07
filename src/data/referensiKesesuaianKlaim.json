@@ -1,0 +1,434 @@
+{
+  "versi": "2026-10-06.2",
+  "diperiksa_pada": "2026-10-06",
+  "sumber": [
+    {
+      "id": "PNPK-DENGUE-DEWASA-2020",
+      "judul": "PNPK dengue dewasa",
+      "nomor": "HK.01.07/MENKES/9845/2020",
+      "jenis": "pedoman_klinis",
+      "versi": "2020",
+      "url": "https://jdih.kemkes.go.id/storage/documents/pdfs/2020kepmenkes9845.pdf",
+      "halaman": "26-29",
+      "status_verifikasi": "terverifikasi",
+      "berlaku_mulai": null,
+      "catatan": "Pilihan pemeriksaan mengikuti fase sakit; bukan kewajiban IgG dan IgM sekaligus untuk semua klaim."
+    },
+    {
+      "id": "PNPK-DENGUE-ANAK-2021",
+      "judul": "PNPK dengue anak dan remaja",
+      "nomor": "HK.01.07/MENKES/4636/2021",
+      "jenis": "pedoman_klinis",
+      "versi": "2021",
+      "url": "https://jdih.kemkes.go.id/storage/documents/pdfs/2021kepmenkes4636.pdf",
+      "url_status": "https://jdih.kemkes.go.id/documents/keputusan-menteri-kesehatan-nomor-hk0107menkes46362021",
+      "halaman": "26-27",
+      "status_verifikasi": "terverifikasi",
+      "berlaku_mulai": "2021-05-03",
+      "catatan": "Status berlaku dikonfirmasi JDIH pada 6 Oktober 2026; salinan PDF masih memuat cap RANCANGAN."
+    },
+    {
+      "id": "PNPK-PNEUMONIA-2025",
+      "judul": "PNPK pneumonia dewasa",
+      "nomor": "HK.01.07/MENKES/1168/2025",
+      "jenis": "pedoman_klinis",
+      "versi": "2025",
+      "url": "https://kemkes.go.id/app_asset/file_content_download/17871299206a8570404565e7.20991219.pdf",
+      "halaman": "12-16",
+      "status_verifikasi": "terverifikasi",
+      "berlaku_mulai": "2025-12-15",
+      "menggantikan": "PNPK-PNEUMONIA-2023",
+      "catatan": "Mikrobiologi sesuai indikasi; hasil negatif tidak menggugurkan diagnosis. Kultur tidak rutin pada rawat jalan."
+    },
+    {
+      "id": "MANUAL-BPJS-EDISI-1",
+      "judul": "Panduan manual verifikasi klaim INA-CBG Edisi 1",
+      "nomor": null,
+      "jenis": "verifikasi_klaim_bpjs",
+      "versi": "edisi-1",
+      "url": "https://www.persi.or.id/wp-content/uploads/2018/03/panduan_verifikasi_inacbg.pdf",
+      "halaman": "67-68 (buku 142-145)",
+      "status_verifikasi": "perlu_konfirmasi_versi",
+      "berlaku_mulai": null,
+      "catatan": "Dokumen asli BPJS, salinan PERSI; versi lama, cakupan dan keberlakuan butir perlu dicocokkan dengan BA berikutnya."
+    },
+    {
+      "id": "PNPK-STROKE-2026",
+      "judul": "PNPK stroke",
+      "nomor": "HK.01.07/MENKES/304/2026",
+      "jenis": "pedoman_klinis",
+      "versi": "2026",
+      "url": "https://keslan.kemkes.go.id/unduhan/fileunduhan1780387545_996111.pdf",
+      "halaman": "15-17",
+      "status_verifikasi": "perlu_konfirmasi_tanggal",
+      "berlaku_mulai": null,
+      "catatan": "Nomor 2026 tetapi tanggal penetapan di PDF tertulis 17 April 2025. Jangan menebak masa berlaku; CT normal awal tidak menyingkirkan stroke iskemik."
+    },
+    {
+      "id": "PNPK-SKA-2026",
+      "judul": "PNPK sindrom koroner akut",
+      "nomor": "HK.01.07/MENKES/876/2026",
+      "jenis": "pedoman_klinis",
+      "versi": "2026",
+      "url": "https://kemkes.go.id/app_asset/file_content_download/17871313946a857602a07b55.82527160.pdf",
+      "halaman": "8-9, 14-19",
+      "status_verifikasi": "terverifikasi",
+      "berlaku_mulai": "2026-08-10",
+      "menggantikan": "PNPK-SKA-2019",
+      "catatan": "Biomarker sesuai subtipe; angina tidak stabil berbeda dari infark. Pemeriksaan tidak menunda terapi darurat."
+    },
+    {
+      "id": "PNPK-KEHAMILAN-2017",
+      "judul": "PNPK komplikasi kehamilan",
+      "nomor": "HK.01.07/MENKES/91/2017",
+      "jenis": "pedoman_klinis",
+      "versi": "2017",
+      "url": "https://keslan.kemkes.go.id/unduhan/fileunduhan_1610340147_342181.pdf",
+      "halaman": "32-34",
+      "status_verifikasi": "terverifikasi",
+      "berlaku_mulai": null,
+      "catatan": "Proteinuria atau gangguan organ tertentu; protein urin negatif tidak sendiri menggugurkan preeklampsia."
+    },
+    {
+      "id": "PNPK-SEPSIS-2017",
+      "judul": "PNPK sepsis dewasa",
+      "nomor": "HK.01.07/MENKES/342/2017",
+      "jenis": "pedoman_klinis",
+      "versi": "2017",
+      "url": "https://kemkes.go.id/app_asset/file_content_download/17012290376566b1ed150b98.27152791.pdf",
+      "halaman": "10-12",
+      "status_verifikasi": "terverifikasi",
+      "berlaku_mulai": null,
+      "catatan": "Infeksi dan disfungsi organ; qSOFA adalah penapisan, kultur bukan satu-satunya dasar diagnosis."
+    },
+    {
+      "id": "BA-KLAIM-2024",
+      "judul": "BA kesepakatan Kemenkes-BPJS klaim INA-CBG 2024",
+      "nomor": "JP.02.03/H.IV/3760/2024; 1247/BA/1124",
+      "jenis": "verifikasi_klaim_bpjs",
+      "versi": "2024",
+      "url": "https://manuver.tireg7.net/wp-content/uploads/2025/01/3760.BA-Administrasi-dg-Kemkes-tahun-2024.pdf",
+      "url_status": "https://www.badankebijakan.kemkes.go.id/kemenkes-dan-bpjs-kesehatan-gelar-sosialisasi-penatalaksanaan-klaim-ina-cbg/",
+      "halaman": "5-7",
+      "status_verifikasi": "terverifikasi",
+      "berlaku_mulai": "2024-12-01",
+      "tanggal_acuan": "akhir_episode",
+      "catatan": "Salinan scan dokumen asli; keberadaan dan penerapan dikonfirmasi BKPK Kemenkes. Kriteria mengikuti butir dan episode."
+    },
+    {
+      "id": "BA-KLAIM-2023",
+      "judul": "BA kesepakatan koding Kemenkes-BPJS 2023",
+      "nomor": "JP.02.03/H.IV/1627/2023",
+      "jenis": "verifikasi_klaim_bpjs",
+      "versi": "2023",
+      "url": "https://manuver.tireg7.net/wp-content/uploads/2023/12/BA-Kesepakatan-Koding-tahun-2023-1-dan-2-bisa-di-search-dan-tanpa-surat-pengantar.pdf",
+      "halaman": "3, aspek koding 9",
+      "status_verifikasi": "perlu_konfirmasi_versi",
+      "berlaku_mulai": null,
+      "catatan": "Salinan gabungan dua BA; nomor dan kode harus diperiksa pada scan asli sebelum perubahan kode otomatis."
+    },
+    {
+      "id": "PNPK-TIFOID-2026",
+      "judul": "PNPK demam tifoid dewasa",
+      "nomor": "HK.01.07/MENKES/875/2026",
+      "jenis": "pedoman_klinis",
+      "versi": "2026",
+      "url": "https://jdih.kemkes.go.id/storage/documents/pdfs/2026kepmenkes875.pdf",
+      "url_status": "https://jdih.kemkes.go.id/documents/keputusan-menteri-kesehatan-nomor-hk0107menkes8752025",
+      "halaman": "15-19, 45",
+      "status_verifikasi": "terverifikasi",
+      "berlaku_mulai": "2026-08-10",
+      "catatan": "Diagnosis klinis dan terkonfirmasi dibedakan. Kultur baku emas; alternatif sesuai kapasitas fasilitas. Widal satu kali memiliki keterbatasan dan tidak sendiri menetapkan diagnosis."
+    }
+  ],
+  "aturan": [
+    {
+      "id": "RK-01",
+      "nama": "Dengue dewasa",
+      "dx": [
+        "A90",
+        "A91"
+      ],
+      "usia_min": 18,
+      "sumber_id": "PNPK-DENGUE-DEWASA-2020",
+      "pemeriksa": "dengue",
+      "bukti": [
+        "hasil_dengue"
+      ],
+      "catatan": "Baca NS1/PCR atau IgM/IgG bersama hari sakit dan diagnosis DPJP. Tidak mewajibkan kedua antibodi positif."
+    },
+    {
+      "id": "RK-02",
+      "nama": "Dengue anak/remaja",
+      "dx": [
+        "A90",
+        "A91"
+      ],
+      "usia_max": 17,
+      "sumber_id": "PNPK-DENGUE-ANAK-2021",
+      "pemeriksa": "dengue",
+      "bukti": [
+        "hasil_dengue"
+      ],
+      "catatan": "Pilihan tes mengikuti hari sakit; jangan menyimpulkan jenis infeksi dari IgG tunggal."
+    },
+    {
+      "id": "RK-03",
+      "nama": "Pneumonia dewasa",
+      "dx": [
+        "J12",
+        "J13",
+        "J14",
+        "J15",
+        "J16",
+        "J17",
+        "J18"
+      ],
+      "usia_min": 18,
+      "sumber_id": "PNPK-PNEUMONIA-2025",
+      "pemeriksa": "pneumonia",
+      "bukti": [
+        "radiologi_toraks",
+        "mikrobiologi"
+      ],
+      "catatan": "Radiologi dibaca bersama gejala. Gram atau kultur sesuai indikasi; hasil mikrobiologi negatif tidak menggugurkan diagnosis."
+    },
+    {
+      "id": "RK-04",
+      "nama": "Hiponatremia sekunder",
+      "dx": [
+        "E87.1"
+      ],
+      "sumber_id": "MANUAL-BPJS-EDISI-1",
+      "pemeriksa": "elektrolit",
+      "parameter": "natrium",
+      "ambang": 135,
+      "bukti": [
+        "terapi_elektrolit"
+      ],
+      "catatan": "Nilai Na rendah dan tata laksana perlu dibuktikan; diagnosis sekunder tetap mengikuti DPJP dan aturan koding."
+    },
+    {
+      "id": "RK-05",
+      "nama": "Hipokalemia sekunder",
+      "dx": [
+        "E87.6"
+      ],
+      "sumber_id": "MANUAL-BPJS-EDISI-1",
+      "pemeriksa": "elektrolit",
+      "parameter": "kalium",
+      "ambang": 3.5,
+      "bukti": [
+        "terapi_elektrolit"
+      ],
+      "catatan": "Nilai K rendah dan tata laksana perlu dibuktikan; resep bukan bukti pemberian."
+    },
+    {
+      "id": "RK-06",
+      "nama": "Gagal ginjal akut",
+      "dx": [
+        "N17"
+      ],
+      "sumber_id": "MANUAL-BPJS-EDISI-1",
+      "pemeriksa": "aki",
+      "bukti": [],
+      "catatan": "Periksa kenaikan kreatinin bertanggal atau diuresis terukur. Satu nilai tinggi tidak menetapkan AKI atau mengganti diagnosis."
+    },
+    {
+      "id": "RK-07",
+      "nama": "TB paru",
+      "dx": [
+        "A15",
+        "A16"
+      ],
+      "sumber_id": "MANUAL-BPJS-EDISI-1",
+      "bukti": [
+        "konfirmasi_tb",
+        "pemberian_oat"
+      ],
+      "catatan": "Bukti konfirmasi, metode pemeriksaan dan pengobatan diperiksa bersama. BTA negatif tidak otomatis mengganti A15 jika TCM/kultur memberi konfirmasi."
+    },
+    {
+      "id": "RK-08",
+      "nama": "Syok hipovolemik",
+      "dx": [
+        "R57.1"
+      ],
+      "sumber_id": "MANUAL-BPJS-EDISI-1",
+      "bukti": [
+        "syok_klinis",
+        "resusitasi"
+      ],
+      "catatan": "Tanda klinis dan resusitasi; pertimbangkan pengecualian meninggal sebelum terapi. Tidak menyamakan semua hipotensi dengan syok."
+    },
+    {
+      "id": "RK-09",
+      "nama": "Kolonoskopi rawat inap",
+      "px": [
+        "45.23"
+      ],
+      "jenis_klaim": [
+        "RAWAT_INAP"
+      ],
+      "sumber_id": "MANUAL-BPJS-EDISI-1",
+      "bukti": [
+        "indikasi_ranap_kolonoskopi"
+      ],
+      "catatan": "Indikasi rawat inap harus ditelaah; tindakan kolonoskopi saja tidak menjelaskan kebutuhan rawat inap."
+    },
+    {
+      "id": "RK-10",
+      "nama": "Stroke akut",
+      "dx": [
+        "I60",
+        "I61",
+        "I62",
+        "I63",
+        "I64"
+      ],
+      "sumber_id": "PNPK-STROKE-2026",
+      "bukti": [
+        "pencitraan_kepala",
+        "neurologis"
+      ],
+      "catatan": "CT/MRI dan interpretasi dokter; CT normal awal tidak menyingkirkan stroke iskemik."
+    },
+    {
+      "id": "RK-11",
+      "nama": "Sindrom koroner akut",
+      "dx": [
+        "I20.0",
+        "I21",
+        "I22",
+        "I24"
+      ],
+      "sumber_id": "PNPK-SKA-2026",
+      "bukti": [
+        "ekg",
+        "biomarker_jantung"
+      ],
+      "catatan": "Interpretasikan EKG dan biomarker sesuai subtipe. Troponin tunggal tidak menetapkan infark; tidak menunda terapi akut."
+    },
+    {
+      "id": "RK-12",
+      "nama": "Preeklampsia",
+      "dx": [
+        "O14"
+      ],
+      "sumber_id": "PNPK-KEHAMILAN-2017",
+      "pemeriksa": "preeklampsia",
+      "bukti": [
+        "hipertensi_kehamilan"
+      ],
+      "catatan": "Hipertensi kehamilan dengan proteinuria atau disfungsi organ; derajat berat memerlukan penilaian tersendiri."
+    },
+    {
+      "id": "RK-13",
+      "nama": "Sepsis dewasa",
+      "dx": [
+        "A40",
+        "A41"
+      ],
+      "usia_min": 18,
+      "sumber_id": "PNPK-SEPSIS-2017",
+      "bukti": [
+        "infeksi",
+        "disfungsi_organ"
+      ],
+      "catatan": "Infeksi dan disfungsi organ akut; qSOFA atau kultur saja bukan diagnosis sepsis."
+    },
+    {
+      "id": "RK-14",
+      "nama": "Eksisi tumor jaringan lunak rawat inap",
+      "dx": [
+        "D17",
+        "D21",
+        "C49"
+      ],
+      "px": [
+        "83.39",
+        "86.3"
+      ],
+      "pemicu": "dx_dan_px",
+      "jenis_klaim": [
+        "RAWAT_INAP"
+      ],
+      "sumber_id": "BA-KLAIM-2024",
+      "bukti": [
+        "laporan_operasi",
+        "pa",
+        "indikasi_ranap_stt"
+      ],
+      "catatan": "Terapkan butir STT sesuai kedalaman, ukuran/keterlibatan struktur vital atau keganasan; jangan perlakukan semua benjolan sebagai neoplasma."
+    },
+    {
+      "id": "RK-15",
+      "nama": "Fraktur dengan reduksi",
+      "dx": [
+        "S02",
+        "S12",
+        "S22",
+        "S32",
+        "S42",
+        "S52",
+        "S62",
+        "S72",
+        "S82",
+        "S92"
+      ],
+      "px": [
+        "79.0",
+        "79.1",
+        "79.2",
+        "79.3",
+        "79.4"
+      ],
+      "pemicu": "dx_dan_px",
+      "sumber_id": "BA-KLAIM-2023",
+      "bukti": [
+        "pencitraan_fraktur",
+        "laporan_operasi"
+      ],
+      "catatan": "Imaging dan laporan operasi menentukan jenis reduksi. Tidak mengganti kode dari nama tindakan saja."
+    },
+    {
+      "id": "RK-16",
+      "nama": "Kelengkapan klaim IGD",
+      "pemicu": "igd",
+      "sumber_id": "BA-KLAIM-2024",
+      "bukti": [
+        "resume_dpjp",
+        "triase_igd",
+        "tanda_vital"
+      ],
+      "catatan": "Matriks kegawatdaruratan mengikuti kondisi dan episode; jangan menerapkan satu ambang waktu untuk semua kunjungan."
+    },
+    {
+      "id": "RK-17",
+      "nama": "Odontektomi",
+      "px": [
+        "23.19"
+      ],
+      "sumber_id": "BA-KLAIM-2024",
+      "bukti": [
+        "laporan_operasi",
+        "indikasi_odontektomi"
+      ],
+      "catatan": "Rawat jalan maupun rawat inap dinilai sesuai PNPK impaksi 777/2022 dan PMK 3/2023. Kode 23.19 saja tidak membuktikan impaksi atau ketidaklayakan rawat inap."
+    },
+    {
+      "id": "RK-18",
+      "nama": "Demam tifoid dewasa",
+      "dx": [
+        "A01.0"
+      ],
+      "usia_min": 18,
+      "sumber_id": "PNPK-TIFOID-2026",
+      "bukti": [
+        "hasil_tifoid",
+        "penilaian_klinis_tifoid"
+      ],
+      "catatan": "Diagnosis klinis mengikuti penilaian dokter; kultur untuk konfirmasi dan alternatif sesuai fasilitas/fase sakit. Telaah serologi serial, jangan menetapkan diagnosis dari Widal tunggal atau mengarang skor Nelwan."
+    }
+  ]
+}

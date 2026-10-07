@@ -32,6 +32,7 @@
 
 const ATURAN = require('../data/konsistensiAntarData.json');
 const { classifyPageDocumentType } = require('./pdfPageClassifier');
+const { isLembarGrouper } = require('./lembarGrouperService');
 
 function teksNormal(v) {
   return String(v === null || v === undefined ? '' : v).toLowerCase();
@@ -130,6 +131,30 @@ function cariKata(petaHalaman, jenis, daftarKata) {
   return null;
 }
 
+// Catatan pemberian obat dapat berada pada lembar pelaksanaan keperawatan,
+// bukan halaman resep. Nama obat dalam rencana atau tagihan saja tidak cukup.
+function cariObatNebulDilaksanakan(petaHalaman, daftarObat) {
+  for (const hal of [...petaHalaman.values()].flat()) {
+    if (isLembarGrouper(hal.teks)) continue;
+    const lines = hal.teks.split(/\n/);
+    let pelaksanaan = false;
+    for (const line of lines) {
+      if (/tindakan\s+keperawatan|catatan\s+pemberian\s+obat|pelaksanaan\s+(?:terapi|tindakan)/i.test(line)) pelaksanaan = true;
+      if (/^\s*(?:rencana|intervensi|instruksi|order|resep)\b/i.test(line)
+        && !/tindakan\s+keperawatan/i.test(line)) pelaksanaan = false;
+      if (!/\bnebu(?:l\w*)?\b/i.test(line)) continue;
+      if (/\b(?:rencana|direncanakan|disarankan|diusulkan|diresepkan|riwayat|akan|belum|tidak|ditunda|batal|stop|dihentikan)\b/i.test(line)) continue;
+      const kata = (daftarObat || []).find(o => teksNormal(line).includes(teksNormal(o)));
+      if (!kata) continue;
+      const sudahDiberikan = /\b(?:diberikan|memberikan|dilakukan|melakukan|telah|sudah)\b/i.test(line);
+      const dosisTercatat = /\d\s*(?::\s*\d|(?:mg|ml|cc|amp|respul)\b)/i.test(line);
+      if (!sudahDiberikan && !(pelaksanaan && dosisTercatat)) continue;
+      return { kata, page_number: hal.page_number, kutipan: line.trim() };
+    }
+  }
+  return null;
+}
+
 /**
  * Nilai satu kondisi. Mengembalikan {benar, bukti} — buktinya dipakai untuk
  * menjelaskan temuan, bukan cuma menyimpulkannya.
@@ -184,8 +209,9 @@ function cekKondisi(kond, konteks) {
     if (!(petaHalaman.get(kond.ada_halaman) || []).length) return { benar: false, bukti };
   }
   if (kond.kata_di_halaman) {
-    const { jenis, salah_satu } = kond.kata_di_halaman;
-    const temuan = cariKata(petaHalaman, jenis, salah_satu);
+    const { jenis, salah_satu, atau_obat_nebul_dilaksanakan } = kond.kata_di_halaman;
+    const temuan = cariKata(petaHalaman, jenis, salah_satu)
+      || (atau_obat_nebul_dilaksanakan && cariObatNebulDilaksanakan(petaHalaman, atau_obat_nebul_dilaksanakan));
     if (!temuan) return { benar: false, bukti };
     bukti = temuan;
   }

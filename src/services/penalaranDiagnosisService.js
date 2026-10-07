@@ -77,9 +77,11 @@ FAKTA KLINIS (per kategori, dengan halaman):\n${faktaUntukPrompt(faktaKlinis)}${
 POLA KEPUTUSAN CASEMIX RS PADA KASUS LAIN (pola, BUKAN bukti pasien ini; status tetap ditentukan fakta berkas ini,
 tetapi bila fakta lemah dan casemix RS biasa tidak mengode, pertimbangkan perlu_klarifikasi):
 ${pelajaran.map(p => `- ${p.pesan}`).join('\n')}` : ''}`;
-  const muatan = { system: SYSTEM, prompt, json: true, maxTokens: 2500, dikenal, jenisKlaim: record.jenis_klaim || record.JENIS_KLAIM, versi: 'penalaran-v1' };
+  const muatan = { system: SYSTEM.replace(KONVENSI_KODING_RS,require('./konvensiKodingRs').konvensiUntukRs(record,pages)), prompt, json: true, maxTokens: 2500, dikenal, jenisKlaim: record.jenis_klaim || record.JENIS_KLAIM, versi: 'penalaran-v2-referensi' };
+  muatan.prioritasKlinis=true;
   let r = await gateway.panggilModel('agen_tinjau', muatan, { db });
-  if (!r || !r.ok) r = await gateway.panggilModel('agen_tinjau', muatan, { db });
+  if ((!r || !r.ok) && !require('./konteksPenggunaanAiService').saatIni().anggaran_ai)
+    r = await gateway.panggilModel('agen_tinjau', muatan, { db });
   const tokens = (r && r.penggunaan && r.penggunaan.total_tokens) || 0;
   const idr = Math.round((r && r.biaya && r.biaya.idr) || 0);
   if (!r || !r.ok || !r.hasil || !Array.isArray(r.hasil.diagnosis)) {

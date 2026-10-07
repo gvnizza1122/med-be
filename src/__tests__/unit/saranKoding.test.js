@@ -40,9 +40,9 @@ describe('saran koding — kasus PPOK + pneumonia rawat jalan', () => {
 
   test('INA-CBG & tarif dihitung dari kode saran, dibandingkan dengan klaim', () => {
     const h = susun(record, ai);
-    expect(h.inacbg).toMatchObject({ kode: 'Q-5-38-0', tarif: 245100 });
-    expect(h.klaim_saat_ini).toMatchObject({ diagnosis: ['J44.9', 'J18.9'], tarif: 245100 });
-    expect(h.selisih_tarif).toBe(0);
+    expect(h.inacbg).toMatchObject({ kode: 'J-3-13-0', tarif: 321700 });
+    expect(h.klaim_saat_ini).toMatchObject({ diagnosis: ['J44.9', 'J18.9'], tarif: null });
+    expect(h.selisih_tarif).toBeNull(); // Hasil estimasi AI bukan tarif pada berkas klaim asli.
   });
 });
 

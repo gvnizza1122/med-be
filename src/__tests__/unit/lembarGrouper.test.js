@@ -4,12 +4,12 @@ const { hitungInacbgDanTarif } = require('../../services/aiReviewService');
 const { padananWho } = require('../../services/kamusKodeService');
 const { simpanAiReview } = require('../../services/simpanAiReviewService');
 
-// Lembar grouper KHOIRIYAH (SEP 0170R0111225V003293) -- bentuk teks pdf-parse.
+// Lembar grouper PASIEN CONTOH A (SEP 0000R0000126V000001) -- bentuk teks pdf-parse.
 const PDFPARSE = `KEMENTERIAN KESEHATAN REPUBLIK INDONESIA JKN
 Berkas Klaim Individual Pasien 02/01/2026
 Kode Rumah Sakit : 3371084 Kelas Rumah Sakit : D
-Nomor Peserta : 0002969212623 Nomor SEP : 0170R0111225V003293
-Nomor Rekam Medis : 175092 Tanggal Masuk : 29/12/2025
+Nomor Peserta : 0000000000001 Nomor SEP : 0000R0000126V000001
+Nomor Rekam Medis : 900001 Tanggal Masuk : 29/12/2025
 Umur Hari : 23853 Jenis Perawatan : 1 - Rawat Inap
 Jenis Kelamin : 2 - Perempuan LOS : 5 hari
 Kelas Perawatan : 3 - Kelas 3 Berat Lahir : -
@@ -34,13 +34,13 @@ describe('lembar grouper E-Klaim', () => {
   test('dikenali; resume/SEP bukan lembar grouper', () => {
     expect(isLembarGrouper(PDFPARSE)).toBe(true);
     expect(isLembarGrouper('RESUME MEDIS RAWAT INAP\nDiagnosis Utama : cardiomegali edem paru')).toBe(false);
-    expect(isLembarGrouper('SURAT ELEGIBILITAS PESERTA\nNo. SEP 0170R0111225V003293')).toBe(false);
+    expect(isLembarGrouper('SURAT ELEGIBILITAS PESERTA\nNo. SEP 0000R0000126V000001')).toBe(false);
   });
 
   test.each([['pdf-parse', PDFPARSE], ['mupdf/OCR', MUPDF]])('dibaca tanpa AI dari teks %s', (_, teks) => {
     const g = bacaLembarGrouper(teks, 15);
     expect(g).toMatchObject({
-      halaman: 15, sep: '0170R0111225V003293', jenis_perawatan: '1 - Rawat Inap', kelas_perawatan: '3 - Kelas 3', los: 5,
+      halaman: 15, sep: '0000R0000126V000001', jenis_perawatan: '1 - Rawat Inap', kelas_perawatan: '3 - Kelas 3', los: 5,
       inacbg: { kode: 'I-4-24-I', deskripsi: 'GANGGUAN SISTEM PEMBULUH DARAH LAIN-LAIN (RINGAN)', tarif: 2116600 },
       total_tarif: 2116600, sub_acute: null, chronic: null, special_cmg: null, versi_eklaim: '5.10.6.202601010630',
     });
@@ -115,9 +115,9 @@ describe('prosedur penunjang masuk saran AI', () => {
   test('temuan penunjang berkode menjadi saran prosedur dengan buktinya', () => {
     const h = susunSaranKoding({ diagnosa_list: 'I51.7', jenis_klaim: 'RAWAT_INAP', kelas_rawat: 3 }, {
       temuan_penunjang: [
-        { istilah_baku: 'Darah lengkap', kode_usulan: '90.59', page_number: 3, kutipan: 'DARAH RUTIN' },
-        { istilah_baku: 'Fungsi ginjal', kode_usulan: '90.59', page_number: 5, kutipan: 'Ureum 37.90' },
-        { istilah_baku: 'Rontgen toraks', kode_usulan: '87.44', page_number: 3, kutipan: 'ro thorax' },
+        { istilah_baku: 'Darah lengkap', kode_usulan: '90.59', jenis_halaman: 'lab_results', page_number: 3, kutipan: 'DARAH RUTIN' },
+        { istilah_baku: 'Fungsi ginjal', kode_usulan: '90.59', jenis_halaman: 'lab_results', page_number: 5, kutipan: 'Ureum 37.90' },
+        { istilah_baku: 'Rontgen toraks', kode_usulan: '87.44', jenis_halaman: 'radiology', page_number: 3, kutipan: 'ro thorax' },
         { istilah_baku: 'Leukosit', kode_usulan: null, page_number: 5, kutipan: 'Lekosit 6.68' },
       ],
     }, hitungInacbgDanTarif);
@@ -163,7 +163,7 @@ describe('pembaca penunjang: EKG & label "Penunjang lain"', () => {
   });
 });
 
-describe('hasil lab hasil OCR (YETY NOVIATI) terbaca rinci', () => {
+describe('hasil lab hasil OCR (IBU CONTOH) terbaca rinci', () => {
   const { bacaBarisLab } = require('../../services/bacaLabService');
   const baca = (baris) => bacaBarisLab(baris)[0];
   test('salah baca nama & satuan dikoreksi', () => {
@@ -185,7 +185,7 @@ describe('hasil lab hasil OCR (YETY NOVIATI) terbaca rinci', () => {
 
 describe('INA-CBG kelompok prosedur & tarif rawat inap', () => {
   const { groupCodesToInaCBG } = require('../../services/inacbgGroupingService');
-  test('sesar -> O-6-10; Z37/O82 bukan komorbid (casemix YETY O-6-10-I Rp4.656.700)', () => {
+  test('sesar -> O-6-10; Z37/O82 bukan komorbid (casemix IBU CONTOH O-6-10-I Rp4.656.700)', () => {
     expect(groupCodesToInaCBG(['O42.1', 'Z37.0', 'O82.1'], ['74.1', '75.32', '90.59'], 'RAWAT_INAP').code).toBe('O-6-10-I');
     const { inacbgCodeForLookup, tarifResult } = hitungInacbgDanTarif(['O42.1', 'Z37.0', 'O82.1'], ['74.1', '75.32', '90.59'], 'RAWAT_INAP', '3', null);
     expect(inacbgCodeForLookup).toBe('O-6-10-I');
@@ -236,10 +236,10 @@ describe('koding obstetri baku', () => {
     const awal = [s('I51.7', 'diagnosis')];
     expect(lengkapiKodeObstetri(awal, POOL).perubahan).toEqual([]);
   });
-  test('rekaman CTG -> 75.32', () => {
+  test('rekaman CTG eksternal -> 75.34, bukan EKG janin dengan elektroda kulit kepala', () => {
     const { bacaTemuanPenunjang } = require('../../services/temuanPenunjangService');
     const r = bacaTemuanPenunjang([{ page_number: 7, ocr_text: 'RM. 46\nFHR 240 bpm 012 MEDI-GRAPH' }]);
-    expect(r.temuan.map(t => [t.istilah_id, t.kode_usulan])).toEqual([['ctg', '75.32']]);
+    expect(r.temuan.map(t => [t.istilah_id, t.kode_usulan])).toEqual([['ctg', '75.34']]);
   });
 });
 
@@ -302,13 +302,13 @@ describe('budget OCR mengikuti jumlah halaman & berkas bersamaan', () => {
 
 describe('identitas lintas halaman: bayi baru lahir pasien bukan pasien lain', () => {
   const { verifikasiIdentitas } = require('../../services/identitasLintasHalamanService');
-  const klaim = { nama_pasien: 'YETY NOVIATI, NY', mrn: '172001' };
+  const klaim = { nama_pasien: 'IBU CONTOH, NY', mrn: '900002' };
   test('skrining bayi (Nama Faskes, RM bayi, Nama Ibu = pasien) tidak dituduh', () => {
-    const hal = { page_number: 17, ocr_text: 'Order NBS Detail Pemeriksaan\nNama Faskes RS LESTARI RAHARJA No. RM 175134\nBY. NY. YETY\nNama Ibu YETY NOVIATI Status Bayi' };
+    const hal = { page_number: 17, ocr_text: 'Order NBS Detail Pemeriksaan\nNama Faskes RS LESTARI RAHARJA No. RM 900003\nBY. NY. IBU CONTOH\nNama Ibu IBU CONTOH Status Bayi' };
     expect(verifikasiIdentitas([hal], klaim)).toEqual([]);
   });
   test('assesmen neonatus bayi pasien tidak dituduh', () => {
-    const hal = { page_number: 14, ocr_text: 'ASSESMEN AWAL Nama : No. RM:175134 YETY NOVIATI, BY NY\nNEONATUS Tgl Lahir : 31/12/2025' };
+    const hal = { page_number: 14, ocr_text: 'ASSESMEN AWAL Nama : No. RM:900003 IBU CONTOH, BY NY\nNEONATUS Tgl Lahir : 31/12/2025' };
     expect(verifikasiIdentitas([hal], klaim)).toEqual([]);
   });
   test('pasien lain & bayi ibu lain tetap tertangkap', () => {
@@ -353,7 +353,7 @@ describe('tab pemeriksaan penunjang', () => {
   const r = susunPemeriksaanPenunjang(halaman);
   test('pemeriksaan yang dilakukan beserta peran buktinya', () => {
     const ctg = r.pemeriksaan.find(p => p.id === 'ctg');
-    expect(ctg).toMatchObject({ kode_icd9: '75.32', ada_hasil: true });
+    expect(ctg).toMatchObject({ kode_icd9: '75.34', ada_hasil: true });
     expect(ctg.bukti.map(b => `${b.peran}@${b.halaman}`)).toEqual(['hasil@7', 'tagihan@19']);
     const darah = r.pemeriksaan.find(p => p.id === 'lab_darah');
     expect(darah).toMatchObject({ kode_icd9: '90.59', kode_lain: [], ada_hasil: true });
@@ -383,15 +383,17 @@ describe('neoplasma dari hasil PA (ANNISA NUR CHASANAH, casemix D21.3 + 86.3, L-
   const resume = { page_number: 3, ocr_text: 'RESUME MEDIS RAWAT INAP\nRingkasan Penemuan Fisik Penting :\nStatus lokalis regio sternum : massa tumor diameter 5 cm, mobile\nPemeriksaan Penunjang :\n1. Laboratorium PA WASKITA\nDiagnosis Utama :\nTumor regio sternum (subfascia)\nDiagnosis Sekunder :\n1. -\nTindakan/Prosedur :\n1. Eksisi dan PA' };
   const pa = (kesimpulan, sifat = 'Sifat : Tidak didapatkan tanda ganas') => ({ page_number: 12, ocr_text: `LABORATORIUM PATOLOGI ANATOMIK\nJAWABAN PEMERIKSAAN HISTOPATOLOGI\nBahan : Massa\nMikroskopik : sel spindel\n${sifat}\nKesimpulan : ${kesimpulan}\nSaran` });
   const d492 = [{ code: 'D49.2', type: 'diagnosis', kamus_valid: false, page_number: 3, quotation: 'Tumor regio sternum (subfascia)' }];
-  test('D49.2 (CM) diganti D21.3; eksisi -> 86.3; alternatif ditunjukkan', () => {
+  test('PA berisi DD tidak otomatis mengubah diagnosis massa menjadi neoplasma jinak', () => {
     const r = lengkapiKodeNeoplasma(d492, [resume, pa('Massa regio sternum : Gambaran histopatologi sesuai untuk keloid DD: Keloidal dermatofibroma')]);
-    expect(r.saran.map(s => s.code)).toEqual(['D21.3', '86.3']);
-    expect(r.saran[0].catatan_aturan).toMatch(/L91\.0/);
-    const { groupCodesToInaCBG } = require('../../services/inacbgGroupingService');
-    expect(groupCodesToInaCBG(['D21.3'], ['86.3', '90.59'], 'RAWAT_INAP').code).toBe('L-1-40-I');
+    expect(r.saran.map(s => s.code)).toEqual(['D49.2']);
+    expect(r.perubahan).toEqual([]);
+    expect(r.catatan).toMatch(/belum_pasti/);
+    const { jagaSumberDiagnosis } = require('../../services/dasarDiagnosisService');
+    const { kodeFinal } = require('../../services/pemeriksaKritisService');
+    expect(kodeFinal({}, { suggested_codes: jagaSumberDiagnosis(r.saran, [resume]) }).dx).toEqual([]);
   });
-  test('lipoma punggung -> D17.1; FAM -> D24 + 85.21; kista epidermoid -> L72.0', () => {
-    const r1 = (dx, kes) => lengkapiKodeNeoplasma([], [{ ...resume, ocr_text: resume.ocr_text.replace('Tumor regio sternum (subfascia)', dx) }, pa(kes)]).saran.map(s => s.code);
+  test('kode massa dengan kutipan dokter yang sama dirinci bila PA jelas dan lokasinya selaras', () => {
+    const r1 = (dx, kes) => lengkapiKodeNeoplasma([{ code: 'R22.9', type: 'diagnosis', page_number: 3, quotation: dx }], [{ ...resume, ocr_text: resume.ocr_text.replace('Tumor regio sternum (subfascia)', dx) }, pa(kes)]).saran.map(s => s.code);
     expect(r1('Benjolan regio punggung', 'Lipoma')).toEqual(['D17.1', '86.3']);
     expect(r1('Tumor mammae sinistra', 'Fibroadenoma mammae')).toEqual(['D24', '85.21']);
     expect(r1('Benjolan regio colli', 'Kista epidermoid')).toEqual(['L72.0', '86.3']);
@@ -410,7 +412,7 @@ describe('neoplasma dari hasil PA (ANNISA NUR CHASANAH, casemix D21.3 + 86.3, L-
     const { susunPemeriksaanPenunjang } = require('../../services/pemeriksaanPenunjangService');
     const { pemeriksaan } = susunPemeriksaanPenunjang([resume, pa('Massa regio sternum : keloid DD dermatofibroma')]);
     const h = pemeriksaan.find(p => p.id === 'histopatologi');
-    expect(h).toMatchObject({ ada_hasil: true, sifat: 'jinak', kode_icd9: null });
+    expect(h).toMatchObject({ ada_hasil: true, sifat: 'belum_pasti', kode_icd9: null });
     expect(h.hasil_ringkas).toMatch(/keloid/);
     expect(h.kode_lain[0].kode).toBe('91.69');
     expect(h.bukti.map(b => `${b.peran}@${b.halaman}`)).toEqual(['hasil@12', 'permintaan@3']);
@@ -421,7 +423,7 @@ describe('neoplasma dari hasil PA (ANNISA NUR CHASANAH, casemix D21.3 + 86.3, L-
   });
 });
 
-test('diagnosis banding PA (keloid) untuk lesi yang sama tidak jadi diagnosis sekunder', () => {
+test('massa umum dan diagnosis banding PA tetap memerlukan klarifikasi sebelum menjadi kode final', () => {
   const { lengkapiKodeNeoplasma } = require('../../services/kodingNeoplasmaService');
   const resume = { page_number: 3, ocr_text: 'RESUME MEDIS RAWAT INAP\nDiagnosis Utama :\nTumor regio sternum (subfascia)\nTindakan/Prosedur :\n1. Eksisi dan PA' };
   const pa = { page_number: 12, ocr_text: 'JAWABAN PEMERIKSAAN HISTOPATOLOGI\nSifat : Tidak didapatkan tanda ganas\nKesimpulan : Massa regio sternum : sesuai untuk keloid DD: Keloidal dermatofibroma\nSaran' };
@@ -429,11 +431,13 @@ test('diagnosis banding PA (keloid) untuk lesi yang sama tidak jadi diagnosis se
     { code: 'D21.3', type: 'diagnosis', kamus_valid: true, page_number: 3, quotation: 'Tumor regio sternum (subfascia)' },
     { code: 'L91.0', type: 'diagnosis', kamus_valid: true, page_number: 12, quotation: 'keloid' },
   ], [resume, pa]);
-  expect(r.saran.filter(s => s.type === 'diagnosis').map(s => s.code)).toEqual(['D21.3']);
-  expect(r.perubahan).toContainEqual({ aksi: 'buang', dari: ['L91.0'], kode: 'D21.3' });
+  const { jagaSumberDiagnosis } = require('../../services/dasarDiagnosisService');
+  const final = jagaSumberDiagnosis(r.saran, [resume, pa]);
+  expect(final.filter(s => s.type === 'diagnosis').every(s => s.boleh_isi_otomatis === false)).toBe(true);
+  expect(r.catatan).toMatch(/belum_pasti/);
 });
 
-describe('DIAGLIST & tarif tidak pernah kosong karena kode ICD-10-CM', () => {
+describe('kode ICD-10-CM: padanan pasti dan kandidat yang belum terverifikasi dibedakan', () => {
   const { padananGrouper, KODE_CM_KE_WHO } = require('../../services/jembatanCmWho');
   const { susunSaranKoding: susun } = require('../../services/saranKodingService');
   test('D49.x dipetakan per kode lengkap (bukan per kategori)', () => {
@@ -451,13 +455,13 @@ describe('DIAGLIST & tarif tidak pernah kosong karena kode ICD-10-CM', () => {
       expect(r.tarifResult.amount).toBeGreaterThan(0);
     }
   });
-  test('kode belum-WHO tetap tampil di saran dengan catatan, tarif tetap ada', () => {
+  test('kode belum-WHO tercatat sebagai tidak dipakai dan tidak menghasilkan tarif', () => {
     const h = susun({ diagnosa_list: '', jenis_klaim: 'RAWAT_INAP', kelas_rawat: 3 }, {
       suggested_codes: [{ code: 'X99.99', type: 'diagnosis', kamus_valid: false, belum_who: true, page_number: 3, quotation: 'diagnosis aneh' }],
     }, hitungInacbgDanTarif);
-    expect(h.diagnosis.map(d => d.kode)).toEqual(['X99.99']);
-    expect(h.diagnosis[0].catatan).toMatch(/belum ada di ICD-10 WHO/);
-    expect(h.tidak_dipakai).toEqual([]);
+    expect(h.diagnosis).toEqual([]);
+    expect(h.inacbg).toBeNull();
+    expect(h.tidak_dipakai).toContainEqual(expect.objectContaining({ kode: 'X99.99', alasan: expect.stringContaining('Belum tervalidasi') }));
   });
   test('kode cadangan dari aplikasi bukan alasan berisiko pending', () => {
     const { susunPutusan } = require('../../services/putusanPendingService');
@@ -465,5 +469,23 @@ describe('DIAGLIST & tarif tidak pernah kosong karena kode ICD-10-CM', () => {
     const a = p.alasan.find(x => x.kode === 'X99.99');
     expect(a.keparahan).toBe('sedang');
     expect(p.status).not.toBe('berisiko_pending');
+  });
+});
+
+describe('hernia inguinal dirinci dari jenis yang tertulis', () => {
+  const { lengkapiKodeBedah } = require('../../services/kodingBedahService');
+  const kode = (teks, saran = []) => lengkapiKodeBedah(saran, [{ page_number: 3, ocr_text: teks }]).saran.filter(x => x.type === 'procedure').map(x => x.code);
+  const R = 'RESUME MEDIS RAWAT INAP\nDiagnosis Utama :\n';
+  test('lateralis + mesh -> 53.04 (PASIEN CONTOH C)', () => {
+    expect(kode(`${R}Hernia inguinalis lateralis dekstra ireponibilis\nTindakan/Prosedur :\n1. Hernia repair dengan mesh graft`)).toEqual(['53.04']);
+  });
+  test('saran AI 53.05 ikut dirinci', () => {
+    expect(kode(`${R}Hernia inguinalis lateralis dekstra\nTindakan/Prosedur :\n-`, [{ code: '53.05', type: 'procedure' }])).toEqual(['53.04']);
+  });
+  test('medialis tanpa mesh -> 53.01', () => {
+    expect(kode(`${R}Hernia inguinalis medialis sinistra\nTindakan/Prosedur :\n1. Herniotomi`)).toEqual(['53.01']);
+  });
+  test('jenis tidak tertulis -> tetap 53.05', () => {
+    expect(kode(`${R}Hernia inguinalis dekstra\nTindakan/Prosedur :\n1. Hernioplasti mesh`)).toEqual(['53.05']);
   });
 });

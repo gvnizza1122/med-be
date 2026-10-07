@@ -2,7 +2,7 @@ const express = require('express');
 const request = require('supertest');
 let mockDb;
 jest.mock('../../database/init', () => ({ getDb: () => mockDb }));
-jest.mock('../../middleware/auth', () => ({ authenticate: (_req, _res, next) => next(), authorize: () => (_req, _res, next) => next() }));
+jest.mock('../../middleware/auth', () => ({ authenticate: (req, _res, next) => { req.user={hospital_code:'3371084'}; next(); }, authorize: () => (_req, _res, next) => next() }));
 jest.mock('../../services/tinjauanDiagnosisService', () => ({ tinjauDiagnosis: jest.fn(async () => ({ versi: 1, status: 'perlu_klarifikasi', ringkasan: 'Periksa dukungan kasus.', kode_rekomendasi: [], kandidat: [], klarifikasi: [] })) }));
 const router = require('../../routes/claimFiles');
 const app = express();

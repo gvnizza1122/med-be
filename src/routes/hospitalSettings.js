@@ -3,6 +3,35 @@ const { getDb } = require('../database/init');
 const { authenticate, authorize } = require('../middleware/auth');
 
 const router = express.Router();
+const profilKlaim = require('../services/profilKlaimRsService');
+
+router.get('/claim-profile', authenticate, async (req, res) => {
+  if (!req.user?.hospital_code) return res.status(403).json({ error: 'Rumah sakit akun belum ditentukan.' });
+  const profil = await profilKlaim.muatProfil(getDb(), req.user.hospital_code);
+  res.json({ profil, katalog: require('../data/referensiKesesuaianKlaim.json'),
+    template_lokal: require('../data/syaratPenunjangDiagnosis.json').aturan.map(a => ({ id:a.id, nama:a.nama_diagnosis, kode_diagnosis:a.kode_diagnosis })) });
+});
+
+router.put('/claim-profile', authenticate, authorize('admin'), async (req, res) => {
+  if (!req.user?.hospital_code) return res.status(403).json({ error: 'Rumah sakit akun belum ditentukan.' });
+  try {
+    profilKlaim.validasiProfil(req.body, req.user.hospital_code);
+  } catch (e) { return res.status(400).json({ error:e.message }); }
+  try {
+    const db=getDb();
+    const profil=await db.transaction(async tx => {
+      const hasil=await profilKlaim.simpanProfil(tx, req.user.hospital_code, req.body, req.user.id);
+      await tx.run(`INSERT INTO audit_logs(id,user_id,user_email,action,resource_type,resource_id,details)
+        VALUES(?,?,?,?,?,?,?)`, [require('uuid').v4(),req.user.id,req.user.email || '',
+        'UPDATE_CLAIM_PROFILE','profil_klaim_rs',req.user.hospital_code,JSON.stringify(req.body)]);
+      return hasil;
+    });
+    res.json({ profil });
+  } catch (e) {
+    console.error('[hospitalSettings] profil klaim:', e.message);
+    res.status(500).json({ error:'Profil klaim belum berhasil disimpan. Silakan coba lagi.' });
+  }
+});
 
 const VALID_KELAS_RS = ['A', 'B', 'C', 'D'];
 

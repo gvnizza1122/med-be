@@ -1,3 +1,4 @@
+const { pastikanIndeks } = require('../database/schemaIdempotent');
 /**
  * Skema tabel "Alur Menjawab Pending BPJS".
  *
@@ -31,7 +32,7 @@ async function ensureSchema(db) {
       diperbarui_pada TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
   `);
-  await db.query('CREATE INDEX IF NOT EXISTS idx_pending_alasan_peta_kategori ON pending_alasan_peta(kategori, jenis_rawat)');
+  await pastikanIndeks(db, 'CREATE INDEX IF NOT EXISTS idx_pending_alasan_peta_kategori ON pending_alasan_peta(kategori, jenis_rawat)');
 
   // Triase empat kotak. kriteria = JSON daftar {id, uraian, terpenuhi, bukti};
   // kotak_manual = putusan koder, dipakai bila ada dan tidak ditimpa hitung ulang.
@@ -77,7 +78,7 @@ async function ensureSchema(db) {
       UNIQUE (pending_id, versi)
     )
   `);
-  await db.query('CREATE INDEX IF NOT EXISTS idx_draft_jawaban_pending_status ON draft_jawaban_pending(pending_id, status)');
+  await pastikanIndeks(db, 'CREATE INDEX IF NOT EXISTS idx_draft_jawaban_pending_status ON draft_jawaban_pending(pending_id, status)');
 }
 
 let sudah = null;

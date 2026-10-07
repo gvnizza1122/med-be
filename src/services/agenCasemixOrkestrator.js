@@ -92,7 +92,7 @@ class SesiAgenCasemix {
     if (this.pola.length) {
       bagian.push(`Pola casemix RS pada kasus lain dengan istilah resume yang sama (petunjuk, bukan bukti pasien ini):\n${this.pola.map(p => `- ${p.jenis} "${p.istilah.slice(0, 80)}" dikode casemix ${p.kode} (${p.jumlah}x)`).join('\n')}`);
     }
-    bagian.push(KONVENSI_KODING_RS);
+    bagian.push(require('./konvensiKodingRs').konvensiUntukRs(this.record,this.pages));
     return `\n\n${bagian.join('\n')}\n`;
   }
 
@@ -118,7 +118,7 @@ class SesiAgenCasemix {
     if (utama && ['belum_cukup_bukti', 'perlu_klarifikasi', 'diagnosis_banding'].includes(utama.status)) this.pemicuSol.push('agen_diagnosis_utama_lemah');
     if (this.pelajaran.some(p => p.pola === 'sering_dihapus' && dx.includes(p.kode) && dx[0] === p.kode)) this.pemicuSol.push('agen_utama_bertentangan_pola_casemix');
     this.pemicuSol = [...new Set(this.pemicuSol)];
-    this.catat('Menilai perlu tidaknya analisis mendalam (Sol)', this.pemicuSol.length ? 'agen_meminta_sol' : 'agen_tidak_menambah_pemicu',
+    this.catat('Menilai perlu tidaknya pemeriksaan mendalam', this.pemicuSol.length ? 'agen_meminta_sol' : 'agen_tidak_menambah_pemicu',
       { keterangan: [...this.pemicuSol, ...(this.pelajaran.length ? [`${this.pelajaran.length} pelajaran casemix`] : [])].join(', ') || null });
     return this.pemicuSol;
   }
@@ -161,7 +161,7 @@ class SesiAgenCasemix {
  */
 function pilihInacbg(hitungInacbgDanTarif, dx, px, record = {}, tebakanLuna = null) {
   const jenis = record.jenis_klaim || record.JENIS_KLAIM;
-  const kelas = record.kelas_rawat || record.KELAS_RAWAT;
+  const kelas = require('./kelasPerawatanService').kelasTarif(record);
   const kodeDari = h => (h && h.inacbgResult ? h.inacbgResult.code : null);
   const grouper = hitungInacbgDanTarif(dx, px, jenis, kelas, null);
   const denganLuna = tebakanLuna ? hitungInacbgDanTarif(dx, px, jenis, kelas, tebakanLuna) : grouper;

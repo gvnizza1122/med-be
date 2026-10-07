@@ -125,7 +125,7 @@ JSON:`;
 
   // Model kadang balas teks penalaran / kosong alih-alih JSON (terutama model gratis).
   // Retry dengan jeda menaik; sekali sukses langsung berhenti.
-  const maxAttempts = Number(process.env.AI_MAX_ATTEMPTS || 3);
+  const maxAttempts = require('./konteksPenggunaanAiService').saatIni().anggaran_ai ? 1 : Number(process.env.AI_MAX_ATTEMPTS || 3);
   const timeoutMs = Number(process.env.AI_TIMEOUT_MS || 60000);
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -138,6 +138,7 @@ JSON:`;
         maxTokens: 2000,
       }, { db: getDb() });
       if (!hasilGateway.ok || !hasilGateway.hasil) {
+        result.error_code=hasilGateway.kode || 'ekstraksi_ai_gagal';
         throw new Error(hasilGateway.error || 'Gateway ekstraksi tidak menghasilkan JSON');
       }
       const extracted = hasilGateway.hasil;

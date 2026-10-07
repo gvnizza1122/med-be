@@ -45,7 +45,7 @@ describe('pelajaran dari kasus lain', () => {
     { dx_aplikasi: 'O41.0', dx_casemix: 'O41.0', px_aplikasi: '', px_casemix: '', jenis_klaim: 'RAWAT_INAP' },
   ];
   test('kode yang berulang dihapus & ditambah casemix menjadi pelajaran', async () => {
-    const p = await pelajaranRelevan(dbPalsu(baris), { dx: ['O42.1', 'O41.0'], recordId: 'r1', jenisKlaim: 'RAWAT_INAP' });
+    const p = await pelajaranRelevan(dbPalsu(baris), { dx: ['O42.1', 'O41.0'], recordId: 'r1', jenisKlaim: 'RAWAT_INAP', untukPerbandingan: true });
     const hapus = p.find(x => x.pola === 'sering_dihapus');
     expect(hapus).toMatchObject({ kode: 'O41.0', jumlah: 2, kasus: 3 });
     expect(p.find(x => x.pola === 'sering_ditambah')).toMatchObject({ kode: 'Z37.0' });

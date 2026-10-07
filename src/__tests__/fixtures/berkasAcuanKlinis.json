@@ -1,0 +1,182 @@
+[
+  {
+    "id": "A",
+    "diagnosis": "pneumonia",
+    "sekunder": "1. kds",
+    "tindakan": "nebulisasi",
+    "kode_tindakan": [
+      "93.94"
+    ],
+    "referensi": {
+      "dx": [
+        "J18.9"
+      ],
+      "px": [
+        "90.59",
+        "91.39",
+        "87.44",
+        "93.94"
+      ],
+      "kelas": "3",
+      "cbg": "J-4-16-I",
+      "tarif": 3432600
+    }
+  },
+  {
+    "id": "B",
+    "diagnosis": "OD Katarak Traumatika (trauma kayu)",
+    "sekunder": "1. HT",
+    "tindakan": "OD EKEK + IOL dg LA",
+    "kode_tindakan": [],
+    "referensi": {
+      "dx": [
+        "H26.1",
+        "W44.9",
+        "I10"
+      ],
+      "px": [
+        "13.71",
+        "89.52",
+        "90.59"
+      ],
+      "kelas": "3",
+      "cbg": "H-1-30-I",
+      "tarif": 6103100
+    }
+  },
+  {
+    "id": "C",
+    "diagnosis": "obs abd pain ec Cholelithiasis",
+    "sekunder": "1. Obs Vomitus dengan dehidrasi sedang",
+    "tindakan": "1. -",
+    "kode_tindakan": [],
+    "referensi": {
+      "dx": [
+        "K80.2",
+        "E86",
+        "R11"
+      ],
+      "px": [
+        "90.59",
+        "88.76"
+      ],
+      "kelas": "2",
+      "cbg": "B-4-14-I",
+      "tarif": 3436700
+    }
+  },
+  {
+    "id": "D",
+    "diagnosis": "Abses glutea",
+    "sekunder": "1. DM",
+    "tindakan": "Debrideman",
+    "kode_tindakan": [],
+    "referensi": {
+      "dx": [
+        "E11.5"
+      ],
+      "px": [
+        "90.59",
+        "89.52",
+        "86.22"
+      ],
+      "kelas": "1",
+      "cbg": "I-4-15-I",
+      "tarif": 5838600
+    }
+  },
+  {
+    "id": "E",
+    "diagnosis": "snh\nckd v on hd rutin\nhipoglikemia",
+    "sekunder": "",
+    "tindakan": "Amlodipin 1x10mg",
+    "kode_tindakan": [],
+    "referensi": {
+      "dx": [
+        "I63.9",
+        "N18.5",
+        "E16.2"
+      ],
+      "px": [
+        "90.59",
+        "89.52",
+        "39.95",
+        "87.03"
+      ],
+      "kelas": "1",
+      "cbg": "G-4-14-I",
+      "tarif": 4683200
+    }
+  },
+  {
+    "id": "F",
+    "diagnosis": "bronkopneumonia CURB 65a score 3",
+    "sekunder": "1. -",
+    "tindakan": "1. nebul",
+    "kode_tindakan": [
+      "93.94"
+    ],
+    "referensi": {
+      "dx": [
+        "J18.0"
+      ],
+      "px": [
+        "90.59",
+        "87.44",
+        "93.94",
+        "89.52"
+      ],
+      "kelas": "3",
+      "cbg": "J-4-16-I",
+      "tarif": 3432600
+    }
+  },
+  {
+    "id": "G",
+    "diagnosis": "Mixed hemoroid dengan perdarahan",
+    "sekunder": "1. -",
+    "tindakan": "1. Ligasi hemoroid dan eksisi hemoroid",
+    "kode_tindakan": [
+      "49.45",
+      "49.46"
+    ],
+    "referensi": {
+      "dx": [
+        "I84.8"
+      ],
+      "px": [
+        "49.45",
+        "49.46",
+        "90.59",
+        "87.44"
+      ],
+      "kelas": "2",
+      "cbg": "K-1-50-I",
+      "tarif": 5846700
+    }
+  },
+  {
+    "id": "H",
+    "diagnosis": "G1P0A0 dgn malposisi janin, PLR, lilitan tali pusat",
+    "sekunder": "1. -",
+    "tindakan": "1. sc+IUD",
+    "kode_tindakan": [],
+    "referensi": {
+      "dx": [
+        "O32.9",
+        "O44.0",
+        "O69.2",
+        "O82.1",
+        "Z37.0"
+      ],
+      "px": [
+        "74.1",
+        "75.32",
+        "90.59"
+      ],
+      "kelas": "3",
+      "cbg": "O-6-10-I",
+      "tarif": 4656700
+    }
+  }
+]

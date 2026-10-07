@@ -680,7 +680,9 @@ async function enhancedOcrExtraction(pdfPath, pageNumbers = null) {
   try {
     // PASS 1: Standard OCR text extraction
     console.log('[EnhancedOCR] Pass 1: General text extraction...');
-    const ocrMentah = await ocrPdfPages(pdfPath, pageNumbers || 'all');
+    const awal = await ocrPdfPages(pdfPath, pageNumbers || 'all');
+    const ocrMentah = await require('./pemulihanPembacaanService').pulihkanPembacaan(awal,
+      halaman => ocrPdfPages(pdfPath, halaman, undefined, { timeoutMs: 180000 }));
     // Lembar grouper E-Klaim (hasil casemix) dipisahkan: tidak ikut ekstraksi
     // klinis maupun teks klaim, hanya disimpan sebagai pembanding.
     const halamanOcr = (ocrMentah && ocrMentah.pages) || [];

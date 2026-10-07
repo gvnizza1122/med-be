@@ -8,5 +8,6 @@ uploads
 .git
 .gitignore
 .DS_Store
+artifacts
 ocr-paddle
 ocr-rapid

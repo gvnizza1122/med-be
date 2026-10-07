@@ -18,7 +18,7 @@
  * RV-14: Validasi Episode Rujukan Internal RJTL (BA 1247/2024) - MAJOR
  * RV-15: Flagging Otomatisasi Program Rujuk Balik / PRB (BA 1247/2024) - MAJOR
  * RV-16: Batasan Maksimal Iterasi Obat Kronis (BA 1247/2024) - MAJOR
- * RV-17: Validasi Tarif Top-Up Odontektomi Khusus Rawat Jalan (PMK 3/2023 & BA 1247/2024) - MAJOR
+ * RV-17: Telaah indikasi odontektomi RJ/RI dilakukan oleh referensi RK-17 (BA 2024)
  * RV-18: Kode Kombinasi I10 + I25.9 -> I11.9 (mining data pending BPJS riil) - MINOR
  * RV-20: Kriteria Kegawatan IGD (kode nyeri generik tanpa bukti kegawatan) - MINOR
  * RV-21: Validasi TARIF_INACBG vs Tabel Resmi PMK 3/2023 (Regional 1 x Kelas D Swasta) - MAJOR
@@ -505,22 +505,9 @@ function validateRecord(record, activeRules) {
     }
   }
 
-  // RV-17: Validasi Tarif Top-Up Odontektomi Khusus Rawat Jalan
-  if (ruleMap['RV-17']?.is_active) {
-    const procStr = record.prosedur_list || '';
-    if (procStr && procStr.split(';').map(p => p.trim()).includes('23.19')) {
-      if (record.jenis_klaim === 'RAWAT_INAP') {
-        errors.push({
-          rule_id: 'RV-17',
-          field_name: 'prosedur_list',
-          severity: 'major',
-          error_message: ruleMap['RV-17'].error_message || 'Tindakan Odontektomi (23.19) terdeteksi pada klaim Rawat Inap. Sesuai PMK No. 3 Tahun 2023, tarif top-up Odontektomi hanya berlaku dan dijamin pada pelayanan Rawat Jalan (RJTL).',
-          expected_value: 'Pelayanan Rawat Jalan (RJTL)',
-          actual_value: `Diajukan sebagai Klaim ${record.jenis_klaim || 'RAWAT_INAP'}`
-        });
-      }
-    }
-  }
+  // RV-17 lama menyamakan kode 23.19/rawat inap dengan ketidaklayakan klaim.
+  // BA 2024 aspek medis 3 mengakui RJ maupun RI sesuai indikasi. Telaah bukti
+  // RK-17 dilakukan referensiKlaimService; jangan menolak dari jenis rawat saja.
 
   // RV-20: Kriteria Kegawatan IGD — deterministik (cek kode ICD eksplisit),
   // pelengkap pola AI "kegawatan_lemah" (aiReviewService.js) yang baca
@@ -606,7 +593,7 @@ function validateRecord(record, activeRules) {
   if (ruleMap['RV-21']?.is_active) {
     const kode = (record.inacbg_code || '').trim().toUpperCase();
     if (kode) {
-      const resVal = validateTarifDiscrepancy(kode, record.kelas_rawat, record.tarif_inacbg);
+      const resVal = validateTarifDiscrepancy(kode, require('./kelasPerawatanService').kelasTarif(record), record.tarif_inacbg);
       if (resVal.status === 'TARIF_TIDAK_BERLAKU') {
         errors.push({
           rule_id: 'RV-21',

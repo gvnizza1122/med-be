@@ -80,3 +80,75 @@ describe('punyaLapisanTeksNyata dan ukurMutuTeks', () => {
     expect(m.rasio_kata_berbunyi).toBeGreaterThan(0.8);
   });
 });
+
+describe('lapisan teks dengan encoding font bergeser', () => {
+  const { putuskanSumberHalaman: putus, teksTergeser } = require('../../services/keputusanSumberHalamanService');
+  const geser = (t, n) => t.replace(/[!-~]/g, c => String.fromCharCode(c.charCodeAt(0) - n));
+  const resume = 'RS LESTARI RAHARJA Jl Soetopo Magelang RESUME MEDIS RAWAT INAP Nama PASIEN CONTOH C Alasan Masuk Rawat Inap Benjolan di lipat paha kanan nyeri mual muntah Ringkasan Penemuan Fisik Penting Pemeriksaan Penunjang Diagnosis Utama Hernia inguinalis lateralis dekstra ireponibilis Tindakan Prosedur Hernia repair dengan mesh graft Terapi pengobatan selama di rumah sakit Dokter Penanggung Jawab Pelayanan '.repeat(2);
+  test('teks normal tetap dipakai', () => {
+    expect(teksTergeser(resume)).toBe(false);
+    expect(putus(resume).sumber).toBe('native_text');
+  });
+  test('teks bergeser 29 (PASIEN CONTOH C) dialihkan ke OCR', () => {
+    const rusak = geser(resume, 29);
+    expect(rusak).toContain('5(680('); // RESUME setelah pergeseran font, tanpa bergantung pada nama pasien.
+    expect(teksTergeser(rusak)).toBe(true);
+    expect(putus(rusak)).toMatchObject({ sumber: 'ocr', alasan: 'lapisan_teks_rusak' });
+  });
+});
+
+describe('laporan radiologi RS rujukan', () => {
+  const { classifyPageDocumentType } = require('../../services/pdfPageClassifier');
+  const { bacaTemuanPenunjang } = require('../../services/temuanPenunjangService');
+  const ct = 'Kemenkes RS Soerojo NO RM 900004 NO. FOTO 2026010100000001 PEMERIKSAAN : CT-Head tanpa kontras KLINIS : SES/SNH\nDilakukan Pemeriksaan HCTS Multislice Non Kontras\nKESAN Lacunar Infarct Regio Thalamus sinistra\nRadiologist';
+  test('"CT-Head" dikenali sebagai halaman radiologi dan dikode 87.03 (PASIEN CONTOH B)', () => {
+    expect(classifyPageDocumentType(ct)).toBe('radiology');
+    const { temuan } = bacaTemuanPenunjang([{ page_number: 7, ocr_text: ct }]);
+    expect(temuan.find(t => t.istilah_id === 'ct_kepala')).toMatchObject({ kode_usulan: '87.03', page_number: 7 });
+  });
+});
+
+describe('pengenal pemeriksaan umum (format vendor baru)', () => {
+  const { kenaliPemeriksaanRadiologi: k } = require('../../services/pengenalPemeriksaanUmum');
+  const { classifyPageDocumentType } = require('../../services/pdfPageClassifier');
+  test.each([
+    ['HCTS Multislice Non Kontras', '87.03'], ['MSCT Brain', '87.03'], ['USG Whole Abdomen', '88.76'],
+    ['Foto Thorax PA', '87.44'], ['MRI Lumbal', '88.93'], ['USG Obstetri', '88.78'],
+  ])('%s -> %s', (teks, kode) => expect(k(teks).kode).toBe(kode));
+  test('"CT" clotting time di lab tidak dikira CT scan', () => {
+    expect(k('Masa Pembekuan (CT) 8.00 menit')).toBeNull();
+    expect(k('CLOTTING TIME CT')).toBeNull();
+  });
+  test('laporan radiologi RS lain dikenali dari strukturnya', () => {
+    expect(classifyPageDocumentType('RSUD Kota X\nHASIL BACAAN\nJenis Foto : Thorax PA\nKlinis : batuk\nKesan : cor dan pulmo normal\nSp.Rad')).toBe('radiology');
+  });
+});
+
+describe('belajar penunjang format baru dari lembar casemix berkas lain', () => {
+  const { ekstrakPasangan, cariPenunjangDipelajari } = require('../../services/pembelajaranCasemixService');
+  const hasil = { page_number: 7, ocr_text: 'RS Vendor Baru\nHASIL PEMERIKSAAN\nPemeriksaan : Kardiografi Ultra Z   Klinis : sesak\nKesimpulan : normal\nSp.Rad' };
+  const lembar = { diagnosis: [{ kode: 'I50.0', peran: 'utama' }], prosedur: [{ kode: '90.59' }, { kode: '88.72' }].slice(1) };
+  test('judul tak dikenal + satu kode penunjang casemix -> pasangan penunjang', () => {
+    expect(ekstrakPasangan([hasil], lembar)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ jenis: 'penunjang', kode: '88.72', teks: 'Kardiografi Ultra Z' }),
+    ]));
+  });
+  test('judul yang sudah dikenali kamus tidak dipelajari ulang', () => {
+    const ct = { page_number: 7, ocr_text: 'Pemeriksaan : CT-Head tanpa kontras\nKesan : infark' };
+    expect(ekstrakPasangan([ct], { prosedur: [{ kode: '87.03' }] }).filter(p => p.jenis === 'penunjang')).toEqual([]);
+  });
+  test('dipakai bila >= 2 berkas lain konsisten', async () => {
+    const db = { query: async () => {}, all: async () => [{ kode: '88.72', jumlah: 2 }] };
+    const r = await cariPenunjangDipelajari(db, [hasil], 'rec-baru', { untukPerbandingan: true });
+    expect(r).toEqual([expect.objectContaining({ kode_usulan: '88.72', sumber_pengenal: 'dipelajari_casemix', page_number: 7 })]);
+  });
+  test('baru 1 berkas -> belum dipakai', async () => {
+    const db = { query: async () => {}, all: async () => [{ kode: '88.72', jumlah: 1 }] };
+    expect(await cariPenunjangDipelajari(db, [hasil], 'rec-baru', { untukPerbandingan: true })).toEqual([]);
+  });
+  test('riwayat casemix tidak menentukan kode pasien baru', async () => {
+    const db = { all: jest.fn(async () => [{ kode: '88.72', jumlah: 100 }]) };
+    expect(await cariPenunjangDipelajari(db, [hasil], 'rec-baru')).toEqual([]);
+    expect(db.all).not.toHaveBeenCalled();
+  });
+});

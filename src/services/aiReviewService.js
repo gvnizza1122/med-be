@@ -71,6 +71,9 @@ const { periksaKode: periksaKodeKamus, tandaiStatusKamusEvidence, STATUS: STATUS
 const { TAHAP_PEMBACAAN, simpanTahapPembacaan } = require('./claimReadingStageService');
 const { mulaiSesiAgen } = require('./agenCasemixOrkestrator');
 const { lengkapiKodeLukaBakar } = require('./kodingLukaBakarService');
+const { jagaSumberDiagnosis, susunDasarDiagnosis } = require('./dasarDiagnosisService');
+const { deskripsiDiagnosis, deskripsiProsedur, padananWho } = require('./kamusKodeService');
+const { kodeIm } = require('./kamusIdrgService');
 
 async function simpanJejakEnamTahap(record, evidencePool, result, codes) {
   if (!record || !record.id || !Array.isArray(evidencePool) || evidencePool.length === 0) return;
@@ -189,8 +192,10 @@ TUGAS:
    bukan diagnosis medis, mis. "nyeri akut", "ketidakefektifan bersihan jalan nafas").
    KODE WAJIB ICD-10 WHO (versi yang dipakai BPJS), BUKAN ICD-10-CM Amerika: tidak ada kode berkarakter
    ke-5/6/7 (R10.84, J45.901, S52.501A) dan tidak ada kategori CM seperti D49, E08, E09, O9A, Z3A. Prosedur
-   WAJIB ICD-9-CM. TUMOR/MASSA/BENJOLAN dikode menurut hasil patologi anatomi bila ada (jinak D10-D36 sesuai
-   jaringan & lokasi, ganas C00-C97); tanpa PA: D48.x.
+   WAJIB ICD-9-CM. Diagnosis akhir dokter menjadi dasar koding. PA/histopatologi dinilai bersama
+   diagnosis klinis, lokasi dan spesimen; tidak mengganti diagnosis dokter secara otomatis. Tidak ada PA
+   tidak otomatis berarti D48.x. Tidak ganas bukan bukti neoplasma jinak: hasil dapat normal, radang,
+   lesi non-neoplastik, neoplasma jinak atau ganas. Bila berbeda, minta klarifikasi dokter/koder.
    quotation WAJIB kutipan VERBATIM istilah diagnosis dari dokumen (bukan kode ICD-10 itu sendiri, karena
    kodenya memang tidak tercetak di dokumen — itulah sebabnya diusulkan); reasoning jelaskan pemetaan
    istilah -> kode secara singkat, DAN sebutkan label sumbernya (mis. "dari Diagnosis Utama" vs "dari
@@ -446,8 +451,41 @@ async function periksaKodeKlaimTerhadapKamus(record) {
  * -- BUKAN berarti "salah". Best-effort: kegagalan di sini tidak pernah
  * menggagalkan hasil AI review.
  */
-async function annotateKamusValid(suggestedCodes) {
+/**
+ * Saran diagnosis KONDISIONAL dari kutipan yang sama adalah alternatif, bukan
+ * diagnosis yang berdiri sendiri: SLAMET FAHRODIN (0170R0111225V003444)
+ * "anemia et causa blood loss" -> D62 "bila akut" DAN D50.0 "bila kronis";
+ * keduanya terisi otomatis seolah dua diagnosis dan menaikkan severity.
+ * Yang pertama dipertahankan; sisanya ditandai alternatif_dari dan tidak diisi
+ * otomatis (tetap tampil untuk diputuskan koder / dikonfirmasi DPJP).
+ */
+const POLA_KONDISIONAL = /\b(?:bila|jika|apabila|kalau|seandainya|pertimbangkan|alternatif|atau)\b/i;
+function tandaiAlternatifDiagnosis(saran) {
+  if (!Array.isArray(saran)) return saran;
+  const kutipan = (s) => String(s.quotation || '').toLowerCase().replace(/\s+/g, ' ').trim();
+  const pertamaPerKutipan = new Map();
+  return saran.map(s => {
+    if (!s || s.type !== 'diagnosis' || !s.code || !kutipan(s) || s.sumber_aturan) return s;
+    const k = `${s.page_number || ''}|${kutipan(s)}`;
+    const pertama = pertamaPerKutipan.get(k);
+    if (!pertama) { pertamaPerKutipan.set(k, s); return s; }
+    const kondisional = POLA_KONDISIONAL.test(String(s.reasoning || '')) || POLA_KONDISIONAL.test(String(pertama.reasoning || ''));
+    // Kategori ICD berbeda (mis. diagnosis + manifestasi) bukan alternatif.
+    if (!kondisional || String(s.code).charAt(0) !== String(pertama.code).charAt(0)) return s;
+    return { ...s, alternatif_dari: pertama.code, boleh_isi_otomatis: false,
+      catatan_alternatif: `Alternatif dari ${pertama.code} untuk kutipan yang sama; pilih salah satu sesuai keterangan dokter (mis. akut/kronis).` };
+  });
+}
+
+async function annotateKamusValid(suggestedCodes, record = {}) {
   if (!Array.isArray(suggestedCodes) || suggestedCodes.length === 0) return suggestedCodes;
+
+  // Kode IM dapat sah untuk iDRG, tetapi saran INA-CBG memakai padanan WHO.
+  // Simpan asalnya; status sah di kamus IM tidak boleh melewati pemetaan ini.
+  suggestedCodes = suggestedCodes.map(entry => {
+    const who = entry?.type === 'diagnosis' ? padananWho(normalizeIcdCode(entry.code)) : null;
+    return who ? { ...entry, code: who, kode_asal: entry.kode_asal || normalizeIcdCode(entry.code) } : entry;
+  });
 
   const diagCodes = [...new Set(
     suggestedCodes
@@ -468,10 +506,10 @@ async function annotateKamusValid(suggestedCodes) {
   const beranotasi = suggestedCodes.map(entry => {
     if (!entry.code) return { ...entry, kamus_valid: null };
     if (entry.type === 'diagnosis') {
-      return { ...entry, kamus_valid: diagFoundSet ? diagFoundSet.has(normalizeIcdCode(entry.code)) : null };
+      return { ...entry, kamus_valid: Boolean(deskripsiDiagnosis(entry.code) || kodeIm(entry.code)) || Boolean(diagFoundSet && diagFoundSet.has(normalizeIcdCode(entry.code))) };
     }
     if (entry.type === 'procedure') {
-      return { ...entry, kamus_valid: procFoundSet ? procFoundSet.has(normalizeIcdCode(entry.code)) : null };
+      return { ...entry, kamus_valid: Boolean(deskripsiProsedur(entry.code) || kodeIm(entry.code, 'prosedur')) || Boolean(procFoundSet && procFoundSet.has(normalizeIcdCode(entry.code))) };
     }
     return { ...entry, kamus_valid: null };
   });
@@ -484,7 +522,7 @@ async function annotateKamusValid(suggestedCodes) {
   return Promise.all(beranotasi.map(async (entry) => {
     if (entry.type !== 'diagnosis' || entry.kamus_valid !== false || !entry.code) return entry;
     // Padanan pasti per kode lengkap (mis. D49.2 -> D48.1), tanpa AI.
-    const pasti = KODE_CM_KE_WHO[normalizeIcdCode(entry.code)];
+    const pasti = padananWho(normalizeIcdCode(entry.code)) || KODE_CM_KE_WHO[normalizeIcdCode(entry.code)];
     if (pasti) return { ...entry, code: pasti, kamus_valid: true, kode_asal: normalizeIcdCode(entry.code) };
     try {
       const pengganti = await petakanKeKodeWho(entry.code, entry.quotation, {
@@ -496,16 +534,53 @@ async function annotateKamusValid(suggestedCodes) {
         alamat: record.alamat || record.ALAMAT,
         telepon: record.telepon || record.TELEPON || record.no_hp || record.NO_HP,
       });
-      // Tanpa padanan pasti: kode TIDAK dibuang -- disimpan dengan penanda
-      // belum_who supaya DIAGLIST tidak kosong dan tarif tetap terhitung;
-      // koder yang memilih kode WHO-nya.
-      if (!pengganti) return { ...entry, belum_who: true };
+      // Tanpa padanan pasti: simpan kandidat agar koder dapat meninjaunya,
+      // tetapi jangan masukkan ke kode klaim atau perhitungan tarif.
+      if (!pengganti) return { ...entry, belum_who: true, boleh_isi_otomatis: false };
       return { ...entry, code: pengganti.kode, kamus_valid: true, kode_asal: normalizeIcdCode(entry.code) };
     } catch (errKoreksi) {
       console.warn(`[AI-REVIEW] Gagal memetakan ${entry.code} ke ICD-10 WHO: ${errKoreksi.message}`);
-      return { ...entry, belum_who: true };
+      return { ...entry, belum_who: true, boleh_isi_otomatis: false };
     }
   }));
+}
+
+/** Semua pengusul kode melewati gerbang ini, termasuk penambahan tahap akhir. */
+async function periksaKodeAkhir(result, evidencePool, record = {}) {
+  result.suggested_codes = await annotateKamusValid(result.suggested_codes, record);
+  const pagar = jalankanPagarAman({ saran: result.suggested_codes, evidencePool });
+  if (pagar.suggested_codes) result.suggested_codes = pagar.suggested_codes;
+  if (pagar.pagar_temuan) {
+    const lama = result.pagar_temuan || {};
+    const baru = pagar.pagar_temuan;
+    for (const key of ['ditolak', 'disangkal', 'perlu_cek_manusia']) {
+      const seen = new Set();
+      baru[key] = [...(lama[key] || []), ...(baru[key] || [])].filter(e => {
+        const k = JSON.stringify([e.kode, e.halaman, e.alasan]);
+        if (seen.has(k)) return false;
+        seen.add(k); return true;
+      });
+      baru.ringkasan[key] = baru[key].length;
+    }
+    baru.ringkasan.alasan_ditolak = {};
+    for (const e of baru.ditolak) baru.ringkasan.alasan_ditolak[e.alasan] = (baru.ringkasan.alasan_ditolak[e.alasan] || 0) + 1;
+    result.pagar_temuan = baru;
+  }
+  result.suggested_codes = jagaSumberDiagnosis(result.suggested_codes, evidencePool);
+  const tindakan = require('./temuanTindakanService').jagaSumberTindakan(result.suggested_codes, result.temuan_tindakan, evidencePool);
+  result.suggested_codes = tindakan.saran;
+  result.temuan_tindakan = tindakan.tindakan;
+  // Daftar terapi yang tertahan tidak boleh menutupi catatan pelaksanaan
+  // pada halaman lain. Semua pengusul dan pengisian otomatis memakai bukti
+  // yang sudah lolos pemeriksaan kutipan, bagian, negasi, dan jenis kode.
+  for (const code of require('./konvensiKodingRs').tindakanTerverifikasi(result)) {
+    if ((result.suggested_codes || []).some(s => s.type === 'procedure' && s.code === code && s.boleh_isi_otomatis !== false && !s.disangkal)) continue;
+    const t = result.temuan_tindakan.find(t => t.kode_usulan === code);
+    const b = (t?.bukti_kode || []).find(b => ['resume_medis', 'triase_igd'].includes(b.sumber));
+    if (b) result.suggested_codes.push({ code, type: 'procedure', kamus_valid: true,
+      page_number: b.page_number, quotation: b.kutipan, sumber_aturan: 'tindakan_tercatat', nama_tindakan: t.nama });
+  }
+  return result;
 }
 
 /**
@@ -722,10 +797,9 @@ ATURAN KETAT (anti-upcoding & bukti verbatim):
   memecah kategori lebih halus sehingga menghasilkan kode yang TIDAK ADA di WHO — contoh: "R10.84" tidak
   ada, padanan WHO-nya "R10.4"; "J45.901" tidak ada, padanan WHO-nya "J45.9". Kalau kamu ragu apakah
   sebuah kode ada di WHO, pakai kode kategori/subkategori yang lebih umum.
-- TUMOR/MASSA/BENJOLAN: kode ditentukan HASIL PATOLOGI ANATOMI (PA/histopatologi) bila ada di berkas --
-  jinak D10-D36 menurut jaringan & lokasi (mis. lipoma badan D17.1, jaringan lunak toraks D21.3, payudara
-  D24, kulit badan D23.5), kista epidermoid L72.0, ganas C00-C97. Tanpa PA: sifat tak tentu D48.x. Kategori
-  D49 (ICD-10-CM) TIDAK ADA di WHO -- jangan dipakai.
+- PA/histopatologi membantu diagnosis akhir dokter, bukan sumber tunggal pengganti diagnosis. Nilai
+  spesimen, lokasi, hasil normal/radang/non-neoplastik/jinak/ganas, dan waktu hasil. Negatif keganasan
+  tidak membuktikan neoplasma jinak. Tanpa PA tidak otomatis D48.x. Konflik perlu klarifikasi.
 - PRINCIPLE: "Bukti Dulu, Tarif Menyusul" — Usulkan kandidat kode murni berdasarkan bukti medis verbatim, BUTA terhadap tarif/biaya.
 - HANYA dari istilah yang benar-benar tertulis eksplisit SEBAGAI diagnosis/prosedur dokter. BUKAN "Keluhan" (gejala
   subjektif pasien sendiri, mis. "nyeri perut"), BUKAN "Diagnosis Keperawatan" (istilah asuhan keperawatan,
@@ -1416,7 +1490,7 @@ async function assessKegawatdaruratan(evidencePool, triagePageNumbers, umurTahun
     };
   } catch (error) {
     console.warn(`[AI-REVIEW] assessKegawatdaruratan gagal: ${error.message}`);
-    return emptyResult('Penilaian Kegawatdaruratan gagal dibuat — coba Baca Ulang.');
+    return { ...emptyResult('Penilaian Kegawatdaruratan gagal dibuat — coba Baca Ulang.'), analisis_gagal: true };
   }
 }
 
@@ -1537,39 +1611,12 @@ jika bukti belum cukup, jelaskan kebutuhan klarifikasi tanpa mengarang penyakit 
       meminta kondisi sekunder stabil semacam ini ditatalaksana rawat jalan kecuali ada bukti krisis --
       SARAN untuk dicek verifikator/koder (mis. lengkapi dokumentasi evaluasi krisis kalau memang ada,
       atau pertimbangkan apakah rawat inap sudah tepat), BUKAN tuduhan bahwa klaim ini pasti salah.
-   i. [massa_jinak_tanpa_infiltrasi] Pola kedua PALING SERING dari data pending BPJS riil RS ini (Jan-Mei
-      2026, sekitar 14 dari 96 kasus pending). Klaim RAWAT_INAP dengan tindakan eksisi massa/tumor/kista
-      (kode prosedur eksisi mis. 86.3, diagnosis DU biasanya D21.x [neoplasma jinak jaringan ikat/lain],
-      D17.x [lipoma], L72.0 [kista epidermoid/pilar], M71.26 [kista Baker], atau sejenis) DI MANA HASIL
-      PEMERIKSAAN PATOLOGI ANATOMI (PA)/HISTOPATOLOGI yang terdokumentasi di berkas menyimpulkan (bagian
-      "Kesimpulan") diagnosis histologi yang SECARA DEFINISI KLINIS berasal dari kulit/jaringan subkutan
-      dan bersifat jinak -- misalnya (contoh, bukan daftar lengkap): kista epidermoid, kista pilar/pilar
-      cyst, lipoma/benign mesenchymal neoplasm jenis adipocytic, fibroepithelial polyp, benign inclusion
-      lession, callus/penebalan kulit, dan sejenisnya -- SELAMA "Sifat Keganasan"/kesimpulan histologi
-      TIDAK menyebut keganasan, invasi ke fascia/otot/struktur vital, atau perluasan di luar kulit-subkutis.
-      PENTING (temuan empiris dari data riil RS ini): kesimpulan histologi semacam itu SUDAH CUKUP sebagai
-      bukti sifat superfisial/non-infiltratif -- ini textbook implisit dari diagnosisnya sendiri (lipoma/
-      kista/callus secara definisi klinis terbatas di kulit-subkutan). JANGAN menunggu kalimat terpisah
-      yang secara eksplisit menyebut kata "subkutan" atau "tidak menginfiltrasi fascia/otot" -- laporan PA
-      RS ini pada praktiknya TIDAK menuliskan itu secara literal, cukup baris "Kesimpulan" diagnosis
-      histologinya saja sebagai basis kutipan. Hasil PA (bukan sekadar kode diagnosis atau klaim naratif
-      operator) adalah sumber bukti paling kuat untuk sifat massa di sini -- data riil RS ini menunjukkan
-      BPJS tetap mempending klaim ini walau laporan operasi/resume dokter operator mengklaim sebaliknya
-      (mis. "letak tumor dalam, menempel dasar otot", "risiko perdarahan besar") SELAMA kesimpulan PA
-      resmi tetap berupa diagnosis histologi jinak superfisial semacam di atas -- jadi klaim naratif
-      operator TANPA kesimpulan PA yang mendukungnya TIDAK otomatis membatalkan pola ini. Pola ini BERBEDA
-      dari kasus "PA wajib dilakukan tapi belum/tidak dilakukan" -- itu bukan bagian pola ini (jangan
-      laporkan pola ini kalau berkas justru menunjukkan PA belum dilakukan/hasil PA belum ada). JANGAN
-      laporkan kalau KESIMPULAN PA ITU SENDIRI menyebut keganasan, invasi ke fascia/otot/struktur
-      vital/tulang, atau margin sayatan positif mengenai jaringan dalam -- itu justru bukti kuat yang
-      membatalkan pola ini, alasan medis sah untuk rawat inap. Field "basis" kutip PERSIS baris
-      "Kesimpulan" dari hasil PA (mis. "Kesimpulan : Digiti V manus dextra : Benign mesenchymal neoplasm
-      jenis adipocytic", atau "Kesimpulan : Kulit plantar pedis : Lesi jinak, pendapat callus"). Field
-      "note" sebutkan diagnosis+kode, jelaskan kenapa kesimpulan histologi itu mengindikasikan massa
-      jinak superfisial/non-infiltratif, dan sebutkan bahwa BA Kesepakatan RS ini secara historis sering
-      meminta eksisi massa jinak superfisial semacam ini ditagihkan rawat jalan kecuali hasil PA
-      menunjukkan keganasan/infiltrasi struktur vital -- SARAN untuk dicek verifikator/koder, BUKAN
-      keputusan final.
+   i. [massa_jinak_tanpa_infiltrasi] Jangan menyimpulkan kebutuhan rawat inap dari hasil PA saja.
+      Tidak ditemukan keganasan, polip, radang atau hasil normal tidak membuktikan lesi superfisial,
+      tidak membuktikan tidak ada infiltrasi, dan tidak membatalkan indikasi klinis/operasi dokter.
+      Pola ini hanya kandidat klarifikasi bila ada bukti eksplisit lokasi/kedalaman dan konteks
+      pelayanan yang relevan, bukan semata PA jinak. Hormati diagnosis akhir, perdarahan, pemeriksaan
+      dokter, operasi dan anestesi. Jangan menganggap semua histopatologi sebagai kasus neoplasma.
    j. [diagnosis_evidence_mismatch] Perluasan pola diagnosis_vitals_mismatch (f) ke jenis bukti SELAIN
       vital sign -- pemeriksaan penunjang (kultur/lab) dan imaging -- untuk 2 kelompok diagnosis yang
       paling sering dipending BPJS RS ini karena ketiadaan bukti penunjang total (BUKAN soal kecukupan/
@@ -1759,7 +1806,8 @@ function buildPendingRiskPrompt(record, evidencePool) {
  * @param {Object} record - Field values rekam klaim (format vClaim/DB).
  * @param {Array} evidencePool - [{page_number, ocr_text}] — SELURUH dokumen (bukan cuma triase).
  * @returns {Promise<Array>} pending_risk_notes — sudah divalidasi (kutipan wajib match evidencePool,
- *   anti-halusinasi), siap pakai. Best-effort: array kosong kalau gagal/timeout.
+ *   anti-halusinasi), siap pakai. Kegagalan ditangkap pemanggil dan dicatat
+ *   sebagai analisis sebagian, bukan hasil risiko kosong yang dianggap bersih.
  */
 async function assessPendingRiskPatterns(record, evidencePool, dikenal = identitasUntukGateway(record)) {
   const KNOWN_PENDING_PATTERNS = new Set([
@@ -1801,11 +1849,19 @@ async function assessPendingRiskPatterns(record, evidencePool, dikenal = identit
     console.warn(`[AI-REVIEW] assessPendingRiskPatterns tokens: total=${hasilGateway.penggunaan?.total_tokens ?? '?'}`);
     const parsed = hasilGateway.hasil;
 
-    const raw = Array.isArray(parsed.pending_risk_notes) ? parsed.pending_risk_notes : [];
+    if (!Array.isArray(parsed.pending_risk_notes)) throw new Error('Daftar hasil pola risiko tidak tersedia');
+    const raw = parsed.pending_risk_notes;
     const out = [];
     for (const entry of raw.slice(0, 10)) {
       const { pattern, page_number: pageNum, basis, note } = entry || {};
       if (!KNOWN_PENDING_PATTERNS.has(pattern)) continue;
+      if (pattern === 'massa_jinak_tanpa_infiltrasi') {
+        const sumber = evidencePool.find(p => Number(p.page_number) === Number(pageNum));
+        // Histologi saja tidak membuktikan kedalaman/indikasi rawat. Kutipan
+        // klinis eksplisit diperlukan agar pola historis tidak menjadi tuduhan.
+        if (!sumber || classifyPageDocumentType(sumber.ocr_text || '') === 'patologi_anatomi'
+          || !/superfisial|subkutan|terbatas\s+(?:di|pada)\s+kulit|tidak\s+menginfiltrasi/i.test(basis || '')) continue;
+      }
       if (pattern === 'kegawatan_lemah' && !isKunjunganIgd) continue;
       if (typeof note !== 'string' || !note.trim()) continue;
       if (!basis) continue;
@@ -1831,7 +1887,7 @@ async function assessPendingRiskPatterns(record, evidencePool, dikenal = identit
     return out;
   } catch (error) {
     console.warn(`[AI-REVIEW] assessPendingRiskPatterns gagal: ${error.message}`);
-    return [];
+    throw error;
   }
 }
 
@@ -1859,7 +1915,7 @@ async function assessPendingRiskPatterns(record, evidencePool, dikenal = identit
  * @param {string[]} procedureCodes kode ICD-9-CM final
  * @param {string} jenisKlaim 'RAWAT_JALAN'|'RAWAT_INAP'
  * @param {string|null} kelasRawat
- * @param {string|null} [aiSuggestedInacbg] kode INA-CBG usulan AI (opsional; dicek dulu ke tabel resmi, degradasi ke grouping kalau tidak ada)
+ * @param {string|null} [aiSuggestedInacbg] usulan AI untuk dicatat bila berbeda; tidak menentukan kelompok atau tingkat
  * @returns {{inacbgCodeForLookup: string|null, inacbgResult: object|null, tarifResult: object|null}}
  */
 /**
@@ -1895,27 +1951,10 @@ function rapikanTemuanTindakan(tindakan, saran) {
 
 function hitungInacbgDanTarif(diagnosisCodes, procedureCodes, jenisKlaim, kelasRawat, aiSuggestedInacbg) {
   const inacbgGrouping = groupCodesToInaCBG(diagnosisCodes || [], procedureCodes || [], jenisKlaim);
-  let inacbgCodeForLookup = null;
+  const inacbgCodeForLookup = inacbgGrouping?.code || null;
   let inacbgResult = null;
-
-  if (aiSuggestedInacbg && typeof aiSuggestedInacbg === 'string') {
-    const aiSuggestedCode = aiSuggestedInacbg.trim().toUpperCase();
-    // Kelompok prosedur bedah/persalinan dari grouper mengalahkan usulan AI
-    // kelompok medis (-4-): grouper E-Klaim juga mendahulukan prosedur
-    // (YETY NOVIATI: AI W-4-16-II, casemix O-6-10-I karena seksio sesarea).
-    const aiKelompokMedis = /^[A-Z]-4-/.test(aiSuggestedCode);
-    if (inacbgGrouping && inacbgGrouping.berbasis_prosedur && aiKelompokMedis) {
-      console.warn(`[AI-REVIEW] AI suggested_inacbg "${aiSuggestedCode}" kelompok medis, padahal ada prosedur ${inacbgGrouping.code} -- dipakai kelompok prosedur.`);
-      inacbgCodeForLookup = inacbgGrouping.code;
-    } else if (lookupTarifInacbg(aiSuggestedCode) && cocokJenisKlaim(aiSuggestedCode, jenisKlaim)) {
-      inacbgCodeForLookup = aiSuggestedCode;
-    } else {
-      console.warn(`[AI-REVIEW] AI suggested_inacbg "${aiSuggestedCode}" tidak ditemukan di tabel PMK 3/2023 (Regional 1 Kelas D Swasta) atau tidak sesuai jenis klaim -- diabaikan, fallback ke grouping service.`);
-      if (inacbgGrouping) inacbgCodeForLookup = inacbgGrouping.code;
-    }
-  } else if (inacbgGrouping) {
-    inacbgCodeForLookup = inacbgGrouping.code;
-  }
+  // Kode ada di tabel tarif tidak membuktikan kesesuaiannya dengan kasus.
+  // Usulan model tidak menentukan kelompok atau menaikkan severity/tarif.
 
   let tarifResult = null;
   if (inacbgCodeForLookup) {
@@ -1972,17 +2011,11 @@ function hitungInacbgDanTarif(diagnosisCodes, procedureCodes, jenisKlaim, kelasR
         // kecil. Kalau kode benar-benar tidak ada di manapun, tarifResult
         // tetap null (bukan angka fiktif) -- lihat catatan yang sama di
         // salinan inline generateAiReview soal kenapa tidak ada "estimasi".
-        const estimasi = getInacbgEstimasi(inacbgCodeForLookup);
-        if (estimasi && estimasi.source === 'DICTIONARY' && estimasi.tarif) {
-          tarifResult = {
-            amount: Number(estimasi.tarif),
-            region: '1',
-            class: 'D_SWASTA',
-            jenis_layanan: jenisKlaim,
-            source: 'DICTIONARY_FALLBACK',
-            kelas_rawat: kelasRawat,
-            note: `Tarif dari kamus fallback (data sampel). Kode "${inacbgCodeForLookup}" belum ada di tabel PMK No. 3 Tahun 2023 Regional 1 Kelas D Swasta.`,
-          };
+        const dariInstaller = require('./inacbgGrouperResmi').tarifResmi(inacbgCodeForLookup, kelasRawat, jenisKlaim);
+        if (dariInstaller && dariInstaller.tarif != null) {
+          tarifResult = { amount: Number(dariInstaller.tarif), region: '1', class: 'D_SWASTA',
+            jenis_layanan: jenisKlaim, source: 'INSTALLER_EKLAIM', kelas_rawat: kelasRawat,
+            note: 'Acuan tarif dari tabel installer E-Klaim; kelompok dan severity tetap perkiraan aplikasi.' };
         }
         inacbgResult = {
           code: inacbgCodeForLookup,
@@ -1992,7 +2025,7 @@ function hitungInacbgDanTarif(diagnosisCodes, procedureCodes, jenisKlaim, kelasR
           severity_level: inacbgCodeForLookup.split('-').pop() || null,
           source: 'GENERATED',
           note: tarifResult
-            ? `Kode dihasilkan dari diagnosis & prosedur (fallback heuristik, bukan grouper resmi). Belum ada di PMK No. 3 Tahun 2023, tarif dari kamus fallback.`
+            ? `Kode dihasilkan dari diagnosis & prosedur (fallback heuristik, bukan grouper resmi). Belum ada di PMK No. 3 Tahun 2023, acuan tarif dari tabel installer E-Klaim.`
             : `Kode dihasilkan dari diagnosis & prosedur (fallback heuristik, bukan grouper resmi). Belum ada di PMK No. 3 Tahun 2023 -- tarif tidak tersedia.`,
         };
       }
@@ -2008,6 +2041,31 @@ function hitungInacbgDanTarif(diagnosisCodes, procedureCodes, jenisKlaim, kelasR
           source: 'FALLBACK',
         };
       }
+    }
+  }
+  if (inacbgResult && inacbgGrouping) {
+    inacbgResult.grouper_resmi = false;
+    inacbgResult.sumber_base = inacbgGrouping.sumber || 'heuristik';
+    inacbgResult.versi_perkiraan = require('./inacbgGrouperResmi').VERSI_PERKIRAAN;
+    inacbgResult.kandidat_base = inacbgGrouping.kandidat_base || [];
+    inacbgResult.base_perlu_verifikasi = !!inacbgGrouping.base_perlu_verifikasi;
+    if (tarifResult) {
+      tarifResult.perlu_verifikasi_grouper = true;
+      tarifResult.note = `${tarifResult.note || ''} Kelompok merupakan perkiraan aplikasi dari kode diagnosis/prosedur; perlu verifikasi mesin E-Klaim.`.trim();
+    }
+    if (inacbgGrouping.severity_estimasi) {
+      Object.assign(inacbgResult, { severity_estimasi: true, severity_status: inacbgGrouping.severity_status,
+        cc_potensial: inacbgGrouping.cc_potensial, skenario_severity: inacbgGrouping.skenario_severity });
+      if (tarifResult) {
+        tarifResult.perlu_verifikasi_grouper = true;
+        tarifResult.note = `${tarifResult.note || ''} Acuan tingkat I; tingkat keparahan final perlu hasil grouper E-Klaim.`.trim();
+        tarifResult.skenario_severity = (inacbgGrouping.skenario_severity || []).map(code => ({
+          code, severity: code.split('-').pop(), amount: getTarifResmi(code, tarifResult.kelas_rawat)?.tarif ?? null,
+        }));
+      }
+    }
+    if (aiSuggestedInacbg && String(aiSuggestedInacbg).trim().toUpperCase() !== inacbgCodeForLookup) {
+      inacbgResult.usulan_ai_ditahan = String(aiSuggestedInacbg).trim().toUpperCase();
     }
   }
   return { inacbgCodeForLookup, inacbgResult, tarifResult };
@@ -2033,12 +2091,12 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
   // hasIgdTriagePage), BUKAN jenis_klaim — lihat catatan di hasIgdTriagePage.
   const shouldReviewForGadar = hasIgdTriagePage(evidencePool);
 
-  if (validationErrors.length === 0 && !hasCodesToCheck && !shouldReviewForGadar) {
+  if (validationErrors.length === 0 && evidencePool.length===0 && !hasCodesToCheck && !shouldReviewForGadar) {
     return null; // tidak ada yang perlu direview
   }
 
   if (!process.env.AI_PROVIDER_API_KEY && !process.env.KIMI_API_KEY) return null;
-  const maxAttempts = Number(process.env.AI_MAX_ATTEMPTS || 3);
+  const maxAttempts = require('./konteksPenggunaanAiService').saatIni().anggaran_ai ? 1 : Number(process.env.AI_MAX_ATTEMPTS || 3);
   const timeoutMs = Number(process.env.AI_TIMEOUT_MS || 60000);
 
   const userPrompt = buildPrompt(record, validationErrors, evidencePool, codes, knowledgeEntries, bpjsExamples);
@@ -2076,7 +2134,7 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
       if (!hasilGateway.ok) throw new Error(hasilGateway.error || 'Panggilan gateway model gagal');
       const aiResult = hasilGateway.hasil;
       const tokensUsed = hasilGateway.penggunaan?.total_tokens || 0;
-      if (!aiResult || typeof aiResult !== 'object') throw new Error('Model tidak mengembalikan JSON');
+      if (!aiResult || typeof aiResult !== 'object' || Array.isArray(aiResult) || !Object.keys(aiResult).length) throw new Error('Model belum mengembalikan hasil analisis yang dapat diverifikasi');
       if (sesiAgen) sesiAgen.catat('Luna membaca berkas (dibekali catatan agen)', 'selesai', { oleh: 'luna', biaya_idr: hasilGateway.biaya?.idr, keterangan: attempt > 1 ? `percobaan ke-${attempt}` : null });
 
       const result = {
@@ -2085,6 +2143,7 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
         suggested_codes: [],
         knowledge_updates: [],
         pending_risk_notes: [],
+        gangguan_tahap: [],
         kegawatdaruratan_assessment: null,
         diagnosis_consistency_flags: [],
         tokens_used: tokensUsed,
@@ -2324,6 +2383,7 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
       const [pendingRiskNotes, kegawatdaruratanAssessment] = await Promise.all([
         assessPendingRiskPatterns(record, evidencePool, identitasUntukGateway(record)).catch(riskErr => {
           console.warn(`[AI-REVIEW] assessPendingRiskPatterns error: ${riskErr.message}`);
+          result.gangguan_tahap.push({ kode: 'pola_risiko', pesan: 'Pemeriksaan pola risiko klaim belum selesai.' });
           return [];
         }),
         hasIgdTriagePage(evidencePool) || Object.values(fallbackDocPageNumbers).some(arr => arr.length > 0)
@@ -2335,6 +2395,7 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
               record._ocr_vital_signs_detected || {}, identitasUntukGateway(record)
             ).catch(kegawatErr => {
               console.warn(`[AI-REVIEW] assessKegawatdaruratan error: ${kegawatErr.message}`);
+              result.gangguan_tahap.push({ kode: 'kegawatdaruratan', pesan: 'Pemeriksaan kegawatdaruratan belum selesai.' });
               return null;
             })
           : Promise.resolve(null),
@@ -2380,11 +2441,13 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
           record.DIAGLIST || record.diagnosa_list,
           record.PROCLIST || record.prosedur_list,
           evidencePool,
-          { pakaiBacaLab: process.env.SYARAT_PAKAI_BACA_LAB !== 'false' }
+          { pakaiBacaLab: process.env.SYARAT_PAKAI_BACA_LAB !== 'false',
+            tanggalPelayanan: require('./referensiKlaimService').tanggalRecord(record) }
         );
       } catch (syaratErr) {
         console.warn(`[AI-REVIEW] evaluasiSyaratPenunjang error: ${syaratErr.message}`);
         result.syarat_penunjang = [];
+        result.gangguan_tahap.push({ kode:'syarat_penunjang', pesan:'Pemeriksaan persyaratan penunjang belum selesai.' });
       }
 
       // Kamus penunjang — normalisasi istilah pemeriksaan penunjang (lab,
@@ -2401,6 +2464,15 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
           const bacaanPenunjang = bacaTemuanPenunjang(evidencePool);
           result.temuan_penunjang = bacaanPenunjang.temuan;
           penunjangTidakDikenali = bacaanPenunjang.tidak_dikenali;
+          // Format pemeriksaan baru yang sudah dipelajari dari casemix berkas lain.
+          try {
+            const { cariPenunjangDipelajari } = require('./pembelajaranCasemixService');
+            const dipelajari = await cariPenunjangDipelajari(getDb(), evidencePool, record.id);
+            const ada = new Set(result.temuan_penunjang.map(t => `${t.kode_usulan}|${t.page_number}`));
+            for (const t of dipelajari) if (!ada.has(`${t.kode_usulan}|${t.page_number}`)) result.temuan_penunjang.push(t);
+          } catch (errPelajaran) {
+            console.warn(`[AI-REVIEW] penunjang dipelajari dilewati: ${errPelajaran.message}`);
+          }
         } else {
           result.temuan_penunjang = [];
         }
@@ -2560,9 +2632,14 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
       // hasil fallback di atas) supaya semua entry tertandai, bukan cuma yang
       // dari alur utama. Best-effort: gagal di sini tidak menggagalkan hasil.
       try {
-        result.suggested_codes = await annotateKamusValid(result.suggested_codes);
+        result.suggested_codes = await annotateKamusValid(result.suggested_codes, record);
       } catch (kamusErr) {
         console.warn(`[AI-REVIEW] annotateKamusValid gagal total: ${kamusErr.message}`);
+      }
+      try {
+        result.suggested_codes = tandaiAlternatifDiagnosis(result.suggested_codes);
+      } catch (altErr) {
+        console.warn(`[AI-REVIEW] tandaiAlternatifDiagnosis gagal: ${altErr.message}`);
       }
 
       // Pagar pasca-AI (lihat pagarPascaAiService.js): kutipan harus ada di
@@ -2648,6 +2725,21 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
         result.agen_tinjau = { status: 'gagal', pesan: String(agenErr.message || agenErr).slice(0, 200) };
       }
       result.temuan_tindakan = rapikanTemuanTindakan(result.temuan_tindakan, result.suggested_codes);
+      // Agen dan aturan bedah dapat menambah kode setelah pemeriksaan awal.
+      // Periksa kembali kamus sebelum kode final dinilai dan dihitung tarifnya.
+      // Gerbang wajib SETELAH seluruh pengusul (termasuk agen): asal aturan
+      // tidak boleh menjadi jalan pintas untuk diagnosis dari PA/lab saja.
+      await periksaKodeAkhir(result, evidencePool, record);
+      result.dasar_diagnosis = susunDasarDiagnosis(evidencePool);
+      const tindakanSah = require('./konvensiKodingRs').tindakanTerverifikasi(result);
+      for (const code of tindakanSah) {
+        if ((result.suggested_codes || []).some(s => s.type === 'procedure' && s.code === code && s.boleh_isi_otomatis !== false)) continue;
+        const t = (result.temuan_tindakan || []).find(t => t.kode_usulan === code);
+        const b = (t?.bukti_kode || []).find(b => ['resume_medis', 'triase_igd'].includes(b.sumber));
+        if (!b) continue;
+        result.suggested_codes.push({ code, type: 'procedure', kamus_valid: true,
+          page_number: b.page_number, quotation: b.kutipan, sumber_aturan: 'tindakan_tercatat', nama_tindakan: t.nama });
+      }
       // Operasi terjadi tetapi tidak ada kode tindakan operasi -> ingatkan koder.
       try {
         const operasi = periksaOperasiTanpaKode(result.suggested_codes, evidencePool, record.PROCLIST || record.prosedur_list);
@@ -2720,9 +2812,16 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
       // bila kosong saran yang sudah lolos verifikasi) -- INA-CBG & tarif tersedia
       // sejak review, tidak menunggu DIAGLIST terisi.
       const kodeGrouper = kodeFinal(record, result);
+      result.kode_final = kodeGrouper;
+      result.syarat_penunjang = evaluasiSyaratPenunjang(kodeGrouper.dx, kodeGrouper.px, evidencePool,
+        { pakaiBacaLab: process.env.SYARAT_PAKAI_BACA_LAB !== 'false',
+          tanggalPelayanan: require('./referensiKlaimService').tanggalRecord(record) });
+      result.referensi_klaim = require('./referensiKlaimService').evaluasiReferensiKlaim(record,evidencePool,
+        { dx:kodeGrouper.dx, px:kodeGrouper.px, profil:require('./konteksPenggunaanAiService').saatIni().profil_klaim_rs });
+      result.tindakan_belum_dikode = require('./konvensiKodingRs').tindakanBelumDikode(record, result);
       const { inacbgCodeForLookup, inacbgResult, tarifResult } = sesiAgen
         ? sesiAgen.hitungGrouper(hitungInacbgDanTarif, kodeGrouper.dx, kodeGrouper.px, aiResult.suggested_inacbg)
-        : hitungInacbgDanTarif(kodeGrouper.dx, kodeGrouper.px, jenisKlaimRecord, record.KELAS_RAWAT || record.kelas_rawat, aiResult.suggested_inacbg);
+        : hitungInacbgDanTarif(kodeGrouper.dx, kodeGrouper.px, jenisKlaimRecord, require('./kelasPerawatanService').kelasTarif(record), aiResult.suggested_inacbg);
 
       // Langkah 3: Tetap update legacy fields untuk backward compatibility --
       // pakai kode & tarif yang SUDAH divalidasi di Langkah 1-2 di atas
@@ -2737,6 +2836,30 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
       // Langkah 4: Set result fields
       result.inacbg_result = inacbgResult;
       result.tariff_result = tarifResult;
+      if (result.tariff_result) result.tariff_result.kelas_perawatan = require('./kelasPerawatanService').informasiKelas(record);
+
+      // Penalaran dan tinjauan diagnosis saling independen; antrean bersama
+      // membatasi beban, tanpa memperpendek bukti atau melangkahi pemeriksa kritis.
+      const prosesPenalaran=(async()=>{
+      // Penalaran diagnosis: fakta klinis (anamnesis -> fisik -> penunjang ->
+      // terapi) lalu dukungan dokumentasi tiap diagnosis final. Lihat
+      // faktaKlinisService & penalaranDiagnosisService.
+      try {
+        const fakta = susunFaktaKlinis(evidencePool, result);
+        result.fakta_klinis = { jumlah: fakta.fakta.length, fakta: fakta.fakta.slice(0, 120) };
+        const { dx } = kodeFinal(record, result);
+        const kodeAturan = new Set((result.suggested_codes || []).filter(s => s && s.sumber_aturan && s.sumber_aturan !== 'agen_tinjau').map(s => String(s.code).toUpperCase()));
+        result.penalaran_diagnosis = await nilaiDiagnosis({ faktaKlinis: fakta, kodeDiagnosis: dx, kodeAturan, pages: evidencePool, record,
+          db: getDb(), dikenal: identitasUntukGateway(record) });
+        result.tokens_used += result.penalaran_diagnosis.tokens_used || 0;
+        if (sesiAgen) sesiAgen.catat('Penalaran diagnosis (anamnesis -> fisik -> penunjang -> kesimpulan)', result.penalaran_diagnosis.status,
+          { oleh: 'luna', biaya_idr: result.penalaran_diagnosis.biaya_idr, keterangan: (result.penalaran_diagnosis.diagnosis || []).map(d => `${d.kode}: ${d.status}`).join(', ') || null });
+      } catch (penalaranErr) {
+        console.warn(`[AI-REVIEW] Penalaran diagnosis gagal: ${penalaranErr.message}`);
+        result.penalaran_diagnosis = { status: 'gagal', pesan: String(penalaranErr.message || penalaranErr).slice(0, 200), diagnosis: [], kondisi_tersirat: [], pertanyaan_klarifikasi: [] };
+      }
+
+      })();
 
       // Tinjauan kasus tersedia sebelum pemilihan alasan pending; saran kode
       // tetap terpisah dari diagnosis yang diklaim dan tidak menggugurkan aturan wajib.
@@ -2778,23 +2901,7 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
         result.putusan_pending = null;
       }
 
-      // Penalaran diagnosis: fakta klinis (anamnesis -> fisik -> penunjang ->
-      // terapi) lalu dukungan dokumentasi tiap diagnosis final. Lihat
-      // faktaKlinisService & penalaranDiagnosisService.
-      try {
-        const fakta = susunFaktaKlinis(evidencePool, result);
-        result.fakta_klinis = { jumlah: fakta.fakta.length, fakta: fakta.fakta.slice(0, 120) };
-        const { dx } = kodeFinal(record, result);
-        const kodeAturan = new Set((result.suggested_codes || []).filter(s => s && s.sumber_aturan && s.sumber_aturan !== 'agen_tinjau').map(s => String(s.code).toUpperCase()));
-        result.penalaran_diagnosis = await nilaiDiagnosis({ faktaKlinis: fakta, kodeDiagnosis: dx, kodeAturan, pages: evidencePool, record,
-          db: getDb(), dikenal: identitasUntukGateway(record) });
-        result.tokens_used += result.penalaran_diagnosis.tokens_used || 0;
-        if (sesiAgen) sesiAgen.catat('Penalaran diagnosis (anamnesis -> fisik -> penunjang -> kesimpulan)', result.penalaran_diagnosis.status,
-          { oleh: 'luna', biaya_idr: result.penalaran_diagnosis.biaya_idr, keterangan: (result.penalaran_diagnosis.diagnosis || []).map(d => `${d.kode}: ${d.status}`).join(', ') || null });
-      } catch (penalaranErr) {
-        console.warn(`[AI-REVIEW] Penalaran diagnosis gagal: ${penalaranErr.message}`);
-        result.penalaran_diagnosis = { status: 'gagal', pesan: String(penalaranErr.message || penalaranErr).slice(0, 200), diagnosis: [], kondisi_tersirat: [], pertanyaan_klarifikasi: [] };
-      }
+      await prosesPenalaran;
 
       // Pemeriksa kritis: aplikasi mempertanyakan hasilnya sendiri (potensi
       // rugi RS, upcoding, kode tanpa bukti) sebelum ditampilkan. Keberatan
@@ -2823,8 +2930,8 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
           getAnyResumeMedisPageNumbers(evidencePool), susunPutusan(result, validationErrors), {
             db: getDb(), dikenal: identitasUntukGateway(record), pemicuAgen, catatanAgen,
           });
-        if (sesiAgen) sesiAgen.catat('Analisis mendalam Sol', lanjutan.metadata.status,
-          { oleh: 'sol', biaya_idr: lanjutan.metadata.biaya && lanjutan.metadata.biaya.idr, keterangan: lanjutan.metadata.dari_cache ? 'dari cache' : (lanjutan.metadata.pemicu || []).join(', ') || null });
+        if (sesiAgen) sesiAgen.catat('Pemeriksaan mendalam', lanjutan.metadata.status,
+          { oleh: lanjutan.metadata.model || null, biaya_idr: lanjutan.metadata.biaya && lanjutan.metadata.biaya.idr, keterangan: lanjutan.metadata.dari_cache ? 'dari cache' : (lanjutan.metadata.pemicu || []).join(', ') || null });
         result.pemeriksaan_lanjutan = lanjutan.metadata;
         result.tokens_used += lanjutan.metadata.tokens_used || 0;
         if (lanjutan.tinjauan) result.tinjauan_diagnosis = lanjutan.tinjauan;
@@ -2836,6 +2943,7 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
 
       if (sesiAgen) result.agen_casemix = sesiAgen.ringkasan();
       result.generated_at = new Date().toISOString();
+      result.kelengkapan_analisis = require('./kelengkapanAnalisisService').nilaiKelengkapanAnalisis(result, { evidencePool, wajibTahap: true });
       await simpanJejakEnamTahap(record, evidencePool, result, codes);
       return result;
     } catch (error) {
@@ -2849,6 +2957,9 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
 }
 
 module.exports = {
+  periksaKodeAkhir,
+  annotateKamusValid,
+  tandaiAlternatifDiagnosis,
   rapikanTemuanTindakan,
   generateAiReview: (record, ...args) => require('./konteksPenggunaanAiService')
     .untukRecord(getDb(), record, () => generateAiReview(record, ...args)),

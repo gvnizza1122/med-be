@@ -69,27 +69,21 @@ function bacaPa(pagesPa) {
     const iK = baris.findIndex(b => /^\s*kesimpulan\b/i.test(b) || /\bkesimpulan\s*:/i.test(b));
     if (iK === -1) continue;
     const kumpul = [];
-    for (let j = iK; j < baris.length && j < iK + 4; j++) {
-      if (j > iK && /^\s*(?:saran|catatan|pemeriksa|dr\.)/i.test(baris[j])) break;
+    for (let j = iK; j < baris.length && j < iK + 12; j++) {
+      if (j > iK && /^\s*(?:saran|catatan|pemeriksa|dokter|dr\.|magelang|verifikator)/i.test(baris[j])) break;
       kumpul.push(baris[j].replace(/^\s*kesimpulan\s*:?\s*/i, '').trim());
     }
     const kesimpulan = kumpul.join(' ').replace(/\s+/g, ' ').trim();
     const sifatBaris = baris.find(b => /^\s*sifat\b|keganasan/i.test(b)) || '';
     const bahan = (baris.find(b => /^\s*bahan\b/i.test(b)) || '').replace(/^\s*bahan\s*:?\s*/i, '').trim();
-    return { page_number: p.page_number, kesimpulan, sifat: sifatBaris.trim(), bahan, quotation: baris[iK].trim().slice(0, 200) };
+    return { page_number: p.page_number, kesimpulan, sifat: sifatBaris.trim(), bahan, quotation: kumpul.join('\n').trim().slice(0, 1000) };
   }
   return null;
 }
 
-const TIDAK_GANAS = /tidak\s+(?:didapatkan|ditemukan|tampak|ada)?\s*(?:tanda[\s-]+)?(?:keganasan|ganas|malignan\w*)|jinak|benign|non[\s-]?ganas/i;
-const GANAS = /karsinoma|carcinoma|sarkoma|sarcoma|malignan\w*|limfoma|lymphoma|melanoma|metasta\w*|\bganas\b|adenokarsinoma|blastoma/i;
-
 function sifatPa(pa) {
-  if (!pa) return null;
-  const isi = `${pa.sifat} ${pa.kesimpulan}`;
-  if (TIDAK_GANAS.test(isi)) return 'jinak';
-  if (GANAS.test(pa.kesimpulan) || GANAS.test(pa.sifat.replace(/^\s*sifat\s*:?\s*/i, ''))) return 'ganas';
-  return null;
+  const kategori = require('./dasarDiagnosisService').klasifikasiPatologi(pa);
+  return kategori === 'neoplasma_jinak' ? 'jinak' : kategori;
 }
 
 /**
@@ -99,11 +93,12 @@ function sifatPa(pa) {
 function kodeJinak(pa, teksKlinis, wilayah) {
   const k = `${pa.kesimpulan} ${pa.bahan}`.toLowerCase();
   const klinis = String(teksKlinis || '').toLowerCase();
-  if (wilayah === 'payudara' || /fibroadenoma|\bfam\b|mamma/.test(k)) return { kode: 'D24', jenis: 'payudara', alternatif: [] };
+  if (/fibroadenoma/.test(k)) return { kode: 'D24', jenis: 'payudara', alternatif: [] };
   if (/lipoma|lipomatous/.test(k)) return { kode: KODE.lipoma[wilayah] || KODE.lipoma._, jenis: 'lipoma', alternatif: [] };
   if (/kista\s+epiderm|epidermal\s+cyst|epidermoid|ateroma|atheroma|kista\s+sebase/.test(k)) return { kode: 'L72.0', jenis: 'kista epidermal', alternatif: [] };
   if (/trikilemal|trichilemmal/.test(k)) return { kode: 'L72.1', jenis: 'kista trikilemal', alternatif: [] };
   if (/^\s*[^,;]*keloid/.test(k) && !/fibroma|tumou?r|neoplas/.test(k)) return { kode: 'L91.0', jenis: 'keloid', alternatif: [] };
+  if (!/dermatofibroma|fibroma|nevus|naevus|benign\s+(?:mesenchymal\s+)?neoplasm|neoplasma?\s+jinak/.test(k)) return null;
   // Lesi di bawah fascia / jaringan lunak dalam -> jaringan ikat & lunak (D21);
   // lesi dermis/kulit tanpa keterangan dalam -> kulit (D23).
   const dalam = /sub\s*fasci|subfasci|intramuskul|jaringan\s+lunak|soft\s+tissue|\bsst\b/.test(`${klinis} ${k}`);
@@ -117,7 +112,7 @@ function kodeJinak(pa, teksKlinis, wilayah) {
   return { kode, jenis: jenis === 'kulit' ? 'neoplasma jinak kulit' : 'neoplasma jinak jaringan ikat/lunak', alternatif };
 }
 
-// Kode diagnosis lesi yang boleh diganti: bukan WHO, atau tidak spesifik.
+// Hanya kode lesi umum untuk diagnosis dan kutipan yang sama boleh dirinci.
 const KODE_LESI_UMUM = /^(?:D4[89]|D36\.9|D21\.9|D23\.9|D17\.9|R22)/;
 
 /**
@@ -137,13 +132,18 @@ function lengkapiKodeNeoplasma(saran, halaman) {
   const statusLokalis = (teksResume.match(/status\s+lokalis[^\n]*/i) || [''])[0];
   const wilayah = wilayahDari(dx.teks) || wilayahDari(statusLokalis);
   const pa = bacaPa(halamanJenis(pool, 'patologi_anatomi'));
+  const wilayahPa = pa && wilayahDari(`${pa.bahan} ${pa.kesimpulan}`);
+  if (wilayah && wilayahPa && wilayah !== wilayahPa) return { saran: daftar, perubahan,
+    catatan: `Lokasi diagnosis dan spesimen PA hal. ${pa.page_number} berbeda; perlu konfirmasi bahwa hasil berasal dari lesi yang sama.` };
   const sifat = sifatPa(pa);
 
   if (sifat === 'ganas') {
     return { saran: daftar, perubahan, catatan: `Hasil PA hal. ${pa.page_number}: ganas ("${pa.kesimpulan.slice(0, 120)}"). Kode neoplasma ganas (C..) dan letak primernya ditentukan koder.` };
   }
-  if (sifat !== 'jinak') {
-    return { saran: daftar, perubahan, catatan: pa ? null : 'Diagnosis berupa tumor/benjolan tanpa hasil PA di berkas: sifat jinak/ganas belum dapat dipastikan dari dokumen.' };
+  if (!pa || ['ganas', 'belum_pasti', 'belum_terbaca', 'normal', 'peradangan'].includes(sifat)) {
+    return { saran: daftar, perubahan, catatan: pa
+      ? `PA hal. ${pa.page_number}: ${sifat}. Cocokkan dengan diagnosis akhir dokter; tidak mengganti diagnosis otomatis.`
+      : 'Diagnosis berupa tumor/benjolan tanpa hasil PA di berkas: sifat jinak/ganas belum dapat dipastikan dari dokumen.' };
   }
 
   const hasil = kodeJinak(pa, `${dx.teks} ${statusLokalis}`, wilayah);
@@ -152,10 +152,11 @@ function lengkapiKodeNeoplasma(saran, halaman) {
   // Kode lesi yang tidak sah WHO / tidak spesifik diganti kode hasil PA.
   const aktif = s => s && !s._diganti && s.type === 'diagnosis' && s.code && s.disangkal !== true;
   const diganti = daftar.filter(s => aktif(s) && String(s.code).toUpperCase() !== hasil.kode
-    && (s.kamus_valid !== true || KODE_LESI_UMUM.test(String(s.code).toUpperCase())));
+    && KODE_LESI_UMUM.test(String(s.code).toUpperCase())
+    && Number(s.page_number) === Number(dx.page_number) && String(s.quotation || '').trim() === dx.quotation);
   for (const s of diganti) s._diganti = true;
   const sudahAda = daftar.some(s => aktif(s) && String(s.code).toUpperCase() === hasil.kode);
-  if (!sudahAda) {
+  if (!sudahAda && diganti.length) {
     const posisi = diganti.length ? daftar.indexOf(diganti[0]) : 0;
     const alt = hasil.alternatif.filter(k => deskripsiDiagnosis(k));
     daftar.splice(posisi, 0, {
@@ -175,6 +176,7 @@ function lengkapiKodeNeoplasma(saran, halaman) {
   // Rp3.811.600). Cukup disebut sebagai alternatif di catatan kode utama.
   const lesiSama = new Set([...hasil.alternatif, ...Object.values(KODE).flatMap(t => Object.values(t)), 'L91.0', 'L72.0', 'L72.1', 'D24']);
   const banding = daftar.filter(s => aktif(s) && String(s.code).toUpperCase() !== hasil.kode
+    && Number(s.page_number) === Number(dx.page_number) && String(s.quotation || '').trim() === dx.quotation
     && (lesiSama.has(String(s.code).toUpperCase()) || /^D48/.test(String(s.code).toUpperCase())));
   for (const s of banding) s._diganti = true;
   if (banding.length) perubahan.push({ aksi: 'buang', dari: banding.map(s => s.code), kode: hasil.kode });

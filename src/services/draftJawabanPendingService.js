@@ -218,11 +218,22 @@ async function setujuiDraft(db, draftId, { userId, catatan, akuiTanpaBukti = fal
   if (!d) throw galat('tidak_ada', 'Draf tidak ditemukan.');
   if (d.status !== STATUS.DRAFT) throw galat('status_tidak_sah', `Draf berstatus "${d.status}", hanya draf berstatus "draft" yang bisa disetujui.`);
 
-  const { halaman } = await muatKonteks(db, d.pending_id);
+  const { pending, klaim, halaman } = await muatKonteks(db, d.pending_id);
   const periksa = pastikanTerverifikasi(d.poin, halaman);
   const gugur = periksa.filter((p, i) => d.poin[i].terverifikasi && !p.terverifikasi);
   if (gugur.length > 0) {
     throw galat('bukti_gugur', `${gugur.length} kutipan tidak lagi cocok dengan teks halaman (berkas berubah?). Buat draf baru.`);
+  }
+  // Draf lama mungkin berisi kutipan literal yang kini dikenali sebagai
+  // rencana, negasi, atau tagihan. Kehadiran teks saja belum cukup untuk
+  // menyetujui bukti: cocokkan lagi dengan penilaian konteks saat ini.
+  const triase = nilaiTriase({ alasan_raw: pending.alasan_raw, kategori: pending.kategori || 'tidak_terpetakan', klaim, halaman });
+  const kandidat = (triase.topik_bukti || []).flatMap(t => t.kutipan || []);
+  const tidakDidukung = d.poin.filter(p => p.jenis_poin === 'bukti' && p.terverifikasi
+    && !kandidat.some(k => Number(k.halaman) === Number(p.halaman) && k.kutipan === p.kutipan));
+  if (tidakDidukung.length) throw galat('bukti_gugur', `${tidakDidukung.length} kutipan belum memenuhi pemeriksaan konteks bukti saat ini. Buat draf baru dari teks tersimpan.`);
+  if (d.kotak === 'D' && pending.kotak_manual !== 'D') {
+    throw galat('perlu_keputusan_koder', 'Sikap tidak mempertahankan klaim harus ditetapkan secara manual oleh koder.');
   }
   const h = hitung(d.poin);
   if (h.tanpa_bukti > 0 && !akuiTanpaBukti) {

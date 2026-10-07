@@ -55,3 +55,28 @@ test('putusan baru tidak menerima lagi KD-02 tersimpan', () => {
 test('klaim yang belum dianalisis tidak diberi putusan risiko bersih', () => {
   expect(perbaruiRisikoTampilan({ diagnosa_list: 'R10.4', ai_review: null }).putusan_pending).toBeNull();
 });
+
+test('PDF lama dengan status valid tetapi tanpa analisis menampilkan alasan kelengkapan',()=>{
+  const h=perbaruiRisikoTampilan({diagnosa_list:'R10.4',validation_status:'valid',source_file_name:'kasus.pdf',ai_review:null});
+  expect(h.kelengkapan_analisis.status).toBe('gagal');
+  expect(h.kelengkapan_analisis.alasan[0].kode).toBe('review_ai');
+  expect(h.putusan_pending).toBeNull(); // bukan tuduhan klinis atau keputusan BPJS
+});
+test('kode kosong tetap dinilai dari saran sah yang tersimpan tanpa mengisi diagnosis pasien',()=>{
+  const rec = {diagnosa_list:'',prosedur_list:'',umur_tahun:35,discharge_date:'2026-09-01',
+    ai_review:{suggested_codes:[{type:'diagnosis',code:'A90'}]}};
+  const before=JSON.stringify(rec);
+  const r=perbaruiRisikoTampilan(rec,[],{pages:[],profil:require('../../services/profilKlaimRsService').profilBawaan('rs-baru')});
+  expect(r.referensi_klaim.temuan.map(t=>t.id)).toEqual(['RK-01']);
+  expect(JSON.stringify(rec)).toBe(before);
+});
+test('grouper tampilan lama disegarkan tanpa OCR/AI ulang atau mengubah hasil pembanding casemix',()=>{
+  const rec = { jenis_klaim: 'RAWAT_JALAN', diagnosa_list:'J45.9', prosedur_list:'93.94', kelas_rawat:3,
+    inacbg_code:'Q-5-44-0', tarif_inacbg:192400,
+    ai_review:{inacbg_result:{code:'Q-5-44-0'},tariff_result:{amount:192400}} };
+  const before=JSON.stringify(rec);
+  const r=perbaruiRisikoTampilan(rec);
+  expect(r.inacbg_result).toMatchObject({code:'J-3-13-0',versi_perkiraan:'2026-10-07.1'});
+  expect(r.tariff_result).toMatchObject({amount:321700,perlu_verifikasi_grouper:true});
+  expect(JSON.stringify(rec)).toBe(before);
+});

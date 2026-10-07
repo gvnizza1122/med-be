@@ -114,6 +114,9 @@ async function pilihDenganAi(kandidat, teksDiagnosis, kodeAsing, dikenal = {}, d
  */
 async function petakanKeKodeWho(kodeAsing, teksDiagnosis, dikenal = {}) {
   const asal = normal(kodeAsing);
+  const { padananWho, deskripsiDiagnosis } = require('./kamusKodeService');
+  const pasti = padananWho(asal);
+  if (pasti) return { kode: pasti, nama: deskripsiDiagnosis(pasti), dari: 'padanan_who_pasti' };
   const kategoriAsal = asal.slice(0, 3);
   if (!/^[A-Z]\d[0-9A-Z]$/.test(kategoriAsal)) return null;
   const kategori = JEMBATAN_CM_KE_WHO[kategoriAsal] || kategoriAsal;

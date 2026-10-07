@@ -5,7 +5,7 @@
   "aturan": [
     {
       "id": "KD-01",
-      "nama": "Nebulisasi tanpa obat pendukung di resep",
+      "nama": "Obat pendukung nebulisasi belum terbaca",
       "keparahan": "tinggi",
       "diverifikasi": true,
       "jika": {
@@ -14,6 +14,7 @@
       "maka": {
         "kata_di_halaman": {
           "jenis": "resep",
+          "atau_obat_nebul_dilaksanakan": ["salbutamol", "ventasal", "combivent", "ipratropium", "budesonide", "budesma", "pulmicort"],
           "salah_satu": [
             "salbutamol",
             "ventasal",
@@ -26,9 +27,9 @@
           ]
         }
       },
-      "yang_dicari": "Obat atau alat nebulisasi di halaman resep",
-      "pesan": "Nebulisasi tercatat sebagai tindakan, tetapi di resep tidak ada obat maupun alat nebulisasi yang mendukungnya. Tindakan tanpa obat pendukung adalah ketidakcocokan yang mudah ditemukan verifikator.",
-      "sumber_aturan": "Prinsip pencocokan antar data: tindakan yang diklaim harus punya jejak di resep."
+      "yang_dicari": "Obat atau alat nebulisasi pada resep, atau bukti obat yang diberikan pada catatan pelaksanaan",
+      "pesan": "Nebulisasi tercatat sebagai tindakan, tetapi bukti obat atau alat pendukung belum terbaca pada resep maupun catatan pelaksanaan. Periksa berkas asli; hasil ini tidak menyatakan obat tidak diberikan.",
+      "sumber_aturan": "Pemeriksaan konsistensi aplikasi: tindakan yang diklaim perlu bukti pendukung pada resep atau catatan pelaksanaan."
     },
     {
       "id": "KD-02",

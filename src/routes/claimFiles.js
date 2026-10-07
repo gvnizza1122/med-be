@@ -43,6 +43,7 @@ const { segarkanAlasanValidasi } = require('../services/putusanPendingService');
 const { susunSaranKoding } = require('../services/saranKodingService');
 const { isLembarGrouper } = require('../services/lembarGrouperService');
 const { perbaruiRisikoTampilan } = require('../services/risikoKlaimTampilanService');
+const { nilaiKelengkapanAnalisis, masalahAnalisisRecord } = require('../services/kelengkapanAnalisisService');
 
 const router = express.Router();
 router.use(async (req, res, next) => {
@@ -170,7 +171,7 @@ async function lampirkanNilaiLabelPosisi(filePath, halamanNative) {
   }
 }
 
-async function gatherEvidencePool(db, recordId, filePath) {
+async function gatherEvidencePool(db, recordId, filePath, classification = null) {
   if (!filePath || !fs.existsSync(filePath)) return [];
 
   // Toggle SKIP_OCR_EVIDENCE (default false = perilaku lama): kalau true,
@@ -196,7 +197,7 @@ async function gatherEvidencePool(db, recordId, filePath) {
   // worker. Kalau timeout tetap terlampaui, upload tetap lanjut tanpa bukti OCR
   // (evidence pool kosong) — tidak fatal, cuma saran kode/verifikasi bukti dari
   // OCR yang tidak muncul untuk record itu; data klaim inti tetap tersimpan benar.
-  if (ocrResults.length === 0) {
+  if (ocrResults.length === 0 && (!classification || classification.pages?.some(p=>p.type!=='NATIVE'))) {
     try {
       const { isAvailable, ocrPdfPages } = require('../services/ocrService');
       if (isAvailable()) {
@@ -219,7 +220,7 @@ async function gatherEvidencePool(db, recordId, filePath) {
   let evidencePool = [...ocrResults];
   try {
     const { classifyPdfPages } = require('../services/pdfPageClassifier');
-    const classified = await classifyPdfPages(filePath);
+    const classified = classification || await classifyPdfPages(filePath);
     if (classified.success) {
       const scanPageNumbers = new Set(ocrResults.map(o => o.page_number));
       // PENTING: kecualikan HANYA halaman "Berkas Klaim Individual" sungguhan
@@ -335,6 +336,27 @@ router.post('/upload', authenticate, upload.single('file'), async (req, res) => 
     await db.prepare('UPDATE claim_files SET status = ? WHERE id = ?').run('parsing', fileId);
     const parseResult = parseClaimFile(req.file.path);
 
+    // TXT mempunyai jenis layanan per baris (PTD); jangan memberi RAWAT_INAP
+    // kepada seluruh ekspor rawat jalan. Berkas lama tanpa kolom jenis harus
+    // mendapat pilihan pengguna, bukan disimpulkan dari kode CBG pembanding.
+    const masalahJenis = parseResult.errors.filter(e => e.type === 'jenis_layanan');
+    const pilihanJenis = require('../services/jenisLayananKlaimService').normalJenis(req.body.jenis_klaim);
+    for (const rec of parseResult.records) {
+      if (!rec.jenis_klaim) {
+        if (pilihanJenis) rec.jenis_klaim = pilihanJenis;
+        else masalahJenis.push({ type: 'jenis_layanan', row: rec._rowNumber, message: 'Jenis layanan tidak tersedia. Pilih rawat inap atau rawat jalan untuk berkas ini.' });
+      }
+    }
+    if (masalahJenis.length) {
+      await db.prepare('UPDATE claim_files SET status = ?, error_message = ? WHERE id = ?')
+        .run('error', masalahJenis[0].message, fileId);
+      if (io) io.emit('validation:error', { fileId, errors: masalahJenis });
+      try { fs.unlinkSync(req.file.path); } catch (_) { /* berkas sementara */ }
+      return res.status(422).json({ file_id: fileId, status: 'error', errors: masalahJenis });
+    }
+    const jenisDalamFile = [...new Set(parseResult.records.map(r => r.jenis_klaim))];
+    if (jenisDalamFile.length === 1) await db.prepare('UPDATE claim_files SET jenis_klaim = ? WHERE id = ?').run(jenisDalamFile[0], fileId);
+
     if (parseResult.errors.length > 0 && parseResult.records.length === 0) {
       await db.prepare('UPDATE claim_files SET status = ?, error_message = ? WHERE id = ?')
         .run('error', parseResult.errors.map(e => e.message).join('; '), fileId);
@@ -408,7 +430,7 @@ router.post('/upload', authenticate, upload.single('file'), async (req, res) => 
           record.jenis_konsultasi || '', record.jumlah_episode_klaim || 1,
           record.is_same_day || 0, record.histori_obat_kronis_bulan_berturut || 0,
           record.status_pasien || 'STABIL', record.flag_rujuk_balik_prb || 0,
-          record.urutan_iterasi || 0, record.jenis_klaim || 'RAWAT_INAP',
+          record.urutan_iterasi || 0, record.jenis_klaim,
           status, errors.length, JSON.stringify(record._rawData || {})
         );
 
@@ -833,6 +855,8 @@ router.get('/:id', authenticate, async (req, res) => {
 router.get('/:id/records', authenticate, async (req, res) => {
   try {
     const db = getDb();
+    const file = await db.prepare('SELECT id, hospital_code,file_name,ai_anggaran_id FROM claim_files WHERE id = ?').get(req.params.id);
+    if (!canAccessFile(file, req.user)) return res.status(404).json({ error:'File tidak ditemukan.' });
     const { status = 'all', page = 1, limit = 50, search, error_type } = req.query;
     const offset = (parseInt(page) - 1) * parseInt(limit);
 
@@ -859,7 +883,8 @@ router.get('/:id/records', authenticate, async (req, res) => {
     const total = Number(totalResult ? totalResult.count : 0);
 
     const records = await db.prepare(`
-      SELECT cr.* FROM claim_records cr ${where}
+      SELECT cr.*, cf.file_path AS source_file_path, cf.file_name AS source_file_name
+      FROM claim_records cr JOIN claim_files cf ON cf.id = cr.file_id ${where}
       ORDER BY cr.row_number ASC
       LIMIT ? OFFSET ?
     `).all(...params, parseInt(limit), offset);
@@ -868,8 +893,8 @@ router.get('/:id/records', authenticate, async (req, res) => {
     // halaman ini, bukan satu query per record (N+1 yang bikin loading lambat
     // untuk file dengan banyak record per halaman).
     let errorsByRecordId = {};
+    const recordIds = records.map(r => r.id);
     if (records.length > 0) {
-      const recordIds = records.map(r => r.id);
       const placeholders = recordIds.map(() => '?').join(',');
       const allErrors = await db.prepare(`
         SELECT ve.*, vr.rule_name FROM validation_errors ve
@@ -894,9 +919,24 @@ router.get('/:id/records', authenticate, async (req, res) => {
       }
     }
 
+    const profil = await require('../services/profilKlaimRsService').muatProfil(db, req.user?.hospital_code);
+    const halamanById = new Map();
+    let halamanTersedia = true;
+    if (recordIds.length) {
+      try {
+        const pages = await db.prepare(`SELECT record_id,page_number,ocr_text FROM ocr_results
+          WHERE record_id IN (${recordIds.map(() => '?').join(',')}) ORDER BY record_id,page_number`).all(...recordIds);
+        for (const p of pages) { const a=halamanById.get(p.record_id) || []; a.push(p); halamanById.set(p.record_id,a); }
+      } catch (e) { halamanTersedia=false; }
+    }
+    const budget=file.ai_anggaran_id ? await require('../services/anggaranAiService').ringkasan(db,
+      {id:file.ai_anggaran_id,hospital_code:file.hospital_code}) : null;
     const recordsWithErrors = records.map(rec => {
-      const errors = errorsByRecordId[rec.id] || [];
-      const review = perbaruiRisikoTampilan(rec, errors);
+      const errors = (errorsByRecordId[rec.id] || []).filter(e => e.rule_id !== 'RV-17');
+      const review = perbaruiRisikoTampilan({ ...rec, hospital_code:file.hospital_code,source_file_name:file.file_name }, errors,
+        { profil, ...(halamanTersedia ? {pages:halamanById.get(rec.id) || []} : {}) });
+      if (!halamanTersedia) review.referensi_klaim = { status:'belum_dapat_dinilai', temuan:[], catatan:'Bukti tersimpan belum berhasil dimuat. Pemeriksaan referensi belum selesai.' };
+      if(budget) review.anggaran_ai=budget;
       return { ...rec, errors, ai_review: typeof rec.ai_review === 'string' ? JSON.stringify(review) : review };
     });
 
@@ -996,6 +1036,8 @@ router.post('/:id/approve', authenticate, authorize('supervisor', 'admin'), asyn
 
     const records = await db.prepare('SELECT * FROM claim_records WHERE file_id = ?').all(req.params.id);
     for (const record of records) {
+      const analisis = masalahAnalisisRecord(record, file);
+      if (analisis) return res.status(409).json({ error: 'Persetujuan ditunda: analisis berkas belum lengkap. Periksa hasil dan baca ulang berkas.', kelengkapan_analisis: analisis });
       const errors = await galatKamusRecord(db, record);
       if (errors.length) return res.status(errors.some(e => e.dictionary_status === 'unavailable') ? 503 : 409)
         .json({ error: 'Klaim belum siap dikirim: pemeriksaan kamus belum lolos.', errors });
@@ -1176,7 +1218,7 @@ router.get('/export/siap-submit', authenticate, authorize('admin', 'verifikator'
       params.push(`%${search}%`, `%${search}%`);
     }
     const klaim = await db.prepare(
-      `SELECT cr.* FROM claim_records cr JOIN claim_files cf ON cf.id = cr.file_id WHERE ${where.join(' AND ')} ORDER BY cr.periode DESC, cr.nama_pasien ASC`,
+      `SELECT cr.*, cf.file_path AS source_file_path, cf.file_name AS source_file_name FROM claim_records cr JOIN claim_files cf ON cf.id = cr.file_id WHERE ${where.join(' AND ')} ORDER BY cr.periode DESC, cr.nama_pasien ASC`,
     ).all(...params);
     const cakupan = {
       periode: periode || null,
@@ -1194,6 +1236,8 @@ router.get('/export/siap-submit', authenticate, authorize('admin', 'verifikator'
       diexportOleh: req.user.email,
     };
     for (const record of klaim) {
+      const analisis = masalahAnalisisRecord(record);
+      if (analisis) return res.status(409).json({ error: 'Ekspor siap submit ditunda: analisis berkas belum lengkap. Periksa hasil dan baca ulang berkas.', kelengkapan_analisis: analisis });
       const errors = await galatKamusRecord(db, record);
       if (errors.length) return res.status(errors.some(e => e.dictionary_status === 'unavailable') ? 503 : 409)
         .json({ error: 'Ekspor siap submit ditunda: pemeriksaan kamus belum lolos.', errors });
@@ -1546,7 +1590,7 @@ router.get('/:id/ai-token-estimate', authenticate, async (req, res) => {
     const fileId = req.params.id;
 
     const file = await db.prepare('SELECT * FROM claim_files WHERE id = ?').get(fileId);
-    if (!file) return res.status(404).json({ error: 'File tidak ditemukan.' });
+    if (!canAccessFile(file,req.user)) return res.status(404).json({ error: 'File tidak ditemukan.' });
 
     const records = await db.prepare('SELECT * FROM claim_records WHERE file_id = ? AND validation_status != ?').all(fileId, 'valid');
 
@@ -1562,7 +1606,7 @@ router.get('/:id/ai-token-estimate', authenticate, async (req, res) => {
         },
         per_record_avg: 0,
         cost_estimate_usd: 0,
-        note: 'Semua record valid - tidak perlu AI audit'
+        note: 'Tidak ada record dengan masalah validasi data. Status ini tidak menyatakan seluruh analisis klinis sudah selesai.'
       });
     }
 
@@ -1586,8 +1630,9 @@ router.get('/:id/ai-token-estimate', authenticate, async (req, res) => {
     const estimatedCompletion = estimateCompletionTokens(records.length);
     const totalEstimate = estimatedPrompt + estimatedCompletion;
 
-    // DeepSeek pricing: $0.014 per 1M input tokens, $0.042 per 1M output tokens
-    const costEstimate = (estimatedPrompt * 0.014 + estimatedCompletion * 0.042) / 1_000_000;
+    const route=await require('../services/routerModelService').resolve(db,'baca_berkas');
+    const cost=require('../services/biayaModelService').estimasiBiaya(route.model,{prompt_tokens:estimatedPrompt,completion_tokens:estimatedCompletion,total_tokens:totalEstimate,cached_tokens:0,cache_write_tokens:estimatedPrompt},route.penyedia);
+    const budget=file.ai_anggaran_id ? await require('../services/anggaranAiService').ringkasan(db,{id:file.ai_anggaran_id,hospital_code:file.hospital_code}) : null;
 
     res.json({
       file_id: fileId,
@@ -1599,9 +1644,10 @@ router.get('/:id/ai-token-estimate', authenticate, async (req, res) => {
         total: totalEstimate
       },
       per_record_avg: Math.round(totalEstimate / records.length),
-      cost_estimate_usd: costEstimate.toFixed(6),
-      cost_estimate_rp: Math.round(costEstimate * 16500),
-      provider: 'deepseek-v4-flash'
+      cost_estimate_usd: cost?.usd ?? null,
+      cost_estimate_rp: cost?.idr ?? null,
+      provider: route.penyedia,model:route.model,anggaran_ai:budget,
+      note:'Estimasi satu review berdasarkan record; bukan biaya seluruh tahap PDF. Pemakaian terukur terdapat pada halaman Penggunaan AI.'
     });
   } catch (err) {
     console.error('[claimFiles] error:', err);
@@ -2111,6 +2157,7 @@ async function catatPolaBedaUntukRecord(db, recordId) {
     // Belajar: pasangan istilah resume -> kode casemix dari berkas yang sudah diklaim.
     const pages = await db.prepare('SELECT page_number, ocr_text FROM ocr_results WHERE record_id = ? ORDER BY page_number').all(rec.id);
     await pelajariCasemix(db, rec.id, rec.jenis_klaim, pages, ai.lembar_grouper);
+    // Riwayat disimpan untuk perbandingan; tidak mengkalibrasi severity pasien lain.
   } catch (e) {
     console.warn(`[PolaBeda] gagal mencatat record ${recordId}: ${e.message}`);
   }
@@ -2131,7 +2178,7 @@ async function isiKodeDariSaranDalamTransaksi(db, recordId, record, aiReview) {
     // boleh_isi_otomatis === false dipasang pagarPascaAiService pada saran yang
     // disangkal berkas atau hanya berupa saran_diagnosis dari anamnesis; saran
     // lama tanpa penanda itu berperilaku persis seperti sebelumnya.
-    saran.filter(s => s && s.type === tipe && s.code && s.kamus_valid === true && s.boleh_isi_otomatis !== false).map(s => String(s.code).trim())
+    saran.filter(s => s && s.type === tipe && s.code && !s.disangkal && !s.belum_who && s.kamus_valid === true && s.boleh_isi_otomatis !== false).map(s => String(s.code).trim())
   )];
 
   const kosong = (v) => !v || String(v).trim() === '';
@@ -2262,28 +2309,25 @@ async function isiKodeDariSaranDalamTransaksi(db, recordId, record, aiReview) {
     }
   }
   if (kosong(record.DIAGLIST || record.diagnosa_list)) {
-    const d = ambil('diagnosis');
+    const d = require('../services/tinjauanDiagnosisService').urutkanDiagnosisTerverifikasi(ambil('diagnosis'), aiReview.tinjauan_diagnosis);
     if (d.length > 0) {
       perubahan.diagnosa_list = d.join(';');
     } else {
-      // Cadangan terakhir: belum ada kode WHO, tetapi AI membaca diagnosis
-      // dengan kode yang belum berpadanan WHO (ICD-10-CM). Kode itu DISIMPAN
-      // supaya DIAGLIST tidak kosong dan INA-CBG/tarif tetap terhitung --
-      // DIAGLIST kosong membuat klaim error karena kesalahan aplikasi, bukan
-      // karena berkasnya. Ditandai "perlu dicek koder", bukan pending.
+      // Belum ada padanan WHO: kandidat tetap terlihat untuk koder, tetapi
+      // tidak mengisi DIAGLIST dan tidak ikut perhitungan grouper/severity.
       const belumWho = [...new Set(saran
-        .filter(s => s && s.type === 'diagnosis' && s.code && s.belum_who === true && s.disangkal !== true && s.boleh_isi_otomatis !== false)
+        .filter(s => s && s.type === 'diagnosis' && s.code && s.belum_who === true && s.disangkal !== true)
         .map(s => String(s.code).trim().toUpperCase()))];
       if (belumWho.length > 0) {
-        perubahan.diagnosa_list = belumWho.join(';');
         aiReview.kode_belum_who = belumWho.map(kode => ({ kode, waktu: new Date().toISOString() }));
         aiReview.kode_luar_kamus = [
           ...(Array.isArray(aiReview.kode_luar_kamus) ? aiReview.kode_luar_kamus.filter(k => !belumWho.includes(String(k.kode).toUpperCase())) : []),
           ...belumWho.map(kode => ({
             kode, jenis: 'diagnosis', keparahan: 'sedang', asal: 'saran_aplikasi',
-            pesan: `Kode "${kode}" terbaca dari berkas tetapi belum ada padanan pastinya di ICD-10 WHO. Disimpan sementara supaya data & tarif tetap tampil; pilih kode WHO yang setara sebelum klaim diunggah.`,
+            pesan: `Kode "${kode}" belum mempunyai padanan ICD-10 WHO yang terverifikasi. Tersimpan sebagai kandidat untuk koder dan tidak digunakan dalam kode klaim atau perhitungan tarif.`,
           })),
         ];
+        await simpanAiReview(db, recordId, aiReview);
       }
     }
   }
@@ -2331,7 +2375,7 @@ async function isiKodeDariSaranDalamTransaksi(db, recordId, record, aiReview) {
         .map(t => String(t.kode_usulan).trim());
 
     // Penunjang yang punya LEMBAR HASIL di berkas (lab -> 90.59, rontgen ->
-    // 87.44, EKG -> 89.52, CTG -> 75.32) ikut diisi: hasilnya bukti pemeriksaan
+    // 87.44, EKG -> 89.52, CTG eksternal -> 75.34) ikut diisi: hasilnya bukti pemeriksaan
     // benar dilakukan, dan casemix RS mengodekannya (KHOIRIYAH, YETY, ANNISA,
     // MUSTAKIMAH). Penunjang yang hanya disebut di resume/resep tidak ikut.
     const dariPenunjang = penunjangBerhasil(aiReview);
@@ -2454,15 +2498,17 @@ async function isiKodeDariSaranDalamTransaksi(db, recordId, record, aiReview) {
     try {
       const diaglistAkhir = perubahan.diagnosa_list || record.DIAGLIST || record.diagnosa_list || '';
       const proclistAkhir = perubahan.prosedur_list || record.PROCLIST || record.prosedur_list || '';
-      const diagnosisAkhir = String(diaglistAkhir).split(/[;,]/).map(k => k.trim()).filter(Boolean);
+      const final = kodeFinal({ ...record, DIAGLIST: diaglistAkhir, PROCLIST: proclistAkhir }, aiReview);
+      const diagnosisAkhir = final.dx;
       if (diagnosisAkhir.length > 0) {
-        const prosedurAkhir = String(proclistAkhir).split(/[;,]/).map(k => k.trim()).filter(Boolean);
+        const prosedurAkhir = final.px;
         const jenisKlaimAkhir = record.JENIS_KLAIM || record.jenis_klaim;
-        const kelasRawatAkhir = record.KELAS_RAWAT || record.kelas_rawat;
+        const kelasRawatAkhir = require('../services/kelasPerawatanService').kelasTarif(record);
         const { inacbgCodeForLookup, inacbgResult, tarifResult } = hitungInacbgDanTarif(
           diagnosisAkhir, prosedurAkhir, jenisKlaimAkhir, kelasRawatAkhir, aiReview.suggested_inacbg,
         );
         if (inacbgResult) {
+          aiReview.kode_final = final;
           aiReview.inacbg_result = inacbgResult;
           aiReview.tariff_result = tarifResult;
           if (inacbgCodeForLookup) {
@@ -2521,7 +2567,8 @@ async function isiKodeDariSaranDalamTransaksi(db, recordId, record, aiReview) {
     const statusAkhir = (URUTAN_STATUS[statusSaatIni] || 0) > (URUTAN_STATUS[statusRuleEngine] || 0)
       ? statusSaatIni
       : statusRuleEngine;
-    await db.prepare('UPDATE claim_records SET validation_status = ? WHERE id = ?').run(statusAkhir, recordId);
+    await db.prepare('UPDATE claim_records SET validation_status = ?, error_count = ? WHERE id = ?')
+      .run(statusAkhir, errorBaru.length, recordId);
 
     // Cache ringkasan di claim_files (dibaca panel "Hasil Validasi" & Riwayat
     // Upload) dihitung SEBELUM fungsi ini mengisi DIAGLIST/PROCLIST otomatis
@@ -2533,6 +2580,7 @@ async function isiKodeDariSaranDalamTransaksi(db, recordId, record, aiReview) {
     if (barisTerbaru.file_id) await recomputeFileCounts(db, barisTerbaru.file_id);
   } catch (errValidasi) {
     console.warn(`[AutoIsi] Gagal hitung ulang validasi record ${recordId}: ${errValidasi.message || errValidasi}`);
+    throw errValidasi;
   }
 }
 
@@ -2560,23 +2608,102 @@ async function findExistingRecordBySep(db, { hospitalCode, sep }) {
   return existing || null;
 }
 
-function processSinglePdfUpload(db, options) {
-  return konteksAi.jalankan(options.hospitalCode ? { hospital_code: options.hospitalCode } : {},
-    () => processSinglePdfUploadDenganKonteks(db, options));
+async function processSinglePdfUpload(db, options) {
+  const fileId=options.fileId||uuidv4(),recordId=options.recordId||uuidv4();
+  const hospitalCode=options.hospitalCode||'3371084';
+  const anggaran=require('../services/anggaranAiService');
+  const scope=await anggaran.untukBerkas(db,{filePath:options.filePath,hospitalCode,
+    jenis:options.allowedJenisKlaim||[options.jenisKlaim],recordId});
+  return konteksAi.jalankan({hospital_code:hospitalCode,record_id:recordId,file_id:fileId,anggaran_ai:scope},
+    async()=>{
+      const existing=await db.get(`SELECT cr.*,cf.file_path,cf.file_name FROM claim_records cr
+        JOIN claim_files cf ON cf.id=cr.file_id WHERE cr.id=? AND cf.id=? AND cf.hospital_code=?`,[recordId,fileId,hospitalCode]);
+      if(existing) return lanjutkanAnalisisTersimpan(db,existing,{...options,fileId,recordId,hospitalCode});
+      return processSinglePdfUploadDenganKonteks(db,{...options,fileId,recordId});
+    });
 }
 
-async function processSinglePdfUploadDenganKonteks(db, { filePath, originalName, jenisKlaim: fixedJenisKlaim, allowedJenisKlaim, userId, hospitalCode, isTesting = false, onTahap = null }) {
+/** Sesudah restart/gangguan DB, lanjutkan dari record & bukti tersimpan. */
+async function lanjutkanAnalisisTersimpan(db, record, {fileId,recordId,hospitalCode,originalName,onTahap}) {
+  const stage=async(t,info={})=>{if(onTahap) await onTahap(t,info);};
+  await stage('membaca_berkas',{file_id:fileId,record_id:recordId,pesan:'Melanjutkan tahap tersimpan tanpa membaca PDF dari awal.'});
+  const pages=await db.prepare('SELECT page_number,ocr_text,confidence FROM ocr_results WHERE record_id=? ORDER BY page_number').all(recordId);
+  const errors=await db.prepare('SELECT * FROM validation_errors WHERE record_id=?').all(recordId);
+  let ai;
+  let classification;
+  let gangguanKode=false;
+  try {ai=typeof record.ai_review==='string'?JSON.parse(record.ai_review):record.ai_review;} catch {ai=null;}
+  if(Array.isArray(ai?.pembacaan_pdf?.halaman_wajib)) {
+    classification={pages:ai.pembacaan_pdf.halaman_wajib.map(page_num=>({page_num}))};
+  }
+  const {nilaiKelengkapanAnalisis}=require('../services/kelengkapanAnalisisService');
+  if(nilaiKelengkapanAnalisis(ai,{evidencePool:pages,wajibTahap:true}).status!=='lengkap') {
+    let raw={};try{raw=JSON.parse(record.raw_data||'{}');}catch{/* Bukti dan record tetap dipertahankan. */}
+    const [knowledge,examples]=await Promise.all([
+      getRelevantKnowledge(db,errors.map(e=>e.rule_id)),getRelevantBpjsExamples(db,{...record,validationErrors:errors})]);
+    await stage('review_ai');
+    ai=await generateAiReview({...raw,...record,id:recordId,JENIS_KLAIM:record.jenis_klaim},errors,pages,knowledge,examples);
+    if(ai) {
+      await stage('mengisi_kode');await simpanAiReview(db,recordId,ai);
+      await isiKodeDariSaranTervalidasi(db,recordId,record,ai).catch(()=>{gangguanKode=true;});
+    }
+  }
+  const result=await finalisasiAnalisisPdf(db,{recordId,fileId,review:ai,evidencePool:pages,classification,gangguanKode});
+  return {success:true,file_id:fileId,record_id:recordId,original_name:originalName||record.file_name,
+    jenis_klaim:record.jenis_klaim,dilanjutkan:true,...result};
+}
+
+async function finalisasiAnalisisPdf(db, { recordId, fileId, review, evidencePool, classification, gangguanKode }) {
+  const latest = await db.prepare('SELECT * FROM claim_records WHERE id = ?').get(recordId);
+  if (!latest) throw new Error('Hasil tersimpan tidak ditemukan.');
+  let saved = review;
+  if (review && latest.ai_review) {
+    try { saved = typeof latest.ai_review === 'string' ? JSON.parse(latest.ai_review) : latest.ai_review; } catch (_) { /* pakai hasil saat ini */ }
+  }
+  if (!saved) saved = { analisis_tidak_tersedia: true };
+  if(classification?.pages) saved.pembacaan_pdf={halaman_wajib:classification.pages
+    .filter(p=>!p.is_lembar_grouper && !p.is_primary_source).map(p=>Number(p.page_num))};
+  saved.kelengkapan_analisis = nilaiKelengkapanAnalisis(saved, { evidencePool, classification, gangguanKode, wajibTahap: true });
+  const scope=konteksAi.saatIni().anggaran_ai;
+  if(scope) {
+    saved.anggaran_ai=await require('../services/anggaranAiService').ringkasan(db,scope);
+    await db.prepare('UPDATE claim_files SET ai_anggaran_id=? WHERE id=?').run(scope.id,fileId);
+  }
+  await simpanAiReview(db, recordId, saved);
+  const errors = await db.prepare('SELECT * FROM validation_errors WHERE record_id = ?').all(recordId);
+  const belumLengkap = saved.kelengkapan_analisis.status !== 'lengkap';
+  const status = belumLengkap && latest.validation_status !== 'error' ? 'pending' : latest.validation_status;
+  await db.prepare('UPDATE claim_records SET validation_status = ?, error_count = ? WHERE id = ?').run(status, errors.length, recordId);
+  await recomputeFileCounts(db, fileId);
+  const usage=await db.prepare(`SELECT COUNT(*) AS calls,COUNT(*) FILTER(WHERE total_tokens>0) AS measured,
+    SUM(prompt_tokens) AS input,SUM(completion_tokens) AS output,SUM(total_tokens) AS total
+    FROM catatan_panggilan_model WHERE hospital_code=? AND record_id IN
+    (SELECT id FROM claim_records WHERE file_id=?)`).get(konteksAi.saatIni().hospital_code||latest?.kode_rs,fileId);
+  if(Number(usage?.measured)>0) await db.prepare(`UPDATE claim_files SET ai_prompt_tokens=?,ai_completion_tokens=?,ai_total_tokens=? WHERE id=?`)
+    .run(Number(usage.input)||0,Number(usage.output)||0,Number(usage.total)||0,fileId);
+  await db.prepare("UPDATE claim_files SET status='completed',validated_at=datetime('now'),updated_at=datetime('now') WHERE id=?").run(fileId);
+  return { ai_review: saved, validation_status: status, validation_errors: errors,
+    analysis_status: saved.kelengkapan_analisis.status,
+    analysis_warning: belumLengkap ? 'Berkas tersimpan, tetapi ada tahap analisis yang belum selesai. Buka hasil untuk melihat tahap dan bukti yang perlu ditinjau.' : null };
+}
+
+async function processSinglePdfUploadDenganKonteks(db, { filePath, originalName, jenisKlaim: fixedJenisKlaim, allowedJenisKlaim, userId, hospitalCode, isTesting = false, onTahap = null, fileId: plannedFileId,recordId: plannedRecordId }) {
   // Pencatat tahap (status proses unggah tersimpan); kegagalannya tidak pernah menghentikan proses.
   const tahap = (nama, info) => { if (typeof onTahap === 'function') Promise.resolve().then(() => onTahap(nama, info)).catch(() => {}); };
+  let fileIdDibuat = null; // dibersihkan bila gagal di tengah, supaya percobaan ulang tidak menggandakan berkas
   try {
     tahap('membaca_berkas');
     const { extractFromPDF } = require('../services/pdfExtractionPipeline');
-    const result = await extractFromPDF(filePath, { jenisKlaim: fixedJenisKlaim, allowedJenisKlaim, originalName: isTesting ? 'berkas-klaim.pdf' : originalName });
+    const result = await extractFromPDF(filePath, { jenisKlaim: fixedJenisKlaim, allowedJenisKlaim,
+      onPages: jumlah => tahap('membaca_berkas', { jumlah_halaman: jumlah }),
+      originalName: isTesting ? 'berkas-klaim.pdf' : originalName });
 
     if (!result.success) {
       // Detail teknis hanya untuk log server, tidak dikirim ke pengguna.
       console.error('[upload-pdf] gagal:', originalName, JSON.stringify(result.errors));
-      return { success: false, original_name: originalName, error: result.pesan };
+      return { success: false, original_name: originalName, error: result.pesan, error_code:result.error_code,
+        // Timeout/keluaran AI yang belum sah tidak memicu permintaan berbayar kedua.
+        dapat_diulang: !result.error_code && (!result.pesan || /coba lagi|tidak dapat dibaca/i.test(result.pesan)) };
     }
 
     // jenisKlaim final: dipilih manual (upload 1 file) ATAU hasil deteksi
@@ -2586,9 +2713,10 @@ async function processSinglePdfUploadDenganKonteks(db, { filePath, originalName,
     // pakai nilai final ini.
     const jenisKlaim = fixedJenisKlaim || result.jenisKlaimDetection?.value || 'RAWAT_INAP';
 
-    const fileId = uuidv4();
-    const recordId = uuidv4();
-    tahap('menyimpan', { jumlah_halaman: Array.isArray(result.ocrPages) ? result.ocrPages.length : null, file_id: fileId, record_id: recordId });
+    const fileId = plannedFileId || uuidv4();
+    fileIdDibuat = fileId;
+    const recordId = plannedRecordId || uuidv4();
+    tahap('menyimpan', { jumlah_halaman: result.metadata?.pagesProcessed || result.classification?.totalPages || null, file_id: fileId, record_id: recordId });
     const resolvedFilePath = path.resolve(filePath);
 
     // Record vClaim lengkap 60 kolom (urutan & format sesuai output vClaim asli).
@@ -2675,6 +2803,7 @@ async function processSinglePdfUploadDenganKonteks(db, { filePath, originalName,
     await db.prepare(`
       INSERT INTO claim_files (id, hospital_code, file_name, file_path, status, uploaded_by, total_records, valid_count, error_count, pending_count, description, jenis_klaim, is_testing)
       VALUES (?, ?, ?, ?, 'uploaded', ?, 1, ?, ?, ?, 'Extracted from PDF', ?, ?)
+      ON CONFLICT(id) DO NOTHING
     `).run(
       fileId, hospitalCode || '3371084', originalName, resolvedFilePath, userId,
       validationStatus === 'valid' ? 1 : 0,
@@ -2689,10 +2818,10 @@ async function processSinglePdfUploadDenganKonteks(db, { filePath, originalName,
         INSERT INTO claim_records (
           id, file_id, row_number, kode_rs, sep, nokartu, nama_pasien, mrn,
           birth_date, gender, kelas_rawat, admission_date, discharge_date,
-          discharge_status, diagnosa_list, prosedur_list, dpjp_name,
+          discharge_status, los, diagnosa_list, prosedur_list, dpjp_name,
           tarif_rs, jenis_klaim, validation_status, error_count, raw_data, klinik_poli, has_bpjs_page,
           has_laporan_operasi, has_hasil_pa
-        ) VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
 
       await txInsertRecord.run(
@@ -2702,6 +2831,7 @@ async function processSinglePdfUploadDenganKonteks(db, { filePath, originalName,
         /^\d+$/.test(extractedData.KELAS_RAWAT) ? parseInt(extractedData.KELAS_RAWAT) : null,
         vclaimDateToISO(extractedData.ADMISSION_DATE), vclaimDateToISO(extractedData.DISCHARGE_DATE),
         /^\d+$/.test(extractedData.DISCHARGE_STATUS) ? parseInt(extractedData.DISCHARGE_STATUS) : 1,
+        /^\d+$/.test(String(extractedData.LOS || '')) ? parseInt(extractedData.LOS) : 0,
         extractedData.DIAGLIST, extractedData.PROCLIST,
         extractedData.DPJP,
         /^\d+$/.test(extractedData.TARIF_RS) ? parseInt(extractedData.TARIF_RS) : null, jenisKlaim,
@@ -2767,13 +2897,16 @@ async function processSinglePdfUploadDenganKonteks(db, { filePath, originalName,
     // bukti dokumen dan jalankan AI review sekali, simpan hasilnya supaya saat
     // halaman hasil dibuka nanti tidak perlu AI call lagi.
     let aiReview = null;
+    let buktiReview = [];
+    let gangguanKode = false;
     try {
       // OCR dari tahap ekstraksi dipakai ulang -- tidak meng-OCR PDF dua kali.
       if (result.ocrPages) {
         await saveOcrResultsToDb(db, recordId, { success: true, pages: result.ocrPages })
           .catch(e => console.warn(`[upload-pdf] gagal simpan OCR tahap ekstraksi: ${e.message}`));
       }
-      const evidencePool = await gatherEvidencePool(db, recordId, resolvedFilePath);
+      const evidencePool = await gatherEvidencePool(db, recordId, resolvedFilePath,result.classification);
+      buktiReview = evidencePool;
       const knowledgeEntries = await getRelevantKnowledge(db, validationErrors.map(e => e.rule_id));
       const bpjsExamples = await getRelevantBpjsExamples(db, { ...extractedData, validationErrors });
       tahap('review_ai');
@@ -2787,15 +2920,21 @@ async function processSinglePdfUploadDenganKonteks(db, { filePath, originalName,
         // DIAGLIST/PROCLIST yang masih kosong -- koder tidak perlu mengetik
         // ulang. Best-effort: kegagalan di sini tidak menggagalkan review.
         if (!isTesting) {
-          await isiKodeDariSaranTervalidasi(db, recordId, extractedData, aiReview).catch(errIsi =>
-            console.warn(`[AutoIsi] gagal untuk record ${recordId}: ${errIsi.message || errIsi}`));
+          await isiKodeDariSaranTervalidasi(db, recordId, extractedData, aiReview).catch(errIsi => {
+            gangguanKode = true;
+            console.warn(`[AutoIsi] gagal untuk record ${recordId}: ${errIsi.message || errIsi}`);
+          });
           recordKnowledge(db, aiReview.knowledge_updates).catch(kbErr =>
             console.warn(`[upload-pdf] Gagal simpan knowledge base: ${kbErr.message}`));
         }
       }
     } catch (aiErr) {
       console.warn(`[upload-pdf] AI review gagal untuk record ${recordId}: ${aiErr.message}`);
+      aiReview = null;
     }
+
+    const finalAnalysis = await finalisasiAnalisisPdf(db, { recordId, fileId, review: aiReview,
+      evidencePool: buktiReview, classification: result.classification, gangguanKode });
 
     if (isTesting) {
       const stored = await db.prepare('SELECT * FROM claim_records WHERE id = ?').get(recordId);
@@ -2812,9 +2951,7 @@ async function processSinglePdfUploadDenganKonteks(db, { filePath, originalName,
       record_id: recordId,
       original_name: originalName,
       vclaimFormat: extractedData,
-      validation_status: validationStatus,
-      validation_errors: validationErrors,
-      ai_review: aiReview,
+      ...finalAnalysis,
       // jenis_klaim final + info deteksi (cuma ada kalau lewat jalur
       // allowedJenisKlaim/batch kategori-campur) — dipakai FE untuk
       // menampilkan status "IGD" dkk setelah proses selesai, dan flag
@@ -2825,7 +2962,16 @@ async function processSinglePdfUploadDenganKonteks(db, { filePath, originalName,
     };
   } catch (err) {
     console.error('[upload-pdf] error tak terduga:', originalName, err);
-    return { success: false, original_name: originalName, error: 'Terjadi gangguan saat memproses berkas. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' };
+    if (fileIdDibuat) {
+      // Jangan menghapus record/bukti yang sudah masuk ketika tahap setelahnya
+      // terganggu. Percobaan antrean berikutnya melanjutkan ID yang sama.
+      const saved=await db.get('SELECT id FROM claim_records WHERE file_id=?',[fileIdDibuat]).catch(()=>null);
+      if(saved) return {success:false,dapat_diulang:true,file_id:fileIdDibuat,record_id:saved.id,
+        original_name:originalName,error:'Data klaim sudah tersimpan; tahap analisis dilanjutkan otomatis.'};
+      await db.prepare("UPDATE claim_files SET status='error',total_records=0,valid_count=0,error_count=0,pending_count=0 WHERE id=?")
+        .run(fileIdDibuat).catch(()=>{});
+    }
+    return { success: false, dapat_diulang: true, original_name: originalName, error: 'Terjadi gangguan saat memproses berkas. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' };
   }
 }
 
@@ -2842,8 +2988,12 @@ async function processSinglePdfUploadDenganKonteks(db, { filePath, originalName,
  *
  * @returns {Promise<{success:boolean, error?:string, vclaimFormat?, validation_status?, validation_errors?, ai_review?}>}
  */
-function reprocessExistingRecord(db, options) {
-  return konteksAi.jalankan({ ...(options.hospitalCode ? { hospital_code: options.hospitalCode } : {}), record_id: options.recordId },
+async function reprocessExistingRecord(db, options) {
+  const file=await db.get('SELECT hospital_code,ai_anggaran_id FROM claim_files WHERE id=?',[options.fileId]);
+  const hospitalCode=options.hospitalCode||file?.hospital_code||'3371084';
+  const scope=await require('../services/anggaranAiService').untukBerkas(db,{filePath:options.filePath,hospitalCode,
+    jenis:[options.jenisKlaim],recordId:options.recordId,anggaranId:file?.ai_anggaran_id});
+  return konteksAi.jalankan({ hospital_code:hospitalCode,record_id:options.recordId,file_id:options.fileId,anggaran_ai:scope },
     () => reprocessExistingRecordDenganKonteks(db, options));
 }
 
@@ -2884,7 +3034,7 @@ async function reprocessExistingRecordDenganKonteks(db, { fileId, recordId, file
         UPDATE claim_records SET
           kode_rs = ?, sep = ?, nokartu = ?, nama_pasien = ?, mrn = ?,
           birth_date = ?, gender = ?, kelas_rawat = ?, admission_date = ?, discharge_date = ?,
-          discharge_status = ?, diagnosa_list = ?, prosedur_list = ?, dpjp_name = ?,
+          discharge_status = ?, los = ?, diagnosa_list = ?, prosedur_list = ?, dpjp_name = ?,
           tarif_rs = ?, validation_status = ?, error_count = ?, raw_data = ?, klinik_poli = ?, has_bpjs_page = ?,
           has_laporan_operasi = ?, has_hasil_pa = ?
         WHERE id = ?
@@ -2895,6 +3045,7 @@ async function reprocessExistingRecordDenganKonteks(db, { fileId, recordId, file
         /^\d+$/.test(extractedData.KELAS_RAWAT) ? parseInt(extractedData.KELAS_RAWAT) : null,
         vclaimDateToISO(extractedData.ADMISSION_DATE), vclaimDateToISO(extractedData.DISCHARGE_DATE),
         /^\d+$/.test(extractedData.DISCHARGE_STATUS) ? parseInt(extractedData.DISCHARGE_STATUS) : 1,
+        /^\d+$/.test(String(extractedData.LOS || '')) ? parseInt(extractedData.LOS) : 0,
         extractedData.DIAGLIST, extractedData.PROCLIST,
         extractedData.DPJP,
         /^\d+$/.test(extractedData.TARIF_RS) ? parseInt(extractedData.TARIF_RS) : null,
@@ -2940,13 +3091,16 @@ async function reprocessExistingRecordDenganKonteks(db, { fileId, recordId, file
     await linkPendingBpjsForSep(db, extractedData.SEP, recordId).catch(() => {});
 
     let aiReview = null;
+    let buktiReview = [];
+    let gangguanKode = false;
     try {
       // Baca ulang = OCR baru; bukti AI review memakai hasil yang sama.
       if (result.ocrPages) {
         await saveOcrResultsToDb(db, recordId, { success: true, pages: result.ocrPages })
           .catch(e => console.warn(`[reread] gagal simpan OCR tahap ekstraksi: ${e.message}`));
       }
-      const evidencePool = await gatherEvidencePool(db, recordId, path.resolve(filePath));
+      const evidencePool = await gatherEvidencePool(db, recordId, path.resolve(filePath),result.classification);
+      buktiReview = evidencePool;
       const knowledgeEntries = await getRelevantKnowledge(db, validationErrors.map(e => e.rule_id));
       const bpjsExamples = await getRelevantBpjsExamples(db, { ...extractedData, validationErrors });
       aiReview = await generateAiReview({ ...extractedData, id: recordId }, validationErrors, evidencePool, knowledgeEntries, bpjsExamples);
@@ -2981,8 +3135,10 @@ async function reprocessExistingRecordDenganKonteks(db, { fileId, recordId, file
         // Kode saran yang sudah terverifikasi kamus ICD-10 langsung mengisi
         // DIAGLIST/PROCLIST yang masih kosong -- koder tidak perlu mengetik
         // ulang. Best-effort: kegagalan di sini tidak menggagalkan review.
-        await isiKodeDariSaranTervalidasi(db, recordId, extractedData, aiReview).catch(errIsi =>
-          console.warn(`[AutoIsi] gagal untuk record ${recordId}: ${errIsi.message || errIsi}`));
+        await isiKodeDariSaranTervalidasi(db, recordId, extractedData, aiReview).catch(errIsi => {
+          gangguanKode = true;
+          console.warn(`[AutoIsi] gagal untuk record ${recordId}: ${errIsi.message || errIsi}`);
+        });
         recordKnowledge(db, aiReview.knowledge_updates).catch(kbErr =>
           console.warn(`[reread] Gagal simpan knowledge base: ${kbErr.message}`));
       } else {
@@ -2990,16 +3146,18 @@ async function reprocessExistingRecordDenganKonteks(db, { fileId, recordId, file
       }
     } catch (aiErr) {
       console.warn(`[reread] AI review gagal untuk record ${recordId}: ${aiErr.message}`);
+      aiReview = null;
     }
+
+    const finalAnalysis = await finalisasiAnalisisPdf(db, { recordId, fileId, review: aiReview,
+      evidencePool: buktiReview, classification: result.classification, gangguanKode });
 
     return {
       success: true,
       file_id: fileId,
       record_id: recordId,
       vclaimFormat: extractedData,
-      validation_status: validationStatus,
-      validation_errors: validationErrors,
-      ai_review: aiReview,
+      ...finalAnalysis,
     };
   } catch (err) {
     console.error('[reread] error tak terduga:', recordId, err);
@@ -3044,7 +3202,7 @@ router.get('/records/:recordId/tarif-ganda', authenticate, async (req, res) => {
   try {
     const db = getDb();
     const record = await db.prepare(`
-      SELECT id, raw_data, diagnosa_list, prosedur_list, jenis_klaim, ai_review
+      SELECT id, raw_data, diagnosa_list, prosedur_list, jenis_klaim, kelas_rawat, ai_review
       FROM claim_records WHERE id = ?
     `).get(req.params.recordId);
     if (!record) return res.status(404).json({ error: 'Record tidak ditemukan' });
@@ -3075,7 +3233,7 @@ async function muatLaporanCasemix(db, recordId) {
   const saran = susunSaranKoding(record, ai, hitungInacbgDanTarif);
   const { dx, px } = kodeFinal(record, ai);
   const [pelajaran, keputusan] = await Promise.all([
-    pelajaranRelevan(db, { dx, px, recordId: record.id, jenisKlaim: record.jenis_klaim }).catch(() => []),
+    pelajaranRelevan(db, { dx, px, recordId: record.id, jenisKlaim: record.jenis_klaim, untukPerbandingan: true }).catch(() => []),
     ambilKeputusan(db, record.id),
   ]);
   const laporan = susunLaporanCasemix({ record, ai, faktaKlinis, saran, hitungInacbgDanTarif, kronologi: susunKronologi(pages), pelajaran, keputusan });
@@ -3122,10 +3280,12 @@ router.post('/records/:recordId/agen-casemix/tanya', authenticate, async (req, r
     const muat = await muatLaporanCasemix(db, req.params.recordId);
     if (!muat) return res.status(404).json({ error: 'Record tidak ditemukan' });
     const { record, pages, faktaKlinis, laporan } = muat;
-    const hasil = await tanyaAgenCasemix({
+    const file=await db.prepare('SELECT * FROM claim_files WHERE id=?').get(record.file_id);
+    if(!canAccessFile(file,req.user)) return res.status(404).json({error:'Record tidak ditemukan'});
+    const hasil = await konteksAi.untukRecord(db,record,()=>tanyaAgenCasemix({
       pertanyaan, riwayat: Array.isArray(req.body?.riwayat) ? req.body.riwayat : [], record, pages, faktaKlinis, laporan, hitungInacbgDanTarif, db,
       dikenal: { nama: record.nama_pasien, nomor_kartu: record.nokartu, nik: record.nik, no_rm: record.mrn, sep: record.sep },
-    });
+    }));
     res.json(hasil);
   } catch (error) {
     console.error('[agen-casemix/tanya] gagal:', error);
@@ -3154,11 +3314,14 @@ router.post('/records/:recordId/tinjauan-diagnosis', authenticate, async (req, r
     const db = getDb();
     const record = await db.prepare('SELECT * FROM claim_records WHERE id = ?').get(req.params.recordId);
     if (!record) return res.status(404).json({ error: 'Record tidak ditemukan.' });
+    const file=await db.prepare('SELECT * FROM claim_files WHERE id=?').get(record.file_id);
+    if(!canAccessFile(file,req.user)) return res.status(404).json({error:'Record tidak ditemukan.'});
     let ai = record.ai_review;
     if (typeof ai === 'string') { try { ai = JSON.parse(ai); } catch (_) { ai = {}; } }
     ai = ai || {};
     const pages = await db.prepare('SELECT page_number, ocr_text FROM ocr_results WHERE record_id = ? ORDER BY page_number').all(record.id);
     const resumePages = getAnyResumeMedisPageNumbers(pages);
+    const penilaian=await konteksAi.untukRecord(db,record,async()=>{
     let tinjauan = await tinjauDiagnosis(record, ai, pages, resumePages, {
       db, dikenal: { nama: record.nama_pasien, nomor_kartu: record.nokartu, nik: record.nik, no_rm: record.mrn, sep: record.sep },
     });
@@ -3167,8 +3330,10 @@ router.post('/records/:recordId/tinjauan-diagnosis', authenticate, async (req, r
       paksaSol: req.body?.paksa_sol === true,
     });
     tinjauan = lanjutan.tinjauan || { ...tinjauan, pemeriksaan_lanjutan: lanjutan.metadata };
+    return tinjauan;
+    });
     const risiko = perbaruiRisikoTampilan(record);
-    res.json({ ...susunSaranKoding(record, { ...ai, tinjauan_diagnosis: tinjauan }, hitungInacbgDanTarif), kesiapan_koding: risiko.kesiapan_koding });
+    res.json({ ...susunSaranKoding(record, { ...ai, tinjauan_diagnosis: penilaian }, hitungInacbgDanTarif), kesiapan_koding: risiko.kesiapan_koding });
   } catch (_) {
     res.status(500).json({ error: 'Tinjauan diagnosis belum dapat disusun. Coba lagi.' });
   }
@@ -3270,6 +3435,66 @@ const pdfUploadBatch = multer({
 const prosesUnggah = require('../services/prosesUnggahService');
 const antreanUnggah = prosesUnggah.buatAntrean(BATCH_AI_CONCURRENCY);
 
+/**
+ * Satu pekerjaan unggah di antrean. Gangguan sementara (AI/OCR timeout,
+ * koneksi, error tak terduga) dicoba ulang otomatis sebelum dinyatakan gagal;
+ * kesalahan yang pasti (API key belum disetel, dokumen kosong) tidak diulang.
+ */
+async function jalankanProsesUnggah(db, io, id, muatan) {
+  if(!muatan.fileId || !muatan.recordId) {
+    muatan={...muatan,fileId:muatan.fileId||uuidv4(),recordId:muatan.recordId||uuidv4()};
+    await prosesUnggah.perbarui(db,id,{muatan:JSON.stringify(muatan)});
+  }
+  const { filePath, originalName, allowedJenisKlaim = [], userId, hospitalCode } = muatan;
+  const catat = prosesUnggah.pencatat(db, id);
+  let rantai = Promise.resolve();
+  const onTahap = (t, info) => { rantai = rantai.then(() => catat(t, info)).catch(() => {}); if (io) io.emit('proses-unggah:update', { id, tahap: t }); return rantai; };
+  let hasil;
+  const JEDA_ULANG_MS = [2000];
+  for (let percobaan = 0; percobaan <= JEDA_ULANG_MS.length; percobaan++) {
+    try {
+      if (!fs.existsSync(filePath)) {
+        hasil = { success: false, error: 'Berkas unggahan tidak ditemukan lagi di server. Silakan unggah ulang.' };
+        break;
+      }
+      hasil = await processSinglePdfUpload(db, {
+        filePath, originalName,
+        jenisKlaim: allowedJenisKlaim.length === 1 ? allowedJenisKlaim[0] : undefined,
+        allowedJenisKlaim, userId, hospitalCode, onTahap,
+        fileId:muatan.fileId,recordId:muatan.recordId,
+      });
+    } catch (err) {
+      console.error(`[upload-antre] ${originalName} gagal:`, err && err.message);
+      hasil = { success: false, dapat_diulang: true, error: 'Terjadi gangguan saat memproses berkas. Silakan coba lagi.' };
+    }
+    if (hasil && (hasil.success || !hasil.dapat_diulang) || percobaan === JEDA_ULANG_MS.length) break;
+    console.warn(`[upload-antre] ${originalName}: percobaan ${percobaan + 1} gagal (${hasil && hasil.error}); diulang dalam ${JEDA_ULANG_MS[percobaan] / 1000} dtk.`);
+    onTahap('antre', { pesan: `Mengulang otomatis (percobaan ${percobaan + 2})` });
+    await new Promise(r => setTimeout(r, JEDA_ULANG_MS[percobaan]));
+  }
+  await rantai;
+  if(!hasil?.success && hasil?.record_id && hasil?.file_id) hasil={...hasil,success:true,analysis_status:'sebagian',
+    analysis_warning:'Berkas dan data klaim sudah tersimpan; satu tahap analisis belum selesai. Lihat hasil untuk meninjau penyebabnya.'};
+  await prosesUnggah.selesai(db, id, hasil);
+  if (io) io.emit('proses-unggah:update', { id, status: prosesUnggah.statusHasil(hasil) });
+}
+
+/**
+ * Dipanggil sekali setelah server & DB siap: unggahan yang terhenti karena
+ * server dimulai ulang dilanjutkan otomatis (berkas yang setengah tersimpan
+ * dari percobaan sebelumnya dibersihkan dulu supaya tidak ganda).
+ */
+async function lanjutkanProsesTerputus(io) {
+  const db = getDb();
+  const daftar = await prosesUnggah.ambilUntukDilanjutkan(db);
+  for (const p of daftar) {
+    console.log(`[upload-antre] melanjutkan ${p.muatan.originalName} (proses ${p.id}) setelah server dimulai ulang.`);
+    antreanUnggah.tambah(() => jalankanProsesUnggah(db, io, p.id,
+      {...p.muatan,fileId:p.file_id||p.muatan.fileId,recordId:p.record_id||p.muatan.recordId}));
+  }
+  return daftar.length;
+}
+
 router.post('/upload-pdf-antre', authenticate, pdfUploadBatch.array('files', MAX_BATCH_PDF_FILES), async (req, res) => {
   let diterima = false;
   try {
@@ -3285,40 +3510,29 @@ router.post('/upload-pdf-antre', authenticate, pdfUploadBatch.array('files', MAX
     const db = getDb();
     const io = req.app.get('io');
     const batchId = uuidv4();
-    const daftarProses = [];
-    for (const file of req.files) {
-      const id = await prosesUnggah.buat(db, { batchId, hospitalCode: req.user.hospital_code, userId: req.user.id, fileName: file.originalname });
-      daftarProses.push({ id, file });
-    }
-    diterima = true;
     const userId = req.user.id; const hospitalCode = req.user.hospital_code;
-    for (const { id, file } of daftarProses) {
-      antreanUnggah.tambah(async () => {
-        const catat = prosesUnggah.pencatat(db, id);
-        let rantai = Promise.resolve();
-        const onTahap = (t, info) => { rantai = rantai.then(() => catat(t, info)).catch(() => {}); if (io) io.emit('proses-unggah:update', { id, tahap: t }); return rantai; };
-        let hasil;
-        try {
-          hasil = await processSinglePdfUpload(db, {
-            filePath: file.path, originalName: file.originalname,
-            jenisKlaim: allowedJenisKlaim.length === 1 ? allowedJenisKlaim[0] : undefined,
-            allowedJenisKlaim, userId, hospitalCode, onTahap,
-          });
-        } catch (err) {
-          console.error(`[upload-antre] ${file.originalname} gagal:`, err && err.message);
-          hasil = { success: false, error: 'Terjadi gangguan saat memproses berkas. Silakan coba lagi.' };
-        }
-        await rantai;
-        await prosesUnggah.selesai(db, id, hasil);
-        if (io) io.emit('proses-unggah:update', { id, status: hasil && hasil.success ? 'selesai' : 'gagal' });
-      });
+    const daftarProses = await prosesUnggah.buatBatch(db, {
+      batchId, hospitalCode, userId, files: req.files, allowedJenisKlaim,
+    });
+    diterima = true;
+    for (const { id, muatan } of daftarProses) {
+      antreanUnggah.tambah(() => jalankanProsesUnggah(db, io, id, muatan));
     }
-    const status = await prosesUnggah.daftar(db, { hospitalCode, batasParalel: BATCH_AI_CONCURRENCY });
-    const milikBatch = status.proses.filter(p => p.batch_id === batchId);
-    res.status(202).json({ batch_id: batchId, proses: milikBatch, perkiraan_selesai_detik: Math.max(0, ...milikBatch.map(p => p.sisa_detik)) });
+    // Gangguan membaca panel progres tidak boleh menyatakan berkas yang
+    // sudah diterima gagal, atau mendorong pengguna mengunggahnya lagi.
+    let milikBatch = daftarProses.map(({ muatan, hospital_code, user_id, ...p }) => p);
+    try {
+      const status = await prosesUnggah.daftar(db, { hospitalCode, batasParalel: BATCH_AI_CONCURRENCY });
+      const terkini = new Map(status.proses.filter(p => p.batch_id === batchId).map(p => [p.id, p]));
+      milikBatch = milikBatch.map(p => terkini.get(p.id) || p);
+    } catch (error) {
+      console.warn('[upload-antre] berkas diterima, status sementara belum dapat dibaca:', error.message);
+    }
+    res.status(202).json({ batch_id: batchId, total_files: daftarProses.length, proses: milikBatch,
+      perkiraan_selesai_detik: milikBatch.some(p => p.sisa_detik == null) ? null : Math.max(0, ...milikBatch.map(p => p.sisa_detik)) });
   } catch (error) {
     console.error('[upload-antre] gagal menerima berkas:', error);
-    res.status(500).json({ error: 'Berkas belum dapat diterima. Silakan coba lagi.' });
+    res.status(503).json({ error: 'Antrean belum dapat disimpan. Berkas belum diterima; silakan coba lagi.' });
   } finally {
     if (!diterima) for (const f of req.files || []) fs.promises.unlink(f.path).catch(() => {});
   }
@@ -3812,7 +4026,7 @@ router.post('/:record_id/update-values', authenticate, async (req, res) => {
         UPDATE claim_records SET
           kode_rs = ?, sep = ?, nokartu = ?, nama_pasien = ?, mrn = ?,
           birth_date = ?, gender = ?, kelas_rawat = ?, admission_date = ?, discharge_date = ?,
-          discharge_status = ?, diagnosa_list = ?, prosedur_list = ?, dpjp_name = ?,
+          discharge_status = ?, los = ?, diagnosa_list = ?, prosedur_list = ?, dpjp_name = ?,
           tarif_rs = ?, validation_status = ?, error_count = ?, raw_data = ?
         WHERE id = ?
       `);
@@ -3824,6 +4038,7 @@ router.post('/:record_id/update-values', authenticate, async (req, res) => {
         /^\d+$/.test(mergedData.KELAS_RAWAT) ? parseInt(mergedData.KELAS_RAWAT) : null,
         vclaimDateToISO(mergedData.ADMISSION_DATE), vclaimDateToISO(mergedData.DISCHARGE_DATE),
         /^\d+$/.test(mergedData.DISCHARGE_STATUS) ? parseInt(mergedData.DISCHARGE_STATUS) : 1,
+        /^\d+$/.test(String(mergedData.LOS || '')) ? parseInt(mergedData.LOS) : 0,
         mergedData.DIAGLIST, mergedData.PROCLIST, mergedData.DPJP,
         /^\d+$/.test(mergedData.TARIF_RS) ? parseInt(mergedData.TARIF_RS) : null,
         validationStatus, validationErrors.length, JSON.stringify(mergedData),
@@ -4055,15 +4270,20 @@ router.post('/:record_id/audit-suggestions', authenticate, async (req, res) => {
 
 module.exports = router;
 module.exports.vclaimToDbFormat = vclaimToDbFormat;
+// Jalur pemeliharaan lokal memakai alur baca ulang yang sama dengan endpoint.
+module.exports.reprocessExistingRecord = reprocessExistingRecord;
+module.exports.finalisasiAnalisisPdf = finalisasiAnalisisPdf;
 module.exports.vclaimDateToISO = vclaimDateToISO;
 module.exports.resolvePdfPath = resolvePdfPath;
 module.exports.RESOLVED_UPLOAD_DIR = RESOLVED_UPLOAD_DIR;
 module.exports.isiKodeDariSaranTervalidasi = isiKodeDariSaranTervalidasi;
 
 module.exports.processSinglePdfUpload = processSinglePdfUpload;
+module.exports.lanjutkanAnalisisTersimpan = lanjutkanAnalisisTersimpan;
 module.exports.pdfUpload = pdfUpload;
 
 module.exports.pdfUploadBatch = multer({ storage, limits: { fileSize: 20 * 1024 * 1024 },
   fileFilter: (req, file, cb) => path.extname(file.originalname).toLowerCase() === ".pdf" ? cb(null, true) : cb(new Error("PDF saja")) });
 module.exports.runWithConcurrencyLimit = runWithConcurrencyLimit;
 module.exports.BATCH_AI_CONCURRENCY = BATCH_AI_CONCURRENCY;
+module.exports.lanjutkanProsesTerputus = lanjutkanProsesTerputus;

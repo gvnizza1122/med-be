@@ -13,11 +13,15 @@ const {
   ocrPdfPages,
   ocrWithRetry,
   isAvailable,
-  OCR_CONFIG
+  OCR_CONFIG,
+  shutdownOcrPool
 } = require('../../services/ocrService');
 
 const fs = require('fs');
 const path = require('path');
+// Pool persisten diperlukan aplikasi, tetapi harus ditutup oleh pemilik uji
+// setelah pemeriksaan selesai agar proses Jest tidak meninggalkan worker.
+afterAll(async () => { await shutdownOcrPool(); }, 30000);
 
 describe('OCR Service', () => {
   // Skip tests if tesseract.js not available: gunakan it langsung, atau it.skip

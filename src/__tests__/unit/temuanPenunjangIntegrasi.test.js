@@ -22,6 +22,7 @@ const mockKamus = { icd10_who_codes: new Set(['J18.9']), icd9_cm_procedures: new
 
 jest.mock('../../database/init', () => ({
   getDb: () => ({
+    get: async () => undefined,
     all: async (sql, params) => {
       if (/LIKE/i.test(sql)) return [];
       const tabel = /icd10_who_codes/.test(sql) ? 'icd10_who_codes' : 'icd9_cm_procedures';
@@ -117,7 +118,7 @@ describe('generateAiReview + temuan_penunjang (default ON)', () => {
 
 describe('generateAiReview + temuan_lab dan evaluasi syarat lab (aktif default)', () => {
   test('baris tanpa satuan ditahan untuk cek manual; temuan tetap tersimpan dan flag false mempertahankan jalur lama', async () => {
-    const record = { ...REKAM, DIAGLIST: 'D63.8', PROCLIST: '90.59' };
+    const record = { ...REKAM, hospital_code: '3371084', DIAGLIST: 'D63.8', PROCLIST: '90.59' };
     const pool = [
       { page_number: 1, ocr_text: 'Resume Medis' },
       { page_number: 2, ocr_text: 'Hemoglobin: 7,2 mg' },

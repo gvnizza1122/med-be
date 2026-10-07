@@ -1,3 +1,4 @@
+const { pastikanIndeks, pastikanKolom } = require('../database/schemaIdempotent');
 /**
  * Catatan panggilan model — jejak audit "model apa dipanggil untuk tugas apa".
  *
@@ -24,23 +25,14 @@ async function ensureSchema(db) {
       ok BOOLEAN NOT NULL
     )
   `);
-  await db.query(
-    'CREATE INDEX IF NOT EXISTS idx_catatan_panggilan_model_tugas_waktu ON catatan_panggilan_model(tugas, waktu DESC)',
-  );
-  await db.query(`ALTER TABLE catatan_panggilan_model
-    ADD COLUMN IF NOT EXISTS effort VARCHAR(12),
-    ADD COLUMN IF NOT EXISTS jenis_klaim VARCHAR(20),
-    ADD COLUMN IF NOT EXISTS prompt_tokens INTEGER,
-    ADD COLUMN IF NOT EXISTS completion_tokens INTEGER,
-    ADD COLUMN IF NOT EXISTS cached_tokens INTEGER,
-    ADD COLUMN IF NOT EXISTS reasoning_tokens INTEGER,
-    ADD COLUMN IF NOT EXISTS estimasi_usd DOUBLE PRECISION,
-    ADD COLUMN IF NOT EXISTS estimasi_idr DOUBLE PRECISION,
-    ADD COLUMN IF NOT EXISTS kurs_usd_idr DOUBLE PRECISION,
-    ADD COLUMN IF NOT EXISTS total_tokens INTEGER,
-    ADD COLUMN IF NOT EXISTS hospital_code TEXT,
-    ADD COLUMN IF NOT EXISTS record_id TEXT`);
-  await db.query('CREATE INDEX IF NOT EXISTS idx_catatan_model_rs_waktu ON catatan_panggilan_model(hospital_code, waktu)');
+  await pastikanIndeks(db, 'CREATE INDEX IF NOT EXISTS idx_catatan_panggilan_model_tugas_waktu ON catatan_panggilan_model(tugas, waktu DESC)');
+  await pastikanKolom(db, 'catatan_panggilan_model', {
+    effort:'VARCHAR(12)',jenis_klaim:'VARCHAR(20)',prompt_tokens:'INTEGER',completion_tokens:'INTEGER',
+    cached_tokens:'INTEGER',reasoning_tokens:'INTEGER',estimasi_usd:'DOUBLE PRECISION',
+    estimasi_idr:'DOUBLE PRECISION',kurs_usd_idr:'DOUBLE PRECISION',total_tokens:'INTEGER',
+    hospital_code:'TEXT',record_id:'TEXT',cache_write_tokens:'INTEGER',
+  });
+  await pastikanIndeks(db, 'CREATE INDEX IF NOT EXISTS idx_catatan_model_rs_waktu ON catatan_panggilan_model(hospital_code, waktu)');
 }
 
 /**
@@ -56,8 +48,8 @@ async function catat(db, c) {
     await db.run(
       `INSERT INTO catatan_panggilan_model (tugas, penyedia, model, versi, waktu, durasi_ms, ok,
          effort, jenis_klaim, prompt_tokens, completion_tokens, cached_tokens, reasoning_tokens,
-         estimasi_usd, estimasi_idr, kurs_usd_idr, total_tokens, hospital_code, record_id)
-       VALUES (?, ?, ?, ?, timezone('UTC', CURRENT_TIMESTAMP), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         estimasi_usd, estimasi_idr, kurs_usd_idr, total_tokens, hospital_code, record_id, cache_write_tokens)
+       VALUES (?, ?, ?, ?, timezone('UTC', CURRENT_TIMESTAMP), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         String(c.tugas).slice(0, 40),
         c.penyedia ? String(c.penyedia).slice(0, 40) : null,
@@ -74,6 +66,7 @@ async function catat(db, c) {
         token('total_tokens'),
         c.hospital_code ? String(c.hospital_code).slice(0, 40) : null,
         c.record_id ? String(c.record_id).slice(0, 80) : null,
+        token('cache_write_tokens'),
       ],
     );
     return true;

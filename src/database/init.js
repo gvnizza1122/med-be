@@ -19,9 +19,12 @@ const dbHelper = {
     
     initPromise = (async () => {
       await initializeSchema();
+      // Katalog tetap disiapkan bila migrasi lama atas tabel milik role DB lain
+      // belum dapat dijalankan. Kegagalan katalog sendiri tidak disembunyikan.
+      await require('../services/profilKlaimRsService').ensureSchema(dbHelper);
       isInitialized = true;
       initPromise = null;
-    })();
+    })().catch(err => { initPromise = null; throw err; });
     return initPromise;
   },
   query(sql, params = []) {
@@ -587,55 +590,64 @@ async function initializeSchema() {
     `);
     // Existing installations predate username login. Keep their user records
     // intact while adding the nullable, unique username field.
-    await dbHelper.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS username TEXT UNIQUE');
+    const username = await dbHelper.get(`SELECT 1 AS ada FROM information_schema.columns
+      WHERE table_schema='public' AND table_name='users' AND column_name='username'`);
+    if (!username) await dbHelper.query('ALTER TABLE users ADD COLUMN username TEXT UNIQUE');
 
+    // PostgreSQL memeriksa kepemilikan tabel sebelum IF NOT EXISTS.
+    // Akun aplikasi tetap dapat memakai indeks lama tanpa hak pemilik tabel.
+    const indeksAda = new Set((await dbHelper.all("SELECT indexname FROM pg_indexes WHERE schemaname='public'")).map(r=>r.indexname));
+    const pastikanIndeks = async sql => {
+      const name = /CREATE INDEX IF NOT EXISTS (\w+)/i.exec(sql)?.[1];
+      if (!indeksAda.has(name)) await dbHelper.query(sql);
+    };
     // Create Indexes
-    await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_claim_files_hospital_period ON claim_files(hospital_code, period)`);
-    await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_claim_files_status ON claim_files(status)`);
-    await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_claim_records_file_id ON claim_records(file_id)`);
-    await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_claim_records_validation_status ON claim_records(validation_status)`);
-    await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_claim_records_sep ON claim_records(sep)`);
-    await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_validation_errors_record_id ON validation_errors(record_id)`);
-    await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_validation_errors_rule_id ON validation_errors(rule_id)`);
-    await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON audit_logs(user_id)`);
-    await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at)`);
-    await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_ai_audit_record ON ai_audit_log(record_id)`);
-    await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_ai_audit_file ON ai_audit_log(file_id)`);
-    await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_ai_audit_style_action ON ai_audit_log(style, nurse_action)`);
-    await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_ocr_results_record_id ON ocr_results(record_id)`);
-    await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_ocr_results_page ON ocr_results(record_id, page_number)`);
-    await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_claim_reading_stages_record ON claim_reading_stages(record_id, stage_key)`);
-    await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_error_kb_rule ON error_knowledge_base(rule_id)`);
-    await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_error_kb_rule_hits ON error_knowledge_base(rule_id, hit_count DESC, created_at DESC)`);
-    await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_icd10_who_chapter ON icd10_who_codes(chapter_number)`);
-    await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_icd10_who_code_upper ON icd10_who_codes(UPPER(code))`);
-    await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_icd9_cm_block ON icd9_cm_procedures(block)`);
-    await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_icd9_cm_code_upper ON icd9_cm_procedures(UPPER(code))`);
-    await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_prb_exemption_mrn ON prb_exemption_list(hospital_code, mrn)`);
-    await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_claim_records_nokartu ON claim_records(nokartu)`);
-    await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_rv20_confirmations_record ON rv20_confirmations(record_id)`);
+    await pastikanIndeks(`CREATE INDEX IF NOT EXISTS idx_claim_files_hospital_period ON claim_files(hospital_code, period)`);
+    await pastikanIndeks(`CREATE INDEX IF NOT EXISTS idx_claim_files_status ON claim_files(status)`);
+    await pastikanIndeks(`CREATE INDEX IF NOT EXISTS idx_claim_records_file_id ON claim_records(file_id)`);
+    await pastikanIndeks(`CREATE INDEX IF NOT EXISTS idx_claim_records_validation_status ON claim_records(validation_status)`);
+    await pastikanIndeks(`CREATE INDEX IF NOT EXISTS idx_claim_records_sep ON claim_records(sep)`);
+    await pastikanIndeks(`CREATE INDEX IF NOT EXISTS idx_validation_errors_record_id ON validation_errors(record_id)`);
+    await pastikanIndeks(`CREATE INDEX IF NOT EXISTS idx_validation_errors_rule_id ON validation_errors(rule_id)`);
+    await pastikanIndeks(`CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON audit_logs(user_id)`);
+    await pastikanIndeks(`CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at)`);
+    await pastikanIndeks(`CREATE INDEX IF NOT EXISTS idx_ai_audit_record ON ai_audit_log(record_id)`);
+    await pastikanIndeks(`CREATE INDEX IF NOT EXISTS idx_ai_audit_file ON ai_audit_log(file_id)`);
+    await pastikanIndeks(`CREATE INDEX IF NOT EXISTS idx_ai_audit_style_action ON ai_audit_log(style, nurse_action)`);
+    await pastikanIndeks(`CREATE INDEX IF NOT EXISTS idx_ocr_results_record_id ON ocr_results(record_id)`);
+    await pastikanIndeks(`CREATE INDEX IF NOT EXISTS idx_ocr_results_page ON ocr_results(record_id, page_number)`);
+    await pastikanIndeks(`CREATE INDEX IF NOT EXISTS idx_claim_reading_stages_record ON claim_reading_stages(record_id, stage_key)`);
+    await pastikanIndeks(`CREATE INDEX IF NOT EXISTS idx_error_kb_rule ON error_knowledge_base(rule_id)`);
+    await pastikanIndeks(`CREATE INDEX IF NOT EXISTS idx_error_kb_rule_hits ON error_knowledge_base(rule_id, hit_count DESC, created_at DESC)`);
+    await pastikanIndeks(`CREATE INDEX IF NOT EXISTS idx_icd10_who_chapter ON icd10_who_codes(chapter_number)`);
+    await pastikanIndeks(`CREATE INDEX IF NOT EXISTS idx_icd10_who_code_upper ON icd10_who_codes(UPPER(code))`);
+    await pastikanIndeks(`CREATE INDEX IF NOT EXISTS idx_icd9_cm_block ON icd9_cm_procedures(block)`);
+    await pastikanIndeks(`CREATE INDEX IF NOT EXISTS idx_icd9_cm_code_upper ON icd9_cm_procedures(UPPER(code))`);
+    await pastikanIndeks(`CREATE INDEX IF NOT EXISTS idx_prb_exemption_mrn ON prb_exemption_list(hospital_code, mrn)`);
+    await pastikanIndeks(`CREATE INDEX IF NOT EXISTS idx_claim_records_nokartu ON claim_records(nokartu)`);
+    await pastikanIndeks(`CREATE INDEX IF NOT EXISTS idx_rv20_confirmations_record ON rv20_confirmations(record_id)`);
 
     // Indexes for 6 Field Types System (migration 006)
-    await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_claim_records_jenis_field ON claim_records(jenis_field)`);
-    await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_claim_records_dokumen_sumber ON claim_records(dokumen_sumber)`);
-    await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_claim_records_status_usulan ON claim_records(status_usulan)`);
-    await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_claim_records_disetujui_oleh ON claim_records(disetujui_oleh)`);
-    await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_claim_records_jenis_field_status ON claim_records(jenis_field, status_usulan)`);
+    await pastikanIndeks(`CREATE INDEX IF NOT EXISTS idx_claim_records_jenis_field ON claim_records(jenis_field)`);
+    await pastikanIndeks(`CREATE INDEX IF NOT EXISTS idx_claim_records_dokumen_sumber ON claim_records(dokumen_sumber)`);
+    await pastikanIndeks(`CREATE INDEX IF NOT EXISTS idx_claim_records_status_usulan ON claim_records(status_usulan)`);
+    await pastikanIndeks(`CREATE INDEX IF NOT EXISTS idx_claim_records_disetujui_oleh ON claim_records(disetujui_oleh)`);
+    await pastikanIndeks(`CREATE INDEX IF NOT EXISTS idx_claim_records_jenis_field_status ON claim_records(jenis_field, status_usulan)`);
 
     // Item 10 (optimasi performa) — kolom-kolom berikut dipakai search/filter
     // di fitur search Riwayat Upload (item 8) dan Pending BPJS (item 9), belum
     // punya index sebelumnya, jadi jadi full-scan begitu datanya banyak.
-    await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_claim_records_nama_pasien ON claim_records(nama_pasien)`);
-    await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_bpjs_pending_file_status ON bpjs_pending_responses(pending_file_id, status)`);
-    await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_bpjs_pending_sep ON bpjs_pending_responses(sep)`);
-    await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_bpjs_pending_nama_peserta ON bpjs_pending_responses(nama_peserta)`);
-    await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_tarif_inacbg_jenis_layanan ON tarif_inacbg_pmk3_2023(jenis_layanan)`);
-    await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_special_cmg_kriteria_kode ON special_cmg_kriteria(kode_special_cmg)`);
-    await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_special_cmg_kriteria_diagnosis ON special_cmg_kriteria(kode_diagnosis)`);
-    await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_special_cmg_penjaminan_kode ON special_cmg_penjaminan(kode_special_cmg)`);
+    await pastikanIndeks(`CREATE INDEX IF NOT EXISTS idx_claim_records_nama_pasien ON claim_records(nama_pasien)`);
+    await pastikanIndeks(`CREATE INDEX IF NOT EXISTS idx_bpjs_pending_file_status ON bpjs_pending_responses(pending_file_id, status)`);
+    await pastikanIndeks(`CREATE INDEX IF NOT EXISTS idx_bpjs_pending_sep ON bpjs_pending_responses(sep)`);
+    await pastikanIndeks(`CREATE INDEX IF NOT EXISTS idx_bpjs_pending_nama_peserta ON bpjs_pending_responses(nama_peserta)`);
+    await pastikanIndeks(`CREATE INDEX IF NOT EXISTS idx_tarif_inacbg_jenis_layanan ON tarif_inacbg_pmk3_2023(jenis_layanan)`);
+    await pastikanIndeks(`CREATE INDEX IF NOT EXISTS idx_special_cmg_kriteria_kode ON special_cmg_kriteria(kode_special_cmg)`);
+    await pastikanIndeks(`CREATE INDEX IF NOT EXISTS idx_special_cmg_kriteria_diagnosis ON special_cmg_kriteria(kode_diagnosis)`);
+    await pastikanIndeks(`CREATE INDEX IF NOT EXISTS idx_special_cmg_penjaminan_kode ON special_cmg_penjaminan(kode_special_cmg)`);
 
     // Explicit index pada users.email untuk mempercepat login queries
-    await dbHelper.query(`CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)`);
+    await pastikanIndeks(`CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)`);
 
     await migrateSchema(dbHelper);
   } catch (err) {
@@ -804,7 +816,7 @@ async function migrateSchema(db) {
         id                 TEXT PRIMARY KEY,
         istilah_baku       VARCHAR(80) NOT NULL,
         kategori           VARCHAR(20) NOT NULL CHECK (kategori IN
-          ('hematologi','kimia_klinik','serologi','urin_feses','mikrobiologi','radiologi','kardiologi','lain','tindakan')),
+          ('hematologi','kimia_klinik','serologi','urin_feses','mikrobiologi','radiologi','kardiologi','lain','tindakan','patologi','obstetri')),
         kode_icd9          VARCHAR(10),
         kode_terverifikasi BOOLEAN NOT NULL DEFAULT FALSE,
         satuan             VARCHAR(16),
@@ -833,6 +845,7 @@ async function migrateSchema(db) {
       );
     `);
     try {
+      await require('./penunjangSchemaService').ensureKategori(dbHelper);
       await require('../services/kamusPenunjangService').seedKamusPenunjang(dbHelper);
     } catch (e) {
       console.error('[init] Seed kamus penunjang gagal:', e.message);
@@ -845,6 +858,7 @@ async function migrateSchema(db) {
       'routerModelService',
       'tinjauanLanjutanService',
       'catatanPanggilanModelService',
+      'anggaranAiService',
       'testingPendingService',
       'ruleVersiService',
       'kotakRegulasiService',
@@ -1096,11 +1110,15 @@ async function migrateSchema(db) {
     // buka itu lagi. DROP + ADD CHECK constraint idempoten — aman dijalankan
     // ulang tiap startup (Postgres tidak punya "ALTER CHECK IF NOT EXISTS").
     try {
+      const roleCheck=await db.get(`SELECT pg_get_constraintdef(oid) AS definition FROM pg_constraint
+        WHERE conrelid='users'::regclass AND conname='users_role_check'`);
+      if (!roleCheck?.definition?.includes("'superadmin'")) {
       await db.query(`ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check`);
       await db.query(`
         ALTER TABLE users ADD CONSTRAINT users_role_check
         CHECK (role = ANY (ARRAY['superadmin'::text, 'admin'::text, 'supervisor'::text, 'verifikator'::text]))
       `);
+      }
     } catch (e) {
       console.error('[migration] Gagal memastikan constraint role superadmin ada:', e.message);
     }

@@ -303,7 +303,10 @@ process.on('SIGINT', () => { shutdownOcrPool(); shutdownRenderPool(); });
 // ("3k6", "163kKali"). Gagal/timeout -> jatuh ke Tesseract untuk halaman itu,
 // upload tidak pernah gagal karena layanan OCR mati.
 const PADDLE_OCR_URL = process.env.PADDLE_OCR_URL || 'http://ocr_rapid:8866';
-const PADDLE_OCR_TIMEOUT_MS = Number(process.env.PADDLE_OCR_TIMEOUT_MS || 60000);
+// 120 dtk: layanan OCR memproses satu halaman sekali jalan dan halaman scan
+// buruk dibaca ulang (perbaikan gambar, maks +12 dtk) -- 60 dtk membuat antrean
+// beberapa berkas sekaligus timeout dan jatuh ke Tesseract.
+const PADDLE_OCR_TIMEOUT_MS = Number(process.env.PADDLE_OCR_TIMEOUT_MS || 120000);
 
 function pakaiPaddle() {
   return (process.env.OCR_ENGINE || 'tesseract').toLowerCase() === 'paddle';
@@ -603,21 +606,6 @@ async function ocrPdfPages(pdfPath, pageNumbers = 'auto-scan', language = OCR_CO
         continue;
       }
 
-      const msRemaining = deadline - Date.now();
-      if (msRemaining <= CRITICAL_PAGE_TIMEOUT_MARGIN_MS) {
-        console.log(`[OCR][Phase1] Deadline mepet (sisa ${msRemaining}ms) saat mau proses halaman ${pageNum} (critical: ${criticalPageNums.has(pageNum)})`);
-      }
-
-      // Budget hampir habis & halaman ini BUKAN critical — skip supaya
-      // halaman critical yang belum sempat diproses (kalau ada) tetap
-      // kebagian waktu, dan Promise.race eksternal (ocrIntegration.js) tidak
-      // memaksa "buang semua hasil" begitu batas keras tercapai.
-      if (!criticalPageNums.has(pageNum) && Date.now() >= deadline - CRITICAL_PAGE_TIMEOUT_MARGIN_MS) {
-        console.log(`[OCR][Phase1] SKIP halaman ${pageNum} (non-critical, budget habis)`);
-        result.skipped_pages.push({ page_number: pageNum, reason: 'ocr_timeout_budget_exceeded_non_critical' });
-        continue;
-      }
-
       // Teks halaman ini sudah terbaca tanpa OCR -- pakai apa adanya.
       // Bukan pelewatan: halamannya tetap masuk result.pages, jadi ekstraksi
       // klinis tetap melihatnya. Yang dihemat render + OCR-nya.
@@ -633,6 +621,21 @@ async function ocrPdfPages(pdfPath, pageNumbers = 'auto-scan', language = OCR_CO
           source: 'native_text',
         });
         console.log(`[OCR][Phase1] Halaman ${pageNum} pakai teks asli PDF (${teksNative.length} char) -- render+OCR dilewati`);
+        continue;
+      }
+
+      const msRemaining = deadline - Date.now();
+      if (msRemaining <= CRITICAL_PAGE_TIMEOUT_MARGIN_MS) {
+        console.log(`[OCR][Phase1] Deadline mepet (sisa ${msRemaining}ms) saat mau proses halaman ${pageNum} (critical: ${criticalPageNums.has(pageNum)})`);
+      }
+
+      // Budget hampir habis & halaman ini BUKAN critical — skip supaya
+      // halaman critical yang belum sempat diproses (kalau ada) tetap
+      // kebagian waktu, dan Promise.race eksternal (ocrIntegration.js) tidak
+      // memaksa "buang semua hasil" begitu batas keras tercapai.
+      if (!criticalPageNums.has(pageNum) && Date.now() >= deadline - CRITICAL_PAGE_TIMEOUT_MARGIN_MS) {
+        console.log(`[OCR][Phase1] SKIP halaman ${pageNum} (non-critical, budget habis)`);
+        result.skipped_pages.push({ page_number: pageNum, reason: 'ocr_timeout_budget_exceeded_non_critical' });
         continue;
       }
 

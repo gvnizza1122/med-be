@@ -21,7 +21,7 @@ const LABEL_STATUS = {
 
 function grup(hitung, record, dx, px) {
   if (!dx.length || typeof hitung !== 'function') return { inacbg: null, deskripsi: null, tarif: null };
-  const h = hitung(dx, px, record.jenis_klaim || record.JENIS_KLAIM, record.kelas_rawat || record.KELAS_RAWAT, null);
+  const h = hitung(dx, px, record.jenis_klaim || record.JENIS_KLAIM, require('./kelasPerawatanService').kelasTarif(record), null);
   return { inacbg: h && h.inacbgResult ? h.inacbgResult.code : null, deskripsi: h && h.inacbgResult ? h.inacbgResult.description : null,
     tarif: h && h.tarifResult && h.tarifResult.amount != null ? Number(h.tarifResult.amount) : null };
 }
@@ -58,7 +58,8 @@ function persyaratan(ai) {
     for (const sy of s.syarat || []) {
       daftar.push({ syarat: `${s.nama_diagnosis || s.kode_diagnosis}: ${sy.nama || sy.deskripsi || sy.id}`,
         status: sy.status === 'terpenuhi' ? 'terpenuhi' : sy.status === 'perlu_cek_manual' ? 'perlu_konfirmasi' : 'belum_ditemukan',
-        sumber: s.sumber_aturan || 'syarat penunjang RS', regulasi: labelSumber('REKAP-PENDING-RS'), bukti: sy.bukti || null });
+        jenis_ketentuan: 'persyaratan_klaim_bpjs',
+        sumber: s.sumber_ketentuan || s.sumber_aturan || 'Persyaratan penunjang klaim BPJS', regulasi: labelSumber(s.rujukan_id || 'REKAP-PENDING-RS'), bukti: sy.bukti || null });
     }
   }
   const igd = ai.kegawatdaruratan_assessment;

@@ -149,6 +149,7 @@ function susunPutusan(aiReviewMasuk = {}, validationErrorsMasuk = []) {
   //    berkasnya, dan menyebutnya sebagai alasan pending akan menyalahkan
   //    rumah sakit atas kegagalan sistem membaca.
   for (const s of aiReview.syarat_penunjang || []) {
+    if (s.perlu_konfirmasi_tanggal === true || s.diverifikasi !== true) continue;
     for (const syarat of s.syarat || []) {
       if (syarat.status === 'terpenuhi' || syarat.status === 'perlu_cek_manual') continue;
       tambah(alasan, {
@@ -163,6 +164,17 @@ function susunPutusan(aiReviewMasuk = {}, validationErrorsMasuk = []) {
         dari_rekap_pending: dariRekapPending(s.sumber_aturan),
       });
     }
+  }
+
+  // Ketentuan BA dengan masa berlaku terkonfirmasi menjadi temuan telaah,
+  // bukan keputusan penolakan. PNPK dan manual lama tidak menjadi syarat wajib.
+  for (const t of aiReview.referensi_klaim?.temuan || []) {
+    if (t.jenis_ketentuan !== 'verifikasi_klaim_bpjs' || t.status !== 'bukti_belum_cukup'
+      || t.berlaku_pada_episode !== true || t.sumber?.status_verifikasi !== 'terverifikasi') continue;
+    tambah(alasan, { sumber_pemeriksaan:'Referensi klaim BPJS', kode:t.id,
+      ringkas:`${t.nama}: dukungan dokumentasi perlu ditinjau`, penjelasan:t.catatan,
+      keparahan:'sedang', tindakan:'Tinjau bukti dan pengecualian sesuai butir sumber; jangan mengganti diagnosis otomatis.',
+      bukti:`${t.sumber.judul} (${t.sumber.nomor}), halaman ${t.sumber.halaman}`, diverifikasi:true, dari_rekap_pending:false });
   }
 
   // 4. Ketentuan kombinasi kode.

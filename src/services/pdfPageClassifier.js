@@ -51,6 +51,7 @@ const path = require('path');
 const { createWorkerPool } = require('./workerThreadPool');
 const CLASSIFY_POOL_SIZE = Math.max(1, parseInt(process.env.CLASSIFY_WORKER_POOL_SIZE || '3', 10));
 let classifyPool = null;
+const classifyCache=new Map();
 function getClassifyPool() {
   if (!classifyPool) {
     classifyPool = createWorkerPool(path.join(__dirname, '..', 'workers', 'pdfClassifyWorker.js'), CLASSIFY_POOL_SIZE);
@@ -61,6 +62,20 @@ function getClassifyPool() {
 async function classifyPdfPages(filePath) {
   const pool = getClassifyPool();
   const isBuffer = typeof filePath !== 'string';
+  if(!isBuffer) {
+    const stat=await require('fs').promises.stat(filePath);
+    const key=`${path.resolve(filePath)}:${stat.size}:${stat.mtimeMs}:${stat.ctimeMs}`;
+    if(classifyCache.has(key)) return structuredClone(await classifyCache.get(key));
+    const job=pool.run({filePath,bufferData:null});
+    classifyCache.set(key,job);
+    try {
+      const result=await job;
+      if(!result.success) classifyCache.delete(key);
+      // Batas cache agar unggah ratusan PDF tidak menahan seluruh teks di RAM.
+      while(classifyCache.size>20) classifyCache.delete(classifyCache.keys().next().value);
+      return structuredClone(result);
+    } catch(e) {classifyCache.delete(key);throw e;}
+  }
   return pool.run({
     filePath: isBuffer ? null : filePath,
     bufferData: isBuffer ? filePath : null,
@@ -68,6 +83,7 @@ async function classifyPdfPages(filePath) {
 }
 
 async function shutdownClassifyPool() {
+  classifyCache.clear();
   if (classifyPool) {
     await classifyPool.shutdown();
     classifyPool = null;
@@ -258,7 +274,20 @@ function classifyPageDocumentType(text) {
     && /kesimpulan|diagnosa?\s+(?:pa|patologi)|mikroskopi/i.test(t)) return 'patologi_anatomi';
 
   // Kata isi -- hanya untuk halaman tanpa judul dokumen yang dikenali.
-  if (/hasil\s+pemeriksaan\s+radiologi|radiologi\s+hasil|laporan\s+radiologi|\bct\s+scan|\bx[\s-]?ray\b|\bmri\b|\bultrasound|\bsonografi/i.test(t)) return 'radiology';
+  // Laporan radiologi RS rujukan: "CT-Head tanpa kontras", "HCTS Multislice"
+  // (SUPRIYATI 0170R0111225V003428, RS Soerojo).
+  if (/hasil\s+pemeriksaan\s+radiologi|radiologi\s+hasil|laporan\s+radiologi|\bct\s+scan|\bct[\s-]*(?:head|kepala|brain|thorax|toraks|abdomen)\b|\bhcts\b|\bmsct\b|\bx[\s-]?ray\b|\bmri\b|\bultrasound|\bsonografi/i.test(t)) return 'radiology';
+  // Laporan radiologi format RS/vendor lain: dikenali dari STRUKTUR laporan
+  // (>=2 penanda) bersama nama pemeriksaan modalitas x bagian tubuh, bukan
+  // dari ejaan vendor tertentu.
+  {
+    const penanda = [/\bkesan\b/i, /radiolog|sp\.?\s*rad\b/i, /no\.?\s*foto/i, /tgl\.?\s*baca|tanggal\s+baca/i,
+      /e[kx]spertis[ei]/i, /hasil\s+bacaan|bacaan\s+radiologi/i, /\bklinis\s*:/i, /kontras/i].filter(re => re.test(t)).length;
+    if (penanda >= 2) {
+      const { kenaliPemeriksaanRadiologi } = require('./pengenalPemeriksaanUmum');
+      if (t.split(/\r?\n/).some(b => kenaliPemeriksaanRadiologi(b))) return 'radiology';
+    }
+  }
   if (/hasil\s+pemeriksaan\s+laboratorium|pemeriksaan\s+laboratorium|hasil\s+lab|laboratorium\s+hasil|hematologi|kimia\s+darah|urinalisis|patologi\s*klinik/i.test(t)) return 'lab_results';
   // Cetakan mesin EKG jarang menulis "EKG"; yang tercetak "ECG", "QTc",
   // "P/QRS/T Axes", "Sinus tachycardia" (hal. 7 berkas KHOIRIYAH).
@@ -320,6 +349,7 @@ function isSepPage(text) {
 
 module.exports = {
   classifyPdfPages,
+  shutdownClassifyPool,
   isClaimDataPage,
   detectJenisKlaim,
   hasBpjsPageSignal,

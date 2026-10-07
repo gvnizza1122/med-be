@@ -13,11 +13,9 @@
  * daftar PROSEDUR IM-nya belum lengkap (282 dari +-902). Karena itu kode
  * yang tidak ada di sini TIDAK pernah dinyatakan salah oleh layanan ini.
  *
- * Arah konversi:
- *   iDRG -> INA-CBG mudah (kode IM S73.02 -> induk WHO S73.0).
- *   INA-CBG -> iDRG TIDAK bisa dipastikan dari kode saja: S73.0 punya
- *   turunan IM S73.00..S73.0x dan pilihan yang benar bergantung pada isi
- *   resume. Layanan ini hanya menyebut kandidatnya; tidak pernah memilihkan.
+ * Kemiripan awalan kode tidak membuktikan padanan klinis. Daftar ini
+ * belum memuat crosswalk yang terverifikasi; kode dasar tidak dikonversi
+ * otomatis ke entri IM dan kode IM tidak dipotong menjadi kode INA-CBG.
  */
 
 const data = require('../data/icdImIdrg.json');
@@ -38,8 +36,8 @@ function kodeIm(kode, jenis = 'diagnosis') {
 }
 
 /**
- * Kode IM yang lebih rinci dari `kode`: S73.0 -> S73.00, S73.01, ...;
- * kategori J45 -> J45.3. Kode IM itu sendiri tidak termasuk.
+ * Entri IM dengan awalan serupa, untuk mendeteksi kebutuhan verifikasi.
+ * Hasil ini tidak boleh diperlakukan sebagai padanan atau pilihan kode.
  */
 function turunanIm(kode, jenis = 'diagnosis') {
   const k = normal(kode);
@@ -52,48 +50,29 @@ function turunanIm(kode, jenis = 'diagnosis') {
   return hasil.sort((a, b) => a.kode.localeCompare(b.kode));
 }
 
-/**
- * Padanan INA-CBG (WHO / ICD-9-CM) untuk kode IM: induk terdekat yang ada di
- * kamus dasar (S73.02 -> S73.0). Null bila induknya hanya kategori yang punya
- * subkode lain (J45.3 -> J45 tidak bisa dipakai di INA-CBG) -- tidak ditebak.
- */
+/** Entri IM yang awalan angkanya serupa bukan crosswalk terverifikasi. */
 function padananInacbg(kode, jenis = 'diagnosis') {
-  let k = normal(kode);
-  while (k.length > 2) {
-    k = k.slice(0, -1).replace(/\.$/, '');
-    // Induk yang masih punya subkode di kamus dasar hanyalah judul kelompok
-    // (J45, 36.0), bukan kode akhir yang boleh ditagihkan -- jangan ditebak.
-    if (deskripsiDasar(k, jenis)) return punyaSubkodeDasar(k, jenis) ? null : k;
-  }
-  return null;
+  const k = normal(kode);
+  return deskripsiDasar(k, jenis) ? k : null;
 }
 
-function punyaSubkodeDasar(k, jenis) {
-  const awalan = k.includes('.') ? k : `${k}.`;
-  for (let d = 0; d <= 9; d++) if (deskripsiDasar(`${awalan}${d}`, jenis)) return true;
-  return false;
-}
-
-/**
- * Status satu kode terhadap iDRG:
- *   im            -- kode IM (sah di iDRG); padanan_inacbg = induk WHO bila pasti
- *   perlu_dipilih -- kode dasar yang punya turunan IM lebih rinci; kandidat disertakan
- *   sama          -- kode dasar tanpa turunan IM: kode iDRG = kode yang sama
- *   tidak_dikenal -- tidak ada di kamus dasar maupun daftar IM yang dimiliki
- */
+/** Status kamus, bukan penetapan kelayakan kode di mesin grouper iDRG. */
 function statusIdrg(kode, jenis = 'diagnosis') {
   const k = normal(kode);
   const im = kodeIm(k, jenis);
   if (im) {
-    return { kode: k, status: 'im', kode_idrg: k, deskripsi: im.deskripsi, padanan_inacbg: padananInacbg(k, jenis), kandidat: [] };
+    return { kode: k, status: 'im', kode_idrg: k, deskripsi: im.deskripsi,
+      padanan_inacbg: padananInacbg(k, jenis), kandidat: [],
+      catatan: 'Entri ditemukan dalam salinan kamus IM; cocokkan makna dan versi dengan E-Klaim.' };
   }
   const dasar = deskripsiDasar(k, jenis);
-  const kandidat = turunanIm(k, jenis);
-  if (dasar && kandidat.length) {
-    return { kode: k, status: 'perlu_dipilih', kode_idrg: null, deskripsi: dasar, padanan_inacbg: k, kandidat };
+  if (dasar && turunanIm(k, jenis).length) {
+    return { kode: k, status: 'perlu_verifikasi', kode_idrg: null, deskripsi: dasar,
+      padanan_inacbg: k, kandidat: [],
+      catatan: 'Ada entri IM dengan awalan serupa, tetapi belum ada crosswalk terverifikasi. Kode asli dipertahankan; periksa definisi dan bukti klinis di E-Klaim.' };
   }
   if (dasar) return { kode: k, status: 'sama', kode_idrg: k, deskripsi: dasar, padanan_inacbg: k, kandidat: [] };
-  return { kode: k, status: 'tidak_dikenal', kode_idrg: null, deskripsi: null, padanan_inacbg: null, kandidat };
+  return { kode: k, status: 'tidak_dikenal', kode_idrg: null, deskripsi: null, padanan_inacbg: null, kandidat: [] };
 }
 
 const pisahKode = (v) => (Array.isArray(v) ? v : String(v || '').split(/[;,#]/))
@@ -103,13 +82,14 @@ const pisahKode = (v) => (Array.isArray(v) ? v : String(v || '').split(/[;,#]/))
 function konversiKeIdrg(diaglist, proclist) {
   const diagnosis = [...new Set(pisahKode(diaglist))].map(k => statusIdrg(k, 'diagnosis'));
   const prosedur = [...new Set(pisahKode(proclist))].map(k => statusIdrg(k, 'prosedur'));
-  const perluDipilih = [...diagnosis, ...prosedur].filter(x => x.status === 'perlu_dipilih').length;
+  const perluDipilih = [...diagnosis, ...prosedur].filter(x => x.status === 'perlu_verifikasi').length;
   return {
     diagnosis,
     prosedur,
     lengkap: perluDipilih === 0 && ![...diagnosis, ...prosedur].some(x => x.status === 'tidak_dikenal'),
     catatan: [
-      perluDipilih ? `${perluDipilih} kode punya versi iDRG yang lebih rinci; pilih sesuai isi resume.` : null,
+      'Pencocokan kamus belum membuktikan kesiapan untuk klaim iDRG. Daftar IM yang tersedia belum lengkap.',
+      perluDipilih ? `${perluDipilih} kode memerlukan verifikasi padanan di E-Klaim; kemiripan awalan kode tidak cukup untuk konversi.` : null,
       prosedur.length ? 'iDRG juga mencatat jumlah tindakan (mis. 86.28+2); periksa jumlahnya di dokumen.' : null,
     ].filter(Boolean),
   };

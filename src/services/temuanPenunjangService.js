@@ -123,6 +123,18 @@ function kunciTemuan(t, pageNumber) {
  * @param {Array<{page_number:number, ocr_text?:string, text?:string}>} halaman
  * @returns {{temuan: Array, tidak_dikenali: Array<{ditulis:string, halaman:number|null}>}}
  */
+const { kenaliPemeriksaanRadiologi } = require('./pengenalPemeriksaanUmum');
+/** Temuan dari pengenal umum modalitas x bagian tubuh (format vendor baru). */
+function temuanPola(teks) {
+  const r = kenaliPemeriksaanRadiologi(teks);
+  if (!r) return null;
+  return {
+    status: 'dikenali', sumber_pengenal: 'pola_umum', istilah_id: `pola_${r.modalitas}_${r.bagian || 'lain'}`,
+    istilah_baku: r.istilah_baku, kategori: 'radiologi', kode_usulan: r.kode, ditulis: String(teks).trim().slice(0, 80),
+    menjadi_syarat: false, kode_terverifikasi: false, satuan: null,
+  };
+}
+
 function bacaTemuanPenunjang(halaman) {
   const temuan = [];
   const tidakDikenali = [];
@@ -145,12 +157,26 @@ function bacaTemuanPenunjang(halaman) {
     const jenis = classifyPageDocumentType(teks);
     jenisAktif = jenis;
     const pageNumber = hal.page_number || null;
+    for (const gram of require('./pemeriksaanSputumService').bacaGramSputum([hal])) {
+      const jenisSebelum = jenisAktif;
+      jenisAktif = 'lab_results';
+      dorong({ status: 'dikenali', istilah_id: 'gram_sputum', istilah_baku: 'Pemeriksaan Gram sputum',
+        kategori: 'lab', kode_usulan: '90.41', kode_terverifikasi: false }, pageNumber, gram.kutipan);
+      jenisAktif = jenisSebelum;
+    }
 
     // 1. Halaman lab_results: baris tabel dibaca dulu oleh bacaBarisLab
     //    (parser nama/nilai/satuan yang sudah teruji), baru NAMA tiap baris
     //    dicocokkan satu-satu. Nama yang tidak dikenali TIDAK didorong ke
     //    tidak_dikenali di sini — sudah tercatat via ai_review.temuan_lab.
     if (jenis === 'lab_results') {
+      // Darah dan urine tidak memakai kode spesimen yang sama. Hasil urine
+      // mikroskopis memerlukan identitas spesimen dan baris hasil aktual.
+      if (/\burin(?:e|a|alisis)?\b/i.test(teks) && /mikroskop|microscopic|sedimen/i.test(teks)) {
+        const hasilUrine = teks.split(/\r?\n/).filter(b => /(?:lekosit|leukosit|eritrosit|epitel|bakteri)\b[^\n]*\d[^\n]*(?:microscopic|mikroskop)/i.test(b));
+        if (hasilUrine.length) dorong({ status: 'dikenali', istilah_id: 'urin_lengkap', istilah_baku: 'Mikroskopis urine',
+          kategori: 'urin_feses', kode_usulan: '91.39', kode_terverifikasi: false }, pageNumber, hasilUrine.map(b => b.trim()).join('\n'));
+      }
       for (const baris of bacaBarisLab(teks, { halaman: pageNumber })) {
         if (!baris.parameter_ditulis) continue;
         // "PCT ... %" di darah lengkap = plateletcrit, bukan prokalsitonin.
@@ -178,6 +204,24 @@ function bacaTemuanPenunjang(halaman) {
           const hasilCocok = cocokkan('Ro thorax', { bagian: 'radiologi' });
           if (hasilCocok.status === 'dikenali') dorong(hasilCocok, pageNumber, b.trim().slice(0, 160));
         }
+        // Lembar foto polos juga menulis bagian tubuh tanpa awalan "Ro".
+        // Jenis halaman hasil dan modalitas lain tetap diperiksa agar MRI/CT
+        // yang menyebut manus tidak dikode sebagai foto polos.
+        if (jenisFoto && !/\b(?:ct|msct|hrct|usg|mri|ultrasonogra\w*|magnetic\s+resonance)\b/i.test(teks)) {
+          const foto = temuanPola(`Foto ${jenisFoto[1]}`);
+          if (foto) dorong(foto, pageNumber, b.trim().slice(0, 160));
+        }
+      }
+      // Kamus tidak mengenali pemeriksaan apa pun di halaman hasil ini
+      // (format RS/vendor baru): pakai pengenal umum modalitas x bagian tubuh
+      // pada baris "Pemeriksaan :" dulu, lalu baris lain.
+      if (!temuan.some(t => t.page_number === pageNumber && t.kategori === 'radiologi')) {
+        const baris = teks.split(/\r?\n/).filter(b => b.trim());
+        const urut = [...baris.filter(b => /pemeriksaan|jenis\s+foto|klinis|exam/i.test(b)), ...baris];
+        for (const b of urut) {
+          const t = temuanPola(b);
+          if (t) { dorong(t, pageNumber, b.trim().slice(0, 160)); break; }
+        }
       }
     }
 
@@ -194,7 +238,13 @@ function bacaTemuanPenunjang(halaman) {
     const barisCtg = teks.split(/\r?\n/).find(b => /\bFHR\b|kardiotokogra|cardiotocogra|\bCTG\b|non\s*stress\s*test/i.test(b));
     if (barisCtg && jenis !== 'resume_medis' && jenis !== 'triase_igd') {
       const hasilCocok = cocokkan('CTG', { bagian: 'obstetri' });
+      const jenisSebelum = jenisAktif;
+      // Tagihan/rencana CTG hanya petunjuk. Bukti rekaman memuat hasil FHR,
+      // bukan sekadar nama tindakan dengan harga pada rincian biaya.
+      if (!['rincian_biaya', 'resep', 'spri'].includes(jenis)
+        && /\bFHR\s*[:=]?\s*\d{2,3}\s*bpm\b|\b(?:hasil|rekaman)\s+(?:CTG|kardiotokogra\w*)/i.test(teks)) jenisAktif = 'rekaman_ctg';
       if (hasilCocok.status === 'dikenali') dorong(hasilCocok, pageNumber, barisCtg.trim().slice(0, 160));
+      jenisAktif = jenisSebelum;
     }
 
     // 1e. Lembar jawaban patologi anatomi: hasilnya sendiri bukti PA dilakukan.
@@ -220,7 +270,9 @@ function bacaTemuanPenunjang(halaman) {
           if (diDalam.length > 0) {
             for (const t of diDalam) dorong(t, pageNumber, baris.slice(0, 160));
           } else {
-            tidakDikenali.push({ ditulis: item, halaman: pageNumber });
+            const pola = temuanPola(item);
+            if (pola) dorong(pola, pageNumber, baris.slice(0, 160));
+            else tidakDikenali.push({ ditulis: item, halaman: pageNumber });
           }
         }
       }

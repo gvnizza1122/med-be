@@ -57,7 +57,7 @@ function rapikanKode(isi, jenis) {
 
 function grup(hitung, record, dx, px) {
   if (!dx.length || typeof hitung !== 'function') return { kode: null, tarif: null };
-  const h = hitung(dx, px, record.jenis_klaim || record.JENIS_KLAIM, record.kelas_rawat || record.KELAS_RAWAT, null);
+  const h = hitung(dx, px, record.jenis_klaim || record.JENIS_KLAIM, require('./kelasPerawatanService').kelasTarif(record), null);
   return { kode: h && h.inacbgResult ? h.inacbgResult.code : null, tarif: h && h.tarifResult && h.tarifResult.amount != null ? Number(h.tarifResult.amount) : null };
 }
 
@@ -141,7 +141,8 @@ const MIN_KASUS = 2;
  * tidak langsung jadi aturan.
  * @returns {Promise<Array<{kode, jenis, pola, kasus, jumlah, pesan, pengganti?}>>}
  */
-async function pelajaranRelevan(db, { dx = [], px = [], recordId = null, jenisKlaim = null } = {}) {
+async function pelajaranRelevan(db, { dx = [], px = [], recordId = null, jenisKlaim = null, untukPerbandingan = false } = {}) {
+  if (!untukPerbandingan) return [];
   if (!db || (!dx.length && !px.length)) return [];
   let baris;
   try {

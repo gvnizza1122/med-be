@@ -14,8 +14,8 @@ test('agen menyiapkan bekal Luna dari berkas: dokumen, kronologi, fakta, pola ca
   expect(c).toMatch(/Resume medis \(hal\. 3\)/);
   expect(c).toMatch(/2025-12-31 Rencana masuk rawat inap/);
   expect(c).toMatch(/kenceng-kenceng/);
-  expect(c).toMatch(/dikode casemix O42\.1 \(3x\)/);
-  expect(c).toMatch(/O42\.1/);
+  expect(c).not.toMatch(/dikode casemix/);
+  expect(sesi.pola).toEqual([]);
   expect(sesi.langkah.map(l => l.nama)).toEqual(['Memetakan dokumen & menyusun fakta klinis', 'Mencari pola keputusan casemix RS (kasus lain)']);
 });
 

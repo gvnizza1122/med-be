@@ -7,6 +7,7 @@ jest.mock('../../services/simpanAiReviewService',()=>({simpanAiReview:jest.fn(as
 jest.mock('../../services/errorKnowledgeService',()=>({getRelevantKnowledge:jest.fn(async()=>[]),getRelevantBpjsExamples:jest.fn(async()=>[]),recordKnowledge:jest.fn(async()=>{})}));
 jest.mock('../../services/bpjsPendingLink',()=>({linkPendingBpjsForSep:jest.fn(async()=>{})}));
 jest.mock('../../services/periodeKlaimService',()=>({isiPeriodeUntukFile:jest.fn(async()=>{})}));
+jest.mock('../../services/anggaranAiService',()=>({untukBerkas:jest.fn(async()=>({id:'budget-uji',hospital_code:'RS-A'})),ringkasan:async()=>({batas_idr:600})}));
 const {processSinglePdfUpload}=require('../../routes/claimFiles');
 const {extractFromPDF}=require('../../services/pdfExtractionPipeline');
 const {generateAiReview}=require('../../services/aiReviewService');
@@ -14,7 +15,7 @@ const {recordKnowledge}=require('../../services/errorKnowledgeService');
 const {linkPendingBpjsForSep}=require('../../services/bpjsPendingLink');
 test('test PDF ditandai sejak insert, tetap dianalisis, tidak memengaruhi pasien lain atau pengetahuan produksi',async()=>{
  const calls=[];
- mockDb={prepare:sql=>({get:jest.fn(async()=>({id:"test-record", validation_status:"pending", diagnosa_list:"J44.9;J18.9"})),all:jest.fn(async()=>{calls.push(sql);return []}),run:jest.fn(async(...params)=>{calls.push({sql,params});return {changes:1}})}),transaction:async fn=>fn(mockDb),run:jest.fn(async(sql,params)=>{calls.push({sql,params});return {changes:1}})};
+ mockDb={get:async()=>null,prepare:sql=>({get:jest.fn(async()=>({id:"test-record", validation_status:"pending", diagnosa_list:"J44.9;J18.9"})),all:jest.fn(async()=>{calls.push(sql);return []}),run:jest.fn(async(...params)=>{calls.push({sql,params});return {changes:1}})}),transaction:async fn=>fn(mockDb),run:jest.fn(async(sql,params)=>{calls.push({sql,params});return {changes:1}})};
  const result=await processSinglePdfUpload(mockDb,{filePath:'/private/tmp/nonexistent-test-pdf.pdf',originalName:'ACC-rahasia.pdf',jenisKlaim:'RAWAT_JALAN',userId:'tester',hospitalCode:'RS-A',isTesting:true});
  expect(result.success).toBe(true);expect(extractFromPDF.mock.calls[0][1].originalName).toBe('berkas-klaim.pdf');expect(generateAiReview).toHaveBeenCalledTimes(1);
  const fileInsert=calls.find(c=>c.sql?.includes('INSERT INTO claim_files'));expect(fileInsert.sql).toContain('is_testing');expect(fileInsert.params.at(-1)).toBe(true);

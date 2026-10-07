@@ -149,4 +149,23 @@ describe('parseClaimFile', () => {
     expect(result.records[1]._rowNumber).toBe(2);
     expect(result.records[2]._rowNumber).toBe(3);
   });
+  test('PTD menentukan jenis layanan per baris, bukan KELAS_RAWAT atau hasil CBG', () => {
+    const file = createTxtFile('SEP\tPTD\tKELAS_RAWAT\tINACBG\nUJI1\t2\t3\tA-4-13-I\nUJI2\t1\t1\tQ-5-44-0');
+    const r = parseClaimFile(file);
+    expect(r.records.map(x => x.jenis_klaim)).toEqual(['RAWAT_JALAN', 'RAWAT_INAP']);
+    expect(r.errors).toEqual([]);
+    expect(r.records[0]._rawData.PTD).toBe('2');
+  });
+  test.each([
+    ['SEP\tPTD\tJENIS_KLAIM\nUJI\t2\tRAWAT_INAP', 'berbeda'],
+    ['SEP\tPTD\tCOL3\nUJI\t3\tx', 'PTD harus'],
+    ['SEP\tPTD\tJENIS_KLAIM\nUJI\t\tngawur', 'tidak dikenali'],
+  ])('jenis layanan salah atau bertentangan dilaporkan tanpa default rawat inap', (content, pesan) => {
+    const r = parseClaimFile(createTxtFile(content));
+    expect(r.errors).toContainEqual(expect.objectContaining({ type: 'jenis_layanan', row: 1, message: expect.stringContaining(pesan) }));
+  });
+  test('berkas lama tanpa PTD dapat memakai jenis layanan tertulis', () => {
+    const r = parseClaimFile(createTxtFile('SEP\tJNSPELAYANAN\tCOL3\nUJI\t2\tx'));
+    expect(r.records[0].jenis_klaim).toBe('RAWAT_JALAN');
+  });
 });

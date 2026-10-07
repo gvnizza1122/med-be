@@ -127,6 +127,14 @@ function susunFaktaKlinis(pages, ai = {}) {
     }
   }
 
+  // "Gram sputum dilakukan" kehilangan isi hasil yang penting. Sertakan
+  // laporan aslinya, termasuk Gram negatif/positif dan temuan (+)/(-), tanpa
+  // mengubahnya menjadi spesies kuman atau diagnosis baru.
+  for (const gram of require('./pemeriksaanSputumService').bacaGramSputum(halaman)) {
+    tambah({ kategori: 'penunjang', teks: gram.kutipan, kutipan: gram.kutipan,
+      halaman: gram.page_number, sumber: 'gram_sputum' });
+  }
+
   // Tanda vital terukur.
   const vf = ai.kegawatdaruratan_assessment && ai.kegawatdaruratan_assessment.vital_findings;
   for (const [k, v] of Object.entries(vf || {})) {

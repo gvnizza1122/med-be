@@ -299,7 +299,8 @@ describe('helper', () => {
 });
 
 describe('syaratPenunjangService dengan opsi pakaiBacaLab', () => {
-  const { evaluasiSyaratPenunjang, STATUS } = require('../../services/syaratPenunjangService');
+  const { evaluasiSyaratPenunjang: evaluasiSyaratPenunjangAsli, STATUS } = require('../../services/syaratPenunjangService');
+  const evaluasiSyaratPenunjang = (dx,px,pages,opsi={}) => evaluasiSyaratPenunjangAsli(dx,px,pages,{hospitalCode:'3371084',...opsi});
   const cari = (r) => r[0].syarat.find(s => s.nama.startsWith('Hemoglobin'));
 
   test('default (opsi mati): perilaku lama, nilai 76 terbaca apa adanya', () => {

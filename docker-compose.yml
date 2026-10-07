@@ -42,6 +42,8 @@ services:
       - AI_USD_IDR=${AI_USD_IDR:-18000}
       - AI_MAX_ATTEMPTS=${AI_MAX_ATTEMPTS:-3}
       - AI_TIMEOUT_MS=${AI_TIMEOUT_MS:-60000}
+      - AI_BUDGET_TIMEOUT_MS=${AI_BUDGET_TIMEOUT_MS:-120000}
+      - AI_CALL_CONCURRENCY=${AI_CALL_CONCURRENCY:-6}
       - KIMI_API_KEY=${KIMI_API_KEY}
       - KIMI_BASE_URL=${KIMI_BASE_URL}
       - KIMI_MODEL=${KIMI_MODEL}
@@ -58,7 +60,7 @@ services:
       # OCR_ENGINE=tesseract untuk mematikan keduanya.
       - OCR_ENGINE=${OCR_ENGINE:-paddle}
       - PADDLE_OCR_URL=${PADDLE_OCR_URL:-http://ocr_rapid:8866}
-      - PADDLE_OCR_TIMEOUT_MS=${PADDLE_OCR_TIMEOUT_MS:-60000}
+      - PADDLE_OCR_TIMEOUT_MS=${PADDLE_OCR_TIMEOUT_MS:-120000}
     depends_on:
       - db
       - ocr_rapid
