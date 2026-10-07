@@ -36,6 +36,19 @@ describe('KD-01 — tindakan tanpa obat pendukung', () => {
     const t = evaluasiKonsistensi({ jenis_klaim: 'RAWAT_JALAN' }, [RESEP_LAIN], []);
     expect(cari(t, 'KD-01')).toBeUndefined();
   });
+
+  test.each([
+    ['Tindakan Keperawatan\nNebul ventasal : Budesma 1:1', false],
+    ['Catatan pemberian obat\nDiberikan nebul budesma 0.5 mg', false],
+    ['Intervensi Keperawatan\nRencana nebul ventasal : Budesma 1:1', true],
+    ['Tindakan Keperawatan\nBelum diberikan nebul ventasal : Budesma 1:1', true],
+    ['Tindakan Keperawatan\nVentasal : Budesma 1:1', true],
+    ['Tindakan Keperawatan\nNebul ventasal : Budesma', true],
+  ])('bukti pelaksanaan obat di luar halaman resep: %s', (teks, perluBukti) => {
+    const t = evaluasiKonsistensi({}, [RESEP_LAIN, hal(9, teks)],
+      [{id:'nebulisasi',bukti:[{page_number:3,kutipan:'Tindakan nebulisasi'}]}]);
+    expect(Boolean(cari(t, 'KD-01'))).toBe(perluBukti);
+  });
 });
 
 describe('KD-02 — SEP menjadi dasar penjamin BPJS', () => {

@@ -1,4 +1,5 @@
 const fs = require('fs');
+const { jenisLayanan } = require('./jenisLayananKlaimService');
 
 /**
  * Full 60-column INACBG/vClaim TXT header mapping
@@ -225,6 +226,9 @@ function parseClaimFile(filePath) {
 
     record._rowNumber = i;
     record._rawData = rawData;
+    const layanan = jenisLayanan(record);
+    if (layanan.masalah) result.errors.push({ type: 'jenis_layanan', row: i, message: layanan.masalah });
+    if (layanan.jenis) record.jenis_klaim = layanan.jenis;
     
     // Extract hospital code
     if (!result.metadata.hospitalCode && record.kode_rs) {

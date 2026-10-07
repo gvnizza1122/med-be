@@ -15,6 +15,8 @@ describe('petakanDenganAturan', () => {
 
   test.each([
     ['Kode diagnosis sekunder tidak sesuai dengan resume', 'kode_diagnosis'],
+    ['pasien hanya rujuk, rslksi kode DU Z71.9', 'kode_diagnosis'],
+    ['rslksi kode DS I10', 'kode_diagnosis'],
     ['Mohon cek kode tindakan ICD-9 yang diajukan', 'kode_tindakan'],
     ['Lampirkan hasil laboratorium', 'hasil_penunjang'],
     ['Lampirkan resume medis pasien', 'dokumen_tidak_lengkap'],

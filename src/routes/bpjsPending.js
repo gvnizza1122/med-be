@@ -48,109 +48,7 @@ const xlsxUpload = multer({
   }
 });
 
-const REQUIRED_HEADER = 'NOSEP';
-
-function excelDateToISO(v) {
-  if (v === '' || v === null || v === undefined) return null;
-  if (typeof v === 'number') {
-    // Serial date Excel (basis 1899-12-30)
-    const ms = Math.round((v - 25569) * 86400 * 1000);
-    const d = new Date(ms);
-    if (isNaN(d.getTime())) return null;
-    return d.toISOString().slice(0, 10);
-  }
-  const s = String(v).trim();
-  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (m) return `${m[1]}-${m[2]}-${m[3]}`;
-  return s || null;
-}
-
-/**
- * Cari baris header (mengandung "NOSEP") lalu map baris-baris di bawahnya
- * jadi objek by kolom. Baris tanpa NOSEP (baris judul/kosong) dilewati.
- */
-function parsePendingSheet(sheet, sheetLabel) {
-  const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
-
-  const headerIdxPrimary = rows.findIndex(r => r.some(c => String(c).trim().toUpperCase() === REQUIRED_HEADER));
-  if (headerIdxPrimary !== -1) {
-    const headers = rows[headerIdxPrimary].map(h => String(h).trim().toUpperCase());
-    const colIdx = (name) => headers.indexOf(name);
-    const iSep = colIdx('NOSEP'), iTglSep = colIdx('TGLSEP'), iTglPlg = colIdx('TGLPLG'),
-      iNokartu = colIdx('NOKARTU'), iMr = colIdx('MR'), iNama = colIdx('NAMAPESERTA'),
-      iInacbg = colIdx('KDINACBG'), iBiaya = colIdx('BYPENGAJUAN'), iAlasan = colIdx('ALASANPENDING'),
-      iJawaban = colIdx('JAWABAN RS');
-
-    const out = [];
-    for (let i = headerIdxPrimary + 1; i < rows.length; i++) {
-      const row = rows[i];
-      const sep = String(row[iSep] ?? '').trim();
-      if (!sep) continue;
-      out.push({
-        sheet: sheetLabel,
-        sep,
-        tgl_sep: excelDateToISO(row[iTglSep]),
-        tgl_pulang: excelDateToISO(row[iTglPlg]),
-        nokartu: iNokartu >= 0 ? String(row[iNokartu] ?? '').trim() : '',
-        mr: iMr >= 0 ? String(row[iMr] ?? '').trim() : '',
-        nama_peserta: iNama >= 0 ? String(row[iNama] ?? '').trim() : '',
-        kdinacbg: iInacbg >= 0 ? String(row[iInacbg] ?? '').trim() : '',
-        by_pengajuan: iBiaya >= 0 ? row[iBiaya] : null,
-        alasan_pending: iAlasan >= 0 ? String(row[iAlasan] ?? '').trim() : '',
-        jawaban_rs: iJawaban >= 0 ? String(row[iJawaban] ?? '').trim() : '',
-      });
-    }
-    return out;
-  }
-
-  // Format alternatif (ditemukan 8 Sep 2026 di rekap RI Januari 2026 RS
-  // Lestari Raharja — sheet "RI" & "RJ" dalam satu file XLSX ternyata bisa
-  // punya format kolom BERBEDA: "No. | Tgl. Masuk | Tgl. Pulang | No. RM |
-  // Nama Pasien | No. Klaim / SEP | INACBG | Top Up | Total Tarif | Tarif RS
-  // | Jenis | Konfirmasi" — kolom "Jenis" di format ini ternyata isinya
-  // ALASAN PENDING (bukan kategori jenis), "Konfirmasi" = jawaban/tindakan
-  // RS. Tanpa fallback ini, sheet berformat begini SILENT gagal total (0
-  // baris ter-import) — bukan error, cuma diam-diam kosong.
-  const normalize = (s) => String(s).trim().toUpperCase().replace(/\.\s*/g, ' ').replace(/\s+/g, ' ');
-  const headerIdxAlt = rows.findIndex(r => r.some(c => /NO\s*KLAIM\s*\/?\s*SEP/.test(normalize(c))));
-  if (headerIdxAlt === -1) return [];
-
-  const headersAlt = rows[headerIdxAlt].map(normalize);
-  const findCol = (...patterns) => headersAlt.findIndex(h => patterns.some(p => p.test(h)));
-
-  const iSep = findCol(/NO\s*KLAIM\s*\/?\s*SEP/), iTglMasuk = findCol(/^TGL\s*MASUK$/),
-    iTglPlg = findCol(/^TGL\s*PULANG$/), iMr = findCol(/^NO\s*RM$/), iNama = findCol(/^NAMA\s*PASIEN$/),
-    iInacbg = findCol(/^INACBG$/), iBiaya = findCol(/^TOTAL\s*TARIF$/),
-    // Kolom alasan pending di format alternatif ternyata beda label antar
-    // bulan (ditemukan 8 Sep 2026, cross-check 6 file Excel Jan-Jun 2026):
-    // "Jenis" (Feb-Apr) vs "Keterangan Pending" (Mei) — sama-sama berisi
-    // alasan pending walau labelnya beda, JENIS bukan berarti kategori.
-    iAlasan = findCol(/^JENIS$/, /KETERANGAN\s*PENDING/),
-    iJawaban = findCol(/^KONFIRMASI$/);
-
-  const out = [];
-  for (let i = headerIdxAlt + 1; i < rows.length; i++) {
-    const row = rows[i];
-    const sep = iSep >= 0 ? String(row[iSep] ?? '').trim() : '';
-    if (!sep) continue;
-    out.push({
-      sheet: sheetLabel,
-      sep,
-      // Format alternatif tidak punya "Tanggal SEP" terpisah — pakai
-      // Tanggal Masuk sebagai referensi tanggal terdekat yang tersedia.
-      tgl_sep: iTglMasuk >= 0 ? excelDateToISO(row[iTglMasuk]) : null,
-      tgl_pulang: iTglPlg >= 0 ? excelDateToISO(row[iTglPlg]) : null,
-      nokartu: '',
-      mr: iMr >= 0 ? String(row[iMr] ?? '').trim() : '',
-      nama_peserta: iNama >= 0 ? String(row[iNama] ?? '').trim() : '',
-      kdinacbg: iInacbg >= 0 ? String(row[iInacbg] ?? '').trim() : '',
-      by_pengajuan: iBiaya >= 0 ? row[iBiaya] : null,
-      alasan_pending: iAlasan >= 0 ? String(row[iAlasan] ?? '').trim() : '',
-      jawaban_rs: iJawaban >= 0 ? String(row[iJawaban] ?? '').trim() : '',
-    });
-  }
-  return out;
-}
+const { parsePendingWorkbook } = require('../services/pendingExcelParserService');
 
 // Daftar kolom vClaim yang valid untuk "kolom_penyebab" — HARUS sinkron
 // dengan FIELD_CATEGORIES di frontend (eclaim-production/src/app/(dashboard)/
@@ -483,29 +381,36 @@ router.post('/pending-import-xlsx', authenticate, xlsxUpload.single('file'), asy
       return res.status(400).json({ error: 'File Excel tidak bisa dibaca. Pastikan format .xlsx/.xls valid.' });
     }
 
-    const sheetLabelOf = (name) => /rawat\s*inap|^ri$|pending\s*ri/i.test(name) ? 'RI'
-      : /rawat\s*jalan|^rj$|pending\s*rj/i.test(name) ? 'RJ' : name;
-
-    let parsedRows = [];
-    for (const sheetName of wb.SheetNames) {
-      const rows = parsePendingSheet(wb.Sheets[sheetName], sheetLabelOf(sheetName));
-      parsedRows = parsedRows.concat(rows);
-    }
+    const { rows: parsedRows, sheets } = parsePendingWorkbook(wb);
     if (!parsedRows.length) {
       return res.status(400).json({ error: 'Tidak ada baris data ditemukan (kolom NOSEP tidak terdeteksi di sheet manapun).' });
     }
 
     const fileId = uuidv4();
-    let imported = 0, skippedDuplicate = 0, matchedClaim = 0;
+    let imported = 0, skippedDuplicate = 0, matchedClaim = 0, updatedConfirmation = 0;
     // Pencocokan SEP dinormalisasi (spasi, karakter tersembunyi, huruf mirip)
     // dan hasilnya dipecah supaya "cocok = 0" bisa dijelaskan penyebabnya.
     const indeksKlaim = await muatIndeksKlaim(db);
     const rincianCocok = { cocok: 0, klaim_tidak_ada: 0, format: 0 };
     for (const row of parsedRows) {
       const dup = await db.prepare(`
-        SELECT id FROM bpjs_pending_responses WHERE sep = ? AND alasan_raw = ? AND source = 'xlsx_import'
+        SELECT id, jawaban_rs_manual FROM bpjs_pending_responses WHERE sep = ? AND alasan_raw = ? AND source = 'xlsx_import'
       `).get(row.sep, row.alasan_pending);
-      if (dup) { skippedDuplicate++; continue; }
+      if (dup) {
+        // Impor ulang dapat melengkapi jawaban yang hilang akibat pembaca lama.
+        // Jawaban yang sudah diisi petugas dan status/outcome tidak diubah.
+        if (row.jawaban_rs && !String(dup.jawaban_rs_manual || '').trim()) {
+          const update = await db.prepare(`UPDATE bpjs_pending_responses SET jawaban_rs_manual = ?
+            WHERE id = ? AND (jawaban_rs_manual IS NULL OR TRIM(jawaban_rs_manual) = '')`).run(row.jawaban_rs, dup.id);
+          if (update.changes > 0) {
+            updatedConfirmation++;
+            await rag.saveReference(db, { pendingId: dup.id, sourceKind: 'rs_manual', alasan: row.alasan_pending,
+              answer: row.jawaban_rs, jenisKlaim: row.sheet, sep: row.sep });
+          }
+        }
+        skippedDuplicate++;
+        continue;
+      }
 
       const hasilCocok = cocokkanSatu(row.sep, indeksKlaim);
       rincianCocok[hasilCocok.status]++;
@@ -545,9 +450,10 @@ router.post('/pending-import-xlsx', authenticate, xlsxUpload.single('file'), asy
       file_id: imported > 0 ? fileId : null,
       total_rows: parsedRows.length, imported, skipped_duplicate: skippedDuplicate, matched_claim: matchedClaim,
       // Rincian penyebab: cocok / klaim_tidak_ada / format (lihat sepCocokService).
-      rincian_cocok: rincianCocok,
+      rincian_cocok: rincianCocok, updated_confirmation: updatedConfirmation, sheets,
     });
   } catch (err) {
+    if (err.kode === 'tanggal_rekap_tidak_valid') return res.status(422).json({ error: err.message, kode: err.kode });
     console.error('[bpjsPending] xlsx import error:', err);
     res.status(500).json({ error: 'Terjadi gangguan pada sistem. Silakan coba lagi. Bila terus berulang, hubungi petugas IT rumah sakit.' });
   }

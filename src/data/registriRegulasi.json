@@ -45,13 +45,13 @@
     },
     {
       "id": "REKAP-PENDING-RS",
-      "jenis": "kesepakatan_lokal",
+      "jenis": "verifikasi_klaim_bpjs",
       "judul": "Rekap pending BPJS RS Lestari Raharja (kalimat verifikator)",
       "nomor": null,
       "versi": "disahkan tim casemix 2026-09-23",
       "berlaku_mulai": "2026-09-23",
       "berlaku_sampai": null,
-      "ringkasan": "Syarat penunjang diagnosis dari kalimat verifikator BPJS setempat. Kesepakatan LOKAL: tidak otomatis berlaku untuk RS lain.",
+      "ringkasan": "Persyaratan penunjang klaim BPJS dari catatan verifikator pada rekap pending RS Lestari Raharja. Sumber dan cakupan mengikuti dokumen rujukan; berbeda dari adaptasi ketersediaan layanan RS.",
       "berkas_data": ["syaratPenunjangDiagnosis.json"],
       "kata_kunci": ["syarat penunjang", "pending", "verifikator", "hb", "transfusi", "pneumonia", "gram", "kreatinin"]
     },

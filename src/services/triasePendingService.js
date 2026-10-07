@@ -79,7 +79,7 @@ function hasil(kotak, alasan_kotak, kriteria, tambahan = {}) {
 
 function nilaiKegawatan(halaman) {
   const triase = cariKutipan(halaman, POLA.triase);
-  const gawat = cariKutipan(halaman, POLA.indikatorGawat);
+  const gawat = cariKutipan(halaman, POLA.indikatorGawat, { klinis: true, afirmatif: true });
   const nonGawat = cariKutipan(halaman, POLA.nonGawat);
   const kriteria = [
     k('gawat_halaman_triase', 'Ada halaman/teks triase atau IGD di berkas', triase.length > 0, triase),
@@ -91,8 +91,8 @@ function nilaiKegawatan(halaman) {
     { topik: 'Indikator kegawatan', kutipan: gawat },
   ];
   if (nonGawat.length > 0 && gawat.length === 0) {
-    return hasil('D', 'Triase tertulis non-gawat dan tidak ada indikator kegawatan di berkas.', kriteria,
-      { topik_bukti: [{ topik: 'Triase non-gawat', kutipan: nonGawat }] });
+    return hasil(null, 'Triase tertulis non-gawat; indikator kegawatan belum didukung kutipan. Sikap mempertahankan klaim memerlukan keputusan koder.', kriteria,
+      { perlu_keputusan_koder: true, topik_bukti: [{ topik: 'Triase non-gawat', kutipan: nonGawat }] });
   }
   if (triase.length > 0 && gawat.length > 0) {
     return hasil('A', 'Ada triase/IGD dan indikator kegawatan tertulis di berkas.', kriteria, { topik_bukti: topik });
@@ -119,15 +119,15 @@ function nilaiKoding(jenis, alasanRaw, klaim, halaman) {
   const ditemukan = [];
   const hilang = [];
   for (const kode of periksa) {
-    const b = cariKutipan(halaman, polaKode(kode), { maks: 2 });
-    kriteria.push(k(`koding_${kode}`, `${kode} (${asal}) tertulis literal di halaman berkas`, b.length > 0, b));
+    const b = cariKutipan(halaman, polaKode(kode), { maks: 2, klinis: true, afirmatif: true });
+    kriteria.push(k(`koding_${kode}`, `${kode} (${asal}) didukung kutipan afirmatif pada halaman klinis`, b.length > 0, b));
     (b.length ? ditemukan : hilang).push({ kode, kutipan: b });
   }
   const topik = ditemukan.map((d) => ({ topik: `Kode ${d.kode} tertulis di berkas`, kutipan: d.kutipan }));
   if (hilang.length === 0) {
-    return hasil('A', `Semua ${asal} tertulis di halaman berkas.`, kriteria, { topik_bukti: topik });
+    return hasil('A', `Semua ${asal} didukung kutipan afirmatif pada halaman klinis. Kesesuaian kriteria diagnosis/tindakan tetap perlu ditinjau koder.`, kriteria, { topik_bukti: topik });
   }
-  return hasil('C', `${label} ${hilang.map((h) => h.kode).join(', ')} tidak tertulis di halaman berkas; koding perlu ditinjau.`, kriteria, {
+  return hasil('C', `${label} ${hilang.map((h) => h.kode).join(', ')} belum didukung kutipan afirmatif pada halaman klinis; koding perlu ditinjau.`, kriteria, {
     topik_bukti: [...topik, ...hilang.map((h) => ({ topik: `Kode ${h.kode} tertulis di berkas`, kutipan: [] }))],
     kode_dipersoalkan: hilang.map((h) => h.kode),
   });
@@ -142,7 +142,9 @@ function nilaiDokumen(alasanRaw, halaman) {
   const topik = [];
   const kurang = [];
   for (const d of diminta) {
-    const b = cariKutipan(halaman, d.berkas, { maks: 2 });
+    const hasilPemeriksaan = ['radiologi', 'ekg', 'laboratorium'].includes(d.id);
+    const b = cariKutipan(halaman, d.berkas, { maks: 2,
+      klinis: hasilPemeriksaan, hasilPemeriksaan });
     kriteria.push(k(`dok_${d.id}`, `${d.nama} ada di berkas`, b.length > 0, b));
     topik.push({ topik: d.nama, kutipan: b });
     if (b.length === 0) kurang.push(d.nama);
@@ -152,7 +154,7 @@ function nilaiDokumen(alasanRaw, halaman) {
 }
 
 function nilaiPolaTunggal(idKriteria, uraian, pola, namaDokumen, halaman) {
-  const b = cariKutipan(halaman, pola, { maks: 3 });
+  const b = cariKutipan(halaman, pola, { maks: 3, klinis: true, afirmatif: true });
   const kriteria = [k(idKriteria, uraian, b.length > 0, b)];
   if (b.length > 0) return hasil('A', `${uraian}: ditemukan di berkas.`, kriteria, { topik_bukti: [{ topik: uraian, kutipan: b }] });
   return hasil('B', `${uraian}: tidak ditemukan di berkas.`, kriteria, { dokumen_dibutuhkan: [namaDokumen], topik_bukti: [{ topik: uraian, kutipan: [] }] });

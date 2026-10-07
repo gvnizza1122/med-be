@@ -10,75 +10,89 @@
  * ke thread lain, cuma mengatur giliran di thread yang sama.
  */
 const { Worker } = require('worker_threads');
-const path = require('path');
 
-function createWorkerPool(workerScriptPath, poolSize) {
-  const size = Math.max(1, poolSize);
-  const idle = [];
-  const waitingTasks = [];
-  let nextTaskId = 1;
-  const pending = new Map(); // taskId -> {resolve, reject}
+function createWorkerPool(workerScriptPath, poolSize, options = {}) {
+  const size = Number.isFinite(Number(poolSize)) ? Math.max(1, Math.floor(Number(poolSize))) : 1;
+  const timeoutMs = Number(options.taskTimeoutMs) > 0 ? Number(options.taskTimeoutMs) : 600000;
+  const idle = [], waitingTasks = [], workers = new Set(), pending = new Map();
+  let nextTaskId = 1, closing = false;
+
+  function settle(taskId, error, result) {
+    const entry = pending.get(taskId);
+    if (!entry) return;
+    pending.delete(taskId);
+    clearTimeout(entry.timer);
+    if (error) entry.reject(error); else entry.resolve(result);
+  }
+
+  function failed(worker, error) {
+    if (!workers.delete(worker)) return; // error dan exit bisa muncul untuk worker yang sama.
+    const index = idle.indexOf(worker);
+    if (index !== -1) idle.splice(index, 1);
+    for (const [id, entry] of pending) if (entry.worker === worker) settle(id, error);
+    worker.terminate().catch(() => {});
+    if (!closing && waitingTasks.length) fill();
+  }
 
   function makeWorker() {
     const worker = new Worker(workerScriptPath);
+    workers.add(worker);
     worker.on('message', (msg) => {
-      const entry = pending.get(msg.taskId);
-      if (!entry) return;
-      pending.delete(msg.taskId);
-      if (msg.error) entry.reject(new Error(msg.error));
-      else entry.resolve(msg.result);
+      const entry = msg && pending.get(msg.taskId);
+      if (!entry || entry.worker !== worker) return;
+      settle(msg.taskId, msg.error ? new Error(msg.error) : null, msg.result);
       checkin(worker);
     });
-    worker.on('error', (err) => {
-      // Worker crash: tolak semua task yang sedang dipegangnya, buat worker
-      // pengganti supaya pool tidak menyusut permanen.
-      for (const [taskId, entry] of pending) {
-        if (entry.worker === worker) {
-          pending.delete(taskId);
-          entry.reject(err);
-        }
-      }
-      replaceWorker(worker);
-    });
+    worker.on('error', (error) => failed(worker, error));
+    worker.on('exit', (code) => failed(worker, new Error(`Pembaca PDF berhenti sebelum selesai (exit ${code}).`)));
     return worker;
   }
 
-  function replaceWorker(oldWorker) {
-    const idx = idle.indexOf(oldWorker);
-    if (idx !== -1) idle.splice(idx, 1);
-    const fresh = makeWorker();
-    checkin(fresh);
-  }
-
   function checkin(worker) {
+    if (closing || !workers.has(worker)) return;
     const next = waitingTasks.shift();
-    if (next) {
-      dispatch(worker, next);
-    } else {
-      idle.push(worker);
-    }
+    if (next) dispatch(worker, next); else { worker.unref(); idle.push(worker); }
   }
 
   function dispatch(worker, task) {
-    pending.set(task.taskId, { resolve: task.resolve, reject: task.reject, worker });
-    worker.postMessage({ taskId: task.taskId, payload: task.payload });
+    worker.ref();
+    const timer = setTimeout(() => failed(worker, new Error('Pembacaan PDF melewati batas waktu; file perlu dicoba kembali.')), timeoutMs);
+    timer.unref?.();
+    pending.set(task.taskId, { ...task, worker, timer });
+    try { worker.postMessage({ taskId: task.taskId, payload: task.payload }); }
+    catch (error) { settle(task.taskId, error); checkin(worker); }
   }
 
-  for (let i = 0; i < size; i++) idle.push(makeWorker());
+  function fill() {
+    while (!closing && waitingTasks.length && (idle.length || workers.size < size)) {
+      let worker;
+      try { worker = idle.pop() || makeWorker(); }
+      catch (error) {
+        // Jalur worker tidak sah: seluruh antrean harus mendapat hasil gagal, bukan menggantung.
+        for (const task of waitingTasks.splice(0)) task.reject(error);
+        return;
+      }
+      dispatch(worker, waitingTasks.shift());
+    }
+  }
 
+  // Worker disiapkan sesuai kebutuhan; tidak melakukan loop respawn saat worker gagal saat startup.
   function run(payload) {
     return new Promise((resolve, reject) => {
-      const task = { taskId: nextTaskId++, payload, resolve, reject };
-      const worker = idle.pop();
-      if (worker) dispatch(worker, task);
-      else waitingTasks.push(task);
+      if (closing) return reject(new Error('Antrean pembaca PDF sudah ditutup.'));
+      waitingTasks.push({ taskId: nextTaskId++, payload, resolve, reject });
+      fill();
     });
   }
 
   async function shutdown() {
-    const all = new Set(idle);
-    for (const entry of pending.values()) all.add(entry.worker);
-    await Promise.all([...all].map((w) => w.terminate().catch(() => {})));
+    closing = true;
+    const error = new Error('Antrean pembaca PDF ditutup sebelum pemrosesan selesai.');
+    for (const task of waitingTasks.splice(0)) task.reject(error);
+    for (const id of [...pending.keys()]) settle(id, error);
+    const all = [...workers];
+    workers.clear(); idle.length = 0;
+    await Promise.all(all.map(worker => worker.terminate().catch(() => {})));
   }
 
   return { run, shutdown };

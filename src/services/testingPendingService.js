@@ -1,3 +1,4 @@
+const { pastikanIndeks, pastikanKolom } = require('../database/schemaIdempotent');
 const { perbaruiRisikoTampilan } = require('./risikoKlaimTampilanService');
 const SCHEMA = `ALTER TABLE claim_files ADD COLUMN IF NOT EXISTS is_testing BOOLEAN NOT NULL DEFAULT FALSE;
 CREATE TABLE IF NOT EXISTS testing_pending (
@@ -15,7 +16,11 @@ CREATE TABLE IF NOT EXISTS testing_pending (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_testing_pending_rs ON testing_pending(hospital_code);`;
-async function ensureSchema(db) { await db.query(SCHEMA); }
+async function ensureSchema(db) {
+  await pastikanKolom(db,'claim_files',{is_testing:'BOOLEAN NOT NULL DEFAULT FALSE'});
+  await db.query(SCHEMA.slice(SCHEMA.indexOf('CREATE TABLE'), SCHEMA.indexOf('CREATE INDEX')));
+  await pastikanIndeks(db,'CREATE INDEX IF NOT EXISTS idx_testing_pending_rs ON testing_pending(hospital_code)');
+}
 
 function prediksi(record, errors = []) {
   const review = perbaruiRisikoTampilan(record, errors);

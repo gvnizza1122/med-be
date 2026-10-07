@@ -118,6 +118,10 @@ function cariKataKunci(halaman, kataKunci) {
     for (const kata of kataKunci || []) {
       const idx = teks.indexOf(normalisasi(kata));
       if (idx === -1) continue;
+      const sebelum = teks.slice(Math.max(0, idx - 65), idx);
+      const sesudah = teks.slice(idx + normalisasi(kata).length, idx + normalisasi(kata).length + 20);
+      if (/\b(?:tidak|tak|tanpa|belum)\s+(?:(?:tampak|ada|ditemukan|didapatkan|terlihat)\s+)*(?:adanya\s+)?$/i.test(sebelum)
+        || /^\s*(?:\(-\)|negatif|tidak\s+ada)/i.test(sesudah)) continue;
       return {
         kata,
         kutipan: teks.substring(Math.max(0, idx - 40), idx + 80).trim(),
@@ -160,9 +164,53 @@ function nilaiSyarat(syarat, kodeProsedur, halaman, opsi = {}) {
   // Syarat yang memang tidak bisa dinilai dari berkas berhenti di sini, apa
   // pun isi dokumennya. Tanpa ini ia akan dilaporkan "tidak ada" — tuduhan
   // yang bersumber dari kegagalan membaca, bukan dari isi berkasnya.
+  if (syarat.jenis_pemeriksaan === 'antibiotik_iv_72_jam') {
+    const pemberian = require('./pemberianAntibiotikService').bacaPemberianAntibiotik(halaman);
+    hasil.status = STATUS.PERLU_CEK_MANUAL;
+    if (pemberian) {
+      hasil.kutipan = pemberian.kutipan;
+      hasil.page_number = pemberian.page_number;
+      hasil.tindakan_ada = true;
+      if (pemberian.durasi_jam != null) {
+        hasil.nilai = pemberian.durasi_jam;
+        hasil.ambang = '≥ 72 jam';
+        hasil.memenuhi_ambang = pemberian.durasi_jam >= 72;
+        hasil.status = hasil.memenuhi_ambang ? STATUS.TERPENUHI : STATUS.TIDAK_ADA;
+        hasil.catatan_batasan = 'Durasi dihitung dari periode pemberian antibiotik IV yang tercatat. Penilaian terapi keseluruhan tetap mengikuti diagnosis dan catatan dokter.';
+      }
+    }
+    return hasil;
+  }
   if (syarat.dapat_diperiksa_sistem === false) {
     hasil.status = STATUS.PERLU_CEK_MANUAL;
     hasil.dapat_diperiksa_sistem = false;
+    return hasil;
+  }
+  if (syarat.memerlukan_baseline) {
+    const lab = opsi.pakaiBacaLab || process.env.SYARAT_PAKAI_BACA_LAB === 'true'
+      ? require('./bacaLabService').nilaiLabDariBaris(halaman, syarat.parameter_lab)
+      : bacaNilaiLab(halaman, syarat.parameter_lab);
+    hasil.status = STATUS.PERLU_CEK_MANUAL;
+    if (lab) {
+      hasil.nilai = lab.tidak_dapat_dipakai ? null : lab.nilai;
+      hasil.kutipan = lab.kutipan;
+      hasil.page_number = lab.page_number;
+    }
+    hasil.memenuhi_ambang = null;
+    hasil.catatan_batasan = lab && !lab.tidak_dapat_dipakai
+      ? 'Nilai kreatinin ditemukan. Kenaikan terhadap baseline dan waktu perubahan belum terkonfirmasi; satu nilai tidak cukup menilai syarat AKI.'
+      : 'Perbandingan kreatinin dengan baseline dan waktu perubahan belum dapat dinilai dari bukti yang terbaca.';
+    return hasil;
+  }
+  if ((syarat.kode_prosedur || []).includes('90.41')) {
+    const gram = require('./pemeriksaanSputumService').bacaGramSputum(halaman)[0];
+    if (gram) {
+      hasil.status = STATUS.TERPENUHI;
+      hasil.tindakan_ada = true;
+      hasil.kutipan = gram.kutipan;
+      hasil.page_number = gram.page_number;
+      hasil.catatan_batasan = 'Hasil Gram sputum terbaca. Hasil ini tidak sendiri menetapkan spesies kuman, diagnosis pneumonia, atau kecukupan lama antibiotik.';
+    }
     return hasil;
   }
 
@@ -221,7 +269,9 @@ function nilaiSyarat(syarat, kodeProsedur, halaman, opsi = {}) {
 
   // Tingkat 2b — temuan berupa kata pada hasil pemeriksaan.
   if (syarat.kata_kunci_hasil && syarat.kata_kunci_hasil.length) {
-    const temuan = cariKataKunci(halaman, syarat.kata_kunci_hasil);
+    const sumber = (syarat.kode_prosedur || []).includes('87.44')
+      ? halaman.filter(p => /(?:hasil|kesan|pemeriksaan|rontgen|thorax|thoraks|toraks|paru|pulmo)/i.test(p.ocr_text || p.text || '')) : halaman;
+    const temuan = cariKataKunci(sumber, syarat.kata_kunci_hasil);
     if (temuan) {
       hasil.kutipan = temuan.kutipan;
       hasil.page_number = temuan.page_number;
@@ -247,6 +297,10 @@ function nilaiSyarat(syarat, kodeProsedur, halaman, opsi = {}) {
  * @returns {Array}
  */
 function evaluasiSyaratPenunjang(diagnosisList, prosedurList, halaman = [], opsi = {}) {
+  halaman = Array.isArray(halaman) ? halaman : [];
+  const konteks = require('./konteksPenggunaanAiService').saatIni();
+  const profil = opsi.profil || konteks.profil_klaim_rs || require('./profilKlaimRsService').profilBawaan(opsi.hospitalCode || konteks.hospital_code);
+  const tanggal = opsi.tanggalPelayanan || null;
   const pisah = v => (Array.isArray(v) ? v : String(v || '').split(/[;,]/))
     .map(s => String(s).trim()).filter(Boolean);
 
@@ -256,23 +310,42 @@ function evaluasiSyaratPenunjang(diagnosisList, prosedurList, halaman = [], opsi
 
   const temuan = [];
   for (const aturan of REFERENSI.aturan || []) {
+    if (!aturan.diverifikasi) continue;
+    const cakupan = (profil.ketentuan_lokal || []).find(a => a.id === aturan.id);
+    if (!cakupan) continue;
+    if (tanggal && ((cakupan.berlaku_mulai && tanggal < cakupan.berlaku_mulai) || (cakupan.berlaku_sampai && tanggal > cakupan.berlaku_sampai))) continue;
     const kodeKena = diagnosis.filter(d => kodeCocok(d, aturan.kode_diagnosis));
     if (!kodeKena.length) continue;
 
     const syarat = (aturan.syarat || []).map(s => nilaiSyarat(s, prosedur, halaman, opsi));
+    if (aturan.id === 'SP-05') {
+      const protein = require('./referensiKlaimService').nilaiPreeklampsia(require('./referensiKlaimService').halamanKlinis(halaman));
+      const s = syarat[0];
+      s.status = protein.status === 'bukti_ditemukan' ? STATUS.TERPENUHI : STATUS.PERLU_CEK_MANUAL;
+      s.kutipan = protein.bukti[0]?.kutipan || null;
+      s.page_number = protein.bukti[0]?.page_number || null;
+      s.catatan_batasan = protein.catatan;
+    }
 
     temuan.push({
       id: aturan.id,
       kode_diagnosis: kodeKena[0],
       kode_aturan: aturan.kode_diagnosis,
       nama_diagnosis: aturan.nama_diagnosis,
-      // Aturan yang belum ditelaah tim casemix tampil sebagai CATATAN, tidak
-      // memicu peringatan. Ambang seperti "Hb < 8" berasal dari kalimat
-      // verifikator dan sebagian menyebut "sesuai BA Kesepakatan" — kesepakatan
-      // lokal yang belum tentu berlaku umum. Satu kalimat verifikator tidak
-      // boleh diam-diam berubah jadi aturan untuk semua klaim.
+      // Persyaratan klaim berasal dari rujukan verifikasi BPJS, bukan
+      // kebijakan layanan RS. Verifikasi penggunaan rujukan tidak mengubah
+      // asal ketentuan atau membuktikan cakupannya berlaku nasional.
       diverifikasi: aturan.diverifikasi === true,
-      sumber_aturan: aturan.sumber_aturan,
+      jenis_ketentuan: 'persyaratan_klaim_bpjs',
+      rujukan_id: 'REKAP-PENDING-RS',
+      hospital_code: profil.hospital_code,
+      cakupan: 'rs',
+      berlaku_mulai: cakupan.berlaku_mulai,
+      berlaku_sampai: cakupan.berlaku_sampai,
+      perlu_konfirmasi_tanggal: !tanggal && !!(cakupan.berlaku_mulai || cakupan.berlaku_sampai),
+      sumber_ketentuan: cakupan.sumber_aturan,
+      // Nama lama dipertahankan untuk hasil analisis dan klien sebelumnya.
+      sumber_aturan: cakupan.sumber_aturan,
       syarat,
       ringkasan: {
         terpenuhi: syarat.filter(s => s.status === STATUS.TERPENUHI).length,

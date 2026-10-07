@@ -103,7 +103,8 @@ async function tanyaAgenCasemix({ pertanyaan, riwayat = [], record, pages, fakta
   const daftarHalaman = halaman.map(p => p.page_number).join(', ');
   const percakapan = (Array.isArray(riwayat) ? riwayat : []).slice(-6).map(m => `${m.peran === 'agen' ? 'AGEN' : 'KODER'}: ${String(m.isi || '').slice(0, 600)}`).join('\n');
   const ringkas = ringkasLaporan(laporan);
-  const konteks = `JENIS_KLAIM: ${record.jenis_klaim || record.JENIS_KLAIM || '-'}; KELAS: ${record.kelas_rawat || record.KELAS_RAWAT || '-'}
+  const kelas = require('./kelasPerawatanService').informasiKelas(record);
+  const konteks = `JENIS_KLAIM: ${record.jenis_klaim || record.JENIS_KLAIM || '-'}; KELAS TARIF: ${kelas.kelas_tarif || '-'}; KELAS HAK: ${kelas.kelas_hak || '-'}; KELAS KAMAR: ${kelas.kelas_ditempati || '-'}
 HALAMAN TERSEDIA: ${daftarHalaman}
 RINGKASAN LAPORAN CASEMIX: ${JSON.stringify(ringkas).slice(0, 3000)}
 ${percakapan ? `PERCAKAPAN SEBELUMNYA:\n${percakapan}\n` : ''}PERTANYAAN/TUGAS KODER: ${tanya}`;
@@ -113,7 +114,7 @@ ${percakapan ? `PERCAKAPAN SEBELUMNYA:\n${percakapan}\n` : ''}PERTANYAAN/TUGAS K
   for (let i = 0; i < MAKS_LANGKAH; i++) {
     const terakhir = i === MAKS_LANGKAH - 1;
     const prompt = `${konteks}\n\nLANGKAH SEBELUMNYA:\n${jejak.map((j, n) => `${n + 1}. ${JSON.stringify(j.langkah)} -> ${JSON.stringify(j.hasil).slice(0, 1800)}`).join('\n') || '(belum ada)'}${terakhir ? '\n\nIni langkah TERAKHIR: wajib {"langkah":"jawab",...}.' : ''}`;
-    const r = await gateway.panggilModel('agen_casemix', { system: SYSTEM, prompt, json: true, maxTokens: 1800, dikenal, jenisKlaim: record.jenis_klaim || record.JENIS_KLAIM, versi: 'agen-casemix-v1' }, { db });
+    const r = await gateway.panggilModel('agen_casemix', { system: SYSTEM.replace(KONVENSI_KODING_RS,require('./konvensiKodingRs').konvensiUntukRs(record,pages)), prompt, json: true, maxTokens: 1800, dikenal, jenisKlaim: record.jenis_klaim || record.JENIS_KLAIM, versi: 'agen-casemix-v2-referensi' }, { db });
     tokens += (r && r.penggunaan && r.penggunaan.total_tokens) || 0;
     idr += (r && r.biaya && r.biaya.idr) || 0;
     model = (r && r.model) || model;

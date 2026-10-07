@@ -46,7 +46,7 @@ const ATURAN = Object.freeze([
   { id: 'prb_1', kategori: 'prb_obat_kronis', pola: /\bprb\b|rujuk\s*balik|obat\s*kronis|program\s*rujukan\s*balik/ },
   { id: 'ulang_1', kategori: 'kunjungan_berulang', pola: /kunjungan\s*(berulang|ulang)|berulang|readmisi|re-?admisi|kasus\s*(yang\s*)?sama|episode|same\s*day|hari\s*yang\s*sama|pasien\s*yang\s*sama|dobel|ganda|duplikas/ },
   { id: 'tindakan_1', kategori: 'kode_tindakan', pola: /kode\s*tindakan|tindakan|prosedur|procedure|icd\s*-?\s*9|operasi|\bproc\s*list\b|proclist/ },
-  { id: 'diagnosis_1', kategori: 'kode_diagnosis', pola: /diagnosis|diagnosa|icd\s*-?\s*10|kode\s*diag|primer|sekunder|koding|kode\s*tidak\s*sesuai|\bdx\b/ },
+  { id: 'diagnosis_1', kategori: 'kode_diagnosis', pola: /diagnosis|diagnosa|icd\s*-?\s*10|kode\s*diag|kode\s*(du|ds)\b|primer|sekunder|koding|kode\s*tidak\s*sesuai|\bdx\b/ },
   { id: 'penunjang_1', kategori: 'hasil_penunjang', pola: /penunjang|\blab\b|laboratorium|radiologi|rontgen|\bx-?ray\b|\bekg\b|\becg\b|\bct\s*scan\b|\bmri\b|\busg\b|patologi|\bpa\b|hasil\s*pemeriksaan/ },
   { id: 'inap_1', kategori: 'indikasi_rawat_inap', pola: /indikasi\s*(rawat\s*inap|ranap)|rawat\s*inap|\branap\b|lama\s*rawat|\blos\b|hari\s*rawat|observasi|spri|perawatan\s*tidak\s*sesuai/ },
   { id: 'tarif_1', kategori: 'tarif_kelas_rawat', pola: /tarif|kelas\s*rawat|naik\s*kelas|top\s*up|selisih\s*biaya|iur\s*biaya|biaya/ },

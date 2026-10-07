@@ -2,7 +2,7 @@ const { jalankanAgenTinjau, temukanMasalah, terapkanUsulan } = require('../../se
 const { hitungInacbgDanTarif } = require('../../services/aiReviewService');
 
 const pages = [
-  { page_number: 3, ocr_text: 'RESUME MEDIS RAWAT INAP\nDiagnosis Utama :\nTumor regio sternum (subfascia)\nTindakan/Prosedur :\n1. Eksisi dan PA' },
+  { page_number: 3, ocr_text: 'RESUME MEDIS RAWAT INAP\nDiagnosis Utama :\nTumor jinak regio sternum (subfascia)\nTindakan/Prosedur :\n1. Eksisi dan PA' },
   { page_number: 12, ocr_text: 'JAWABAN PEMERIKSAAN HISTOPATOLOGI\nKesimpulan : sesuai untuk keloid DD dermatofibroma' },
 ];
 const record = { jenis_klaim: 'RAWAT_INAP', kelas_rawat: '3', diagnosa_list: '' };
@@ -24,9 +24,9 @@ test('kode belum WHO -> agen mencari di kamus lalu mengganti, berkutipan', async
   const g = gw(
     { langkah: 'cari_kode', sistem: 'icd10', teks: 'benign connective tissue thorax' },
     { langkah: 'selesai', ringkasan: 'Tumor jinak jaringan lunak toraks.', perlu_analisis_mendalam: false,
-      usulan: [{ kode: 'D21.3', jenis: 'diagnosis', peran: 'utama', halaman: 3, kutipan: 'Tumor regio sternum (subfascia)', alasan: 'PA jinak, subfascia', mengganti: 'X99.9' }] },
+      usulan: [{ kode: 'D21.3', jenis: 'diagnosis', peran: 'utama', halaman: 3, kutipan: 'Tumor jinak regio sternum (subfascia)', alasan: 'PA jinak, subfascia', mengganti: 'X99.9' }] },
   );
-  const saran = [{ code: 'X99.9', type: 'diagnosis', kamus_valid: false, belum_who: true, page_number: 3, quotation: 'Tumor regio sternum (subfascia)' }];
+  const saran = [{ code: 'X99.9', type: 'diagnosis', kamus_valid: false, belum_who: true, page_number: 3, quotation: 'Tumor jinak regio sternum (subfascia)' }];
   const r = await jalankanAgenTinjau({ saran, record, pages, hitungInacbgDanTarif, db, gateway: g });
   expect(g.panggilModel).toHaveBeenCalledTimes(2);
   expect(g.panggilModel.mock.calls[1][1].prompt).toMatch(/D21\.3 Benign neoplasm/);

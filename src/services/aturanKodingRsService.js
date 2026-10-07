@@ -1,3 +1,4 @@
+const { pastikanIndeks } = require('../database/schemaIdempotent');
 /**
  * Aturan koding per RS — tahap KODING, terpisah dari tahap BACA.
  *
@@ -49,7 +50,7 @@ async function ensureSchema(db) {
       UNIQUE (rs_id, istilah_id, kondisi)
     )
   `);
-  await db.run(`CREATE INDEX IF NOT EXISTS idx_aturan_koding_rs ON aturan_koding_rs(rs_id, istilah_id)`);
+  await pastikanIndeks(db, `CREATE INDEX IF NOT EXISTS idx_aturan_koding_rs ON aturan_koding_rs(rs_id, istilah_id)`);
 }
 
 /** Muat seluruh aturan sebuah RS: Map istilah_id -> [aturan]. Kosong bila gagal. */

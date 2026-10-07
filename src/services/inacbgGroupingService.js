@@ -6,7 +6,7 @@
 const { getTarifResmi, lookupTarifInacbg } = require('./tarifInacbgLookup');
 const { padananGrouper } = require('./jembatanCmWho');
 const { detectSpecialCmg, calculateTotalTopup } = require('./specialCmgService');
-const { grouperResmi, tentukanBase: tentukanBaseResmi } = require('./inacbgGrouperResmi');
+const { tentukanBase: tentukanBaseResmi, tanpaBaseRawatInap, VERSI_PERKIRAAN } = require('./inacbgGrouperResmi');
 const DX_RESMI = require('../data/inacbg/grouperDiagnosis.json');
 const CC_RESMI = require('../data/inacbg/cc.json');
 const CC_EXCL_RESMI = require('../data/inacbg/ccExclusion.json');
@@ -329,10 +329,8 @@ function groupCodesToInaCBG(diagnosisCodes, procedureCodes = [], jenisKlaim = 'R
   const primaryDiagnosis = diagnosisCodes[0]?.trim().toUpperCase();
   if (!primaryDiagnosis) return null;
 
-  // Base CBG dari GROUPER RESMI (tabel alt_diagnosis/alt_procedures E-Klaim):
-  // akurasi base ~99,7% vs ~34,5% heuristik rentang di bawah. Hanya BASE yang
-  // diambil dari tabel resmi; SEVERITY (I/II/III) tetap dari logika heuristik
-  // di bawah (matriks CC resmi ada di berkas terenkripsi, tidak dipakai).
+  // Pemetaan base dari tabel installer E-Klaim. Ini bukan mesin grouper lengkap;
+  // tidak ada angka akurasi atau parity severity yang dapat disimpulkan darinya.
   // Bila tabel resmi tidak mengenali kode primer, base jatuh ke heuristik.
   let baseResmi = null;
   try {
@@ -356,9 +354,12 @@ function groupCodesToInaCBG(diagnosisCodes, procedureCodes = [], jenisKlaim = 'R
           berbasis_prosedur: baseResmi.via === 'prosedur',
           confidence: baseResmi.via === 'prosedur' ? 0.75 : 0.65,
           sumber: 'grouper_resmi_tabel_eklaim',
+          versi_perkiraan: VERSI_PERKIRAAN,
+          kandidat_base: baseResmi.kandidat_base,
+          base_perlu_verifikasi: !!baseResmi.base_perlu_verifikasi,
           reasoning: baseResmi.via === 'prosedur'
-            ? `Base rawat jalan ${baseResmi.base} dari prosedur ${baseResmi.prosedur} (tabel resmi alt_procedures), diagnosis utama ${primaryDiagnosis}.`
-            : `Base rawat jalan ${baseResmi.base} dari diagnosis utama ${primaryDiagnosis} (tabel resmi alt_diagnosis).`,
+            ? `Base rawat jalan ${baseResmi.base} dari prosedur ${baseResmi.prosedur} (alt_procedures, urutan ${baseResmi.sumber_hierarki}), diagnosis utama ${primaryDiagnosis}.`
+            : `Base rawat jalan ${baseResmi.base} dari diagnosis utama ${primaryDiagnosis} (alt_diagnosis).${baseResmi.catatan_base ? ` ${baseResmi.catatan_base}` : ''}`,
         };
       }
     }
@@ -388,7 +389,11 @@ function groupCodesToInaCBG(diagnosisCodes, procedureCodes = [], jenisKlaim = 'R
   //     persalinan O-6-11/12/13 dari 72-75, tandur kulit luka bakar, dll.);
   //  3. base resmi dari DIAGNOSIS (tabel alt_diagnosis);
   //  4. heuristik rentang diagnosis (cadangan terakhir).
-  const bedah = kelompokProsedurRawatInap(kodeIcd, procedureCodes);
+  // Kolom ip kosong adalah informasi dari tabel, bukan prosedur tak dikenal.
+  // Heuristik tidak boleh mengubahnya menjadi pemicu bedah (mis. 86.22).
+  const bedah = kelompokProsedurRawatInap(kodeIcd, procedureCodes.filter(p => !tanpaBaseRawatInap(p)
+    // Cara persalinan menetapkan subkelompok obstetri dalam aturan tersendiri.
+    || (/^O/.test(kodeIcd) && PROSEDUR_PERSALINAN_VAGINAL.test(p))));
   let kategori, berbasisProsedur, sumberBase, prosedurPemicu;
   if (baseResmi && baseResmi.via === 'prosedur') {
     ({ base: kategori, prosedur: prosedurPemicu } = baseResmi);
@@ -405,29 +410,20 @@ function groupCodesToInaCBG(diagnosisCodes, procedureCodes = [], jenisKlaim = 'R
   }
   if (!kategori) return null;
 
-  // Severity INA-CBG (I/II/III) ditentukan DIAGNOSIS SEKUNDER (komorbiditas/
-  // komplikasi), BUKAN prosedur. Dulu prosedur berkode memuat "87"/"89"/"93"/
-  // "96" ikut menaikkan severity, sehingga rontgen toraks 87.44 saja membuat
-  // I51.7 rawat inap menjadi I-4-24-II Rp4.873.800 padahal grouper E-Klaim
-  // casemix memberi I-4-24-I Rp2.116.600 (KHOIRIYAH, 0170R0111225V003293) --
-  // menyarankan tarif lebih tinggi tanpa dasar. Ada diagnosis sekunder -> II;
-  // III tidak ditebak (butuh komplikasi berat yang tidak bisa disimpulkan dari
-  // jumlah kode saja).
-  // Daftar CC resmi E-Klaim (cclist) dan pengecualiannya per diagnosis utama
-  // (c51ccex) hanya bisa MENURUNKAN perkiraan: diagnosis sekunder yang di tabel
-  // resmi bukan CC, atau dikecualikan untuk diagnosis utama ini, tidak
-  // menaikkan severity (YETY: O41.0 bukan CC -> tetap O-6-10-I). Kode yang tak
-  // dikenal tabel resmi (mis. ICD-10-CM) tetap memakai aturan lama.
+  // cclist menandai kandidat komplikasi, bukan tingkat I/II/III per kelompok.
+  // Matriks umum belum tersedia: tampilkan acuan I dan skenario lainnya,
+  // tanpa otomatis menaikkan tingkat dari jumlah diagnosis atau contoh casemix.
   const bukanCcResmi = (k) => {
     if (!DX_RESMI[k]) return false;
     if (!CC_RESMI[k]) return true;
     return (CC_EXCL_RESMI[k] || []).includes(kodeIcd);
   };
-  const adaSekunder = diagnosisCodes.slice(1)
+  const ccPotensial = [...new Set(diagnosisCodes.slice(1)
     .map(k => String(k || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, ''))
-    .some(k => !BUKAN_KOMORBID.test(k) && !BUKAN_KOMORBID_UMUM.test(k) && !satuKelompokCedera(kodeIcd, k) && !bukanCcResmi(k));
-  const severity = adaSekunder ? 'II' : 'I';
-  const confidence = adaSekunder ? 0.55 : 0.5;
+    .filter(k => !BUKAN_KOMORBID.test(k) && !BUKAN_KOMORBID_UMUM.test(k) && !satuKelompokCedera(kodeIcd, k) && !bukanCcResmi(k)))];
+  const severity = 'I';
+  const confidence = 0.5;
+  const skenario = ['I', 'II', 'III'].map(s => `${kategori}-${s}`).filter(k => lookupTarifInacbg(k));
 
   const finalCode = `${kategori}-${severity}`;
   if (!lookupTarifInacbg(finalCode)) return null;
@@ -437,10 +433,13 @@ function groupCodesToInaCBG(diagnosisCodes, procedureCodes = [], jenisKlaim = 'R
     berbasis_prosedur: berbasisProsedur,
     confidence: Math.min(confidence, 1.0),
     sumber: sumberBase,
-    severity_estimasi: true, // base dari tabel resmi; severity I/II masih heuristik
+    severity_estimasi: true, // acuan I; matriks tingkat keparahan umum belum tersedia
+    severity_status: 'belum_terverifikasi',
+    cc_potensial: ccPotensial,
+    skenario_severity: skenario,
     reasoning: prosedurPemicu
-      ? `Base CBG ${kategori} dari prosedur ${prosedurPemicu} (${sumberBase === 'grouper_resmi_tabel_eklaim' ? 'tabel resmi' : 'heuristik'}), diagnosis utama ${primaryDiagnosis}. Severity: ${severity} (estimasi).`
-      : `Base CBG ${kategori} dari diagnosis utama ${primaryDiagnosis} (${sumberBase === 'grouper_resmi_tabel_eklaim' ? 'tabel resmi' : 'heuristik'}), ${diagnosisCodes.length} diagnosis total. Severity: ${severity} (estimasi).`,
+      ? `Base CBG ${kategori} dari prosedur ${prosedurPemicu} (${sumberBase === 'grouper_resmi_tabel_eklaim' ? 'tabel resmi' : 'heuristik'}), diagnosis utama ${primaryDiagnosis}. Acuan tingkat I; tingkat keparahan final perlu grouper E-Klaim.`
+      : `Base CBG ${kategori} dari diagnosis utama ${primaryDiagnosis} (${sumberBase === 'grouper_resmi_tabel_eklaim' ? 'tabel resmi' : 'heuristik'}), ${diagnosisCodes.length} diagnosis total. Acuan tingkat I; tingkat keparahan final perlu grouper E-Klaim.`,
   };
 }
 

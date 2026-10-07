@@ -68,7 +68,7 @@ async function applyOcrEnhancements(standardResult, filePath, options = {}) {
     // jumlah halaman & berkas yang di-OCR bersamaan) berhenti sendiri dan
     // tidak pernah melebihi OCR_ANGGARAN_MAKS_MS, jadi halaman yang sudah
     // selesai tidak pernah dibuang oleh batas ini.
-    const batasMs = Math.max(OCR_ENHANCEMENT_TIMEOUT_MS, OCR_ANGGARAN_MAKS_MS + 15000);
+    const batasMs = Math.max(OCR_ENHANCEMENT_TIMEOUT_MS, OCR_ANGGARAN_MAKS_MS + 180000 + 15000);
     let timerBatas;
     const enhancementResult = await Promise.race([
       enhancedOcrExtraction(filePath, pageNumbers),
@@ -103,7 +103,7 @@ async function applyOcrEnhancements(standardResult, filePath, options = {}) {
       // lab) ikut dibaca AI. Dulu hanya halaman berteks asli yang masuk, dan
       // kelas rawat/laporan operasi YETY NOVIATI (0170R0111225V003427) hilang.
       const sudahAda = new Set((enhanced.claimDataPages || []).map(p => p.page_num));
-      const halamanScan = new Set((enhanced.pages || []).filter(p => p.type === 'SCAN' && !p.is_lembar_grouper).map(p => p.page_num));
+      const halamanScan = new Set((enhanced.pages || []).filter(p => !p.is_lembar_grouper).map(p => p.page_num));
       const tambahan = halamanOcr.filter(p => halamanScan.has(p.page_number) && !sudahAda.has(p.page_number));
       if (tambahan.length > 0) {
         enhanced.claimDataPages = [

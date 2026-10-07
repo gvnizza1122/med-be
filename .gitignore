@@ -60,3 +60,6 @@ nul
 # Keluaran penarik E-Klaim (data klaim RS) -- jangan di-commit
 scripts/eklaim/*.jsonl
 scripts/eklaim/*.txt
+
+# Artefak audit lokal, hasil uji, dan ekstraksi dokumen
+artifacts/

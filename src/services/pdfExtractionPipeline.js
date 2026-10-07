@@ -36,6 +36,21 @@ const { extractClaimData } = require('./pdfExtractionService');
 const { parsePhysicalExam, translateClinicalText } = require('./notasiMedisParser');
 const { applyOcrEnhancements, mergeEnhancementsIntoRecord } = require('./ocrIntegration');
 
+/** OCR juga diperlukan pada halaman bertipe NATIVE dengan lapisan teks tidak lengkap. */
+function teksFallbackDokumen(classification) {
+  const pages = classification.pages || [];
+  const nomorGrouper = new Set([
+    ...pages.filter(p => p.is_lembar_grouper).map(p => Number(p.page_num)),
+    ...(classification.grouperPages || []).map(p => Number(p.page_num || p.page_number)),
+  ]);
+  const native = pages.filter(p => !nomorGrouper.has(Number(p.page_num)) && !isLembarGrouper(p.text_full || ''))
+    .map(p => p.text_full || '');
+  const ocr = (classification.ocr_enhancement?.pass1_general_ocr?.pages || [])
+    .filter(p => !nomorGrouper.has(Number(p.page_number)) && p.text && !isLembarGrouper(p.text))
+    .map(p => p.text);
+  return [...native, ...ocr].join('\n\n');
+}
+
 /**
  * Jaring pengaman deterministik (regex, BUKAN AI) untuk SEP/NOKARTU/KELAS_RAWAT
  * — dijalankan SETELAH ekstraksi AI, cuma mengisi field yang AI kembalikan
@@ -73,6 +88,9 @@ function applyDeterministicFallback(record, allPagesText, jenisKlaim, originalNa
     }
   }
   const isOutpatientLike = jenisKlaim === 'RAWAT_JALAN';
+  const kelasSep = require('./kelasPerawatanService').bacaKelasSep(allPagesText);
+  if (kelasSep.kelas_hak) record.KELAS_HAK = kelasSep.kelas_hak;
+  if (kelasSep.kelas_ditempati) record.KELAS_DITEMPATI = kelasSep.kelas_ditempati;
   // Syaratnya BUKAN 'masih kosong' melainkan 'belum berisi 1/2/3'. Aturan 8 di
   // pdfExtractionService.js sendiri memberitahu AI bahwa field 'Kelas Rawat'
   // pada berkas rawat jalan/IGD wajar berisi "-", dan AI memang kadang
@@ -96,10 +114,7 @@ function applyDeterministicFallback(record, allPagesText, jenisKlaim, originalNa
     }
   }
   if (!kelasRawatSudahValid && !isOutpatientLike) {
-    // Rawat inap: kelas tarif = "Kls.Rawat" di SEP (naik kelas tidak menaikkan
-    // tarif INA-CBG di atas hak, jadi Kls.Hak dipakai bila Kls.Rawat tak
-    // terbaca). Tanpa ini tarif INA-CBG rawat inap kosong padahal SEP hasil
-    // scan jelas tertulis "Kls.Rawat : Kelas 3" (YETY NOVIATI).
+    // KELAS_RAWAT menyimpan kelas kamar. KELAS_HAK dipakai terpisah untuk tarif.
     const m = /(?:kelas|kls\.?)\s*rawat\s*:?\s*(?:kelas\s*)?([123])\b/i.exec(allPagesText)
       || /(?:kelas|kls\.?)\s*hak\s*:?\s*(?:kelas\s*)?([123])\b/i.exec(allPagesText);
     if (m) {
@@ -128,6 +143,72 @@ function applyDeterministicFallback(record, allPagesText, jenisKlaim, originalNa
         record.DISCHARGE_DATE = tglPelayanan;
         console.log('[Pipeline] Fallback regex mengisi DISCHARGE_DATE dari tanggal pelayanan (rawat jalan, AI mengembalikan kosong).');
       }
+    }
+  }
+
+  if (!isOutpatientLike) {
+    // Rawat inap -- tanggal dari dokumen RS sendiri (lembar grouper "Berkas
+    // Klaim Individual" hanya pembanding, tidak dibaca):
+    //   MASUK : SPRI "Tanggal MRS : 31 Dec 2025"; cadangan awal rentang
+    //           "Tgl Rawat" rincian biaya, lalu Tgl.SEP.
+    //   KELUAR: akhir rentang "Tgl Rawat" rincian biaya; cadangan tanggal
+    //           tanda tangan DPJP di resume ("Magelang, 3 Januari 2026 /
+    //           Dokter Penanggung Jawab Pelayanan").
+    // Contoh acuan dari RS: SUPRIYATI 0170R0111225V003428 (31/12/2025 -
+    // 03/01/2026). Tanggal dari dokumen ini mengalahkan isian AI karena
+    // kutipannya pasti; tanggal keluar tidak pernah ditebak dari sumber lain.
+    const ambil = (re) => tanggalDariCocokan(re.exec(allPagesText), 1);
+    const rentang = new RegExp(`tgl\\.?\\s*rawat\\s*:?\\s*${POLA_TANGGAL}\\s*(?:-|s\\.?\\s*d\\.?|sampai)\\s*${POLA_TANGGAL}`, 'i').exec(allPagesText);
+    const masuk = ambil(new RegExp(`tanggal\\s*mrs\\s*:?\\s*${POLA_TANGGAL}`, 'i'))
+      || (rentang ? tanggalDariCocokan(rentang, 1) : null)
+      || ambil(new RegExp(`tgl\\.?\\s*sep\\s*:?\\s*${POLA_TANGGAL}`, 'i'));
+    // "<Kota>, 3 Januari 2026" tepat sebelum "Dokter Penanggung Jawab (Pelayanan)".
+    const ttdResume = new RegExp(`[A-Za-z]+\\s*,\\s*${POLA_TANGGAL}[\\s\\S]{0,40}?dokter\\s+penanggung\\s+jawab`, 'gi');
+    // Akhir "Tgl Rawat" rincian biaya lebih dulu: resume bisa ditandatangani
+    // sehari SESUDAH pulang (SLAMET FAHRODIN 0170R0111225V003444: resume
+    // "5 Januari 2026", casemix & rincian biaya 04/01/2026). Tanda tangan DPJP
+    // hanya cadangan bila rincian biaya tidak ada.
+    let keluar = rentang ? tanggalDariCocokan(rentang, 5) : null;
+    if (!keluar) for (const m of allPagesText.matchAll(ttdResume)) keluar = tanggalDariCocokan(m, 1) || keluar; // tanda tangan terakhir
+    const pasang = (field, nilai, sumber) => {
+      if (!nilai || record[field] === nilai) return;
+      console.log(`[Pipeline] ${field} rawat inap = ${nilai} dari ${sumber}${record[field] ? ` (menggantikan ${record[field]})` : ''}.`);
+      record[field] = nilai;
+    };
+    pasang('ADMISSION_DATE', masuk, 'SPRI/rincian biaya/SEP');
+    const a = parseDDMMYYYY(record.ADMISSION_DATE), b = parseDDMMYYYY(keluar);
+    if (keluar && (!a || !b || b >= a)) pasang('DISCHARGE_DATE', keluar, 'tanda tangan DPJP resume/rincian biaya');
+  }
+
+  // DPJP tidak terbaca AI (SLAMET FAHRODIN, MUHAMMAD ARSYA): dari SPRI
+  // "DPJP : dr. ...", nama di bawah tanda tangan "Dokter Penanggung Jawab
+  // Pelayanan" pada resume, atau kolom "Dokter :" di SEP.
+  if (!record.DPJP || !String(record.DPJP).trim()) {
+    const bersih = (v) => String(v || '').replace(/\s{2,}.*$/, '').replace(/\s+(?:kls|kelas|poli|faskes)\b.*$/i, '').replace(/[,;]\s*$/, '').trim();
+    const m = /^[ \t]*(?:nama[ \t]+)?DPJP[ \t]*:[ \t]*([^\n]{3,80})/im.exec(allPagesText)
+      || /dokter\s+penanggung\s+jawab(?:\s+pelayanan)?\s*,?\s*\n+\s*((?:dr|drg)\.?\s[^\n]{2,80})/i.exec(allPagesText)
+      || /^[ \t]*(?:nama[ \t]+)?dokter[ \t]*:[ \t]*([^\n]{3,80})/im.exec(allPagesText);
+    const nama = m ? bersih(m[1]) : '';
+    if (nama && !/^[-.:\s]*$/.test(nama)) {
+      record.DPJP = nama;
+      console.log(`[Pipeline] Fallback mengisi DPJP = ${nama}.`);
+    }
+  }
+
+  // LOS adalah field turunan (fieldTypeRegistry) tetapi tidak pernah dihitung,
+  // sehingga selalu 0. Rumus E-Klaim inklusif: keluar - masuk + 1 (lembar
+  // grouper SUPRIYATI 31/12/2025-03/01/2026 = 4 hari; ISTIYAH 02-04/01 = 3;
+  // TRIMOKO 02-03/01 = 2). Field turunan: bila kedua tanggal ada, LOS selalu
+  // dihitung ulang -- AI pernah mengisi selisih eksklusif (SUPRIYATI: 3, bukan
+  // 4). Nilai AI hanya dipakai bila tanggal tidak lengkap.
+  if (record.ADMISSION_DATE && record.DISCHARGE_DATE) {
+    const a = parseDDMMYYYY(record.ADMISSION_DATE), b = parseDDMMYYYY(record.DISCHARGE_DATE);
+    if (a && b && b >= a) {
+      const los = String(Math.round((b - a) / 86400000) + 1);
+      if (String(record.LOS || '').trim() !== los) {
+        console.log(`[Pipeline] Menghitung LOS = ${los} hari dari tanggal masuk/keluar${record.LOS ? ` (menggantikan ${record.LOS})` : ''}.`);
+      }
+      record.LOS = los;
     }
   }
 
@@ -176,6 +257,50 @@ function applyDeterministicFallback(record, allPagesText, jenisKlaim, originalNa
   }
 
   return record;
+}
+
+// Tanggal tercetak: "31 Dec 2025", "3 Januari 2026", "31/12/2025", "2025-12-31".
+// Grup: (1 hari)(2 bulan-nama)(3 tahun) | (1 hari)(2 bulan-angka)(3 tahun) diseragamkan
+// lewat tanggalDariCocokan; pola dirangkai sehingga tiap tanggal memakai 4 grup.
+const BULAN = { jan: 1, feb: 2, mar: 3, apr: 4, mei: 5, may: 5, jun: 6, jul: 7, agu: 8, agt: 8, aug: 8, sep: 9, okt: 10, oct: 10, nov: 11, des: 12, dec: 12 };
+const POLA_TANGGAL = '(?:(\\d{1,2})[\\s\\-\\/]+([A-Za-z]{3,9}|\\d{1,2})[\\s\\-\\/]+(\\d{4})|(\\d{4})-\\d{2}-\\d{2})';
+function tanggalDariCocokan(m, i) {
+  if (!m) return null;
+  if (m[i + 3] && !m[i]) {
+    const iso = /(\d{4})-(\d{2})-(\d{2})/.exec(m[0].slice(m[0].indexOf(m[i + 3])));
+    return iso ? `${iso[3]}/${iso[2]}/${iso[1]}` : null;
+  }
+  const hari = Number(m[i]);
+  const bulan = /^\d+$/.test(m[i + 1]) ? Number(m[i + 1]) : BULAN[String(m[i + 1]).slice(0, 3).toLowerCase()];
+  const tahun = Number(m[i + 2]);
+  if (!bulan || hari < 1 || hari > 31 || bulan > 12) return null;
+  return `${String(hari).padStart(2, '0')}/${String(bulan).padStart(2, '0')}/${tahun}`;
+}
+
+/**
+ * Cadangan terakhir sebelum menolak berkas: gabungkan teks semua halaman
+ * (lapisan teks + hasil OCR) kecuali lembar grouper menjadi claimDataText.
+ * @returns {boolean} true bila teks cukup (>= 200 karakter) dan terpasang.
+ */
+function pakaiSemuaHalaman(classification, result) {
+  const ocr = ((classification.ocr_enhancement && classification.ocr_enhancement.pass1_general_ocr
+    && classification.ocr_enhancement.pass1_general_ocr.pages) || [])
+    .filter(p => p.text && p.text.trim().length > 30 && !isLembarGrouper(p.text));
+  const nomorOcr = new Set(ocr.map(p => p.page_number));
+  const halaman = [
+    ...(classification.pages || [])
+      .filter(p => !p.is_lembar_grouper && !nomorOcr.has(p.page_num) && String(p.text_full || '').trim().length > 30)
+      .map(p => ({ page_num: p.page_num, text: p.text_full })),
+    ...ocr.map(p => ({ page_num: p.page_number, text: p.text })),
+  ].sort((a, b) => a.page_num - b.page_num);
+  const teks = halaman.map(p => p.text).join('\n\n---\n\n');
+  if (teks.trim().length < 200) return false;
+  classification.claimDataPages = halaman;
+  classification.claimDataText = teks.slice(0, 60000);
+  result.metadata.claimDataPagesFound = halaman.length;
+  result.metadata.sumberDataSemuaHalaman = true;
+  console.log(`[Pipeline] Halaman data klaim tidak dikenali kata kuncinya; ${halaman.length} halaman berteks dipakai sebagai sumber data.`);
+  return true;
 }
 
 /** Parse tanggal format DD/MM/YYYY (format wajib field tanggal vClaim) ke Date, atau null. */
@@ -241,6 +366,9 @@ async function extractFromPDF(filePath, options = {}) {
     result.classification = classification;
     result.metadata.pagesProcessed = classification.totalPages;
     result.metadata.claimDataPagesFound = classification.claimDataPages.length;
+    if (typeof options.onPages === 'function' && classification.totalPages > 0) {
+      try { await options.onPages(classification.totalPages); } catch (_) { /* status pelengkap */ }
+    }
 
     if (!classification.success) {
       result.errors.push(...classification.errors.map(e => e.message));
@@ -255,7 +383,13 @@ async function extractFromPDF(filePath, options = {}) {
       try {
         const { ocrPdfPages } = require('./ocrService');
         const totalText = classification.pages.reduce((sum, p) => sum + p.text_length, 0);
-        if (totalText < 200 && classification.totalPages > 0) {
+        // PDF campuran: halaman berteks (SPRI, resume, rincian biaya, lembar
+        // grouper) cukup banyak, tetapi SEP-nya hasil scan -- data klaim hanya
+        // ada di halaman scan. Dulu OCR hanya jalan bila total teks < 200
+        // karakter, sehingga TRIMOKO (0170R0110126V000204, SEP hal. 2 scan)
+        // ditolak "Berkas Klaim Individual tidak ditemukan".
+        const adaHalamanScan = classification.pages.some(p => p.text_length < 50);
+        if ((totalText < 200 || adaHalamanScan) && classification.totalPages > 0) {
           console.log(`[Pipeline] Teks pdf-parse terlalu sedikit (${totalText} chars), mencoba OCR...`);
 
           // ENHANCEMENT: Apply multi-pass OCR untuk extract vital signs dan clinical findings
@@ -308,8 +442,14 @@ async function extractFromPDF(filePath, options = {}) {
       }
 
       if (!ocrFallbackWorked) {
-        result.pesan = PESAN.bukanBerkasKlaim;
-        return result;
+        // Jangan gagal hanya karena kata kunci halaman data klaim tidak cocok
+        // (format/vendor baru, judul SEP terpotong scan): seluruh halaman
+        // berteks selain lembar grouper dipakai sebagai sumber data. Gagal
+        // hanya bila dokumen memang kosong/tak terbaca.
+        if (!pakaiSemuaHalaman(classification, result)) {
+          result.pesan = PESAN.bukanBerkasKlaim;
+          return result;
+        }
       }
     } else {
       // ENHANCEMENT: Kalau pdf-parse SUDAH dapat teks, apply enhancement untuk extract vital signs
@@ -321,7 +461,7 @@ async function extractFromPDF(filePath, options = {}) {
             performEnhancedOcr: true,
             pageNumbers: null
           });
-          if (enhanced.enhancement_applied) {
+          if (enhanced.enhancement_applied || enhanced.ocr_enhancement?.pass1_general_ocr?.pages?.length) {
             classification = enhanced;
             result.metadata.ocrEnhancementApplied = true;
           }
@@ -366,7 +506,7 @@ async function extractFromPDF(filePath, options = {}) {
       return result;
     }
 
-    if (!classification.claimDataText || classification.claimDataText.trim().length < 50) {
+    if ((!classification.claimDataText || classification.claimDataText.trim().length < 50) && !pakaiSemuaHalaman(classification, result)) {
       result.pesan = PESAN.dataKurang;
       return result;
     }
@@ -376,6 +516,7 @@ async function extractFromPDF(filePath, options = {}) {
     result.attempts = extraction.attempts;
 
     if (!extraction.success) {
+      result.error_code=extraction.error_code;
       result.errors.push(...extraction.errors);
       // Bedakan "belum disetel" (butuh tindakan IT) dari "gagal baca" (bisa dicoba lagi).
       const belumDisetel = extraction.errors.some(e => /AI_PROVIDER_API_KEY|401|403/i.test(e));
@@ -388,15 +529,7 @@ async function extractFromPDF(filePath, options = {}) {
     // boleh mengisi kolom klaim lewat fallback deterministik.
     // Halaman scan ikut lewat teks OCR (pass 1 enhancement, sudah tanpa lembar
     // grouper) -- tanpa ini SEP hasil scan tidak pernah terbaca sebagai sinyal.
-    const nomorScan = new Set(classification.pages.filter(p => p.type === 'SCAN').map(p => p.page_num));
-    const teksOcrScan = ((classification.ocr_enhancement && classification.ocr_enhancement.pass1_general_ocr
-      && classification.ocr_enhancement.pass1_general_ocr.pages) || [])
-      .filter(p => nomorScan.has(p.page_number) && p.text && !isLembarGrouper(p.text))
-      .map(p => p.text);
-    const allPagesText = [
-      ...classification.pages.filter(p => !p.is_lembar_grouper).map(p => p.text_full),
-      ...teksOcrScan,
-    ].join('\n\n');
+    const allPagesText = teksFallbackDokumen(classification);
     result.record = applyDeterministicFallback(extraction.record, allPagesText, jenisKlaim, originalName);
     // Dipakai RV-01/RV-02 (ruleEngine.js) buat bedakan "AI gagal ekstrak
     // NOKARTU dari dokumen BPJS asli" vs "dokumen ini memang bukan klaim BPJS".
@@ -489,4 +622,4 @@ async function classifyOnly(filePath) {
   return extractFromPDF(filePath, { skipAI: true });
 }
 
-module.exports = { extractFromPDF, classifyOnly, PESAN, applyDeterministicFallback };
+module.exports = { extractFromPDF, classifyOnly, PESAN, applyDeterministicFallback, teksFallbackDokumen };

@@ -37,6 +37,7 @@ const PUNYA_SUBKODE = new Set([...DIAGNOSIS.keys()].filter(k => k.includes('.'))
 function padananWho(kode) {
   const k = String(kode || '').trim().toUpperCase();
   if (!k.includes('.') || deskripsiDiagnosis(k)) return null;
+  if (k === 'D63.1' && deskripsiDiagnosis('D63.8')) return 'D63.8';
   const kategori = k.split('.')[0];
   return deskripsiDiagnosis(kategori) && !PUNYA_SUBKODE.has(kategori) ? kategori : null;
 }

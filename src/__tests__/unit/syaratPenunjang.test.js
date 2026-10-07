@@ -1,5 +1,5 @@
 const {
-  evaluasiSyaratPenunjang, bacaNilaiLab, cariKataKunci, kodeCocok, STATUS,
+  evaluasiSyaratPenunjang: evaluasiSyaratPenunjangAsli, bacaNilaiLab, cariKataKunci, kodeCocok, STATUS,
 } = require('../../services/syaratPenunjangService');
 
 const hal = (page_number, ocr_text) => ({ page_number, ocr_text });
@@ -108,7 +108,7 @@ describe('evaluasiSyaratPenunjang — empat keadaan', () => {
     const ab = t[0].syarat.find(s => s.nama.includes('Antibiotik'));
     expect(ab.status).toBe(STATUS.PERLU_CEK_MANUAL);
     expect(ab.status).not.toBe(STATUS.TIDAK_ADA);
-    expect(ab.catatan_batasan).toMatch(/tidak dapat diperiksa sistem/i);
+    expect(ab.catatan_batasan).toMatch(/catatan pemberian bertanggal/i);
   });
 });
 
@@ -188,3 +188,5 @@ describe('evaluasiSyaratPenunjang — kehati-hatian', () => {
     expect(t.map(x => x.id).sort()).toEqual(['SP-01', 'SP-04']);
   });
 });
+
+function evaluasiSyaratPenunjang(dx,px,pages,opsi={}) { return evaluasiSyaratPenunjangAsli(dx,px,pages,{hospitalCode:'3371084',...opsi}); }

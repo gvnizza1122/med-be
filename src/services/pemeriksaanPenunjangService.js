@@ -175,7 +175,8 @@ function susunPemeriksaanPenunjang(halaman) {
     if (!t || !t.istilah_id) continue;
     // Parameter tunggal (hemoglobin, hematokrit) sudah tampil di tabel lab.
     if (t.kategori === 'hematologi' && !t.kode_usulan && t.istilah_id !== 'masa_perdarahan') continue;
-    const peran = PERAN_HALAMAN[jenisHalaman.get(t.page_number)] || (REKAMAN_ALAT.has(t.istilah_id) ? 'hasil' : 'catatan');
+    const jenisBukti = t.jenis_halaman || jenisHalaman.get(t.page_number);
+    const peran = jenisBukti === 'rekaman_ctg' ? 'hasil' : PERAN_HALAMAN[jenisBukti] || 'catatan';
     const item = perId.get(t.istilah_id) || {
       id: t.istilah_id, nama: t.istilah_baku, kategori: t.kategori || null,
       kode_icd9: t.kode_usulan || null, deskripsi_icd9: t.kode_usulan ? deskripsiProsedur(t.kode_usulan) || null : null,

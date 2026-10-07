@@ -60,6 +60,33 @@ function teksRusak(m) {
   return m.jumlah_kata >= MIN_KATA_UNTUK_UJI_BUNYI && m.rasio_kata_berbunyi < MIN_RASIO_KATA_BERBUNYI;
 }
 
+// Lapisan teks dengan encoding font bergeser: tiap glyph dipetakan ke karakter
+// lain sejumlah tetap (umumnya 29: "$0$16$17262" = "AMAN SANTOSO"). Rasio
+// alfanumeriknya tetap tinggi sehingga lolos teksRusak(), padahal isinya tak
+// terbaca -- resume medis AMAN SANTOSO (0170R0111225V003405) terbaca sampah
+// sehingga diagnosis & tindakan hilang. Deteksi: geser balik, lalu bandingkan
+// jumlah kata umum dokumen RS sebelum vs sesudah. Teks hasil geser TIDAK
+// dipakai (angka ikut hilang saat ekstraksi); halaman cukup di-OCR.
+const KATA_UMUM = /\b(?:rawat|inap|jalan|pasien|diagnos\w*|dokter|resume|medis|tindakan|prosedur|lestari|raharja|obat|kelas|tanggal|nama|alamat|keluhan|terapi|pemeriksaan|rumah|sakit|hasil)\b/gi;
+const GESERAN_UMUM = [29, 3];
+function hitungKataUmum(t) { return (String(t).match(KATA_UMUM) || []).length; }
+function geser(t, n) {
+  return String(t).replace(/[!-~]/g, c => {
+    const k = c.charCodeAt(0) + n;
+    return k >= 33 && k <= 126 ? String.fromCharCode(k) : c;
+  });
+}
+function teksTergeser(teks) {
+  const asli = hitungKataUmum(teks);
+  for (const n of GESERAN_UMUM) {
+    // Kata menempel tanpa spasi pada teks bergeser; pisahkan huruf besar-kecil dulu.
+    const g = geser(teks, n).replace(/([a-z])([A-Z])/g, '$1 $2');
+    const tergeser = hitungKataUmum(g) + (String(g).match(/(?:rawat|inap|pasien|diagnos|dokter|resume|medis|lestari|raharja)/gi) || []).length;
+    if (tergeser >= 3 && tergeser > 2 * (asli + 1)) return true;
+  }
+  return false;
+}
+
 /**
  * Putuskan sumber teks satu halaman.
  *
@@ -74,7 +101,7 @@ function teksRusak(m) {
 function putuskanSumberHalaman(teks, { mode = 'all' } = {}) {
   const metrik = ukurMutuTeks(teks);
   if (metrik.panjang < AMBANG_HALAMAN_PINDAI) return { sumber: SUMBER.OCR, alasan: ALASAN.TANPA_TEKS, metrik };
-  if (teksRusak(metrik)) return { sumber: SUMBER.OCR, alasan: ALASAN.TEKS_SAMPAH, metrik };
+  if (teksRusak(metrik) || teksTergeser(teks)) return { sumber: SUMBER.OCR, alasan: ALASAN.TEKS_SAMPAH, metrik };
   const ambang = mode === 'auto-scan' ? AMBANG_HALAMAN_PINDAI : AMBANG_TEKS_NYATA;
   if (metrik.panjang < ambang) return { sumber: SUMBER.OCR, alasan: ALASAN.TEKS_SEDIKIT, metrik };
   return { sumber: SUMBER.NATIVE, alasan: ALASAN.TEKS_CUKUP, metrik };
@@ -103,5 +130,5 @@ function rencanakanSumberHalaman(halaman, opsi) {
 
 module.exports = {
   SUMBER, ALASAN, AMBANG_HALAMAN_PINDAI, AMBANG_TEKS_NYATA,
-  ukurMutuTeks, putuskanSumberHalaman, punyaLapisanTeksNyata, rencanakanSumberHalaman,
+  ukurMutuTeks, putuskanSumberHalaman, punyaLapisanTeksNyata, rencanakanSumberHalaman, teksTergeser,
 };

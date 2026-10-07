@@ -5,10 +5,17 @@
  * Tanpa AI; pencarian kata kunci sederhana.
  */
 const registri = require('../data/registriRegulasi.json');
+const katalogKlaim = require('../data/referensiKesesuaianKlaim.json');
+// Referensi berversi tersedia untuk pencarian agen dan halaman regulasi.
+for (const s of katalogKlaim.sumber) {
+  if (!registri.sumber.some(x => x.id === s.id)) registri.sumber.push({ ...s, ringkasan:s.catatan,
+    berlaku_sampai:null, kata_kunci:katalogKlaim.aturan.filter(a=>a.sumber_id===s.id).flatMap(a=>[a.nama,...(a.dx || []),...(a.px || [])]) });
+}
 const syaratPenunjang = require('../data/syaratPenunjangDiagnosis.json');
 const kombinasi = require('../data/ketentuanKlaimKombinasi.json');
 
 function berlaku(s, tanggal = new Date().toISOString().slice(0, 10)) {
+  if (s.status_verifikasi && s.status_verifikasi !== 'terverifikasi') return null;
   return (!s.berlaku_mulai || s.berlaku_mulai <= tanggal) && (!s.berlaku_sampai || s.berlaku_sampai >= tanggal);
 }
 
@@ -18,12 +25,15 @@ function sumberById(id) { return registri.sumber.find(s => s.id === id) || null;
 function labelSumber(id) {
   const s = sumberById(id);
   if (!s) return null;
-  return { id: s.id, judul: s.judul, nomor: s.nomor, versi: s.versi, berlaku: berlaku(s) };
+  return { id: s.id, judul: s.judul, nomor: s.nomor, versi: s.versi, berlaku: berlaku(s),
+    jenis:s.jenis, url:s.url || null, halaman:s.halaman || null, status_verifikasi:s.status_verifikasi || null };
 }
 
 /** Semua butir sebagai daftar datar {sumber_id, kode, judul, teks}. */
 function semuaButir() {
   const butir = [];
+  for (const a of katalogKlaim.aturan) butir.push({ sumber_id:a.sumber_id, kode:a.id, judul:a.nama,
+    teks:a.catatan, diverifikasi:katalogKlaim.sumber.find(s=>s.id===a.sumber_id)?.status_verifikasi==='terverifikasi' });
   for (const s of registri.sumber) for (const b of s.butir || []) butir.push({ sumber_id: s.id, kode: b.id, judul: s.judul, teks: b.teks });
   for (const a of syaratPenunjang.aturan || []) {
     butir.push({ sumber_id: 'REKAP-PENDING-RS', kode: a.id, judul: `${a.kode_diagnosis} ${a.nama_diagnosis}`, diverifikasi: a.diverifikasi,

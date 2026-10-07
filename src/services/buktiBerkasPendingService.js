@@ -14,6 +14,8 @@
  */
 
 const { verifikasiKutipan } = require('./pagarTemuanService');
+const { classifyPageDocumentType } = require('./pdfPageClassifier');
+const { isLembarGrouper } = require('./lembarGrouperService');
 
 const PANJANG_MAKS_KUTIPAN = 240;
 
@@ -42,15 +44,36 @@ function potongSekitar(baris, indeks, panjang) {
  */
 function cariKutipan(halaman, pola, opsi = {}) {
   const maks = opsi.maks || 2;
-  const cari = new RegExp(pola.source, 'i'); // tanpa flag g/y: exec stateless
+  const cari = new RegExp(pola.source, 'gi');
   const hasil = [];
   const terlihat = new Set();
   for (const h of halaman || []) {
+    const teks = String(h.ocr_text || '');
+    if (opsi.klinis && (isLembarGrouper(teks)
+      || ['rincian_biaya', 'sep'].includes(classifyPageDocumentType(teks)))) continue;
+    // Nama pemeriksaan pada instruksi/tagihan belum merupakan dokumen hasil.
+    // Hasil negatif tetap hasil pemeriksaan, sehingga tidak memakai pagar
+    // afirmatif (yang diperlukan untuk gejala/diagnosis/tindakan).
+    if (opsi.hasilPemeriksaan && !/\b(?:kesan|kesimpulan|interpretasi|impression|temuan|normal|abnormal|irama|sinus|infiltrat|echogen|hiperekoik|fraktur|hemoglobin|leukosit|hematologi)\b|\d+(?:[.,]\d+)?\s*(?:mg\/dl|g\/dl|mmol\/l|u\/l)\b/i.test(teks)) continue;
     const baris = String(h.ocr_text || '').split(/\r?\n/);
     for (const b of baris) {
-      const m = cari.exec(b);
-      if (!m) continue;
-      const kutipan = potongSekitar(b, m.index);
+      cari.lastIndex = 0;
+      let m, diterima = null;
+      while ((m = cari.exec(b))) {
+        if (!m[0].length) break;
+        const sebelum = b.slice(0, m.index);
+        const sesudah = b.slice(m.index + m[0].length);
+        const klausa = b.slice(Math.max(sebelum.lastIndexOf(';'), sebelum.lastIndexOf(',')) + 1)
+          .split(/[;,]/)[0];
+        const rencana = /\b(?:rencana|direncanakan|akan|usul|anjuran|jika|bila perlu|belum dilakukan|tidak dilakukan|belum diperiksa|tidak diperiksa|dibatalkan|ditunda)\b/i.test(klausa);
+        const negasi = /\b(?:tanpa|tidak|tdk|tak|belum|bukan)\s+(?:(?:ada|mengalami|ditemukan|tampak|perlu|dilakukan|diberikan)\s*)?(?:(?:bukti|tanda|gejala)\s*)?$/i.test(sebelum)
+          || /^\s*(?:(?:[:=]\s*)?(?:\(-\)|negatif\b)|disangkal\b|tidak\b|belum\b|ditiadakan\b)/i.test(sesudah);
+        if ((opsi.afirmatif && (negasi || rencana)) || (opsi.hasilPemeriksaan && rencana)) continue;
+        diterima = m;
+        break;
+      }
+      if (!diterima) continue;
+      const kutipan = potongSekitar(b, diterima.index);
       if (kutipan.length < 3) continue;
       const kunci = `${h.page_number}|${kutipan.toLowerCase()}`;
       if (terlihat.has(kunci)) continue;

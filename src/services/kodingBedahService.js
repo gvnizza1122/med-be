@@ -47,7 +47,7 @@ const ISTILAH = [
   [/\bamputasi\s+(?:above\s+knee|atas\s+lutut|ak)\b|\baka\b/i, '84.17', 'Amputasi atas lutut'],
   [/\b(?:laparoskopi\w*\s+apend\w*|lap\.?\s*appendectomy|laparoscopic\s+appendectomy)\b/i, '47.01', 'Apendektomi laparoskopik'],
   [/\b(?:apendektomi|appendectomy|apendiktomi|appendektomi|appendiktomi)\b/i, '47.09', 'Apendektomi'],
-  [/\b(?:laparotomi\s+eksplor\w*|explorative\s+laparotomy|eksplorasi\s+laparotomi|laparotomi)\b/i, '54.11', 'Laparotomi eksplorasi'],
+  [/\b(?:laparotomi\s+eksplor\w*|explorative\s+laparotomy|exploratory\s+laparotomy|eksplorasi\s+laparotomi)\b/i, '54.11', 'Laparotomi eksplorasi'],
   [/\b(?:lap\.?\s*chole|laparoscopic\s+cholecystectomy|kolesistektomi\s+laparoskop\w*)\b/i, '51.23', 'Kolesistektomi laparoskopik'],
   [/\b(?:kolesistektomi|cholecystectomy)\b/i, '51.22', 'Kolesistektomi'],
   [/\b(?:hernioplast\w*|lichtenstein|mesh)\b/i, '53.05', 'Repair hernia inguinal dengan mesh'],
@@ -62,6 +62,12 @@ const ISTILAH = [
   [/\b(?:hidrokelektomi|hydrocelectomy|eksisi\s+hidrokel)\b/i, '61.2', 'Eksisi hidrokel'],
   [/\b(?:orchidopexy|orkidopeksi|orchiopexy)\b/i, '62.5', 'Orkidopeksi'],
   [/\b(?:tonsilektomi|tonsillectomy)\b/i, '28.2', 'Tonsilektomi'],
+  // Transfusi per komponen darah, tahan salah ketik ("tranfsui porc" = transfusi
+  // PRC, SLAMET FAHRODIN 0170R0111225V003444: casemix 99.04, aplikasi melewatkan).
+  [/\btran?s?f[a-z]{2,7}\b[^\n]{0,30}?\b(?:p\s?o?r\s?c|packed\s*(?:red\s*)?cells?|pack\s*cell|eritrosit|sel\s+darah\s+merah)\b|\b(?:prc|porc)\s*\d+\s*(?:kolf|kantong|kntg|bag|unit|labu)\b/i, '99.04', 'Transfusi packed red cells'],
+  [/\btran?s?f[a-z]{2,7}\b[^\n]{0,30}?\b(?:wb|whole\s*blood|darah\s+lengkap|darah\s+utuh)\b/i, '99.03', 'Transfusi whole blood'],
+  [/\btran?s?f[a-z]{2,7}\b[^\n]{0,30}?\b(?:tc|trombosit|thrombo\w*|platelet\w*)\b/i, '99.05', 'Transfusi trombosit'],
+  [/\btran?s?f[a-z]{2,7}\b[^\n]{0,30}?\b(?:ffp|fresh\s+frozen\s+plasma|plasma)\b/i, '99.07', 'Transfusi plasma'],
 ];
 
 function lokasiDari(teks, diagnosis) {
@@ -121,7 +127,33 @@ function lengkapiKodeBedah(saran, halaman) {
       }
     }
   }
+  rincikanJenisHernia(daftar, halamanBedah(Array.isArray(halaman) ? halaman : []), perubahan);
   return { saran: daftar.filter(s => !s._diganti), perubahan };
+}
+
+// Hernia inguinal: jenisnya biasanya tertulis di diagnosis ("hernia inguinalis
+// lateralis") bukan di baris tindakan, jadi kode "tidak dirinci" (53.00/53.05)
+// dirincikan dari teks resume/laporan operasi. Lateralis = indirek, medialis =
+// direk. Kalau keduanya tertulis (atau tidak ada), kode dibiarkan.
+// AMAN SANTOSO (0170R0111225V003405): "lateralis dekstra ireponibilis" +
+// "hernia repair dengan mesh graft" -> 53.04, bukan 53.05 (kelompok sama K-1-14).
+const RINCI_HERNIA = { '53.00': { indirek: '53.02', direk: '53.01' }, '53.05': { indirek: '53.04', direk: '53.03' } };
+function rincikanJenisHernia(daftar, halaman, perubahan) {
+  const teks = halaman.map(p => String(p.ocr_text || p.text || '')).join('\n');
+  const indirek = /\b(?:lateral(?:is)?|indire[ck]t?)\b/i.test(teks) && /hernia/i.test(teks);
+  const direk = /\b(?:medial(?:is)?|dire[ck]t?)\b/i.test(teks.replace(/indire[ck]t?/gi, ''));
+  if (indirek === direk) return;
+  const jenis = indirek ? 'indirek' : 'direk';
+  for (const s of daftar) {
+    if (!s || s.type !== 'procedure' || s._diganti || !RINCI_HERNIA[String(s.code)]) continue;
+    const kode = RINCI_HERNIA[String(s.code)][jenis];
+    if (!deskripsiProsedur(kode)) continue;
+    perubahan.push({ aksi: 'ganti', dari: [s.code], kode });
+    Object.assign(s, {
+      code: kode, kamus_valid: true, sumber_aturan: 'koding_bedah',
+      catatan_aturan: `Hernia inguinal ${jenis === 'indirek' ? 'lateralis (indirek)' : 'medialis (direk)'} tertulis di dokumen -> ${kode} (${deskripsiProsedur(kode)}), menggantikan ${s.code} yang tidak merinci jenis.`,
+    });
+  }
 }
 
 /**

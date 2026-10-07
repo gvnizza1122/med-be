@@ -28,9 +28,10 @@ describe('triase kegawatdaruratan', () => {
     expect(kr.gawat_indikator.bukti[0]).toMatchObject({ halaman: 2 });
   });
 
-  test('D: triase non-gawat tanpa indikator kegawatan', () => {
+  test('triase non-gawat tanpa indikator kegawatan memerlukan keputusan koder, bukan otomatis melepas klaim', () => {
     const t = nilaiTriase({ alasan_raw: 'cek kegawatan', kategori: 'kegawatdaruratan', klaim: KLAIM, halaman: HAL_NONGAWAT });
-    expect(t.kotak).toBe('D');
+    expect(t.kotak).toBeNull();
+    expect(t.perlu_keputusan_koder).toBe(true);
     expect(t.alasan_kotak).toMatch(/non-gawat/);
   });
 
@@ -38,6 +39,43 @@ describe('triase kegawatdaruratan', () => {
     const t = nilaiTriase({ alasan_raw: 'x', kategori: 'kegawatdaruratan', klaim: KLAIM, halaman: [{ page_number: 1, ocr_text: 'Resume medis rawat jalan biasa' }] });
     expect(t.kotak).toBe('B');
     expect(t.dokumen_dibutuhkan).toContain('Triase IGD');
+  });
+});
+
+describe('bukti pending memerlukan konteks, bukan kemunculan kata', () => {
+  const nilai = (kategori, alasan_raw, text) => nilaiTriase({ kategori, alasan_raw, klaim: KLAIM,
+    halaman: [{ page_number: 1, ocr_text: text }] });
+  test('gejala disangkal tidak membuat triase hijau menjadi bisa dijawab', () => {
+    expect(nilai('kegawatdaruratan','cek kegawatan',
+      'TRIASE IGD\nKategori triase: HIJAU\nTidak ada sesak, tidak ada nyeri dada, tidak ada syok').kotak).toBeNull();
+  });
+  test('negasi gejala lain tidak membuang gejala positif di klausa berikutnya', () => {
+    expect(nilai('kegawatdaruratan','cek kegawatan',
+      'TRIASE IGD\nTidak ada sesak, pasien kejang').kotak).toBe('A');
+  });
+  test.each([
+    'Resume medis\nRencana: USG jika diperlukan. Pemeriksaan belum dilakukan.',
+    'RINCIAN BIAYA\nUSG abdomen Rp 200.000',
+    'Resume medis\nHasil radiologi akan dilampirkan',
+  ])('rencana/tagihan/sebutan hasil tidak menjadi dokumen hasil radiologi', text => {
+    expect(nilai('dokumen_tidak_lengkap','Lampirkan hasil radiologi',text).kotak).toBe('B');
+  });
+  test('hasil radiologi negatif tetap merupakan dokumen hasil', () => {
+    expect(nilai('dokumen_tidak_lengkap','Lampirkan hasil radiologi',
+      'HASIL PEMERIKSAAN RADIOLOGI\nFoto thorax\nKesan: tidak tampak infiltrat').kotak).toBe('A');
+  });
+  test('kode diagnosis disangkal tidak menjadi bukti pendukung', () => {
+    const r=nilai('kode_diagnosis','Diagnosis J18.9 tidak sesuai',
+      'Resume medis\nDiagnosis J18.9 disangkal. Tidak ditemukan bukti pneumonia.');
+    expect(r.kotak).toBe('C');
+  });
+  test('negasi sebelum kode ICD dengan batas spasi tidak menjadi bukti pendukung', () => {
+    expect(nilai('kode_diagnosis','Diagnosis J18.9 tidak sesuai',
+      'Resume medis\nTidak ada J18.9').kotak).toBe('C');
+  });
+  test('kode pada tagihan tidak menjadi bukti klinis', () => {
+    expect(nilai('kode_tindakan','Kode 93.94 tidak sesuai',
+      'RINCIAN BIAYA\nNebulisasi 93.94 Rp 150.000').kotak).toBe('C');
   });
 });
 
@@ -287,6 +325,21 @@ describe('buatDraft / persetujuan koder', () => {
     })(db.prepare);
     await expect(setujuiDraft(db, d.id, { userId: 'k' })).rejects.toMatchObject({ kode: 'bukti_gugur' });
     expect(db.drafts[0].status).toBe('draft');
+  });
+  test('draf lama dengan teks literal negasi ditolak oleh pemeriksaan konteks saat persetujuan', async () => {
+    const halaman=[{page_number:2,ocr_text:'TRIASE IGD\nKategori triase: HIJAU\nTidak ada sesak'}];
+    const db=dbTiruan({pending:PENDING,halaman});
+    db.drafts.push({id:'lama',pending_id:'p1',status:'draft',kotak:'A',poin:JSON.stringify([
+      {jenis_poin:'bukti',halaman:2,kutipan:'Tidak ada sesak',terverifikasi:true},
+    ])});
+    await expect(setujuiDraft(db,'lama',{userId:'k'})).rejects.toMatchObject({kode:'bukti_gugur'});
+    expect(db.drafts[0].status).toBe('draft');
+  });
+  test('draf D lama tidak disetujui tanpa keputusan kotak D manual oleh koder', async()=>{
+    const db=dbTiruan({pending:PENDING});
+    const d=await buatDraft(db,'p1',{});
+    db.drafts[0].kotak='D';
+    await expect(setujuiDraft(db,d.id,{userId:'k'})).rejects.toMatchObject({kode:'perlu_keputusan_koder'});
   });
 
   test('draf yang sudah siap tidak bisa disetujui/ditolak lagi', async () => {

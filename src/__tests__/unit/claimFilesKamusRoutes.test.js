@@ -48,6 +48,15 @@ test('kamus offline menunda approval tanpa menyatakan kode pasien salah', async 
   expect(writes).toEqual([]);
 });
 
+test.each(['/claims/file/approve','/claims/export/siap-submit'])('analisis PDF gagal tidak lolos %s walaupun status lama valid dan kodenya sah',async url=>{
+  mockDb.prepare=sql=>({get:async()=>({status:'completed',file_name:'kasus.pdf'}),
+    all:async()=>[{id:'r',diagnosa_list:'J45.9',prosedur_list:'93.94',validation_status:'valid',source_file_name:'kasus.pdf',ai_review:JSON.stringify({analisis_tidak_tersedia:true})}],
+    run:async(...values)=>writes.push({sql,values})});
+  const response=url.endsWith('approve')?await request(app).post(url):await request(app).get(url);
+  expect(response.status).toBe(409);expect(response.body.error).toMatch(/analisis berkas belum lengkap/);
+  expect(writes).toEqual([]);
+});
+
 test('edit manual kode IM iDRG J45.3 tersimpan tanpa RV-05', async () => {
   const response = await request(app).post('/claims/rec/update-values').send({ updates: { DIAGLIST: 'J45.3' } });
   expect(response.status).toBe(200);
@@ -65,11 +74,11 @@ test('tarif-ganda: INA-CBG dari data klaim, iDRG belum dapat dihitung tanpa grou
   const r = await request(app).get('/claims/records/rec/tarif-ganda');
   expect(r.status).toBe(200);
   expect(r.body.inacbg.resmi).toMatchObject({ sumber: 'data_klaim', kode: 'M-1-04-I', tarif: 31713400 });
-  expect(r.body.inacbg.cocok).toBe(true);
+  expect(r.body.inacbg.cocok).toBe(false); // hasil lama tidak menjadi dasar perhitungan dari diagnosis/prosedur saat ini
   expect(r.body.idrg).toMatchObject({ status: 'belum_dapat_dihitung', tarif: null });
-  expect(r.body.idrg.nbr).toMatchObject({ nilai: 8037060, jenis: 'rawat_inap' });
+  expect(r.body.idrg.nbr).toMatchObject({ nilai: null, jenis: 'rawat_inap', status: 'tidak_tersedia' });
   const dx = Object.fromEntries(r.body.koding_idrg.diagnosis.map(d => [d.kode, d]));
-  expect(dx['S73.0'].status).toBe('perlu_dipilih');
-  expect(dx['S73.0'].kandidat.map(k => k.kode)).toContain('S73.02');
+  expect(dx['S73.0'].status).toBe('perlu_verifikasi');
+  expect(dx['S73.0'].kandidat).toEqual([]);
   expect(dx['J45.3']).toMatchObject({ status: 'im', kode_idrg: 'J45.3' });
 });

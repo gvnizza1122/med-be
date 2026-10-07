@@ -40,6 +40,7 @@ const STATUS_KODE = {
   status_tidak_sah: 409,
   bukti_gugur: 409,
   perlu_pengakuan: 409,
+  perlu_keputusan_koder: 409,
   tanpa_pengguna: 401,
 };
 

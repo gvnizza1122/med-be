@@ -26,6 +26,14 @@ adalah bukti lahir hidup (Z37.0 bila satu bayi) walau pilihan cetak di formulir 
 Gejala sesak/batuk, satu obat, atau nebulisasi saja tidak membuktikan PPOK maupun pneumonia. Tidak adanya
 rontgen/lab di berkas tidak otomatis membantah diagnosis dokter atau membuktikan penyakit tidak ada.
 Diagnosis akhir dokter tidak boleh digugurkan hanya karena AI merasa diagnosis lain lebih cocok.
+SPRI, SEP dan triase berisi diagnosis awal. Perbedaannya dengan diagnosis akhir DPJP di resume bukan
+konflik diagnosis akhir dan tidak dengan sendirinya memerlukan klarifikasi, kode tambahan atau baca ulang.
+Utamakan diagnosis akhir yang sudah ditetapkan DPJP. Konsul SpOG/kehamilan bersamaan dengan apendisitis
+tidak sendiri membuktikan penyakit tersebut menyulitkan kehamilan; jangan otomatis memilih O99.6 sebagai utama.
+Persyaratan klaim BPJS dibedakan dari adaptasi layanan RS dan harus menyebut sumber ketentuannya.
+RS Lestari Raharja tidak memiliki rehabilitasi medis. Pertimbangkan rujukan bila diperlukan secara klinis;
+jangan menambahkan kode rehabilitasi tanpa pelaksanaan. Ketiadaan layanan tidak otomatis menjadi pengecualian
+persyaratan BPJS. Jika tindakan/kode rehabilitasi tercantum pada klaim, tetap nilai persyaratan dan buktinya.
 Formulir hasil scan sering mencetak semua pilihan (mis. "CITO ELEKTIF", "Ya/Tidak", "Lk/P"); teks pilihan
 cetak tanpa tanda yang jelas bukan keterangan dan tidak bertentangan dengan catatan dokter.
 Jika dokumen bertentangan, diagnosis masih ambigu, atau bukti hanya anamnesis, gunakan perlu_klarifikasi.
@@ -57,7 +65,7 @@ function buatKandidat(record, ai, pages, resumePages) {
   };
   pecahDaftarKode(record.diagnosa_list || record.DIAGLIST).forEach(k => tambah(k));
   for (const s of ai.suggested_codes || []) {
-    if (s.type === 'diagnosis' && s.kamus_valid === true && !s.disangkal && s.boleh_isi_otomatis !== false) tambah(s.code, s.quotation, s.page_number, Boolean(s.sumber_aturan));
+    if (s.type === 'diagnosis' && s.kamus_valid === true && !s.disangkal && s.boleh_isi_otomatis !== false) tambah(s.code, s.quotation, s.page_number, s.diagnosis_akhir_terverifikasi === true);
   }
   for (const e of ai.code_evidence || []) {
     if (e.type === 'diagnosis' && e.found === true && !e.disangkal && kandidat.has(normalisasiKode(e.code))) tambah(e.code, e.quotation, e.page_number);
@@ -105,6 +113,16 @@ function validasiTinjauan(raw, candidates, pages) {
   return periksaTinjauan(raw, candidates, pages).hasil;
 }
 
+// Hanya mengurutkan kode otomatis yang semuanya sudah didukung; tidak
+// menghapus diagnosis dokter saat pemeriksaan klinis masih perlu klarifikasi.
+function urutkanDiagnosisTerverifikasi(kodes, tinjauan) {
+  const pilihan = tinjauan?.kode_rekomendasi;
+  if (tinjauan?.versi !== 1 || tinjauan.status !== 'ada_saran' || !Array.isArray(pilihan)
+    || pilihan.length !== kodes.length || new Set(pilihan).size !== kodes.length
+    || !pilihan.every(k => kodes.includes(k) && tinjauan.kandidat?.some(c => c.kode === k && c.status === 'didukung'))) return kodes;
+  return [...pilihan];
+}
+
 async function tinjauDiagnosis(record, ai, pages, resumePages, { gateway = gatewayModelService, db = null, dikenal = {} } = {}) {
   const candidates = buatKandidat(record, ai, pages, resumePages);
   const belum = pesan => ({ versi: 1, status: 'belum_dinilai', ringkasan: pesan, kode_rekomendasi: [], kandidat: [], klarifikasi: [] });
@@ -135,4 +153,4 @@ async function tinjauDiagnosis(record, ai, pages, resumePages, { gateway = gatew
   return valid ? { ...valid, ...metadata } : { ...belum('Tinjauan AI belum berhasil diverifikasi. Pilihan diagnosis perlu diperiksa koder.'), ...metadata };
 }
 
-module.exports = { tinjauDiagnosis, validasiTinjauan, periksaTinjauan, buatKandidat, SYSTEM };
+module.exports = { tinjauDiagnosis, validasiTinjauan, periksaTinjauan, buatKandidat, urutkanDiagnosisTerverifikasi, SYSTEM };

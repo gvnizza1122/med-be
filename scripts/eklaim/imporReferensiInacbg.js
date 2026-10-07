@@ -93,7 +93,7 @@ function main() {
     profil: { regional: args.regional, kode_tarif: args.kodeTarif },
     icc_version: args.iccVersion || null,
     diambil: new Date().toISOString().slice(0, 10),
-    catatan: 'Base group & tarif = tabel resmi E-Klaim (terbuka). Severity I/II/III belum memakai matriks CC resmi (berkas iDRG terenkripsi); tetap estimasi. Lembar grouper casemix otoritas final.',
+    catatan: 'Base group & tarif = tabel referensi resmi E-Klaim (terbuka). Impor ini tidak mencakup matriks CCL atau pemetaan dccol; keberadaan dan kelengkapannya harus diperiksa pada setiap patch. Severity I/II/III tetap estimasi; hasil mesin grouper E-Klaim otoritas final.',
   };
 
   const w = (n, o) => fs.writeFileSync(path.join(OUT, `${n}.json`), JSON.stringify(o));

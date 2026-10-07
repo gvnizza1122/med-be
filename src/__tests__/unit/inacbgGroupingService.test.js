@@ -40,8 +40,8 @@ describe('groupCodesToInaCBG', () => {
     expect(groupCodesToInaCBG(['N18.5'], ['39.95'], 'RAWAT_JALAN').code).toBe('N-3-15-0');
   });
 
-  test('komorbiditas menaikkan severity rawat inap', () => {
-    expect(groupCodesToInaCBG(['K29.7', 'E11.9'], [], 'RAWAT_INAP').code).toBe('K-4-11-II');
+  test('CC tidak sendiri menentukan tingkat II tanpa matriks kelompok', () => {
+    expect(groupCodesToInaCBG(['K29.7', 'E11.9'], [], 'RAWAT_INAP')).toMatchObject({ code: 'K-4-11-I', severity_status: 'belum_terverifikasi', cc_potensial: ['E119'] });
   });
 
   test('tanpa pemetaan resmi -> null, bukan kode karangan', () => {
@@ -69,6 +69,14 @@ describe('hitungInacbgDanTarif rawat jalan', () => {
     expect(tarifResult.amount).toBe(getTarifResmi('Q-5-25-0', '').tarif);
     expect(tarifResult.amount).toBeGreaterThan(0);
   });
+  test('kelompok OP tetap perkiraan; label dan kandidat tidak menyebut severity rawat inap', () => {
+    const { inacbgResult, tarifResult } = hitungInacbgDanTarif(['R57.0'], ['93.96', '99.60'], 'RAWAT_JALAN', 3, 'J-3-13-0');
+    expect(inacbgResult).toMatchObject({ code: 'I-3-10-0', grouper_resmi: false, base_perlu_verifikasi: true, versi_perkiraan: '2026-10-07.1' });
+    expect(inacbgResult.kandidat_base.map(c => c.base)).toEqual(['I-3-10', 'J-3-13']);
+    expect(inacbgResult.usulan_ai_ditahan).toBe('J-3-13-0');
+    expect(tarifResult).toMatchObject({ perlu_verifikasi_grouper: true, amount: 893100 });
+    expect(tarifResult.note).not.toMatch(/tingkat I/);
+  });
 });
 
 describe('usulan INA-CBG dari AI harus sesuai jenis klaim', () => {
@@ -85,19 +93,39 @@ describe('usulan INA-CBG dari AI harus sesuai jenis klaim', () => {
     expect(inacbgCodeForLookup).toBe('J-4-16-I');
   });
 
-  test('usulan AI yang sesuai tetap dipakai', () => {
-    const { inacbgCodeForLookup } = hitungInacbgDanTarif(['J18.9'], [], 'RAWAT_JALAN', '', 'Q-5-26-0');
-    expect(inacbgCodeForLookup).toBe('Q-5-26-0');
+  test('kode AI yang ada di tarif tetap tidak mengganti pemetaan dari diagnosis', () => {
+    const { inacbgCodeForLookup, inacbgResult } = hitungInacbgDanTarif(['J18.9'], [], 'RAWAT_JALAN', '', 'Q-5-26-0');
+    expect(inacbgCodeForLookup).toBe('Q-5-38-0');
+    expect(inacbgResult.usulan_ai_ditahan).toBe('Q-5-26-0');
   });
 });
 
 describe('severity hanya dari diagnosis sekunder, bukan prosedur', () => {
-  // KHOIRIYAH (0170R0111225V003293): casemix I51.7 + 90.59;89.52;87.44 -> I-4-24-I.
+  // PASIEN CONTOH A (0000R0000126V000001): casemix I51.7 + 90.59;89.52;87.44 -> I-4-24-I.
   test('prosedur penunjang tidak menaikkan severity', () => {
     expect(groupCodesToInaCBG(['I51.7'], ['90.59', '89.52', '87.44'], 'RAWAT_INAP').code).toBe('I-4-24-I');
   });
-  test('diagnosis sekunder menaikkan ke II, tidak pernah ditebak III', () => {
-    expect(groupCodesToInaCBG(['I51.7', 'J81'], [], 'RAWAT_INAP').code).toBe('I-4-24-II');
-    expect(groupCodesToInaCBG(['I51.7', 'J81', 'E11.9'], ['87.44'], 'RAWAT_INAP').code).toBe('I-4-24-II');
+  test('diagnosis sekunder tetap tercatat, tingkat II/III hanya skenario sampai ada grouper resmi', () => {
+    const r = groupCodesToInaCBG(['I51.7', 'J81', 'E11.9'], ['87.44'], 'RAWAT_INAP');
+    expect(r).toMatchObject({ code: 'I-4-24-I', severity_status: 'belum_terverifikasi' });
+    expect(r.cc_potensial).toEqual(expect.arrayContaining(['J81', 'E119']));
+    expect(r.skenario_severity).toEqual(['I-4-24-I', 'I-4-24-II', 'I-4-24-III']);
   });
+});
+
+test('perhitungan menahan usulan AI tingkat III dan menyediakan tarif skenario berkelas sama', () => {
+  const r = hitungInacbgDanTarif(['I63.9', 'N18.5', 'E16.2'], ['39.95'], 'RAWAT_INAP', '1', 'G-4-14-III');
+  expect(r.inacbgResult).toMatchObject({ code: 'G-4-14-I', grouper_resmi: false, severity_estimasi: true });
+  expect(r.tarifResult).toMatchObject({ amount: 4683200, perlu_verifikasi_grouper: true });
+  expect(r.tarifResult.skenario_severity).toEqual(['I', 'II', 'III'].map(s => ({code:`G-4-14-${s}`,severity:s,amount:getTarifResmi(`G-4-14-${s}`,'1').tarif})));
+});
+
+test('kode tarif valid dari AI tidak menghasilkan grouper bila diagnosis tidak terpetakan', () => {
+  expect(hitungInacbgDanTarif(['U09.9'], [], 'RAWAT_INAP', '3', 'J-4-16-I')).toMatchObject({ inacbgResult: null, tarifResult: null });
+});
+
+test('debridemen tanpa pemetaan bedah rawat inap tidak mengganti kelompok diagnosis; eksisi nyata tetap kelompok bedah', () => {
+  expect(groupCodesToInaCBG(['E11.5'], ['86.22'], 'RAWAT_INAP').code).toBe('I-4-15-I');
+  expect(groupCodesToInaCBG(['L02.3'], ['86.22'], 'RAWAT_INAP').code).toBe('L-4-12-I');
+  expect(groupCodesToInaCBG(['D17.1'], ['86.3'], 'RAWAT_INAP').code).toBe('L-1-40-I');
 });

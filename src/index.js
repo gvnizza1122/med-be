@@ -179,28 +179,15 @@ io.on('connection', (socket) => {
 });
 
 // Error handling middleware
+app.use(require('./middleware/uploadLimitError'));
 app.use((err, req, res, next) => {
   console.error('Unhandled error:', err);
-
-  if (err.code === 'LIMIT_FILE_SIZE') {
-    // Batas beda-beda per endpoint (upload-pdf 20MB, upload-batch 50MB, lainnya 10MB) —
-    // jangan hardcode satu angka, salah untuk endpoint lain (dulu selalu bilang "10MB").
-    const path = req.originalUrl || req.path || '';
-    let maxMb = 10;
-    if (path.includes('/upload-pdf')) maxMb = 20;
-    else if (path.includes('/upload-batch')) maxMb = 50;
-    return res.status(400).json({ error: `File terlalu besar. Maksimum ${maxMb}MB.` });
-  }
 
   // Pesan penolakan tipe file dari fileFilter multer (mis. "Hanya file TXT...",
   // "Hanya file PDF yang diperbolehkan.") — selalu tampilkan apa adanya ke user,
   // ini bahasa awam yang sudah ramah, jangan jatuh ke 500 generic.
   if (err.message && /^Hanya file/i.test(err.message)) {
     return res.status(400).json({ error: err.message });
-  }
-
-  if (err.code === 'LIMIT_UNEXPECTED_FILE') {
-    return res.status(400).json({ error: 'Jumlah berkas melebihi batas maksimum. Kirim maksimal 10 berkas per permintaan.' });
   }
 
   res.status(500).json({ error: 'Terjadi kesalahan internal server.' });
@@ -217,6 +204,14 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`   Server running on http://0.0.0.0:${PORT}`);
   console.log(`   Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`   CORS: ${process.env.CORS_ORIGIN || 'http://localhost:3000'}\n`);
+  // Hasil casemix tersimpan hanya sebagai pembanding kasus, bukan kalibrasi
+  // severity otomatis untuk analisis atau grouper mandiri pasien lain.
+  // Unggahan yang terhenti karena server dimulai ulang dilanjutkan otomatis.
+  setTimeout(() => {
+    claimFileRoutes.lanjutkanProsesTerputus(io)
+      .then(n => { if (n) console.log(`   ${n} unggahan terputus dilanjutkan otomatis.`); })
+      .catch(e => console.warn('   Gagal melanjutkan unggahan terputus:', e.message));
+  }, 3000);
 });
 // Default Node requestTimeout (~5 menit) lebih pendek dari waktu proses batch
 // besar (upload-pdf-batch: AI+OCR per file). Batch maks naik ke 300 file (26

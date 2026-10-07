@@ -26,6 +26,58 @@
  */
 
 const { classifyPageDocumentType } = require('./pdfPageClassifier');
+const { bagianKutipan, BAGIAN } = require('./bagianTemuanService');
+
+/** Nama obat/alat pada daftar terapi tetap petunjuk; perlu catatan pelaksanaan untuk kode tindakan. */
+function alasanTahanTindakan(bukti, halaman) {
+  const hal = (halaman || []).find(p => Number(p.page_number) === Number(bukti.page_number));
+  if (!hal) return 'Kutipan tindakan belum mempunyai halaman sumber yang dapat diperiksa; perlu klarifikasi sebelum mengisi kode.';
+  const teks = hal.ocr_text || hal.text || '';
+  const q = String(bukti.kutipan || bukti.quotation || '');
+  if (!q.trim()) return 'Kutipan pelaksanaan tindakan belum tersedia; perlu klarifikasi sebelum mengisi kode.';
+  if (!require('./pagarTemuanService').verifikasiKutipan(q, bukti.page_number, halaman).valid)
+    return 'Kutipan pelaksanaan tindakan tidak ditemukan pada halaman sumber; kandidat ditahan agar tidak menjadi kode klaim.';
+  const jenis = classifyPageDocumentType(teks);
+  const resepMurni = jenis === 'resep' && !/discharge\s+planning|perencanaan\s+pemulangan/i.test(teks);
+  const dariDaftar = resepMurni || bagianKutipan(teks, q) === BAGIAN.TERAPI;
+  const pelaksanaan = /\b(?:dilakukan|melakukan|diberikan|memberikan|menjalani|terpasang|dinebulisasi|dienema|diklisma)\b/i.test(q);
+  const rencana = /\b(?:rencana|akan|belum|ditunda|dibatalkan|riwayat)\b|\btidak\s+(?:dilakukan|diberikan|dinebulisasi|dienema|diklisma)\b/i.test(q);
+  if (rencana) return 'Kutipan menyebut rencana, riwayat, atau tindakan yang belum/tidak dilakukan; tidak menjadi bukti pelaksanaan pada episode ini.';
+  if (dariDaftar && (resepMurni || !pelaksanaan || rencana)) {
+    return 'Kutipan hanya menyebut obat, alat, atau rencana pada daftar terapi/resep; pelaksanaan tindakan belum terbukti. Periksa catatan tindakan sebelum mengisi kode.';
+  }
+  return null;
+}
+
+function alasanKodeTindakan(kode, kutipan) {
+  if (String(kode) === '75.32' && /\bCTG\b|kardiotokogra|cardiotocogra|\bNST\b|non\s*stress\s*test/i.test(kutipan || '')
+    && !/\bscalp\b|elektroda\s+(?:kepala|kulit)|fetal\s+(?:EKG|ECG)/i.test(kutipan || ''))
+    return 'CTG/NST tidak sendiri membuktikan EKG janin dengan elektroda kulit kepala (75.32). Pemantauan janin lain dinilai sebagai 75.34 dengan bukti pelaksanaan.';
+  if (String(kode) === '54.11' && !/laparotomi\s+eksplor\w*|explor(?:ative|atory)\s+laparotomy|eksplorasi\s+laparotomi/i.test(kutipan || ''))
+    return 'Laparotomi sebagai akses operasi tidak membuktikan laparotomi eksplorasi tersendiri (54.11). Gunakan tindakan definitif yang tercatat.';
+  if (['89.29', '89.39'].includes(String(kode)) && /\bgds\b|gula\s+darah|gluko[sz]/i.test(kutipan || ''))
+    return 'Pemeriksaan gula darah bukan pemeriksaan fisik 89.29/89.39; kode penunjang darah dinilai dari hasil pemeriksaan.';
+  return null;
+}
+
+function jagaSumberTindakan(saran, tindakan, halaman) {
+  const suggestions = (saran || []).map(s => {
+    if (!s || s.type !== 'procedure' || s.boleh_isi_otomatis === false) return s;
+    const alasan = alasanKodeTindakan(s.code, s.quotation)
+      || alasanTahanTindakan({ page_number: s.page_number, kutipan: s.quotation }, halaman);
+    return alasan ? { ...s, boleh_isi_otomatis: false, alasan_tahan: alasan } : s;
+  });
+  const findings = (tindakan || []).map(t => {
+    if (!t?.kode_usulan || !(t.bukti || []).length) return t;
+    // Gerbang yang sama berlaku untuk temuan; kode tertahan tidak boleh
+    // dimasukkan kembali lewat tindakanTerverifikasi pada tahap berikutnya.
+    const alasan = t.bukti.map(b => alasanKodeTindakan(t.kode_usulan, b.kutipan || b.quotation) || alasanTahanTindakan(b, halaman));
+    if (alasan.some(a => !a)) return { ...t, bukti_kode: t.bukti.filter((_, i) => !alasan[i]) }; // Petunjuk resep tetap terlihat; kode memakai catatan pelaksanaan yang sah.
+    return { ...t, kode_perlu_klarifikasi: t.kode_usulan, kode_usulan: null,
+      perlu_klarifikasi: true, alasan_tahan: alasan[0], catatan_kode: `Kandidat ${t.kode_usulan}. ${alasan[0]}` };
+  });
+  return { saran: suggestions, tindakan: findings };
+}
 
 /**
  * Kamus tindakan. `kode_usulan` adalah USULAN, bukan keputusan — apakah ia
@@ -35,13 +87,15 @@ const { classifyPageDocumentType } = require('./pdfPageClassifier');
  * jauh lebih berbahaya daripada kolom kosong.
  */
 const KAMUS_TINDAKAN = [
+  { id: 'kateter_urin', nama: 'Kateterisasi urin', kode_usulan: '57.94',
+    pola: /\b(?:pasang|pemasangan|terpasang)\s+(?:dc|dower\s+catheter|kateter\s+(?:urin|urine)|foley)\b|\bkateterisasi\s+(?:urin|urine)\b/i },
   {
     id: 'nebulisasi',
     nama: 'Nebulisasi',
     kode_usulan: '93.94',
     // "Nebulizer"/"Nebuliser" ditulis dokter di kolom Tindakan resume IGD
     // (berkas 0170R0110826V000083: "Nebulizer Ventasal : Budesma = 1 : 1").
-    pola: /\bnebu?l(isasi)?\b|\bnebules\b|\bnebuli[sz]er\b/i,
+    pola: /\b(?:di)?nebu(?:l(?:isasi|i[sz]er|i[sz]ation|es)?)?\b/i,
     // Petunjuk di RESEP bahwa tindakannya dilakukan. Yang dihitung alat, atau
     // obat dalam bentuk nebul; salbutamol tablet bukan nebulisasi, jadi obat
     // selalu dipasangkan dengan bentuk sediaannya.
@@ -49,6 +103,14 @@ const KAMUS_TINDAKAN = [
       /\bmasker\s*nebul|\bnebuli[sz]er\b|\bnebul\s*chamber\b/i,
       /\b(ventasal|salbutamol|combivent|ipratropium|ventolin|budesonide|pulmicort)\b[^\n]{0,40}\b(nebul\w*|respul|inhalasi)\b/i,
     ],
+  },
+  {
+    id: 'ligasi_hemoroid', nama: 'Ligasi hemoroid', kode_usulan: '49.45',
+    pola: /\b(?:ligasi|ligation|banding)\s+(?:hemoroid|hemorroid|hemorrhoid)s?\b/i,
+  },
+  {
+    id: 'eksisi_hemoroid', nama: 'Eksisi hemoroid', kode_usulan: '49.46',
+    pola: /\b(?:eksisi|excision|excisi\w*)\s+(?:hemoroid|hemorroid|hemorrhoid)s?\b|\b(?:hemoroidektomi|hemorrhoidectomy)\b/i,
   },
   {
     id: 'terapi_oksigen',
@@ -122,7 +184,7 @@ const KAMUS_TINDAKAN = [
  * yang salah, terutama yang kosong.
  */
 const LABEL_PER_JENIS = {
-  resume_medis: [/\bTindakan\b/i],
+  resume_medis: [/\bTindakan(?:\s*\/\s*Prosedur)?\b/i, /^\s*(?:Prosedur|Terapi\/pengobatan selama di rumah sakit)\s*:/i],
   triase_igd: [/\bTindakan\s+Keperawatan\b/i, /\bIntervensi\s+Keperawatan\b/i],
 };
 
@@ -134,7 +196,7 @@ const LABEL_PER_JENIS = {
 // Awal bagian berikutnya — dipakai membatasi sampai mana daftar tindakan
 // dibaca, baik pada triase maupun resume. Tanpa batas, pemindaian menelan
 // isi bagian berikutnya dan menautkan tindakan ke tempat yang salah.
-const BATAS_BAGIAN = /^(evaluasi|discharge|planning|edukasi|tanda\s*tangan|catatan\s*perkembangan|pemeriksaan\s*penunjang|diagnosa\s*keperawatan|rencana|anjuran|kelanjutan|diagnosa|penyebab|magelang,)/i;
+const BATAS_BAGIAN = /^(evaluasi|discharge|planning|edukasi|tanda\s*tangan|catatan\s*perkembangan|pemeriksaan\s*penunjang|diagnosa\s*keperawatan|rencana|anjuran|kelanjutan|diagnos[ai]s?|penyebab|terapi|reaksi|diet|instruksi|keadaan\s+keluar|cara\s+keluar|magelang,)/i;
 
 /**
  * Isi kolom Tindakan resume menurut POSISI kata, bila halaman membawanya.
@@ -177,12 +239,16 @@ function ambilNilaiLabel(baris, indeks, pola) {
  */
 function dinegasi(teks, indeks) {
   const sebelum = String(teks).slice(Math.max(0, indeks - 24), indeks);
-  return /\b(tanpa|tidak|tdk|tak|belum|bukan)\s+(perlu\s+|ada\s+|di\s*beri\s+|diberi\s+|pakai\s+|dilakukan\s+|di\s*lakukan\s+)?$/i.test(sebelum);
+  return /\b(tanpa|tidak|tdk|tak|belum|bukan)\s+(perlu\s+|ada\s+|di\s*beri(?:kan)?\s+|diberi(?:kan)?\s+|pakai\s+|dilakukan\s+|di\s*lakukan\s+)?$/i.test(sebelum);
 }
 
 function cocokPola(pola, teks) {
   const m = pola.exec(teks);
-  return Boolean(m) && !dinegasi(teks, m.index);
+  if (!m || dinegasi(teks, m.index)) return false;
+  const sebelum = String(teks).slice(0, m.index);
+  const sesudah = String(teks).slice(m.index + m[0].length);
+  return !/\b(?:rencana|direncanakan|anjuran|anjurkan|bila\s+perlu|jika|riwayat|pro|jadwal|akan)\b/i.test(sebelum)
+    && !/^\s*(?:belum|tidak|ditunda|dibatalkan|batal|\(-\))/i.test(sesudah);
 }
 
 function cocokkanKamus(teks) {
@@ -300,6 +366,15 @@ function bacaTemuanTindakan(halaman) {
       }
     }
 
+    // Discharge planning/intervensi di halaman lanjutan triase: hanya catatan
+    // pelaksanaan eksplisit, bukan rencana obat pulang atau edukasi.
+    if (/discharge\s+planning|perencanaan\s+pemulangan/i.test(teks)) {
+      for (const b of baris) {
+        if (!/memberikan|diberikan|dilakukan|melakukan|telah|terpasang/i.test(b)) continue;
+        for (const t of cocokkanKamus(b)) catat(t, { page_number: hal.page_number || null, sumber: 'triase_igd', kutipan: b.trim().slice(0, 160) });
+      }
+    }
+
     // 2. Dari resep. Resep tidak pernah menambah tindakan sendiri — ia hanya
     //    menguatkan atau memunculkan pertanyaan. Karena itu sumbernya ditandai
     //    supaya bisa dibedakan saat dinilai.
@@ -400,6 +475,7 @@ function periksaSilangTindakan(temuan) {
 }
 
 module.exports = {
+  jagaSumberTindakan,
   kalimatTindakanTakDikenal,
   bacaTemuanTindakan,
   periksaSilangTindakan,

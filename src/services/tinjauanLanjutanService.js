@@ -9,7 +9,8 @@ const { classifyPageDocumentType } = require('./pdfPageClassifier');
 
 const VERSI = 'hybrid-rj-ri-v1';
 // Hasil Sol untuk masukan yang persis sama dipakai ulang (baca ulang, segarkan
-// saran) -- satu panggilan Sol ±Rp500-700. Kedaluwarsa bawaan 30 hari.
+// saran). Biaya berdasarkan penggunaan aktual, bukan harga tetap per panggilan.
+// Kedaluwarsa bawaan 30 hari.
 const CACHE_HARI = Number(process.env.AI_SOL_CACHE_HARI ?? 30);
 // Halaman administratif tidak dikirim ke Sol kecuali dirujuk temuan diagnosis/pending.
 const HALAMAN_ADMINISTRASI = new Set(['sep', 'rincian_biaya', 'berkas_eklaim']);
@@ -194,6 +195,7 @@ membuktikan, "klarifikasi" paling banyak 3 butir. Ketelitian penilaian tidak bol
   const muatan = {
     system: denganHumanizer(system), dikenal, json: true, maxTokens: 16000, versi: VERSI,
     jenisKlaim: record.jenis_klaim || record.JENIS_KLAIM,
+    pemicuPendalaman: pemicu,
     prompt: `JENIS_KLAIM: ${record.jenis_klaim || record.JENIS_KLAIM}\nPEMICU: ${JSON.stringify(pemicu)}
 KANDIDAT_DIAGNOSIS: ${JSON.stringify(candidates)}
 HALAMAN_RESUME: ${JSON.stringify(resumePages)}
@@ -203,13 +205,16 @@ ${catatanAgen ? `${catatanAgen}\n` : ''}HASIL_AWAL_UNTUK_DIBANDINGKAN: ${JSON.st
   ...(ai.analisis_kritis?.perlu_analisis_mendalam ? { analisis_kritis: (ai.analisis_kritis.temuan || []).filter(t => t.keparahan === 'tinggi').map(t => ({ jenis: t.jenis, pesan: t.pesan, bukti: t.bukti })) } : {}) })}`,
   };
   const kunci = createHash('sha256').update(JSON.stringify([VERSI, process.env.AI_REVIEW_MODEL || 'gpt-6.1-sol', muatan.system, muatan.prompt])).digest('hex');
-  const dariCache = await ambilCache(db, kunci);
+  const budgetScope=require('./konteksPenggunaanAiService').saatIni().anggaran_ai;
+  // PDF beranggaran memakai cache gateway per RS/berkas, tanpa cache lintas RS.
+  const dariCache = budgetScope ? null : await ambilCache(db, kunci);
   const response = dariCache || await gateway.panggilModel('tinjau_kasus_lanjutan', muatan, { db });
   const metadata = { ...awal, status: 'gagal', model: response?.model || null, effort: response?.effort || null,
-    ...(dariCache ? { dari_cache: true } : {}),
+    ...(dariCache || response?.dari_cache ? { dari_cache: true } : {}),
     tokens_used: response?.penggunaan?.total_tokens || 0, biaya: response?.biaya || null,
     halaman_dikirim: pilihan.map(p => Number(p.page_number)),
-    pesan: 'Pemeriksaan lanjutan belum berhasil diverifikasi; hasil awal dan tanda risiko tetap berlaku.' };
+    ...(response?.kode ? { kode: response.kode } : {}),
+    pesan: response?.error || 'Pemeriksaan lanjutan belum berhasil diverifikasi; hasil awal dan tanda risiko tetap berlaku.' };
   if (!response?.ok) return { metadata };
   const cekSol = diagnosisBisaDinilai ? periksaTinjauan(response.hasil?.diagnosis, candidates, pilihan) : { hasil: null, alasan: null };
   const solDiagnosis = cekSol.hasil;
@@ -219,7 +224,7 @@ ${catatanAgen ? `${catatanAgen}\n` : ''}HASIL_AWAL_UNTUK_DIBANDINGKAN: ${JSON.st
   }
   const solPutusan = putusanKandidat ? bentukPutusan(putusanKandidat, response.hasil?.putusan, response) : null;
   if ((diagnosisBisaDinilai && !solDiagnosis) || (putusanKandidat && !solPutusan?.ok)) return { metadata };
-  if (!dariCache) await simpanCache(db, kunci, response);
+  if (!dariCache && !budgetScope) await simpanCache(db, kunci, response);
   let tinjauan;
   let berbeda = false;
   if (solDiagnosis) {

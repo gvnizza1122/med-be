@@ -212,6 +212,16 @@ describe('isiKodeDariSaranTervalidasi (regresi)', () => {
     expect(db.tulis.find(t => /SET diagnosa_list/.test(t.sql))).toBeUndefined();
   });
 
+  test('kandidat non-WHO yang tertahan tetap terlihat, tanpa mengisi DIAGLIST atau menghitung tarif', async () => {
+    const db = dbPalsu();
+    const ai = { suggested_codes: [{ code: 'Z99.999', type: 'diagnosis', kamus_valid: false, belum_who: true, boleh_isi_otomatis: false }] };
+    await isiKodeDariSaranTervalidasi(db, 'rec1', { DIAGLIST: '', PROCLIST: '93.94' }, ai);
+    expect(db.tulis.find(t => /SET diagnosa_list/.test(t.sql))).toBeUndefined();
+    expect(ai.inacbg_result).toBeFalsy();
+    expect(ai.kode_belum_who).toEqual([expect.objectContaining({ kode: 'Z99.999' })]);
+    expect(db.tulis.filter(t => /SET ai_review/.test(t.sql)).some(t => JSON.parse(t.a[0]).kode_belum_who)).toBe(true);
+  });
+
   // Ditemukan pada SEP 0170R0110826V003045 (SUMIDAH): kartu klaim menampilkan
   // "VALID" tapi ringkasan "Hasil Validasi" di atas menampilkan "100% PENDING".
   // Sebabnya recomputeFileCounts (pengisi cache claim_files.valid_count/
@@ -255,7 +265,10 @@ describe('isiKodeDariSaranTervalidasi (regresi)', () => {
         }
         if (/SELECT \* FROM validation_rules/.test(sql)) return { all: async () => [] };
         if (/UPDATE claim_records SET validation_status = \?/.test(sql)) {
-          return { run: async (v) => { state.validation_status = v; } };
+          return { run: async (v, count) => {
+            state.validation_status = v;
+            if (/error_count = \?/.test(sql)) state.error_count = count;
+          } };
         }
         if (/UPDATE claim_files SET valid_count/.test(sql)) {
           return { run: async (...a) => { recompute.push(a); } };
@@ -305,6 +318,19 @@ describe('isiKodeDariSaranTervalidasi (regresi)', () => {
     expect(db.state.validation_status).toBe('valid');
   });
 
+  test.each([
+    ['J45.9', 0, 'pending'],
+    ['R10.84', 1, 'error'],
+  ])('hitungan kesalahan mengikuti validasi terbaru %s tanpa menghapus penanda klinis', async (dx, count, status) => {
+    const db = dbBerstatus({ validation_status: 'pending', error_count: 7,
+      file_id: 'file-9', diagnosa_list: dx, prosedur_list: '' });
+    db.all = dbPalsu().all;
+    await isiKodeDariSaranTervalidasi(db, 'rec1', { DIAGLIST: dx }, {});
+    expect(db.state.error_count).toBe(count);
+    expect(db.state.validation_status).toBe(status);
+    expect(db.recompute).toHaveLength(1);
+  });
+
   // Kasus SUMIDAH: INA-CBG & Tarif tampil "Pending verifikasi" terus walau
   // DIAGLIST/PROCLIST sudah valid, karena grouping di dalam generateAiReview
   // dihitung dari kode yang ada SAAT itu (masih kosong). Di sini DIAGLIST/
@@ -320,9 +346,8 @@ describe('isiKodeDariSaranTervalidasi (regresi)', () => {
     );
     expect(ai.inacbg_result).not.toBeNull();
     // Rawat jalan memakai kode ambulatori bertarif tunggal. J45.9 -> Q-5-44-0
-    // (kolom Outpatient tabel resmi alt_diagnosis); nebulisasi 93.94 adalah
-    // penunjang/terapi, tidak menggerakkan kelompok prosedur.
-    expect(ai.inacbg_result.code).toBe('Q-5-44-0');
+    // Nebulisasi 93.94 memiliki base Outpatient J-3-13 di installer.
+    expect(ai.inacbg_result.code).toBe('J-3-13-0');
     expect(ai.tariff_result.amount).toBeGreaterThan(0);
     const tulisAiReview = db.tulis.filter(t => /SET ai_review/.test(t.sql));
     expect(tulisAiReview.some(t => JSON.parse(t.a[0]).inacbg_result)).toBe(true);

@@ -7,5 +7,5 @@
   },
   "icc_version": "0.2.1831.202606291712",
   "diambil": "2026-10-04",
-  "catatan": "Base group & tarif = tabel resmi E-Klaim (terbuka). Severity I/II/III belum memakai matriks CC resmi (berkas iDRG terenkripsi); tetap estimasi. Lembar grouper casemix otoritas final."
+  "catatan": "Base group & tarif = tabel referensi resmi E-Klaim (terbuka). Patch memuat c51cclm terbuka (106 baris), tetapi c51dc hanya memetakan 6 kelompok COVID-19; belum cukup untuk severity umum. Referensi tambahan ada di referensiTambahan.json. Severity I/II/III tetap estimasi; hasil mesin grouper E-Klaim otoritas final."
 }

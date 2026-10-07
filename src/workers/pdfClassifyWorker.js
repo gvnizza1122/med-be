@@ -46,7 +46,9 @@ async function classify(filePath, bufferData) {
   };
   try {
     const data = bufferData || fs.readFileSync(filePath);
-    const parsed = await new PDFParse({ data }).getText();
+    const parser=new PDFParse({ data });
+    let parsed;
+    try {parsed=await parser.getText();} finally {await parser.destroy();}
     const full = parsed.text || '';
 
     const markers = [...full.matchAll(/--\s*(\d+)\s*of\s*(\d+)\s*--/gi)];

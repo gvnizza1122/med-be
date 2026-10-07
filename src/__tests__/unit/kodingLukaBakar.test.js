@@ -33,8 +33,8 @@ test('grouper: debridemen luka bakar tetap S-4-16; lokasi, penyebab luar & I10 t
   const h = hitungInacbgDanTarif(['T31.1', 'T20.2', 'T22.2', 'T23.2', 'T24.2', 'X09.5', 'I10'], ['86.22', '90.59', '87.44', '89.52'], 'RAWAT_INAP', '3', null);
   expect(h.inacbgResult.code).toBe('S-4-16-I');
   expect(h.tarifResult.amount).toBe(3908200);
-  // Debridemen di luar luka bakar tetap kelompok prosedur kulit.
-  expect(hitungInacbgDanTarif(['L03.1'], ['86.22'], 'RAWAT_INAP', '3', null).inacbgResult.code).toMatch(/^L-1-40/);
+  // Referensi installer menandai 86.22 sebagai NON-OR; jangan mengarang kelompok bedah.
+  expect(hitungInacbgDanTarif(['L03.1'], ['86.22'], 'RAWAT_INAP', '3', null).inacbgResult.code).toBe('L-4-12-I');
 });
 
 test('temuan penunjang mencatat jenis halaman sumber (lembar hasil vs resume)', () => {

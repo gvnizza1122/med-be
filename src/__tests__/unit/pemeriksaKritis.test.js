@@ -16,9 +16,16 @@ test('hasil yang beres: tanpa temuan aturan', () => {
   expect(t).toEqual([]);
 });
 
-test('severity naik karena diagnosis sekunder di luar resume -> potensi upcoding (tinggi)', () => {
+test('diagnosis sekunder tidak otomatis menaikkan severity atau memicu tuduhan upcoding', () => {
   const t = periksaAturan({ record, ai: { suggested_codes: [s('D21.3', 'diagnosis'), s('D64.9', 'diagnosis', 12), s('86.3', 'procedure')] }, pages: [resume, tagihan], hitungInacbgDanTarif });
+  expect(t.some(x => x.jenis === 'potensi_upcoding')).toBe(false);
+});
+
+test('hasil tingkat II dengan kode sekunder yang belum didukung tetap memicu klarifikasi', () => {
+  const hitung = () => ({ inacbgResult: { code: 'L-1-40-II' }, tarifResult: null });
+  const t = periksaAturan({ record, ai: { suggested_codes: [s('D21.3', 'diagnosis'), s('D64.9', 'diagnosis', 12), s('86.3', 'procedure')] }, pages: [resume, tagihan], hitungInacbgDanTarif: hitung });
   expect(t.map(x => [x.jenis, x.keparahan])).toContainEqual(['potensi_upcoding', 'tinggi']);
+  expect(t.find(x => x.jenis === 'potensi_upcoding').pesan).not.toMatch(/dipengaruhi/);
 });
 
 test('tarif jauh di bawah tagihan & operasi tanpa kode -> potensi rugi RS', () => {
@@ -59,4 +66,16 @@ test('AI pemeriksa gagal (koneksi) -> diulang sekali, dan TIDAK dilaporkan aman'
   expect(r).toMatchObject({ ai_gagal: true, tingkat: 'sedang', pesan_gangguan: 'fetch failed' });
   expect(r.skor_keyakinan).toBeLessThanOrEqual(70);
   expect(r.kesimpulan).toMatch(/belum berjalan/);
+});
+
+test('keberatan AI "kode tidak didukung" dibantah bila ada halaman hasil (EKG)', async () => {
+  const ekg = { page_number: 8, ocr_text: 'Sinus tachycardia Abnormal ECG Vent. Rate QRS Duration' };
+  const gateway = { panggilModel: jest.fn(async () => ({ ok: true, penggunaan: { total_tokens: 100 }, biaya: { idr: 1 }, model: 'gpt-6-luna', hasil: {
+    keberatan: [{ jenis: 'kode_tidak_didukung', keparahan: 'sedang', pesan: 'Kode EKG 89.52 tidak didukung oleh bukti yang tersedia.', saran: 'Hapus 89.52.', kutipan: 'Tumor regio sternum', halaman: 3 }],
+    kesimpulan: 'x' } })) };
+  const ai = { suggested_codes: [s('D21.3', 'diagnosis'), s('86.3', 'procedure'), s('89.52', 'procedure', 8)],
+    temuan_penunjang: [{ istilah_id: 'ekg', kode_usulan: '89.52', page_number: 8, jenis_halaman: 'ekg' }] };
+  const r = await periksaKritis({ record, ai, pages: [resume, ekg, tagihan], hitungInacbgDanTarif, gateway });
+  expect(r.temuan.some(t => /89\.52/.test(t.pesan))).toBe(false);
+  expect(r.keberatan_dibantah_bukti).toEqual([expect.objectContaining({ kode: '89.52', halaman: 8 })]);
 });

@@ -177,14 +177,14 @@ describe('validateRecord', () => {
     });
   });
 
-  describe('RV-17: Odontektomi Rawat Jalan', () => {
-    test('triggers for odontektomi in rawat inap', () => {
+  describe('RV-17: indikasi odontektomi sesuai BA 2024', () => {
+    test('kode odontektomi rawat inap saja tidak menjadi kesalahan', () => {
       const record = {
         prosedur_list: '23.19;88.72',
         jenis_klaim: 'RAWAT_INAP'
       };
       const errors = validateRecord(record, activeRules);
-      expect(errors.some(e => e.rule_id === 'RV-17')).toBe(true);
+      expect(errors.some(e => e.rule_id === 'RV-17')).toBe(false);
     });
 
     test('does not trigger without odontektomi code', () => {

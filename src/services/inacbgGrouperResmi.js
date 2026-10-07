@@ -9,18 +9,19 @@
  * Yang RESMI & PASTI di sini:
  *   - Base CBG dari diagnosis utama  (src/data/inacbg/grouperDiagnosis.json:
  *     kolom Inpatient/Outpatient tabel alt_diagnosis).
- *   - Base CBG dari prosedur bedah   (grouperProsedur.json: tabel alt_procedures);
- *     bila ada beberapa, prioritas diambil dari urutan hierarki resmi
- *     (grouperHierarki.json: tabel alt_hierarchy1 -- ID kecil = prioritas tinggi).
+ *   - Kandidat base dari prosedur (alt_procedures) dan urutan hierarki
+ *     alt_hierarchy1 (IP), alt_hierarchy2/3 (OP). Tabel kandidat belum mencakup
+ *     seluruh pengecualian dan kondisi mesin grouper.
  *   - Tarif per kelas & rawat jalan  (tarif.json: tabel tariff_20230124, irisan
  *     profil RS di meta.json, default Regional 1 x Kelas D Swasta).
  *
  * Yang BELUM resmi (estimasi):
- *   - Severity I/II/III. Matriks level CC per base-CBG (c51cclm diindeks kolom
- *     dccol) ada di berkas grouper terenkripsi, jadi TIDAK bisa direproduksi di
- *     sini. Severity default = I (paling konservatif, tidak pernah menaikkan
- *     tarif tanpa dasar). `severity_estimasi: true` menandai ini. Otoritas final
- *     tetap lembar grouper casemix / E-Klaim.
+ *   - Severity I/II/III. Patch juga membawa c51cclm terbuka, tetapi c51dc
+ *     (pemetaan dccol) hanya mencakup 6 kelompok COVID-19. Data tambahan
+ *     tersimpan di referensiTambahan.json; belum cukup untuk severity umum.
+ *     Severity default = I (paling konservatif, tidak pernah menaikkan
+ *     tarif tanpa dasar). `severity_estimasi: true` menandai ini. Perhitungan
+ *     aplikasi berdiri sendiri; hasil mesin E-Klaim dipakai untuk verifikasi.
  */
 
 const dxTable = require('../data/inacbg/grouperDiagnosis.json');
@@ -28,6 +29,14 @@ const pxTable = require('../data/inacbg/grouperProsedur.json');
 const hierarki = require('../data/inacbg/grouperHierarki.json');
 const tarifTable = require('../data/inacbg/tarif.json');
 const META = require('../data/inacbg/meta.json');
+const tambahan = require('../data/inacbg/referensiTambahan.json');
+const VERSI_PERKIRAAN = '2026-10-07.1';
+// Dua tingkat prioritas prosedur OP terpisah. ID di hierarchy3 dimulai ulang
+// dari 1; tidak boleh dibandingkan langsung dengan ID hierarchy2.
+const hierarkiOp = Object.fromEntries([2, 3].flatMap((n) =>
+  (tambahan.tabel[`casemix.alt_hierarchy${n}`] || [])
+    .filter(r => r.InOut === 'OP')
+    .map(r => [r.DRG.trim(), (n - 2) * 10000 + Number(r.ID)])));
 
 const norm = (c) => String(c || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
 
@@ -41,6 +50,12 @@ function baseProsedur(kode, rawatInap) {
   const r = pxTable[norm(kode)];
   if (!r) return [];
   return rawatInap ? (r.ip || []) : (r.op || []);
+}
+
+/** Tabel mengenali prosedur ini, tetapi tidak memetakannya sebagai pemicu base rawat inap. */
+function tanpaBaseRawatInap(kode) {
+  const r = pxTable[norm(kode)];
+  return Boolean(r && Array.isArray(r.ip) && r.ip.length === 0);
 }
 
 /** Tarif resmi untuk kode CBG penuh (mis. "A-4-13-II"). */
@@ -69,21 +84,29 @@ function tentukanBase(dxs, pxs, rawatInap) {
   const procs = (pxs || []).map(p => String(p || '').trim()).filter(Boolean);
   if (!diags.length) return null;
 
-  // 1. Prosedur bedah: kumpulkan semua base-CBG prosedur, ambil prioritas hierarki.
-  //    Prosedur PENUNJANG/TERAPI (ICD-9-CM mayor >= 87: lab 90.x, radiologi 87.x,
-  //    EKG 89.52, nebulisasi 93.94, oksigen 93.96, dst.) TIDAK menggerakkan
-  //    kelompok -- konsisten dengan konvensi casemix RS (penunjang & tindakan
-  //    rutin tidak dikode sebagai prosedur bedah). Tanpa ini, rontgen/nebulisasi
-  //    rawat jalan salah menjadi CBG prosedur (mis. 93.94 -> J-3-13).
+  const opsi = baseDiagnosis(diags[0], rawatInap);
+  // Kolom IP/OP menentukan apakah prosedur memicu kelompok. Nomor >=87
+  // bukan alasan membuang prosedur: nebulisasi/perawatan luka/USG memiliki
+  // base OP; angiografi/intubasi tertentu juga mempunyai base IP.
+  // OP memakai hierarki 2/3. Layanan medis umum dari prosedur (mis. interview
+  // 89.xx -> kelompok jiwa) hanya dipakai bila sesuai kandidat diagnosis;
+  // sebutan pemeriksaan rutin tidak otomatis mengubah pelayanan utamanya.
+  const prioritas = rawatInap ? hierarki : hierarkiOp;
   const kandidat = [];
   for (const p of procs) {
-    const mayor = parseInt(String(p).replace(/[^0-9]/g, '').slice(0, 2), 10);
-    if (Number.isFinite(mayor) && mayor >= 87) continue;
-    for (const g of baseProsedur(p, rawatInap)) kandidat.push({ grup: g, prosedur: p });
+    for (const g of baseProsedur(p, rawatInap)) {
+      if (!rawatInap && prioritas[g] == null && !opsi.includes(g)) continue;
+      kandidat.push({ grup: g, prosedur: p });
+    }
   }
   if (kandidat.length) {
-    kandidat.sort((a, b) => (hierarki[a.grup] ?? 9999) - (hierarki[b.grup] ?? 9999));
-    return { base: kandidat[0].grup, via: 'prosedur', prosedur: kandidat[0].prosedur };
+    kandidat.sort((a, b) => (prioritas[a.grup] ?? 99999) - (prioritas[b.grup] ?? 99999)
+      || a.grup.localeCompare(b.grup) || norm(a.prosedur).localeCompare(norm(b.prosedur)));
+    const unik = kandidat.filter((c, i) => kandidat.findIndex(k => k.grup === c.grup) === i);
+    return { base: kandidat[0].grup, via: 'prosedur', prosedur: kandidat[0].prosedur,
+      sumber_hierarki: rawatInap ? 'alt_hierarchy1' : 'alt_hierarchy2/3',
+      kandidat_base: unik.map(c => ({ base: c.grup, prosedur: c.prosedur })),
+      base_perlu_verifikasi: unik.length > 1 };
   }
 
   // 2. Diagnosis utama. Bila ada beberapa opsi, buang dulu kelompok BEDAH
@@ -91,10 +114,20 @@ function tentukanBase(dxs, pxs, rawatInap) {
   //    ditangani di langkah 1). Dari sisanya ambil opsi PERTAMA (urutan tabel
   //    resmi = prioritas). Contoh: T31 "L-1-20,S-4-16" -> S-4-16 (L-1-20 bedah,
   //    tak ada prosedur); P07.3 "P-8-17,Z-4-12" -> P-8-17 (opsi pertama).
-  const opsi = baseDiagnosis(diags[0], rawatInap);
   if (!opsi.length) return null;
-  const nonBedah = opsi.filter(g => !/^[A-Z]-[123]-/.test(g));
-  return { base: (nonBedah[0] || opsi[0]), via: 'diagnosis', prosedur: null };
+  const nonBedah = opsi.filter(g => !(rawatInap ? /^[A-Z]-[123]-/ : /^[A-Z]-[1237]-|^X-0-/).test(g));
+  // Diagnosis antepartum tidak membuktikan tindakan persalinan OP (-7-).
+  // Konseling tanpa prosedur tidak membuktikan MCU/ECG/vaksinasi/pasang infus.
+  // Bila tabel menyediakan konsultasi umum, gunakan sebagai acuan dan tandai
+  // kebutuhan verifikasi layanan khusus yang belum tercatat.
+  const konsultasi = !rawatInap && nonBedah.includes('Q-5-18');
+  const base = konsultasi ? 'Q-5-18' : nonBedah[0];
+  if (!base) return null;
+  return { base, via: 'diagnosis', prosedur: null,
+    kandidat_base: (konsultasi ? nonBedah : [base]).map(g => ({ base: g, prosedur: null })),
+    base_perlu_verifikasi: !!konsultasi && nonBedah.length > 1,
+    catatan_base: konsultasi && nonBedah.length > 1
+      ? 'Konseling/konsultasi menjadi acuan sementara. Jenis pemeriksaan khusus belum dibuktikan oleh daftar prosedur.' : null };
 }
 
 /**
@@ -125,13 +158,18 @@ function grouperResmi(diagnosisCodes, procedureCodes = [], jenisKlaim = 'RAWAT_I
     tarif_status: t.status,
     sumber: 'grouper_resmi_tabel_eklaim',
     confidence: b.via === 'prosedur' ? 0.75 : 0.65,
-    reasoning: b.via === 'prosedur'
-      ? `Base CBG ${b.base} dari prosedur ${b.prosedur} (tabel resmi alt_procedures), diagnosis utama ${norm(diagnosisCodes[0])}. Severity I = estimasi (matriks CC resmi tidak tersedia).`
-      : `Base CBG ${b.base} dari diagnosis utama ${norm(diagnosisCodes[0])} (tabel resmi alt_diagnosis). Severity I = estimasi (matriks CC resmi tidak tersedia).`,
+    versi_perkiraan: VERSI_PERKIRAAN,
+    kandidat_base: b.kandidat_base,
+    base_perlu_verifikasi: !!b.base_perlu_verifikasi,
+    reasoning: (b.via === 'prosedur'
+      ? `Base CBG ${b.base} dari prosedur ${b.prosedur} (alt_procedures, urutan ${b.sumber_hierarki}), diagnosis utama ${norm(diagnosisCodes[0])}.`
+      : `Base CBG ${b.base} dari diagnosis utama ${norm(diagnosisCodes[0])} (alt_diagnosis).`)
+      + (rawatInap ? ' Severity I = estimasi (matriks CC umum belum lengkap).' : ' Rawat jalan menggunakan tarif tunggal dengan akhiran 0.')
+      + (b.catatan_base ? ` ${b.catatan_base}` : ''),
   };
 }
 
 module.exports = {
-  grouperResmi, tarifResmi, tentukanBase, baseDiagnosis, baseProsedur,
-  PROFIL: META.profil, META,
+  grouperResmi, tarifResmi, tentukanBase, baseDiagnosis, baseProsedur, tanpaBaseRawatInap,
+  PROFIL: META.profil, META, VERSI_PERKIRAAN,
 };

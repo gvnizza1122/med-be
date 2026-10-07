@@ -1,3 +1,4 @@
+const { pastikanIndeks } = require('../database/schemaIdempotent');
 /**
  * Rule berversi ("Dua Model, Satu Aturan") — pengetahuan hidup di database,
  * bukan di model. Model hanya mengusulkan; MENGAKTIFKAN rule berubah adalah
@@ -61,7 +62,7 @@ async function ensureSchema(db) {
       CHECK (berlaku_sampai IS NULL OR berlaku_sampai >= berlaku_mulai)
     )
   `);
-  await db.query('CREATE INDEX IF NOT EXISTS idx_rule_versi_kode_status ON rule_versi(rule_kode, status)');
+  await pastikanIndeks(db, 'CREATE INDEX IF NOT EXISTS idx_rule_versi_kode_status ON rule_versi(rule_kode, status)');
 }
 
 // ---------- tanggal ----------

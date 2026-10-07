@@ -10,14 +10,10 @@
  *   ditampilkan TERPISAH sebagai pembanding, tidak pernah menggantikan 1-2.
  *
  * iDRG -- Tarif = Cost Weight (CW) x National Base Rate (NBR).
- *   Rumus terbukti pada contoh respons E-Klaim (koleksi Postman E-Klaim
- *   iDRG): total CW 7,1976662 x NBR 8.037.060 = Rp 57.848.075, sama dengan
- *   total_tarif keluaran grouper. NBR yang dipakai adalah angka rancangan
- *   Kemenkes (rawat inap Rp 8.037.060, rawat jalan Rp 461.474) dan bisa
- *   diubah lewat env IDRG_NBR_RANAP / IDRG_NBR_RAJAL begitu angka resmi terbit.
- *   Kode DRG dan CW HANYA dihasilkan grouper iDRG (di dalam E-Klaim); tabel
- *   CW belum dipublikasikan resmi. Tanpa keduanya tarif iDRG TIDAK ditebak --
- *   statusnya "belum_dapat_dihitung" dengan alasan yang jelas.
+ *   Tampilan hasil berkas hanya memakai tarif, CW dan NBR dari berkas itu.
+ *   NBR rancangan/configurasi hanya tersedia melalui helper simulasi terpisah.
+ *   Aplikasi belum memiliki mesin iDRG atau tabel CW terverifikasi untuk
+ *   menghitung kode dan tarif iDRG secara mandiri.
  */
 
 const { konversiKeIdrg, SUMBER: SUMBER_KAMUS_IM } = require('./kamusIdrgService');
@@ -47,6 +43,12 @@ const angka = (v) => {
   if (v == null || v === '') return null;
   const n = Number(String(v).replace(/[^\d.-]/g, ''));
   return Number.isFinite(n) && n > 0 ? n : null;
+};
+const desimal = v => {
+  const s = String(v ?? '').trim();
+  if (!/^\d+(?:[.,]\d+)?$/.test(s)) return null;
+  const n = Number(s.replace(',', '.'));
+  return n > 0 ? n : null;
 };
 
 function bagianInacbg(raw, ai) {
@@ -80,31 +82,61 @@ function bagianInacbg(raw, ai) {
     tarif: tarifHitung && tarifHitung.amount != null ? Number(tarifHitung.amount) : null,
     catatan: (tarifHitung && tarifHitung.note) || null,
     sumber_tarif: (tarifHitung && tarifHitung.source) || null,
+    alasan: hasil.reasoning || null,
+    perlu_verifikasi_grouper: true,
+    versi_perkiraan: hasil.versi_perkiraan || null,
   } : null;
 
   return {
     resmi,
     hitungan_medaudit: hitungan,
+    // Perkiraan kasus berdiri sendiri; ketiadaan pembanding bukan ketiadaan
+    // perhitungan aplikasi. Field lama dipertahankan untuk klien sebelumnya.
+    perkiraan_klaim: hitungan ? {
+      ...hitungan,
+      status: hitungan.tarif == null ? 'tarif_belum_tersedia' : 'tersedia',
+      label: 'Perkiraan klaim kasus ini',
+      keterangan: hasil.severity_estimasi
+        ? 'Tingkat keparahan I merupakan acuan sementara. Nilai ini belum merupakan hasil final grouper E-Klaim.'
+        : 'Perkiraan berdasarkan diagnosis dan prosedur kasus ini; perlu verifikasi dengan hasil E-Klaim.',
+    } : null,
     cocok: resmi && hitungan ? resmi.kode === hitungan.kode : null,
   };
 }
 
 function bagianIdrg(raw, ai, jenisKlaim) {
   const rumus = 'Tarif iDRG = Cost Weight (CW) x National Base Rate (NBR)';
-  const nbr = nbrIdrg(jenisKlaim);
+  const nbr = { nilai: null, jenis: /INAP/i.test(String(jenisKlaim || '')) ? 'rawat_inap' : 'rawat_jalan', status: 'tidak_tersedia' };
   // Lembar cetak iDRG dari E-Klaim (bila pembacanya sudah tersedia) -- resmi.
   const lembar = ai && ai.lembar_grouper_idrg;
-  if (lembar && (lembar.total_tarif || lembar.cost_weight)) {
-    const hitung = lembar.cost_weight ? hitungTarifIdrg(lembar.total_cost_weight || lembar.cost_weight, jenisKlaim) : null;
+  if (lembar && (lembar.total_tarif || lembar.total_cost_weight || lembar.cost_weight)) {
+    const cw = desimal(lembar.total_cost_weight || lembar.cost_weight);
+    const nbrLembar = desimal(lembar.nbr?.nilai ?? lembar.nbr ?? lembar.national_base_rate);
+    const tarifLembar = desimal(lembar.total_tarif);
+    const tarif = tarifLembar || (cw && nbrLembar ? Math.round(cw * nbrLembar) : null);
     return {
-      status: 'tersedia',
+      status: tarif ? 'tersedia' : 'belum_dapat_dihitung',
       sumber: 'lembar_grouper_eklaim',
       drg: lembar.drg || null,
       deskripsi: lembar.drg_deskripsi || null,
-      cost_weight: lembar.total_cost_weight || lembar.cost_weight || null,
-      nbr,
-      tarif: lembar.total_tarif || (hitung && hitung.tarif) || null,
-      rumus,
+      cost_weight: cw,
+      nbr: nbrLembar ? { ...nbr, nilai: nbrLembar, status: 'dari_lembar_eklaim' } : nbr,
+      tarif, rumus,
+      verifikasi_rumus: tarifLembar && cw && nbrLembar ? Math.round(cw * nbrLembar) === tarifLembar : null,
+      ...(tarif ? {} : { alasan: 'Cost weight terbaca, tetapi tarif dan NBR dari hasil E-Klaim belum tersedia. NBR rancangan tidak dipakai untuk menetapkan tarif klaim.' }),
+    };
+  }
+  // Ekspor MIX juga membawa hasil iDRG. Ini pembacaan hasil yang sudah ada,
+  // bukan perhitungan kode iDRG oleh aplikasi, dan tidak memakai NBR rancangan.
+  if (raw.IDRG_DRG_CODE && desimal(raw.IDRG_TOTAL_TARIF)) {
+    const cw = desimal(raw.IDRG_TOTAL_COST_WEIGHT);
+    const nbrEkspor = desimal(raw.IDRG_NBR);
+    const tarif = desimal(raw.IDRG_TOTAL_TARIF);
+    return { status: 'tersedia', sumber: 'data_klaim', drg: String(raw.IDRG_DRG_CODE).trim(),
+      deskripsi: raw.IDRG_DRG_DESCRIPTION || null, cost_weight: cw,
+      nbr: nbrEkspor ? { nilai: nbrEkspor, jenis: nbr.jenis, status: 'dari_ekspor_eklaim' } : { nilai: null, jenis: nbr.jenis, status: 'tidak_tersedia' },
+      tarif, rumus, versi_grouper: raw.IDRG_GROUPER_VERSION || null,
+      verifikasi_rumus: cw && nbrEkspor ? Math.round(cw * nbrEkspor) === tarif : null,
     };
   }
   return {
@@ -116,7 +148,7 @@ function bagianIdrg(raw, ai, jenisKlaim) {
     nbr,
     tarif: null,
     rumus,
-    alasan: 'Kode DRG dan cost weight hanya dihasilkan grouper iDRG Kemenkes (di aplikasi E-Klaim), dan tabel cost weight iDRG belum dipublikasikan resmi. Tarif iDRG akan terisi otomatis bila berkas memuat lembar hasil grouper iDRG dari E-Klaim.',
+    alasan: 'Aplikasi belum memiliki mesin grouper iDRG atau tabel cost weight terverifikasi untuk menghitung kode dan tarif mandiri. Hasil iDRG dapat dibaca dari lembar atau ekspor E-Klaim bila tersedia.',
   };
 }
 
@@ -131,10 +163,20 @@ function susunTarifGanda(record, ai) {
   const jenisKlaim = record.jenis_klaim || raw.JENIS_KLAIM || null;
   const diaglist = record.diagnosa_list || raw.DIAGLIST || '';
   const proclist = record.prosedur_list || raw.PROCLIST || '';
+  // Selalu hitung pembanding INA-CBG dari kode masukan terkini, tidak menyalin
+  // hasil casemix/AI lama. Tidak perlu mengulang OCR atau panggilan model.
+  const review = { ...(ai || {}) };
+  const final = require('./pemeriksaKritisService').kodeFinal({ ...record, diagnosa_list: diaglist, prosedur_list: proclist }, review);
+  if (final.dx.length && ['RAWAT_INAP', 'RAWAT_JALAN'].includes(jenisKlaim)) {
+    const h = require('./aiReviewService').hitungInacbgDanTarif(final.dx, final.px, jenisKlaim,
+      require('./kelasPerawatanService').kelasTarif(record), null);
+    review.inacbg_result = h.inacbgResult;
+    review.tariff_result = h.tarifResult;
+  }
 
   return {
     jenis_klaim: jenisKlaim,
-    inacbg: bagianInacbg(raw, ai || {}),
+    inacbg: bagianInacbg(raw, review),
     idrg: bagianIdrg(raw, ai || {}, jenisKlaim),
     koding_idrg: { ...konversiKeIdrg(diaglist, proclist), sumber_kamus_im: SUMBER_KAMUS_IM },
   };

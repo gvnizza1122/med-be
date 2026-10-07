@@ -15,3 +15,7 @@ test('input panjang memakai pengali tarif resmi', () => {
   const usage = normalisasiPenggunaan({ prompt_tokens: 300000, completion_tokens: 10000 });
   expect(estimasiBiaya('gpt-6.1-sol', usage).usd).toBeCloseTo(1.35);
 });
+test('cache write yang tidak dilaporkan tetap tidak diketahui, berbeda dari nol terukur',()=>{
+  expect(normalisasiPenggunaan({prompt_tokens:100}).cache_write_tokens).toBeNull();
+  expect(normalisasiPenggunaan({prompt_tokens:100,prompt_tokens_details:{cache_write_tokens:0}}).cache_write_tokens).toBe(0);
+});
