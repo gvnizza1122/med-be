@@ -1102,6 +1102,34 @@ async function migrateSchema(db) {
       console.error('[migration] Gagal memastikan rule RV-21 ada:', e.message);
     }
 
+    // Hitungan per berkas (valid/pending/error) diselaraskan dengan status
+    // klaimnya. Validasi ulang lintas berkas (episode internal, PRB) dulu
+    // mengubah status klaim tanpa memperbarui hitungan berkasnya, sehingga
+    // Riwayat Upload menampilkan "perlu dikerjakan" untuk klaim yang sudah
+    // valid (7 Okt 2026). Satu perintah teragregasi, idempoten, hanya
+    // menyentuh berkas yang angkanya berbeda.
+    try {
+      const hasil = await db.query(`
+        UPDATE claim_files cf
+        SET valid_count = h.valid_count, error_count = h.error_count, pending_count = h.pending_count
+        FROM (
+          SELECT file_id,
+            SUM(CASE WHEN validation_status = 'valid' THEN 1 ELSE 0 END)::int AS valid_count,
+            SUM(CASE WHEN validation_status = 'error' THEN 1 ELSE 0 END)::int AS error_count,
+            SUM(CASE WHEN validation_status = 'pending' THEN 1 ELSE 0 END)::int AS pending_count
+          FROM claim_records GROUP BY file_id
+        ) h
+        WHERE h.file_id = cf.id
+          AND (cf.valid_count IS DISTINCT FROM h.valid_count
+            OR cf.error_count IS DISTINCT FROM h.error_count
+            OR cf.pending_count IS DISTINCT FROM h.pending_count)
+      `);
+      const jumlah = hasil && (hasil.rowCount ?? hasil.changes ?? 0);
+      if (jumlah) console.log(`[migration] Hitungan ${jumlah} berkas diselaraskan dengan status klaimnya.`);
+    } catch (e) {
+      console.error('[migration] Gagal menyelaraskan hitungan berkas:', e.message);
+    }
+
     // Role 'superadmin' (8 Sep 2026) — dulu users_role_check cuma izinkan
     // admin/supervisor/verifikator. Superadmin ditambahkan sebagai role di
     // atas admin (lihat ROLE_INHERITANCE di middleware/auth.js — superadmin
