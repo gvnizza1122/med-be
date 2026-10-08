@@ -19,7 +19,11 @@ function database(spent=0) {
         if(!optional && total>row.batas_idr) {row.tambahan_alasan.push(...JSON.parse(alasan));row.batas_idr=Math.ceil(total);}
         row.dicadangkan_idr+=value;return {id};
       }
-      if(sql.startsWith('INSERT INTO ai_kegagalan_berkas')) {if(failed.has(p[0]))return null;failed.set(p[0],{scope:p[1],kode:p[2]||'permintaan_sedang_berjalan'});return {kunci:p[0]};}
+      if(sql.startsWith('INSERT INTO ai_kegagalan_berkas')) {
+        const previous=failed.get(p[0]);
+        if(previous && !(previous.scope===p[1] && previous.kode==='terputus_restart' && p[2]==='permintaan_ulang_setelah_restart'))return null;
+        failed.set(p[0],{scope:p[1],kode:p[2]||'permintaan_sedang_berjalan'});return {kunci:p[0]};
+      }
       if(sql.startsWith('DELETE FROM ai_kegagalan_berkas')) {const f=failed.get(p[0]);if(f?.scope===p[1]&&f.kode==='terputus_restart'){failed.delete(p[0]);return {kunci:p[0]};}return null;}
       if(sql.includes('FROM ai_kegagalan_berkas')) return failed.get(p[0])?.scope===p[1] ? {kode:failed.get(p[0]).kode} : null;
       if(sql.includes('FROM ai_cache_berkas')) return cache.get(p[0])?.scope===p[1] ? {jawaban:cache.get(p[0]).value} : null;
@@ -249,6 +253,26 @@ test('percobaan ulang setelah restart yang terputus lagi tetap diblokir',async()
   db.failed.set(key,{scope:'b',kode:'biaya_belum_pasti'});
   expect(await call(db)).toMatchObject({ok:false,kode:'pengulangan_berbiaya_dicegah'});
   expect(fn).not.toHaveBeenCalled();
+});
+test('anggaran habis tidak menghapus penanda restart saat belum ada pengiriman',async()=>{
+  const db=database(1500),fn=jest.fn(async()=>answer());restore=gateway.pasangAdapter('openai_compat',fn);
+  const key=ai.kunciCache(scope,'baca_berkas',{penyedia:'openai_compat',model:'gpt-6-luna'},payload.system,payload.prompt,'high',12000);
+  db.failed.set(key,{scope:'b',kode:'terputus_restart'});
+  expect(await call(db)).toMatchObject({ok:false,kode:'anggaran_ai_terbatas'});
+  expect(db.failed.get(key).kode).toBe('terputus_restart');
+  expect(fn).not.toHaveBeenCalled();
+});
+test('100 pekerja hanya dapat mengklaim satu percobaan ulang setelah restart',async()=>{
+  const db=database();db.failed.set('restart',{scope:'b',kode:'terputus_restart'});
+  const result=await Promise.all(Array.from({length:100},()=>ai.mulaiPanggilan(db,'restart',scope,'permintaan_ulang_setelah_restart')));
+  expect(result.filter(Boolean)).toHaveLength(1);
+  expect(db.failed.get('restart').kode).toBe('permintaan_ulang_setelah_restart');
+});
+test('penanda restart tidak dapat diklaim oleh RS lain atau sebagai panggilan baru',async()=>{
+  const db=database();db.failed.set('restart',{scope:'b',kode:'terputus_restart'});
+  expect(await ai.mulaiPanggilan(db,'restart',{id:'other',hospital_code:'OTHER'},'permintaan_ulang_setelah_restart')).toBe(false);
+  expect(await ai.mulaiPanggilan(db,'restart',scope)).toBe(false);
+  expect(db.failed.get('restart').kode).toBe('terputus_restart');
 });
 test.each([[13000,13000],[30000,16000],[3000,8000]])('jatah keluaran tahap klinis mengikuti permintaan %s (maks 16000, tidak pernah menurunkan)',async(minta,harap)=>{
   const db=database(),fn=jest.fn(async()=>answer());restore=gateway.pasangAdapter('openai_compat',fn);

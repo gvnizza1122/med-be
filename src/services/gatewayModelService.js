@@ -193,7 +193,9 @@ async function panggilModel(tugas, payload, opsi = {}) {
           const failed=await anggaranAi.ambilKegagalan(db,kunciP,scope);
           // Terputus karena server dimulai ulang (bukan kegagalan jawaban):
           // dikirim ulang tepat satu kali; bila terputus/gagal lagi, diblokir.
-          if(failed && failed.kode==='terputus_restart' && await anggaranAi.izinkanUlangSetelahRestart(db,kunciP,scope)) {
+          // Jangan lepaskan penanda saat pemeriksaan anggaran. Hak percobaan
+          // ulang baru diklaim atomik setelah reservasi berhasil, sebelum request.
+          if(failed && failed.kode==='terputus_restart') {
             ulangSetelahRestart=true;
             continue;
           }

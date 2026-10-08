@@ -161,12 +161,10 @@ async function ambilKegagalan(db,key,scope) {
 }
 async function mulaiPanggilan(db,key,scope,kode='permintaan_sedang_berjalan') {
   const row=await db.get(`INSERT INTO ai_kegagalan_berkas(kunci,anggaran_id,kode) VALUES(?,?,?)
-    ON CONFLICT(kunci) DO NOTHING RETURNING kunci`,[key,scope.id,kode]);
-  return Boolean(row);
-}
-/** Penanda terputus karena restart dilepas agar permintaan itu dapat dikirim ulang sekali. */
-async function izinkanUlangSetelahRestart(db,key,scope) {
-  const row=await db.get(`DELETE FROM ai_kegagalan_berkas WHERE kunci=? AND anggaran_id=? AND kode='terputus_restart' RETURNING kunci`,[key,scope.id]);
+    ON CONFLICT(kunci) DO UPDATE SET kode=EXCLUDED.kode,dibuat=CURRENT_TIMESTAMP
+    WHERE ai_kegagalan_berkas.anggaran_id=EXCLUDED.anggaran_id
+      AND ai_kegagalan_berkas.kode='terputus_restart'
+      AND EXCLUDED.kode='permintaan_ulang_setelah_restart' RETURNING kunci`,[key,scope.id,kode]);
   return Boolean(row);
 }
 async function hapusPenanda(db,key,scope) {
@@ -196,4 +194,4 @@ function satuPanggilan(key,fn) {
   const p=Promise.resolve().then(fn).finally(()=>sedangJalan.delete(key));
   sedangJalan.set(key,p);return p;
 }
-module.exports={VERSI,KEBIJAKAN,ensureSchema,untukBerkas,cadangkan,cadangkanSaatSiap,tandaiAktif,lunasi,ringkasan,kunciCache,ambilCache,simpanCache,ambilKegagalan,mulaiPanggilan,izinkanUlangSetelahRestart,hapusPenanda,simpanKegagalan,satuPanggilan,sidikBerkas};
+module.exports={VERSI,KEBIJAKAN,ensureSchema,untukBerkas,cadangkan,cadangkanSaatSiap,tandaiAktif,lunasi,ringkasan,kunciCache,ambilCache,simpanCache,ambilKegagalan,mulaiPanggilan,hapusPenanda,simpanKegagalan,satuPanggilan,sidikBerkas};
