@@ -1,0 +1,1788 @@
+{
+  "versi": "BA-PNPK-ANAK-2026-10-08.3",
+  "diperiksa_pada": "2026-10-08",
+  "sumber": [
+    {
+      "id": "BA-KLAIM-2018",
+      "judul": "BA Kesepakatan Bersama Panduan Penatalaksanaan Solusi Permasalahan Klaim INA-CBG Tahun 2018",
+      "nomor": "JP.02.03/3/2411/2018; 620/BA/1118",
+      "jenis": "verifikasi_klaim_bpjs",
+      "versi": "2018",
+      "url": "https://ppid.kepulauanselayarkab.go.id/images/berkas/92_dok_PKS%20RS%20dengan%20BPJS.pdf",
+      "halaman": "31-40 (aspek medis)",
+      "arsip": "docs/referensi/ba-kesepakatan-2018.pdf",
+      "sha256": "c2a2887fae2a92c8fefc11c0de3b43d2dde082d551643f3ea8e53fdb0a753717",
+      "jumlah_halaman": 42,
+      "status_verifikasi": "salinan_sumber_ditelaah",
+      "berlaku_mulai": null,
+      "catatan": "BA bernomor dan bertanda tangan pada scan; surat pengantar 29 November 2018 bukan awal berlaku yang terkonfirmasi. Periksa perubahan BA/PNPK berikutnya sesuai episode. URL pembanding adalah lampiran perjanjian, bukan PDF lokal dengan penomoran identik. Butir aspek medis 1-63 dikukuhkan ulang dalam BA 2019 (JP.02.03/3/1693/2020; 411/BA/0720)."
+    },
+    {
+      "id": "PNPK-PNEUMONIA-ANAK-IDAI",
+      "judul": "PNPK Tata Laksana Pneumonia pada Anak, PP IDAI / UKK Respirologi",
+      "nomor": null,
+      "jenis": "pedoman_klinis",
+      "versi": "salinan pengguna, tahun pengesahan belum terkonfirmasi",
+      "url": "",
+      "halaman": "3-8, 10, 12",
+      "arsip": "docs/referensi/pnpk-pneumonia-anak-idai.pdf",
+      "sha256": "59406c6885f8aafa3493d19df208734fd8a9d42e8805f1e8402cc01a3770f93c",
+      "jumlah_halaman": 15,
+      "status_verifikasi": "salinan_sumber_ditelaah",
+      "berlaku_mulai": null,
+      "catatan": "Salinan beridentitas PP IDAI; nomor KMK, tahun pengesahan dan awal berlaku tidak tercantum. Tanggal nama unduhan bukan tahun pedoman. Tidak dianggap ketentuan penjaminan nasional."
+    },
+    {
+      "id": "BA-KLAIM-2019",
+      "judul": "BA Kesepakatan Bersama Panduan Penatalaksanaan Solusi Permasalahan Klaim INA-CBG Tahun 2019",
+      "nomor": "JP.02.03/3/1693/2020; 411/BA/0720",
+      "jenis": "verifikasi_klaim_bpjs",
+      "versi": "2019 (disampaikan Juli 2020)",
+      "url": "https://manuver.tireg7.net/wp-content/uploads/2022/08/BA-Kesepakatan-Koding-2019-bisa-di-search.pdf",
+      "halaman": "38-51 (aspek medis dan administrasi)",
+      "arsip": "docs/referensi/katalog/92b706de834e273c24cbe48333ab0797194ea462b19648d79f3270abe2fa656a.pdf",
+      "sha256": "92b706de834e273c24cbe48333ab0797194ea462b19648d79f3270abe2fa656a",
+      "jumlah_halaman": 51,
+      "status_verifikasi": "salinan_sumber_ditelaah",
+      "berlaku_mulai": null,
+      "katalog_id": "BA-KLAIM-2019",
+      "catatan": "Salinan publik. Aspek medis butir 1-63 mengulang BA 2018 (kolom keterangan \"BA Kesepakatan Bersama Tahun 2018\"); butir 64-69 baru tahun 2019. Awal berlaku belum terkonfirmasi."
+    },
+    {
+      "id": "BA-KLAIM-2023-KODING",
+      "judul": "BA Kesepakatan Bersama Panduan Penatalaksanaan Solusi Permasalahan Klaim INA-CBG Tahun 2023 (aspek koding)",
+      "nomor": "JP.02.03/H.IV/1627/2023; 415/BA/0623; JP.02.03/H.IV/2739/2023; 668/BA/0823",
+      "jenis": "verifikasi_klaim_bpjs",
+      "versi": "2023 edisi 415/BA/0623 dan 668/BA/0823",
+      "url": "https://manuver.tireg7.net/wp-content/uploads/2023/12/BA-Kesepakatan-Koding-tahun-2023-1-dan-2-bisa-di-search-dan-tanpa-surat-pengantar.pdf",
+      "halaman": "1-9",
+      "arsip": "docs/referensi/katalog/54ee080e34a0d22a820b19323cc63876dcb5993d2e094a1fc1c0a1d3dd8a7f64.pdf",
+      "sha256": "54ee080e34a0d22a820b19323cc63876dcb5993d2e094a1fc1c0a1d3dd8a7f64",
+      "jumlah_halaman": 9,
+      "status_verifikasi": "salinan_sumber_ditelaah",
+      "berlaku_mulai": null,
+      "katalog_id": "BA-KLAIM-2023-1-2",
+      "catatan": "Tabel koding dua edisi. Butir kombinasi kode diterapkan di ketentuanKlaimKombinasi.json (KMB-13 s.d. KMB-27, KMB-04 diperluas); butir yang memerlukan bukti dokumen dinilai di katalog ini."
+    }
+  ],
+  "aturan": [
+    {
+      "id": "RK-19",
+      "nama": "Pneumonia anak (PNPK IDAI)",
+      "dx": [
+        "J12",
+        "J13",
+        "J14",
+        "J15",
+        "J16",
+        "J17",
+        "J18"
+      ],
+      "usia_max": 17,
+      "sumber_id": "PNPK-PNEUMONIA-ANAK-IDAI",
+      "halaman": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        10,
+        12
+      ],
+      "pemeriksa": "pneumonia_anak"
+    },
+    {
+      "id": "BA-18-M03",
+      "nama": "Pneumonia dewasa: rujukan BA 2018",
+      "dx": [
+        "J12",
+        "J13",
+        "J14",
+        "J15",
+        "J16",
+        "J17",
+        "J18"
+      ],
+      "usia_min": 18,
+      "sumber_id": "BA-KLAIM-2018",
+      "halaman": [
+        31
+      ],
+      "butir": "Aspek medis 3",
+      "catatan": "BA 2018 (dikukuhkan BA 2019) merujuk KMK 514/2015: foto toraks dengan infiltrat baru/progresif ditambah >=2 gejala (batuk bertambah, dahak purulen, suhu >38 C aksila/riwayat demam, tanda konsolidasi/suara napas bronkial/ronki, leukosit >10.000 atau <4.500). Untuk episode yang memakai PNPK pneumonia dewasa 1168/2025, kriteria PNPK juga ditelaah.",
+      "gabung_ke": [
+        "RK-03",
+        "TK-25-03"
+      ],
+      "kriteria": [
+        [
+          "infiltrat_toraks"
+        ],
+        [
+          "dua_gejala_pneumonia"
+        ]
+      ],
+      "syarat": "semua"
+    },
+    {
+      "id": "BA-18-M05-ANAK",
+      "nama": "Hiponatremia anak",
+      "dx": [
+        "E87.1"
+      ],
+      "usia_max": 17,
+      "sumber_id": "BA-KLAIM-2018",
+      "halaman": [
+        31
+      ],
+      "butir": "Aspek medis 5",
+      "bukti": [
+        "terapi_elektrolit"
+      ],
+      "catatan": "Butir anak: Na <130 dan/atau kejang, penurunan kesadaran atau dehidrasi berat; penyakit penyerta jantung mempunyai pengecualian <135. Telaah hasil, temuan klinis, terapi dan konteks; bukan penetapan diagnosis dari satu angka.",
+      "pemeriksa_ba": "natrium_anak",
+      "gabung_ke": []
+    },
+    {
+      "id": "BA-18-M06-ANAK",
+      "nama": "Hipokalemia anak",
+      "dx": [
+        "E87.6"
+      ],
+      "usia_max": 17,
+      "sumber_id": "BA-KLAIM-2018",
+      "halaman": [
+        31
+      ],
+      "butir": "Aspek medis 6",
+      "bukti": [
+        "terapi_elektrolit"
+      ],
+      "catatan": "Butir anak: K <3 dan/atau kelemahan otot, kembung, aritmia atau bising usus menurun; penyakit penyerta jantung mempunyai pengecualian <3,5. Jangan membawa ambang dewasa ke anak tanpa menilai pengecualian.",
+      "pemeriksa_ba": "kalium_anak",
+      "gabung_ke": [
+        "BDD-01"
+      ]
+    },
+    {
+      "id": "BA-18-M31",
+      "nama": "Asfiksia neonatus: rujukan BA 2018",
+      "dx": [
+        "P21"
+      ],
+      "neonatus": true,
+      "sumber_id": "BA-KLAIM-2018",
+      "halaman": [
+        36
+      ],
+      "butir": "Aspek medis 31",
+      "bukti": [
+        "resume_dpjp"
+      ],
+      "catatan": "Telaah derajat asfiksia dengan Apgar pada menit penilaian, pernapasan, resusitasi/VTP, AGD dan disfungsi organ. Butir berat/ringan-sedang berisi alternatif ATAU; jangan mewajibkan seluruh alternatif. Tidak dipakai pada anak lebih besar/dewasa.",
+      "gabung_ke": [
+        "TK-25-07"
+      ]
+    },
+    {
+      "id": "BA-18-M37",
+      "nama": "ISK: rujukan BA 2018",
+      "dx": [
+        "N39.0"
+      ],
+      "sumber_id": "BA-KLAIM-2018",
+      "halaman": [
+        37
+      ],
+      "butir": "Aspek medis 37",
+      "catatan": "BA 2018 butir 37: salah satu (1) gejala klinis khas minimal satu (sakit kencing, nyeri perut bawah/suprapubik, anyang-anyangan, nyeri pinggang/ketok CVA) dengan leukosit urin >10/LPB; atau (2) kultur urin positif. Leu/uL dibandingkan dengan nilai rujukan lab pada baris yang sama, tidak dikonversi.",
+      "gabung_ke": [
+        "BDD-13"
+      ],
+      "kriteria": [
+        [
+          "gejala_isk",
+          "piuria_10"
+        ],
+        [
+          "kultur_urin_tumbuh"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "kontradiksi_tinggi": true,
+      "bukti_info": [
+        "kesan_radiologi_isk",
+        "temuan_urin_lain"
+      ]
+    },
+    {
+      "id": "BA-18-M43",
+      "nama": "Sepsis: rujukan historis BA 2018",
+      "dx": [
+        "A40",
+        "A41"
+      ],
+      "usia_min": 18,
+      "sumber_id": "BA-KLAIM-2018",
+      "halaman": [
+        37
+      ],
+      "butir": "Aspek medis 43",
+      "catatan": "BA 2018 butir 43 (dikukuhkan BA 2019): sepsis mengikuti >=2 kriteria SIRS (suhu >38,5/<36 C, nadi >90, napas >20 atau PaCO2 <32, leukositosis) dan wajib melampirkan bukti kultur darah; bila tegak harus diikuti tata laksana sepsis. PNPK sepsis memakai disfungsi organ (SOFA) dan kultur negatif tidak sendiri membatalkan sepsis; kedua sumber ditelaah bersama.",
+      "gabung_ke": [
+        "RK-13",
+        "TK-25-09"
+      ],
+      "kriteria": [
+        [
+          "sirs_2"
+        ],
+        [
+          "kultur_darah_hasil"
+        ]
+      ],
+      "syarat": "semua"
+    },
+    {
+      "id": "BA-18-M61",
+      "nama": "Kejang demam pada anak",
+      "dx": [
+        "R56.0"
+      ],
+      "usia_max": 17,
+      "sumber_id": "BA-KLAIM-2018",
+      "halaman": [
+        40
+      ],
+      "butir": "Aspek medis 61",
+      "catatan": "BA 2018 butir 61: kejang demam dapat menjadi diagnosis utama bila tidak ada diagnosis lain yang menjadi penyebab kejang dan/atau diperlukan obat anti kejang intravena. Bila bukan diagnosis utama, butir ini tidak dinilai.",
+      "gabung_ke": [
+        "BDD-35"
+      ],
+      "dx_utama": true,
+      "kriteria": [
+        [
+          "tanpa_dx_penyebab_kejang"
+        ],
+        [
+          "oak_iv"
+        ]
+      ],
+      "syarat": "salah_satu"
+    },
+    {
+      "id": "BA-18-M01",
+      "nama": "Syok kardiogenik sebagai diagnosis sekunder",
+      "dx": [
+        "R57.0"
+      ],
+      "sumber_id": "BA-KLAIM-2018",
+      "halaman": [
+        31
+      ],
+      "butir": "Aspek medis 1",
+      "gabung_ke": [
+        "BDD-26"
+      ],
+      "kriteria": [
+        [
+          "td_syok"
+        ],
+        [
+          "ef_rendah"
+        ]
+      ],
+      "syarat": "semua",
+      "catatan": "Syok kardiogenik dapat menjadi diagnosis sekunder (terutama pasien penyakit jantung yang meninggal) bila kriteria tertulis: TD <90 mmHg tanpa inotropik atau <80 mmHg dengan inotropik, dan EF <50%. Tidak dikoding bila tidak tegak secara medis dan tidak ada sumber daya khusus. TD/EF yang tidak terbaca bukan bukti nilai normal."
+    },
+    {
+      "id": "BA-18-M02",
+      "nama": "USG pada kehamilan",
+      "px": [
+        "88.76",
+        "88.79"
+      ],
+      "dx_bersama": [
+        "^(?:O\\d|Z3[3-6])"
+      ],
+      "sumber_id": "BA-KLAIM-2018",
+      "halaman": [
+        31
+      ],
+      "butir": "Aspek medis 2",
+      "syarat": "informasi",
+      "catatan": "Kehamilan normal: USG 3 kali (1 kali tiap trimester); kehamilan dengan indikasi medis lain dapat membutuhkan lebih banyak. Jumlah USG lintas kunjungan tidak dapat dihitung dari satu berkas."
+    },
+    {
+      "id": "BA-18-M04",
+      "nama": "TB paru A15: konfirmasi BTA",
+      "dx": [
+        "A15"
+      ],
+      "sumber_id": "BA-KLAIM-2018",
+      "halaman": [
+        31
+      ],
+      "butir": "Aspek medis 4",
+      "gabung_ke": [
+        "RK-07"
+      ],
+      "pemeriksa_ba": "tb_a15",
+      "catatan": "TB paru (A15) dengan penunjang positif (imaging, BTA) dan tatalaksana khusus OAT serta edukasi minum obat. Jika hasil BTA negatif, BA memakai kode A16. Konfirmasi TCM/kultur positif ditelaah bersama; kode tidak diganti otomatis.",
+      "ringkas_telaah": "BTA negatif tertulis; BA 2018 memakai A16 tanpa konfirmasi bakteriologis"
+    },
+    {
+      "id": "BA-18-M05",
+      "nama": "Hiponatremia dewasa: rujukan BA 2018",
+      "dx": [
+        "E87.1"
+      ],
+      "usia_min": 18,
+      "sumber_id": "BA-KLAIM-2018",
+      "halaman": [
+        31
+      ],
+      "butir": "Aspek medis 5",
+      "gabung_ke": [
+        "RK-04"
+      ],
+      "syarat": "informasi",
+      "catatan": "Na <135 mEq/L tetap hiponatremia dan dapat menjadi diagnosis sekunder apabila ada tatalaksana/terapi."
+    },
+    {
+      "id": "BA-18-M06",
+      "nama": "Hipokalemia dewasa: rujukan BA 2018",
+      "dx": [
+        "E87.6"
+      ],
+      "usia_min": 18,
+      "sumber_id": "BA-KLAIM-2018",
+      "halaman": [
+        31
+      ],
+      "butir": "Aspek medis 6",
+      "gabung_ke": [
+        "RK-05",
+        "BDD-01"
+      ],
+      "syarat": "informasi",
+      "catatan": "K <3,5 mEq/L tetap hipokalemia dan dapat menjadi diagnosis sekunder apabila ada tatalaksana/terapi."
+    },
+    {
+      "id": "BA-18-M07",
+      "nama": "Hipertensi dengan gagal ginjal (I12)",
+      "dx": [
+        "I12"
+      ],
+      "sumber_id": "BA-KLAIM-2018",
+      "halaman": [
+        32
+      ],
+      "butir": "Aspek medis 7",
+      "gabung_ke": [
+        "BDD-15"
+      ],
+      "pemeriksa_ba": "i12_ggk",
+      "catatan": "I12 mencakup N00-N07, N18, N19 atau N26 karena hipertensi. Gagal ginjal akut (N17) tidak termasuk I12; GGA mengikuti KDIGO 2012 (kreatinin dan/atau output urin). Pada kondisi berulang diagnosis menjadi gagal ginjal kronik.",
+      "ringkas_telaah": "GGA (N17) tidak termasuk I12; kelainan ginjal I12 belum dikode"
+    },
+    {
+      "id": "BA-18-M07-GGA",
+      "nama": "Gagal ginjal akut: rujukan BA 2018 (KDIGO)",
+      "dx": [
+        "N17"
+      ],
+      "sumber_id": "BA-KLAIM-2018",
+      "halaman": [
+        32
+      ],
+      "butir": "Aspek medis 7",
+      "gabung_ke": [
+        "RK-06",
+        "BDD-14"
+      ],
+      "syarat": "informasi",
+      "catatan": "GGA mengikuti KDIGO 2012: kenaikan kreatinin serum dan/atau penurunan output urin. Wajar pada keluhan pertama tanpa baseline (dianggap normal); kondisi berulang menjadi GGK kecuali ada perbaikan pada episode pertama."
+    },
+    {
+      "id": "BA-18-M08",
+      "nama": "Syok hipovolemik: rujukan BA 2018",
+      "dx": [
+        "R57.1"
+      ],
+      "sumber_id": "BA-KLAIM-2018",
+      "halaman": [
+        32
+      ],
+      "butir": "Aspek medis 8",
+      "gabung_ke": [
+        "RK-08",
+        "BDD-24"
+      ],
+      "syarat": "informasi",
+      "catatan": "Diagnosis sekunder bila ada manifestasi klinis dan tatalaksana minimal loading cairan; pengecualian pasien gawat yang meninggal sebelum tatalaksana."
+    },
+    {
+      "id": "BA-18-M09",
+      "nama": "Kolonoskopi rawat inap: rujukan BA 2018",
+      "px": [
+        "45.23"
+      ],
+      "jenis_klaim": [
+        "RAWAT_INAP"
+      ],
+      "sumber_id": "BA-KLAIM-2018",
+      "halaman": [
+        32,
+        35
+      ],
+      "butir": "Aspek medis 9 dan 30",
+      "gabung_ke": [
+        "RK-09"
+      ],
+      "syarat": "informasi",
+      "catatan": "Rawat inap kolonoskopi berdasarkan keadaan umum: geriatri dengan risiko dehidrasi, kecemasan tinggi, atau perdarahan masif yang memerlukan perbaikan keadaan umum."
+    },
+    {
+      "id": "BA-18-M10-ANAK",
+      "nama": "Transfusi thalassemia anak rawat inap",
+      "dx": [
+        "D56"
+      ],
+      "px": [
+        "99.04"
+      ],
+      "pemicu": "dx_dan_px",
+      "jenis_klaim": [
+        "RAWAT_INAP"
+      ],
+      "usia_max": 17,
+      "sumber_id": "BA-KLAIM-2018",
+      "halaman": [
+        32
+      ],
+      "butir": "Aspek medis 10",
+      "gabung_ke": [
+        "BDD-19"
+      ],
+      "kriteria": [
+        [
+          "hb_6"
+        ],
+        [
+          "sesak"
+        ],
+        [
+          "dx_gagal_jantung"
+        ],
+        [
+          "reaksi_transfusi"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "Transfusi anak dapat rawat inap (transfusi minimal 4 jam dan pemantauan 4 jam) dengan indikasi Hb <6 dan/atau sesak, atau komplikasi dekompensasi kordis dan reaksi transfusi. Transfusi maksimal 4 kali sebulan dengan Hb <10 atau hipersplenisme (lintas kunjungan, tidak dihitung dari satu berkas)."
+    },
+    {
+      "id": "BA-18-M10",
+      "nama": "Transfusi thalassemia dewasa rawat inap",
+      "dx": [
+        "D56"
+      ],
+      "px": [
+        "99.04"
+      ],
+      "pemicu": "dx_dan_px",
+      "jenis_klaim": [
+        "RAWAT_INAP"
+      ],
+      "usia_min": 18,
+      "sumber_id": "BA-KLAIM-2018",
+      "halaman": [
+        32
+      ],
+      "butir": "Aspek medis 10",
+      "gabung_ke": [
+        "BDD-19"
+      ],
+      "kriteria": [
+        [
+          "dx_gagal_jantung"
+        ],
+        [
+          "reaksi_transfusi"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "Transfusi thalassemia seharusnya episode rawat jalan; nilai Hb atau jumlah kantong darah tidak menjadi dasar rawat inap. Komplikasi (dekompensasi kordis, reaksi transfusi) atau indikasi medis lain perlu tertulis dan ditelaah DPJP."
+    },
+    {
+      "id": "BA-18-M11",
+      "nama": "Skin graft bukan estetik",
+      "px": [
+        "86.6"
+      ],
+      "sumber_id": "BA-KLAIM-2018",
+      "halaman": [
+        32
+      ],
+      "butir": "Aspek medis 11",
+      "kriteria": [
+        [
+          "bukan_estetik"
+        ],
+        [
+          "luka_luas_dalam"
+        ]
+      ],
+      "syarat": "semua",
+      "catatan": "Skin graft tidak dijamin untuk estetik (hipo/hiperpigmentasi pasca inflamasi, deposit lemak, tato). Pastikan graft wajar (luka/injury luas dan dalam); luka kecil yang dikode 86.69 perlu dikonfirmasi."
+    },
+    {
+      "id": "BA-18-M12",
+      "nama": "Educational therapy (93.82) pada rawat inap",
+      "px": [
+        "93.82"
+      ],
+      "jenis_klaim": [
+        "RAWAT_INAP"
+      ],
+      "sumber_id": "BA-KLAIM-2018",
+      "halaman": [
+        32
+      ],
+      "butir": "Aspek medis 12",
+      "pemeriksa_ba": "selalu_telaah",
+      "alasan_telaah": "BA: episode educational therapy mengikuti aturan rawat jalan.",
+      "catatan": "Episode sesuai aturan rawat jalan. Konsultasi gizi dikode 89.07; pelayanan klinik gizi oleh dokter spesialis gizi klinik.",
+      "ringkas_telaah": "educational therapy mengikuti episode rawat jalan menurut BA 2018"
+    },
+    {
+      "id": "BA-18-M13",
+      "nama": "Anemia sebagai diagnosis sekunder",
+      "dx": [
+        "D50",
+        "D51",
+        "D52",
+        "D53",
+        "D55",
+        "D56",
+        "D57",
+        "D58",
+        "D59",
+        "D60",
+        "D61",
+        "D62",
+        "D63",
+        "D64"
+      ],
+      "dx_sekunder": true,
+      "dx_kecuali": [
+        "^(?:O\\d|Z3[3-9])"
+      ],
+      "sumber_id": "BA-KLAIM-2018",
+      "halaman": [
+        33
+      ],
+      "butir": "Aspek medis 13",
+      "gabung_ke": [
+        "SP-04",
+        "BDD-19",
+        "BDD-20"
+      ],
+      "kriteria": [
+        [
+          "transfusi_epo"
+        ],
+        [
+          "hb_8",
+          "penyakit_kronik"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "Anemia sebagai diagnosis sekunder: (1) komplikasi penyakit utama yang terapinya berbeda dan memerlukan transfusi darah/eritropoetin, atau (2) anemia gravis Hb <8 pada penyakit kronik (mis. GGK, kanker). Terapi anemia lain ditelaah DPJP/casemix; kode tidak dihapus otomatis."
+    },
+    {
+      "id": "BA-18-M13-PERSALINAN",
+      "nama": "Anemia pada kehamilan/persalinan",
+      "dx": [
+        "D50",
+        "D51",
+        "D52",
+        "D53",
+        "D55",
+        "D56",
+        "D57",
+        "D58",
+        "D59",
+        "D60",
+        "D61",
+        "D62",
+        "D63",
+        "D64",
+        "O99.0"
+      ],
+      "dx_bersama": [
+        "^(?:O\\d|Z3[3-9])"
+      ],
+      "sumber_id": "BA-KLAIM-2018",
+      "halaman": [
+        33
+      ],
+      "butir": "Aspek medis 13",
+      "gabung_ke": [
+        "BDD-19",
+        "BDD-20"
+      ],
+      "kriteria": [
+        [
+          "hb_11"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "Anemia pada persalinan memakai standar WHO; bila terdapat bukti lab, anemia tetap dikoding."
+    },
+    {
+      "id": "BA-18-M14",
+      "nama": "Leukositosis (D72.8) sebagai diagnosis sekunder",
+      "dx": [
+        "D72.8"
+      ],
+      "sumber_id": "BA-KLAIM-2018",
+      "halaman": [
+        33
+      ],
+      "butir": "Aspek medis 14",
+      "pemeriksa_ba": "leukositosis",
+      "catatan": "D72.8 sekunder bukan leukositosis karena infeksi, obat (G-CSF, steroid) atau MPN. Leukositosis pada kehamilan bukan penyakit tersendiri; pada kehamilan leukosit s.d. 16.000/uL masih fisiologis."
+    },
+    {
+      "id": "BA-18-M15",
+      "nama": "Leukopenia-agranulositosis (D70)",
+      "dx": [
+        "D70"
+      ],
+      "sumber_id": "BA-KLAIM-2018",
+      "halaman": [
+        33
+      ],
+      "butir": "Aspek medis 15",
+      "pemeriksa_ba": "leukopenia",
+      "catatan": "Penegakan diagnosis mencantumkan bukti lab. Pada pasien kanker D70 bila leukosit <3.000."
+    },
+    {
+      "id": "BA-18-M16",
+      "nama": "Efusi pleura sebagai diagnosis sekunder",
+      "dx": [
+        "J90",
+        "J91"
+      ],
+      "dx_sekunder": true,
+      "sumber_id": "BA-KLAIM-2018",
+      "halaman": [
+        33
+      ],
+      "butir": "Aspek medis 16",
+      "kriteria": [
+        [
+          "pungsi_pleura"
+        ],
+        [
+          "imaging_efusi",
+          "tatalaksana_efusi"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "Salah satu: (1) efusi berapa pun dengan pungsi pleura/torakosentesis yang membuktikan cairan; (2) efusi terbukti imaging (foto/USG/CT toraks), minimal atau lebih, disertai pungsi (tidak harus keluar cairan) dan/atau tatalaksana tambahan di luar tatalaksana diagnosis primer. Efusi minimal: tebal <10 mm (foto lateral dekubitus/CT) atau <100 ml (USG)."
+    },
+    {
+      "id": "BA-18-M17",
+      "nama": "Gagal napas (J96)",
+      "dx": [
+        "J96"
+      ],
+      "sumber_id": "BA-KLAIM-2018",
+      "halaman": [
+        34
+      ],
+      "butir": "Aspek medis 17",
+      "gabung_ke": [
+        "BDD-33"
+      ],
+      "pemeriksa_ba": "gagal_napas",
+      "catatan": "J96.0 akut: salah satu pO2 <60 dan/atau SaO2 <91%, SpO2 <91%, P/F <300, pCO2 >50 dengan pH <7,35, atau pCO2 naik >=10 dari dasar. J96.1 kronik: AGD pCO2 >50, HCO3 >24, pH 7,35-7,45 dan pO2 <60/SaO2 <91 seluruhnya. Disertai tatalaksana oksigen (low/high flow), NIV (CPAP/BiPAP) atau ventilator."
+    },
+    {
+      "id": "BA-18-M18",
+      "nama": "Respiratory arrest (R09.2)",
+      "dx": [
+        "R09.2"
+      ],
+      "sumber_id": "BA-KLAIM-2018",
+      "halaman": [
+        34
+      ],
+      "butir": "Aspek medis 18",
+      "kriteria": [
+        [
+          "henti_napas"
+        ],
+        [
+          "ventilasi_buatan"
+        ]
+      ],
+      "syarat": "semua",
+      "catatan": "Henti napas dibuktikan tidak adanya frekuensi napas, dengan tatalaksana ventilasi buatan (mouth to mouth, bag mask dengan/tanpa OPA) atau ventilasi mekanik invasif."
+    },
+    {
+      "id": "BA-18-M19",
+      "nama": "Disfagia (R13) bersama tonsilektomi",
+      "dx": [
+        "R13"
+      ],
+      "px": [
+        "28.2",
+        "28.3"
+      ],
+      "pemicu": "dx_dan_px",
+      "sumber_id": "BA-KLAIM-2018",
+      "halaman": [
+        34
+      ],
+      "butir": "Aspek medis 19",
+      "gabung_ke": [
+        "BDD-34"
+      ],
+      "kriteria": [
+        [
+          "usia_anak"
+        ],
+        [
+          "gizi_kurang"
+        ]
+      ],
+      "syarat": "semua",
+      "catatan": "Disfagia sekunder dapat dikoding bersama tonsilektomi (28.2) pada pasien anak dengan gizi kurang akibat gangguan menelan (BB kurang dibanding usia atau IMT menurut usia)."
+    },
+    {
+      "id": "BA-18-M20",
+      "nama": "Hemiparese/hemiplegia rawat inap",
+      "dx": [
+        "G81"
+      ],
+      "jenis_klaim": [
+        "RAWAT_INAP"
+      ],
+      "sumber_id": "BA-KLAIM-2018",
+      "halaman": [
+        34
+      ],
+      "butir": "Aspek medis 20",
+      "gabung_ke": [
+        "BDD-39"
+      ],
+      "kriteria": [
+        [
+          "fisioterapi"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "Tidak semua stroke disertai hemiplegia/hemiparese. Pasien hemiplegia yang dirawat inap mendapat tindakan fisioterapi."
+    },
+    {
+      "id": "BA-18-M21-SENTRAL",
+      "nama": "Vertigo sentral rawat inap",
+      "dx": [
+        "R42"
+      ],
+      "dx_utama": true,
+      "jenis_klaim": [
+        "RAWAT_INAP"
+      ],
+      "sumber_id": "BA-KLAIM-2018",
+      "halaman": [
+        35
+      ],
+      "butir": "Aspek medis 21",
+      "kriteria": [
+        [
+          "etiologi_vertigo_sentral"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "Vertigo (R42) sentral dapat dirawat inap dengan etiologi: stroke (iskemik/hemoragik), infeksi akut/kronik, trauma kepala, tumor intraserebral dengan peningkatan tekanan intrakranial."
+    },
+    {
+      "id": "BA-18-M21-PERIFER",
+      "nama": "Vertigo perifer rawat inap",
+      "dx": [
+        "H81"
+      ],
+      "dx_utama": true,
+      "jenis_klaim": [
+        "RAWAT_INAP"
+      ],
+      "sumber_id": "BA-KLAIM-2018",
+      "halaman": [
+        35
+      ],
+      "butir": "Aspek medis 21",
+      "kriteria": [
+        [
+          "muntah",
+          "dehidrasi"
+        ],
+        [
+          "muntah",
+          "hemodinamik"
+        ],
+        [
+          "muntah",
+          "elektrolit_abnormal"
+        ],
+        [
+          "muntah",
+          "hipoglikemi"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "Vertigo perifer (H81.3) dirawat inap bila muntah hebat (sulit makan) disertai salah satu: tanda dehidrasi, gangguan hemodinamik (takikardi, nadi lemah, hipotensi), gangguan elektrolit, atau hipoglikemia."
+    },
+    {
+      "id": "BA-18-M22",
+      "nama": "Katarak rawat inap",
+      "dx": [
+        "H25",
+        "H26",
+        "H28"
+      ],
+      "px": [
+        "13.2",
+        "13.3",
+        "13.4",
+        "13.5"
+      ],
+      "pemicu": "dx_dan_px",
+      "jenis_klaim": [
+        "RAWAT_INAP"
+      ],
+      "sumber_id": "BA-KLAIM-2018",
+      "halaman": [
+        35
+      ],
+      "butir": "Aspek medis 22",
+      "gabung_ke": [
+        "TK-25-12"
+      ],
+      "kriteria": [
+        [
+          "px_ecce"
+        ],
+        [
+          "komorbid_katarak",
+          "asuhan_spesialis_lain"
+        ],
+        [
+          "usia_anak"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "ECCE dirawat inap (insisi lebih besar, risiko komplikasi). Rawat inap lain bila penyakit penyerta (HT, DM, HBsAg +) atau indikasi medis lain yang mendapat tata laksana khusus dan asuhan spesialis lain selama perawatan, atau usia pediatrik <18 tahun."
+    },
+    {
+      "id": "BA-18-M23",
+      "nama": "Pterigium rawat inap",
+      "dx": [
+        "H11.0"
+      ],
+      "jenis_klaim": [
+        "RAWAT_INAP"
+      ],
+      "sumber_id": "BA-KLAIM-2018",
+      "halaman": [
+        35
+      ],
+      "butir": "Aspek medis 23",
+      "kriteria": [
+        [
+          "pterigium_grade4"
+        ],
+        [
+          "teknik_pterigium"
+        ],
+        [
+          "usia_anak"
+        ],
+        [
+          "anestesi_umum"
+        ],
+        [
+          "asuhan_spesialis_lain"
+        ],
+        [
+          "perdarahan_komplikasi"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "Rawat inap: grade IV; teknik graft/flap konjungtiva atau membran amnion (jahitan/glue); anak atau pasien tidak kooperatif yang memerlukan anestesi umum; keperluan sistemik yang dievaluasi bagian lain; perdarahan masif/komplikasi. Tanpa penyulit dengan bare sclera: rawat jalan."
+    },
+    {
+      "id": "BA-18-M24",
+      "nama": "Chalazion rawat inap",
+      "dx": [
+        "H00.1"
+      ],
+      "jenis_klaim": [
+        "RAWAT_INAP"
+      ],
+      "sumber_id": "BA-KLAIM-2018",
+      "halaman": [
+        35
+      ],
+      "butir": "Aspek medis 24",
+      "kriteria": [
+        [
+          "usia_anak",
+          "anestesi_umum"
+        ],
+        [
+          "usia_anak",
+          "tidak_kooperatif"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "Tindakan chalazion dilakukan rawat jalan, kecuali anak yang belum kooperatif/memerlukan anestesi umum."
+    },
+    {
+      "id": "BA-18-M25",
+      "nama": "Sindrom ekstrapiramidal",
+      "dx": [
+        "G25.9",
+        "G21.1"
+      ],
+      "sumber_id": "BA-KLAIM-2018",
+      "halaman": [
+        35
+      ],
+      "butir": "Aspek medis 25",
+      "syarat": "informasi",
+      "catatan": "Skala penilaian gejala EPS dari PDSKJI dipakai sebagai panduan diagnosis dan verifikasi bersama verifikator bila ada keraguan diagnosis."
+    },
+    {
+      "id": "BA-18-M26",
+      "nama": "Epistaksis pada DBD",
+      "dx": [
+        "R04.0"
+      ],
+      "dx_bersama": [
+        "A90",
+        "A91"
+      ],
+      "sumber_id": "BA-KLAIM-2018",
+      "halaman": [
+        35
+      ],
+      "butir": "Aspek medis 26",
+      "kriteria": [
+        [
+          "tatalaksana_perdarahan"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "Perdarahan pada DHF dinyatakan sebagai diagnosis sekunder; bukti pendukungnya penatalaksanaan perdarahan dalam rekam medis."
+    },
+    {
+      "id": "BA-18-M27",
+      "nama": "Volume depletion pada gastroenteritis",
+      "dx": [
+        "E86"
+      ],
+      "dx_bersama": [
+        "^(?:A0\\d|K52)"
+      ],
+      "sumber_id": "BA-KLAIM-2018",
+      "halaman": [
+        35
+      ],
+      "butir": "Aspek medis 27",
+      "gabung_ke": [
+        "TK-25-05",
+        "BDD-05"
+      ],
+      "kriteria": [
+        [
+          "dehidrasi"
+        ],
+        [
+          "terapi_cairan"
+        ]
+      ],
+      "syarat": "semua",
+      "catatan": "Gastroenteritis dapat dirawat inap atas dasar volume depletion/dehidrasi; bukti pendukungnya penatalaksanaan terapi cairan."
+    },
+    {
+      "id": "BA-18-M28",
+      "nama": "Gagal ginjal dengan HD rawat inap",
+      "dx": [
+        "N18",
+        "N19",
+        "I12"
+      ],
+      "px": [
+        "39.95"
+      ],
+      "pemicu": "dx_dan_px",
+      "jenis_klaim": [
+        "RAWAT_INAP"
+      ],
+      "usia_min": 18,
+      "sumber_id": "BA-KLAIM-2018",
+      "halaman": [
+        35
+      ],
+      "butir": "Aspek medis 28",
+      "kriteria": [
+        [
+          "indikasi_spesifik_hd"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "Pasien gagal ginjal dengan HD dirawat inap sesuai indikasi medis spesifik (contoh anemia), bukan atas perbaikan keadaan umum."
+    },
+    {
+      "id": "BA-18-M29",
+      "nama": "Endoskopi rawat inap",
+      "px": [
+        "45.11",
+        "45.13"
+      ],
+      "jenis_klaim": [
+        "RAWAT_INAP"
+      ],
+      "sumber_id": "BA-KLAIM-2018",
+      "halaman": [
+        35
+      ],
+      "butir": "Aspek medis 29",
+      "kriteria": [
+        [
+          "ku_rawat"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "Pasien endoskopi dapat dirawat inap berdasarkan keadaan umum. BA mencantumkan kode 45.11; 45.13 (endoskopi saluran cerna atas) ditelaah dengan topik yang sama."
+    },
+    {
+      "id": "BA-18-M32",
+      "nama": "Syok saat operasi (T81.1)",
+      "dx": [
+        "T81.1"
+      ],
+      "sumber_id": "BA-KLAIM-2018",
+      "halaman": [
+        36
+      ],
+      "butir": "Aspek medis 32",
+      "kriteria": [
+        [
+          "manifestasi_syok"
+        ],
+        [
+          "tatalaksana_syok"
+        ]
+      ],
+      "syarat": "semua",
+      "catatan": "Diagnosis sekunder bila rekam medis menulis manifestasi klinis syok sebagai komplikasi operasi serta penatalaksanaannya."
+    },
+    {
+      "id": "BA-18-M33",
+      "nama": "Hemoroid rawat inap",
+      "dx": [
+        "I84",
+        "K64"
+      ],
+      "jenis_klaim": [
+        "RAWAT_INAP"
+      ],
+      "sumber_id": "BA-KLAIM-2018",
+      "halaman": [
+        36
+      ],
+      "butir": "Aspek medis 33",
+      "pemeriksa_ba": "hemoroid",
+      "catatan": "Rawat inap hemoroid salah satu: interna grade IV; memerlukan tindakan intervensi; kombinasi interna dan eksterna dengan gejala menonjol (Hb <10, anemia, nyeri >5); fibrosis/striktur; disertai fistula/fisura. Hemoroidektomi: grade III-IV, atau grade II dengan perdarahan akut, perdarahan kronis dengan anemia, atau trombosis. Skleroterapi (49.42) dapat dirawat inap berdasarkan keadaan umum."
+    },
+    {
+      "id": "BA-18-M34",
+      "nama": "Edema paru pada penyakit ginjal hipertensi/CKD",
+      "dx": [
+        "J81"
+      ],
+      "dx_bersama": [
+        "I12",
+        "N18"
+      ],
+      "sumber_id": "BA-KLAIM-2018",
+      "halaman": [
+        36
+      ],
+      "butir": "Aspek medis 34",
+      "gabung_ke": [
+        "BDD-38"
+      ],
+      "kriteria": [
+        [
+          "edema_paru_klinis"
+        ],
+        [
+          "diuretik"
+        ],
+        [
+          "terapi_oksigen"
+        ],
+        [
+          "dx_utama_bukan_z49"
+        ]
+      ],
+      "syarat": "semua",
+      "catatan": "Edema paru: gejala sesak, takikardi, ronki dengan penatalaksanaan tercatat di resume serta terapi diuretik dan oksigen. Pada HD rutin yang dirawat inap karena edema paru, diagnosis utama CKD dan edema paru sekunder (bukan kontrol HD/kode Z)."
+    },
+    {
+      "id": "BA-18-M35",
+      "nama": "Ascites pada penyakit ginjal hipertensi/CKD",
+      "dx": [
+        "R18"
+      ],
+      "dx_bersama": [
+        "I12",
+        "N18"
+      ],
+      "jenis_klaim": [
+        "RAWAT_INAP"
+      ],
+      "sumber_id": "BA-KLAIM-2018",
+      "halaman": [
+        36
+      ],
+      "butir": "Aspek medis 35",
+      "kriteria": [
+        [
+          "ascites_masif"
+        ],
+        [
+          "pungsi_ascites"
+        ]
+      ],
+      "syarat": "semua",
+      "catatan": "Kriteria rawat inap ascites: ascites masif dengan tujuan pungsi terapeutik. Pada CKD, ascites dapat menjadi diagnosis sekunder dan diagnosis utama CKD."
+    },
+    {
+      "id": "BA-18-M36",
+      "nama": "Insufisiensi renal (N19)",
+      "dx": [
+        "N19"
+      ],
+      "sumber_id": "BA-KLAIM-2018",
+      "halaman": [
+        36
+      ],
+      "butir": "Aspek medis 36",
+      "gabung_ke": [
+        "BDD-15"
+      ],
+      "pemeriksa_ba": "insufisiensi_renal",
+      "catatan": "Penegakan insufisiensi renal: GFR <60 atau kreatinin wanita >1,1 dan pria >1,3. Pada anak dilakukan pemeriksaan ureum kreatinin berulang."
+    },
+    {
+      "id": "BA-18-M38",
+      "nama": "Ventricular fibrillation",
+      "dx": [
+        "I49.0"
+      ],
+      "sumber_id": "BA-KLAIM-2018",
+      "halaman": [
+        37
+      ],
+      "butir": "Aspek medis 38",
+      "kriteria": [
+        [
+          "penyakit_jantung_dasar"
+        ],
+        [
+          "tatalaksana_henti_jantung"
+        ]
+      ],
+      "syarat": "semua",
+      "catatan": "VF harus disertai diagnosis jantung yang berpotensi menyebabkan henti jantung dan tata laksana sesuai henti jantung. BA menulis kode I49.3; VF/flutter pada ICD-10 adalah I49.0 (I49.3 = VES, dinilai catatan lain)."
+    },
+    {
+      "id": "BA-18-M39",
+      "nama": "Hepatitis reaktif non spesifik (K75.2)",
+      "dx": [
+        "K75.2"
+      ],
+      "sumber_id": "BA-KLAIM-2018",
+      "halaman": [
+        37
+      ],
+      "butir": "Aspek medis 39",
+      "gabung_ke": [
+        "BDD-11"
+      ],
+      "kriteria": [
+        [
+          "transaminase_tinggi"
+        ],
+        [
+          "tatalaksana_hepatitis"
+        ]
+      ],
+      "syarat": "semua",
+      "kontradiksi_tinggi": true,
+      "catatan": "Kriteria: SGOT/SGPT di atas nilai normal dan mendapatkan tata laksana khusus."
+    },
+    {
+      "id": "BA-18-M40",
+      "nama": "Gout arthritis rawat inap",
+      "dx": [
+        "M10"
+      ],
+      "dx_utama": true,
+      "jenis_klaim": [
+        "RAWAT_INAP"
+      ],
+      "sumber_id": "BA-KLAIM-2018",
+      "halaman": [
+        37
+      ],
+      "butir": "Aspek medis 40",
+      "kriteria": [
+        [
+          "gout_poliartikular"
+        ],
+        [
+          "vas_7"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "Rawat inap gout: banyak sendi (>=3) atau poliartikular, dirawat karena penyakit lain, atau nyeri hebat VAS >=7. Injeksi artikular dikode 81.92."
+    },
+    {
+      "id": "BA-18-M41",
+      "nama": "Injeksi intraartikular osteoartritis",
+      "dx": [
+        "M15",
+        "M16",
+        "M17",
+        "M18",
+        "M19"
+      ],
+      "px": [
+        "81.92"
+      ],
+      "pemicu": "dx_dan_px",
+      "jenis_klaim": [
+        "RAWAT_INAP"
+      ],
+      "sumber_id": "BA-KLAIM-2018",
+      "halaman": [
+        37
+      ],
+      "butir": "Aspek medis 41",
+      "pemeriksa_ba": "selalu_telaah",
+      "alasan_telaah": "BA: injeksi intraartikular pada osteoartritis dilakukan di rawat jalan.",
+      "catatan": "Injeksi intraartikular pada kasus osteoartritis dilakukan di rawat jalan.",
+      "ringkas_telaah": "injeksi intraartikular osteoartritis dilakukan rawat jalan menurut BA 2018"
+    },
+    {
+      "id": "BA-18-M42",
+      "nama": "Phlebitis sebagai diagnosis sekunder",
+      "dx": [
+        "I80",
+        "T80.1"
+      ],
+      "dx_sekunder": true,
+      "sumber_id": "BA-KLAIM-2018",
+      "halaman": [
+        37
+      ],
+      "butir": "Aspek medis 42",
+      "kriteria": [
+        [
+          "tatalaksana_flebitis"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "Phlebitis menjadi diagnosis sekunder bila dilakukan penatalaksanaan khusus, seperti debridement atau pemberian antibiotik."
+    },
+    {
+      "id": "BA-18-M44",
+      "nama": "Alergi obat (T88.7)",
+      "dx": [
+        "T88.7"
+      ],
+      "sumber_id": "BA-KLAIM-2018",
+      "halaman": [
+        37
+      ],
+      "butir": "Aspek medis 44",
+      "kriteria": [
+        [
+          "alergi_obat_resume"
+        ],
+        [
+          "bukan_skin_test"
+        ]
+      ],
+      "syarat": "semua",
+      "catatan": "Reaksi lokal/sistemik akibat obat (oral, parenteral, topikal, inhalasi), tidak termasuk alergi karena skin test. Alergi yang menjadi sebab perawatan atau terjadi selama perawatan dapat menjadi diagnosis sekunder dan dicantumkan pada resume medis saat pulang."
+    },
+    {
+      "id": "BA-18-M45-ANAK",
+      "nama": "CKD anak rawat inap",
+      "dx": [
+        "N18"
+      ],
+      "jenis_klaim": [
+        "RAWAT_INAP"
+      ],
+      "usia_max": 17,
+      "sumber_id": "BA-KLAIM-2018",
+      "halaman": [
+        37
+      ],
+      "butir": "Aspek medis 45",
+      "kriteria": [
+        [
+          "overload"
+        ],
+        [
+          "elektrolit_abnormal"
+        ],
+        [
+          "akses_dialisis"
+        ],
+        [
+          "malfungsi_akses"
+        ],
+        [
+          "albumin_25"
+        ],
+        [
+          "transfusi"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "CKD dengan komplikasi dapat dirawat inap lebih dari sekali sesuai indikasi. Anak salah satu: overload (sesak/bengkak kelopak mata, kaki, perut); imbalans elektrolit; pemasangan akses dialisis; malfungsi akses; albumin <2,5; memerlukan transfusi sesuai kriteria."
+    },
+    {
+      "id": "BA-18-M46",
+      "nama": "Atrial fibrilasi",
+      "dx": [
+        "I48"
+      ],
+      "sumber_id": "BA-KLAIM-2018",
+      "halaman": [
+        38
+      ],
+      "butir": "Aspek medis 46",
+      "kriteria": [
+        [
+          "ekg_af"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "Kriteria: anamnesis; EKG laju ventrikel ireguler, tanpa gelombang P jelas (diganti gelombang F), QRS ireguler, laju umumnya 110-140x/menit; foto toraks dapat normal atau menunjukkan gagal jantung/patologi paru."
+    },
+    {
+      "id": "BA-18-M47",
+      "nama": "Cor angiografi/kateterisasi jantung",
+      "px": [
+        "88.55",
+        "88.56",
+        "88.57",
+        "37.21",
+        "37.22",
+        "37.23"
+      ],
+      "dx_kecuali": [
+        "I21",
+        "I22",
+        "I20.0"
+      ],
+      "sumber_id": "BA-KLAIM-2018",
+      "halaman": [
+        38,
+        39
+      ],
+      "butir": "Aspek medis 47, 53, 56, 57",
+      "kriteria": [
+        [
+          "ccs_34"
+        ],
+        [
+          "riwayat_infark"
+        ],
+        [
+          "stress_test_positif"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "Indikasi mengacu PPK dan clinical pathway PERKI per diagnosis. Angina pektoris: CAG hanya untuk CCS 3-4 (simptomatik) atau riwayat infark lama; CCS 1-2 menjalani uji iskemik (treadmill, ekokardiografi stres, perfusi, MRI) lebih dulu. CAG ulang mengacu diagnosis terakhir. MSCT/perfusi untuk asimptomatik risiko tinggi bila exercise test tidak memungkinkan."
+    },
+    {
+      "id": "BA-18-M50",
+      "nama": "PCI/pemasangan stent",
+      "px": [
+        "36.06",
+        "36.07",
+        "00.66"
+      ],
+      "dx_kecuali": [
+        "I21",
+        "I22",
+        "I20.0"
+      ],
+      "sumber_id": "BA-KLAIM-2018",
+      "halaman": [
+        38,
+        39
+      ],
+      "butir": "Aspek medis 48, 49, 50, 51, 52, 54, 55",
+      "gabung_ke": [
+        "TK-25-14"
+      ],
+      "kriteria": [
+        [
+          "lesi_signifikan"
+        ],
+        [
+          "ffr_08"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "PCI/CABG elektif bila bukti iskemik dari penunjang dan lesi signifikan (LM >=50%, LAD osteal/proksimal >50%, LAD mid-distal >70%, LCx >70%, RCA >70%); lesi non signifikan dengan iskemia luas memakai FFR <0,8 atau uji iskemik. Standby PCI untuk STEMI, NSTEMI, AP CCS 3-4. Multivessel risiko tinggi CABG: PCI selektif bertahap, lanjutan 1-3 bulan bila stabil (dipercepat bila simptomatik). Stent berulang tidak dibatasi PPK 3. LM/3VD indikasi CABG; antrian >6 bulan dapat PCI selektif."
+    },
+    {
+      "id": "BA-18-M58",
+      "nama": "NSTEMI: stratifikasi risiko strategi invasif",
+      "dx": [
+        "I21.4"
+      ],
+      "px": [
+        "88.55",
+        "88.56",
+        "88.57",
+        "37.22",
+        "37.23",
+        "36.06",
+        "36.07",
+        "00.66"
+      ],
+      "pemicu": "dx_dan_px",
+      "sumber_id": "BA-KLAIM-2018",
+      "halaman": [
+        39
+      ],
+      "butir": "Aspek medis 58",
+      "gabung_ke": [
+        "RK-11"
+      ],
+      "kriteria": [
+        [
+          "risiko_sangat_tinggi"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "tanpa_putusan": true,
+      "catatan": "Stratifikasi risiko di IGD menentukan strategi invasif. Risiko sangat tinggi (angina berulang, syok kardiogenik, aritmia maligna VT/VF/TAVB, hemodinamik tidak stabil) sebaiknya PCI dalam 2 jam sesuai fasilitas; peningkatan enzim tanpa kriteria tersebut dirawat 5 hari dan dapat standby PCI."
+    },
+    {
+      "id": "BA-18-M59",
+      "nama": "RIRS (56.0)",
+      "px": [
+        "56.0"
+      ],
+      "sumber_id": "BA-KLAIM-2018",
+      "halaman": [
+        40
+      ],
+      "butir": "Aspek medis 59",
+      "gabung_ke": [
+        "TK-25-15"
+      ],
+      "pemeriksa_ba": "batu",
+      "catatan": "RIRS untuk batu ginjal, dilakukan di OK dengan sedasi umum/regional di rawat inap. Batu <2 cm: ESWL setara RIRS kecuali kaliks inferior; >2 cm: PCNL atau operasi terbuka."
+    },
+    {
+      "id": "BA-18-M60",
+      "nama": "Kejang (R56): pengecualian koding",
+      "dx": [
+        "R56"
+      ],
+      "sumber_id": "BA-KLAIM-2018",
+      "halaman": [
+        40
+      ],
+      "butir": "Aspek medis 60",
+      "pemeriksa_ba": "kejang",
+      "catatan": "R56 mengecualikan kejang disosiatif (F44.5), epilepsi (G40-G41) dan kejang neonatus (P90). Epilepsi ditegakkan dengan kejang berulang minimal dua kali dengan pola sama dan EEG abnormal.",
+      "ringkas_telaah": "kode R56 perlu dicek terhadap pengecualian (neonatus P90, epilepsi G40-G41, disosiatif F44.5)"
+    },
+    {
+      "id": "BA-18-M62",
+      "nama": "Laparotomi eksplorasi",
+      "px": [
+        "54.11"
+      ],
+      "sumber_id": "BA-KLAIM-2018",
+      "halaman": [
+        40
+      ],
+      "butir": "Aspek medis 62 dan 63",
+      "pemeriksa_ba": "laparotomi",
+      "catatan": "Apendisitis atau hernia yang disertai perforasi dan peritonitis dilakukan laparotomi eksplorasi. Laparotomi eksplorasi insidental bukan prosedur utama dan tidak direncanakan.",
+      "ringkas_telaah": "indikasi atau urutan laparotomi eksplorasi perlu dicek"
+    },
+    {
+      "id": "BA-19-M64",
+      "nama": "Gagal jantung: ekokardiografi",
+      "dx": [
+        "I50"
+      ],
+      "sumber_id": "BA-KLAIM-2019",
+      "halaman": [
+        47
+      ],
+      "butir": "Aspek medis 64",
+      "gabung_ke": [
+        "BDD-10"
+      ],
+      "kriteria": [
+        [
+          "hasil_echo"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "Penegakan diagnosis heart failure harus disertai ekokardiografi. Ekokardiografi berlaku paling lama 1 tahun; pengulangan <1 tahun dengan indikasi (dicurigai saat ada simptom, mis. sesak memburuk, pasca operasi, pasca PTCA)."
+    },
+    {
+      "id": "BA-19-M65",
+      "nama": "PPOK: spirometri",
+      "dx": [
+        "J44"
+      ],
+      "sumber_id": "BA-KLAIM-2019",
+      "halaman": [
+        47
+      ],
+      "butir": "Aspek medis 65",
+      "gabung_ke": [
+        "BDD-06",
+        "KD-12"
+      ],
+      "kriteria": [
+        [
+          "hasil_spirometri"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "Penegakan diagnosis PPOK harus disertai hasil spirometri. Spirometri dilakukan pertama kali untuk penegakan; evaluasi paling cepat 6 bulan; bila sudah pernah, hasil spirometri sebelumnya (riwayat) dilihat kembali."
+    },
+    {
+      "id": "BA-19-M66",
+      "nama": "Injeksi intravitreal: indikasi",
+      "px": [
+        "14.79"
+      ],
+      "sumber_id": "BA-KLAIM-2019",
+      "halaman": [
+        48
+      ],
+      "butir": "Aspek medis 66",
+      "kriteria": [
+        [
+          "indikasi_intravitreal"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "Injeksi intravitreal (kode 14.79) diindikasikan salah satu: wet AMD, retinopati diabetik, CRVO/BRVO, neovaskularisasi koroid, uveitis posterior, endoftalmitis, cystoid macular edema, ROP."
+    },
+    {
+      "id": "BA-19-M67",
+      "nama": "Polisomnografi",
+      "px": [
+        "89.17"
+      ],
+      "sumber_id": "BA-KLAIM-2019",
+      "halaman": [
+        48
+      ],
+      "butir": "Aspek medis 67",
+      "syarat": "informasi",
+      "catatan": "Polisomnografi diklaimkan rawat inap kelas 3. Bila dirawat hanya untuk polisomnografi, diagnosis utama Z03.-; bila ada diagnosis penyerta yang menjadi indikasi rawat, diklaim rawat inap. Ruang dan kompetensi sesuai rekomendasi PDPI."
+    },
+    {
+      "id": "BA-19-M68",
+      "nama": "Repair hernia bersama adhesiolisis",
+      "px": [
+        "54.5"
+      ],
+      "px_bersama": [
+        "53."
+      ],
+      "sumber_id": "BA-KLAIM-2019",
+      "halaman": [
+        48
+      ],
+      "butir": "Aspek medis 68",
+      "pemeriksa_ba": "selalu_telaah",
+      "alasan_telaah": "Adhesiolisis yang berasal dari hernia termasuk herniorafi (PABI); dikode terpisah hanya bila adhesi di lokasi lain.",
+      "ringkas_telaah": "adhesiolisis bersama repair hernia perlu dicek lokasinya (termasuk herniorafi bila adhesi dari hernia)",
+      "catatan": "Menurut ICD-9-CM 2010, kode 54 mengecualikan hernia repair (53.00-53.9). PABI: lisis adhesi merupakan bagian herniorafi bila perlengketan berasal dari hernia; bila di lokasi lain dikode terpisah."
+    },
+    {
+      "id": "BA-19-M69",
+      "nama": "Odontektomi rawat inap: rujukan BA 2019",
+      "px": [
+        "23.19"
+      ],
+      "sumber_id": "BA-KLAIM-2019",
+      "halaman": [
+        48
+      ],
+      "butir": "Aspek medis 69",
+      "gabung_ke": [
+        "RK-17"
+      ],
+      "syarat": "informasi",
+      "catatan": "Kriteria rawat inap odontektomi sesuai keputusan DPK 01/DPK/V/2018; odontektomi tanpa komorbiditas tidak memerlukan rawat inap untuk persiapan preoperasi. Untuk episode mulai 1 Desember 2024 berlaku BA 2024 (PNPK impaksi gigi)."
+    },
+    {
+      "id": "BA-23-K34",
+      "nama": "Asfiksia berat (P21.0): skor Apgar",
+      "dx": [
+        "P21.0"
+      ],
+      "sumber_id": "BA-KLAIM-2023-KODING",
+      "halaman": [
+        9
+      ],
+      "butir": "Aspek koding no. 34 (415/BA/0623)",
+      "gabung_ke": [
+        "TK-25-07",
+        "BA-18-M31"
+      ],
+      "kriteria": [
+        [
+          "apgar_berat"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "kontradiksi_tinggi": true,
+      "catatan": "Sesuai ICD-10 2010, P21.0 (asfiksia berat): nadi <100 saat lahir dan menurun/menetap, napas tidak ada atau megap-megap, Apgar menit pertama 0-3. P21.1 (ringan-sedang): Apgar menit pertama 4-7. Asfiksia berat yang tidak didukung skor Apgar menjadi temuan BPJS."
+    },
+    {
+      "id": "BA-19-K87",
+      "nama": "Bronkitis tanpa keterangan akut/kronik pada anak <15 tahun",
+      "dx": [
+        "J40"
+      ],
+      "usia_max": 14,
+      "sumber_id": "BA-KLAIM-2019",
+      "halaman": [
+        18
+      ],
+      "butir": "Aspek koding 87",
+      "pemeriksa_ba": "selalu_telaah",
+      "alasan_telaah": "J40 pada usia di bawah 15 tahun diasumsikan akut dan dikode J20.",
+      "ringkas_telaah": "J40 pada usia <15 tahun dikode J20 (bronkitis akut)",
+      "catatan": "Catatan kategori J40 ICD-10 (BA 2019 aspek koding 87): bronkitis yang tidak disebut akut atau kronik pada usia di bawah 15 tahun dapat diasumsikan akut dan dikode J20."
+    },
+    {
+      "id": "BA-19-K156",
+      "nama": "Pemasangan IOL tanpa ekstraksi katarak pada episode yang sama",
+      "px": [
+        "13.71"
+      ],
+      "px_kecuali": [
+        "13.1",
+        "13.2",
+        "13.3",
+        "13.4",
+        "13.5",
+        "13.6"
+      ],
+      "sumber_id": "BA-KLAIM-2019",
+      "halaman": [
+        30
+      ],
+      "butir": "Aspek koding 156",
+      "pemeriksa_ba": "selalu_telaah",
+      "alasan_telaah": "13.71 adalah pemasangan IOL saat ekstraksi katarak (satu tahap); tanpa ekstraksi pada episode yang sama dikode 13.72.",
+      "ringkas_telaah": "13.71 tanpa kode ekstraksi katarak; pemasangan IOL sekunder dikode 13.72",
+      "catatan": "13.71 Insertion of intraocular lens prosthesis at time of cataract extraction, one stage; pemasangan IOL terpisah dari ekstraksi dikode 13.72."
+    },
+    {
+      "id": "BA-19-K181",
+      "nama": "Repair perineum pada episiotomi rutin",
+      "px": [
+        "75.69"
+      ],
+      "px_bersama": [
+        "73.6"
+      ],
+      "sumber_id": "BA-KLAIM-2019",
+      "halaman": [
+        33
+      ],
+      "butir": "Aspek koding 181",
+      "pemeriksa_ba": "selalu_telaah",
+      "alasan_telaah": "Repair pada episiotomi rutin saat persalinan normal dikode 73.6, bukan 75.69.",
+      "ringkas_telaah": "75.69 bersama 73.6: repair episiotomi rutin sudah termasuk 73.6",
+      "catatan": "75.69 mengecualikan repair of routine episiotomy (73.6). Repair laserasi lain di luar episiotomi rutin tetap dapat dikode terpisah bila tertulis."
+    },
+    {
+      "id": "BA-19-K188",
+      "nama": "Debridemen eksisional (86.22)",
+      "px": [
+        "86.22"
+      ],
+      "sumber_id": "BA-KLAIM-2019",
+      "halaman": [
+        34
+      ],
+      "butir": "Aspek koding 188, 189",
+      "kriteria": [
+        [
+          "eksisi_debridemen"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "86.22 dikode bila laporan operasi menulis eksisi dan debridemen (pembuangan jaringan nekrotik secara eksisi). Pembersihan tanpa eksisi (irigasi, scrubbing, washing, brushing, maggot) dikode 86.28."
+    },
+    {
+      "id": "BA-23-K18",
+      "nama": "Tindakan yang diklaim tertulis di berkas",
+      "px": [
+        "57.94",
+        "97.64",
+        "96.07",
+        "99.04",
+        "99.6",
+        "93.93",
+        "96.04",
+        "34.04",
+        "89.52"
+      ],
+      "sumber_id": "BA-KLAIM-2023-KODING",
+      "halaman": [
+        6
+      ],
+      "butir": "Aspek koding no. 18 (415/BA/0623); BA 2019 butir 158, 197, 200, 204, 209",
+      "pemeriksa_ba": "prosedur_tertulis",
+      "catatan": "Sumber koding INA-CBG adalah resume medis dan berkas rekam medis (PMK 26/2021). Tindakan yang tidak tercantum di dokumen namun dikode menjadi temuan. RJP (99.60) perlu tertulis bersama henti jantung/napas; resusitasi 93.93 dilihat di lembar observasi; lepas kateter 97.64, pasang kateter 57.94."
+    }
+  ],
+  "batas_cakupan": "Aspek medis BA 2018 (butir 1-63, PDF 31-40) dipetakan seluruhnya: kriteria yang dapat dibaca dari berkas dinilai, butir lintas kunjungan/kebijakan ditampilkan sebagai rujukan. Butir yang topiknya sudah dinilai aturan lain (gabung_ke) ditempel ke kartu aturan itu. Aspek koding BA 2018 (PDF 3-30) belum menjadi aturan otomatis kecuali yang sudah ada di ketentuanKlaimKombinasi."
+}

@@ -79,6 +79,9 @@ tetapi bila fakta lemah dan casemix RS biasa tidak mengode, pertimbangkan perlu_
 ${pelajaran.map(p => `- ${p.pesan}`).join('\n')}` : ''}`;
   const muatan = { system: SYSTEM.replace(KONVENSI_KODING_RS,require('./konvensiKodingRs').konvensiUntukRs(record,pages)), prompt, json: true, maxTokens: 2500, dikenal, jenisKlaim: record.jenis_klaim || record.JENIS_KLAIM, versi: 'penalaran-v2-referensi' };
   muatan.prioritasKlinis=true;
+  // Setiap diagnosis menambah penalaran + bukti mendukung/melemahkan; jatah
+  // keluaran ikut jumlah diagnosis agar jawaban tidak terpotong.
+  muatan.batasKeluaran=Math.min(16000,8000+1500*Math.max(0,kode.length-2));
   let r = await gateway.panggilModel('agen_tinjau', muatan, { db });
   if ((!r || !r.ok) && !require('./konteksPenggunaanAiService').saatIni().anggaran_ai)
     r = await gateway.panggilModel('agen_tinjau', muatan, { db });

@@ -202,4 +202,4 @@ test('hasil Gram sampai ke fakta penalaran; urine mikroskopis dibaca berdasarkan
   expect(temuan.filter(t=>t.kode_usulan==='91.39').map(t=>t.page_number)).toEqual([7]);
 });
 
-function evaluasiSyaratPenunjang(dx,px,pages,opsi={}) { return evaluasiSyaratPenunjangAsli(dx,px,pages,{hospitalCode:'3371084',...opsi}); }
+function evaluasiSyaratPenunjang(dx,px,pages,opsi={}) { return evaluasiSyaratPenunjangAsli(dx,px,pages,{hospitalCode:'3371084',usia:35,...opsi}); }

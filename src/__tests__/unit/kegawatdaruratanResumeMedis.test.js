@@ -189,7 +189,9 @@ describe('pending dari kriteria kegawatdaruratan', () => {
     const p = susunPutusan({ kegawatdaruratan_assessment: penilaian(true, 'tidak', 'tidak', 'tidak', 'borderline', 'tidak') }, []);
     expect(p.status).toBe('berisiko_pending');
     const a = p.alasan.find(x => x.kode === 'KGD-IGD');
-    expect(a).toMatchObject({ ringkas: 'Kunjungan IGD tidak memenuhi kriteria kegawatdaruratan', wajib_pending: true });
+    expect(a).toMatchObject({ wajib_pending: true });
+    // Ringkasan menyebut nilai yang terbaca agar alasan jelas sekilas.
+    expect(a.ringkas).toMatch(/^Kunjungan IGD tanpa kriteria gawat darurat K1-K5/);
     expect(a.penjelasan).toMatch(/K4 \(TD_sistolik=141\)/);
   });
 

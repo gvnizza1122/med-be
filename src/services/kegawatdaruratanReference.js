@@ -182,8 +182,11 @@ const THRESHOLD_TABLE = {
   // dibiarkan apa adanya karena justru itu yang relevan untuk klaim IGD.
   TD_sistolik: {
     unit: 'mmHg',
-    dewasa: { normal: [90, 139], borderline: [[140, 179], [80, 89]], gawatUnder: 80, gawatOver: 180 },
-    lansia: { normal: [90, 139], borderline: [[140, 179], [80, 89]], gawatUnder: 80, gawatOver: 180 }, // sama dewasa, tidak ada dasar literatur kuat u/ geser
+    // Hipotensi dewasa <90 mmHg = gawat (BA kesepakatan 2018 hal. 31: "TD < 90 mmHg tanpa
+    // inotropik"), sama dengan matriks IGD (matriksIgdService). Dulu 80-89 hanya borderline
+    // sehingga TD 81/65 pada melena dinyatakan "tanpa kriteria gawat darurat".
+    dewasa: { normal: [90, 139], borderline: [[140, 179]], gawatUnder: 90, gawatOver: 180 },
+    lansia: { normal: [90, 139], borderline: [[140, 179]], gawatUnder: 90, gawatOver: 180 }, // sama dewasa, tidak ada dasar literatur kuat u/ geser
     remaja: { normal: [112, 128], gawatUnder: 90 },
     // Ambang hipotensi pediatrik baku PALS sebenarnya rumus dinamis 70+(usia_tahun x2)
     // mmHg, BUKAN angka statis -- diaproksimasi jadi angka statis per kelompok usia

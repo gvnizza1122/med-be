@@ -317,7 +317,21 @@ function evaluasiSyaratPenunjang(diagnosisList, prosedurList, halaman = [], opsi
     const kodeKena = diagnosis.filter(d => kodeCocok(d, aturan.kode_diagnosis));
     if (!kodeKena.length) continue;
 
-    const syarat = (aturan.syarat || []).map(s => nilaiSyarat(s, prosedur, halaman, opsi));
+    // Syarat khusus usia hanya dinilai setelah usia terkonfirmasi.
+    const usia = Number.isFinite(opsi.usia) ? opsi.usia : null;
+    const diluarUsia = s => usia !== null && ((s.usia_min !== undefined && usia < s.usia_min) || (s.usia_max !== undefined && usia > s.usia_max));
+    const syaratDilewati = (aturan.syarat || []).filter(diluarUsia)
+      .map(s => ({ nama: s.nama, alasan: s.catatan_usia || `Tidak berlaku untuk usia ${usia} tahun.` }));
+    const syarat = (aturan.syarat || []).filter(s => !diluarUsia(s)).map(s => {
+      if(usia===null && (s.usia_min!==undefined || s.usia_max!==undefined)) return {nama:s.nama,tingkat_risiko:s.tingkat_risiko,status:STATUS.PERLU_CEK_MANUAL,tindakan_ada:false,kode_prosedur_ditemukan:[],nilai:null,kutipan:null,page_number:null,catatan_batasan:'Usia belum terkonfirmasi; syarat khusus anak/dewasa belum dinilai.'};
+      const hasil=nilaiSyarat(s, prosedur, halaman, opsi);
+      if(s.konfirmasi_cakupan_anak && (usia===null || usia<18)) {
+        hasil.status_bukti=hasil.status;
+        hasil.status=STATUS.PERLU_CEK_MANUAL;
+        hasil.catatan_batasan=[hasil.catatan_batasan, 'Syarat dari rekap pending RS perlu konfirmasi cakupan pada anak. PNPK anak tidak menjadikan foto toraks rutin atau antibiotik IV 72 jam sebagai syarat universal klaim.'].filter(Boolean).join(' ');
+      }
+      return hasil;
+    });
     if (aturan.id === 'SP-05') {
       const protein = require('./referensiKlaimService').nilaiPreeklampsia(require('./referensiKlaimService').halamanKlinis(halaman));
       const s = syarat[0];
@@ -342,11 +356,13 @@ function evaluasiSyaratPenunjang(diagnosisList, prosedurList, halaman = [], opsi
       cakupan: 'rs',
       berlaku_mulai: cakupan.berlaku_mulai,
       berlaku_sampai: cakupan.berlaku_sampai,
+      perlu_konfirmasi_cakupan: aturan.id==='SP-01' && (usia===null || usia<18),
       perlu_konfirmasi_tanggal: !tanggal && !!(cakupan.berlaku_mulai || cakupan.berlaku_sampai),
       sumber_ketentuan: cakupan.sumber_aturan,
       // Nama lama dipertahankan untuk hasil analisis dan klien sebelumnya.
       sumber_aturan: cakupan.sumber_aturan,
       syarat,
+      ...(syaratDilewati.length ? { syarat_dilewati_usia: syaratDilewati, usia_pasien: usia } : {}),
       ringkasan: {
         terpenuhi: syarat.filter(s => s.status === STATUS.TERPENUHI).length,
         hasil_belum_terbaca: syarat.filter(s => s.status === STATUS.HASIL_BELUM_TERBACA).length,

@@ -77,8 +77,8 @@ def health():
 # teks sangat sedikit), dicoba ulang dengan perbaikan gambar dan rotasi, lalu
 # dipilih hasil terbaik (skor = keyakinan x jumlah karakter terbaca). Halaman
 # yang sudah bagus tidak diproses ulang, jadi biaya tambahan hanya untuk scan
-# buruk. Contoh pemicu: rekaman EKG terputar 90 derajat (SUPRIYATI
-# 0170R0111225V003428 hal. 8-9), fotokopi pudar, scan miring.
+# buruk. Contoh pemicu: rekaman EKG terputar 90 derajat (PASIEN CONTOH A
+# 0000R0000126V000002 hal. 8-9), fotokopi pudar, scan miring.
 AMBANG_KEYAKINAN = float(__import__("os").environ.get("OCR_AMBANG_KEYAKINAN", "88"))
 AMBANG_KARAKTER = int(__import__("os").environ.get("OCR_AMBANG_KARAKTER", "80"))
 
@@ -218,6 +218,87 @@ def _ocr_adaptif(img):
     return terbaik
 
 
+# --- Pemulihan baris yang tidak terdeteksi ---------------------------------
+# Detektor kadang melewatkan satu baris utuh di tengah paragraf yang rapat,
+# bahkan pada halaman bersih ber-keyakinan tinggi -- laporan operasi KASUS ACUAN STT
+# (0000R0000126V000001 hal. 14) kehilangan "sampai ke lapisan otot pectoralis
+# mayor - Otot pectoralis mayor split kanan kiri, mencapai massa tumor di",
+# satu-satunya bukti tumor di bawah fascia. Baris dalam satu paragraf normalnya
+# rapat/bertumpuk; celah tegak >= 0,3 x tinggi baris menandakan baris yang
+# hilang. Area celah dipotong dan dibaca ulang; hanya teks yang terbaca jelas
+# dan belum ada yang disisipkan.
+import os as _os
+import re as _re
+MAKS_CELAH = int(_os.environ.get("OCR_MAKS_CELAH", "12"))
+
+
+def _isi_celah(img, h):
+    baris = sorted(h["baris"], key=lambda b: b["bbox"][1])
+    if len(baris) < 2:
+        return h
+    tinggi = sorted(b["bbox"][3] - b["bbox"][1] for b in baris)
+    t_med = max(1.0, float(tinggi[len(tinggi) // 2]))
+    H, W = img.shape[:2]
+    tambahan = []
+    dicek = 0
+    teks_ada = lambda: ["".join(x["text"].lower().split()) for x in baris + tambahan]
+    for a, b in zip(baris, baris[1:]):
+        if dicek >= MAKS_CELAH:
+            break
+        # Satu paragraf: tepi kiri berdekatan dan keduanya baris panjang (bukan label/sel tabel).
+        if abs(a["bbox"][0] - b["bbox"][0]) > max(60.0, 1.5 * t_med):
+            continue
+        if min(a["bbox"][2] - a["bbox"][0], b["bbox"][2] - b["bbox"][0]) < 8 * t_med:
+            continue
+        celah = b["bbox"][1] - a["bbox"][3]
+        if not (0.3 * t_med <= celah <= 1.8 * t_med):
+            continue
+        # Kalimat bersambung melintasi celah: baris atas belum selesai atau
+        # baris bawah mulai huruf kecil. Jarak antarbaris tabel/formulir tidak
+        # memenuhi ini, sehingga tidak dibaca ulang percuma.
+        ta, tb = a["text"].rstrip(), b["text"].lstrip(" -")
+        bersambung = (tb[:1].islower() or ta.endswith((",", "-", "/"))
+                      or _re.search(r"\b(?:dan|dengan|yang|di|ke|sampai|atau|serta)$", ta, _re.I) is not None)
+        if not bersambung:
+            continue
+        dicek += 1
+        y0 = max(0, int(a["bbox"][3] - 0.35 * t_med))
+        y1 = min(H, int(b["bbox"][1] + 0.35 * t_med))
+        x0 = max(0, int(min(a["bbox"][0], b["bbox"][0]) - t_med))
+        x1 = min(W, int(max(a["bbox"][2], b["bbox"][2]) + t_med))
+        if y1 - y0 < 8 or x1 - x0 < 8:
+            continue
+        try:
+            r = _baca(img[y0:y1, x0:x1])
+        except Exception:
+            continue
+        for c in r["baris"]:
+            teks = c["text"].strip()
+            if c["confidence"] < 0.85 or len(teks) < 8 or len(_re.findall(r"[A-Za-z]{2,}", teks)) < 2:
+                continue
+            kunci = "".join(teks.lower().split())
+            if any(kunci in t for t in teks_ada()):
+                continue
+            bx = c["bbox"]
+            tambahan.append({"text": teks, "confidence": c["confidence"],
+                             "bbox": [bx[0] + x0, bx[1] + y0, bx[2] + x0, bx[3] + y0]})
+    if not tambahan:
+        return h
+    semua = sorted(baris + tambahan, key=lambda b: (b["bbox"][1] + b["bbox"][3]) / 2)
+    skor = [b["confidence"] for b in semua]
+    return {**h, "baris": semua, "keyakinan": sum(skor) / len(skor) * 100,
+            "karakter": sum(len(b["text"]) for b in semua),
+            "varian": h.get("varian", "asli") + "+celah", "baris_dipulihkan": len(tambahan)}
+
+
+def _ocr_lengkap(img):
+    h = _ocr_adaptif(img)
+    try:
+        return _isi_celah(img, h)
+    except Exception:
+        return h
+
+
 @app.post("/ocr")
 async def ocr(request: Request):
     data = await request.body()
@@ -228,11 +309,12 @@ async def ocr(request: Request):
         raise HTTPException(status_code=400, detail="gambar tidak dapat dibaca")
 
     # Inferensi memblokir; dijalankan di thread supaya /health tetap responsif.
-    h = await run_in_threadpool(_ocr_adaptif, img)
+    h = await run_in_threadpool(_ocr_lengkap, img)
     return {
         "text": "\n".join(b["text"] for b in h["baris"]),
         "confidence": round(h["keyakinan"], 2),
         "varian": h["varian"],
+        "baris_dipulihkan": h.get("baris_dipulihkan", 0),
         "lines": [
             {"text": b["text"], "confidence": round(b["confidence"] * 100, 2), "bbox": b["bbox"]}
             for b in h["baris"]

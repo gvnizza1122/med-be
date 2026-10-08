@@ -64,7 +64,7 @@ function validateRecord(record, activeRules) {
           field_name: 'sep',
           severity: 'critical',
           error_message: 'Format SEP tidak valid. SEP terlalu pendek.',
-          expected_value: 'Minimal 10 karakter (contoh: 0170R0111225V003313)',
+          expected_value: 'Minimal 10 karakter (contoh: 0000R0000126V000011)',
           actual_value: sep
         });
       }
@@ -441,9 +441,9 @@ function validateRecord(record, activeRules) {
       errors.push({
         rule_id: 'RV-13',
         field_name: 'jumlah_episode_klaim',
-        severity: 'major',
-        error_message: ruleMap['RV-13'].error_message || 'Sesuai BA 1247/2024, pelayanan Konsul Internal antar-spesialis/poli harus digabung menjadi 1 Episode Klaim.',
-        expected_value: '1 Episode Klaim',
+        severity: 'minor',
+        error_message: 'Telaah BA 1247/2024: label konsul internal perlu dicocokkan dengan surat dan jawaban konsul. Satu episode bila pasien dikembalikan ke dokter perujuk, walau berbeda hari. Kunjungan antar-poli saja belum memastikan konsul internal.',
+        expected_value: 'Konfirmasi surat/jawaban konsul dan pengembalian ke perujuk sebelum menetapkan episode',
         actual_value: `${record.jumlah_episode_klaim} Episode`
       });
     }
@@ -455,21 +455,18 @@ function validateRecord(record, activeRules) {
       errors.push({
         rule_id: 'RV-14',
         field_name: 'jumlah_episode_klaim',
-        severity: 'major',
-        error_message: ruleMap['RV-14'].error_message || 'Rujukan internal antar-poli pada hari yang sama tanpa dikembalikan ke poli asal harus divalidasi ketepatan pemisahan episodenya agar tidak dispute.',
-        expected_value: 'Validasi Kesesuaian Rujukan / 1 Rangkaian Episode',
+        severity: 'minor',
+        error_message: 'Telaah BA 1247/2024: cocokkan surat rujukan internal, tanggal dan pengembalian ke perujuk. Rujukan yang tidak dikembalikan dapat dua episode bila berbeda hari; jumlah kunjungan saja belum menetapkan episode.',
+        expected_value: 'Periksa dokumen rujukan dan tanggal pelayanan sebelum memisahkan episode',
         actual_value: `Terpisah ${record.jumlah_episode_klaim} Episode pada hari yang sama`
       });
     }
   }
 
   // RV-15: Flagging Otomatisasi Program Rujuk Balik (PRB)
-  // Syarat status_pasien === 'STABIL' SENGAJA dihapus — field itu tidak pernah
-  // bisa diverifikasi dari dokumen (tidak ada "status stabil/tidak" tercetak
-  // eksplisit), jadi kalau dipertahankan rule ini tidak akan pernah menyala.
-  // histori_obat_kronis_bulan_berturut sekarang diisi nyata oleh
-  // detectAndFlagPRB() di claimFiles.js (hitung bulan berturut-turut diagnosis
-  // kategori PRB yang sama, lintas record yang sudah terupload di sistem ini).
+  // Riwayat sistem berasal dari kategori diagnosis yang sama, bukan
+  // pembuktian obat yang sama. BA memerlukan telaah obat 3 bulan dan
+  // pengecualian kegawatan/diagnosis di luar PRB; perkiraan ini hanya telaah.
   if (ruleMap['RV-15']?.is_active) {
     const prbCategory = matchPrbCategory(record.diagnosa_list);
     if (prbCategory && record.histori_obat_kronis_bulan_berturut >= 3 && !record.prb_exempt_reason) {
@@ -477,10 +474,10 @@ function validateRecord(record, activeRules) {
         errors.push({
           rule_id: 'RV-15',
           field_name: 'diagnosa_list',
-          severity: 'major',
-          error_message: ruleMap['RV-15'].error_message || 'Pasien penyakit kronis dengan kondisi stabil telah mendapatkan terapi 3 bulan berturut-turut. Wajib dialihkan masuk Program Rujuk Balik (PRB) ke FKTP.',
-          expected_value: 'Flagging PRB Aktif / Rujuk Balik ke FKTP, atau tambahkan ke daftar Exempt PRB',
-          actual_value: `Diagnosa kronis ${prbCategory}, terekam ${record.histori_obat_kronis_bulan_berturut} bulan berturut-turut`
+          severity: 'minor',
+          error_message: 'Telaah BA 1247/2024: riwayat kategori diagnosis PRB mencapai 3 bulan. Konfirmasi obat kronis yang sama 3 bulan berturut-turut serta pengecualian kegawatdaruratan/diagnosis di luar PRB; riwayat diagnosis saja belum memastikan kewajiban rujuk balik.',
+          expected_value: 'Cocokkan resep/riwayat obat dan pengecualian sebelum menetapkan PRB',
+          actual_value: `Kategori diagnosis ${prbCategory}, terekam ${record.histori_obat_kronis_bulan_berturut} bulan berturut-turut; kesamaan obat belum terverifikasi`
         });
       }
     }
@@ -497,9 +494,9 @@ function validateRecord(record, activeRules) {
       errors.push({
         rule_id: 'RV-16',
         field_name: 'urutan_iterasi',
-        severity: 'major',
-        error_message: ruleMap['RV-16'].error_message || 'Sesuai regulasi BA 1247/2024, pelayanan iterasi (perulangan resep) obat kronis di FKRTL dibatasi maksimal hanya boleh dilakukan sebanyak 2 kali.',
-        expected_value: '<= 2 Kali Iterasi',
+        severity: 'minor',
+        error_message: 'Telaah BA 1247/2024: iterasi resep obat kronis maksimal 2 kali. Jumlah kunjungan kategori diagnosis yang sama merupakan perkiraan, bukan nomor iterasi resep asli; periksa resep sebelum menyatakan batas iterasi terlampaui.',
+        expected_value: 'Konfirmasi nomor iterasi resep asli dan tempat pengambilan obat bulan ke-2/ke-3',
         actual_value: `Estimasi ${record.urutan_iterasi}x kunjungan diagnosis kronis sama bulan ini (dihitung dari riwayat, bukan nomor iterasi resep asli — mohon cek manual)`
       });
     }

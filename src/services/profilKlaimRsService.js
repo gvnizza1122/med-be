@@ -2,7 +2,8 @@
 const referensi = require('../data/referensiKesesuaianKlaim.json');
 const lokal = require('../data/syaratPenunjangDiagnosis.json');
 const ID_LOKAL = new Set(lokal.aturan.map(a => a.id));
-const ID_REFERENSI = new Set(referensi.aturan.map(a => a.id));
+const dokumen = require('../data/baTkmkb2025.json');
+const ID_REFERENSI = new Set([...referensi.aturan,...dokumen.aturan].map(a => a.id));
 
 function profilBawaan(hospitalCode) {
   const code = String(hospitalCode || '').trim();
@@ -71,6 +72,9 @@ async function ensureSchema(db) {
   await db.run(`INSERT INTO referensi_klaim_catalog(versi,diperiksa_pada,katalog)
     VALUES(?,?,?::jsonb) ON CONFLICT(versi) DO NOTHING`,
   [referensi.versi, referensi.diperiksa_pada, JSON.stringify(referensi)]);
+  await db.run(`INSERT INTO referensi_klaim_catalog(versi,diperiksa_pada,katalog)
+    VALUES(?,?,?::jsonb) ON CONFLICT(versi) DO NOTHING`,
+  [dokumen.versi,dokumen.diperiksa_pada,JSON.stringify(dokumen)]);
   await db.run(`UPDATE validation_rules SET rule_name=?,description=?,priority=3,error_message=? WHERE id='RV-17'`,
     ['Telaah Indikasi Odontektomi','BA 2024: rawat jalan/rawat inap sesuai indikasi; telaah bukti melalui RK-17.',
       'Periksa indikasi dan laporan tindakan odontektomi; jenis rawat saja tidak menentukan kelayakan.']);

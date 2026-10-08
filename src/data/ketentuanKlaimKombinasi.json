@@ -1,111 +1,1230 @@
 {
-  "_catatan": "Tipe 3 (aturan kombinasi kode) dari catatan revisi dokter: gabungan catatan casemix RS Lestari Raharja + Berita Acara Kesepakatan Kemenkes-BPJS No. JP.02.03/3/2411/2018 & 620/BA/1118. Aturan dievaluasi HANYA terhadap DIAGLIST -- tidak perlu membaca dokumen, lab, atau kamus.",
+  "_catatan": "Tipe 3 (aturan kombinasi kode) dari catatan revisi dokter: gabungan catatan casemix RS Lestari Raharja + Berita Acara Kesepakatan Kemenkes-BPJS No. JP.02.03/3/2411/2018 & 620/BA/1118. Aturan dievaluasi HANYA terhadap DIAGLIST -- tidak perlu membaca dokumen, lab, atau kamus. Ditambah butir koding BA Kesepakatan Koding 2023 edisi 415/BA/0623 dan 668/BA/0823 (sumber ba_2023). Aksi telaah/urutan/ganti_kode tidak diterapkan otomatis ke saran kode. Ditambah butir koding BA 2019 (411/BA/0720) KMB-28..57; KMB-03/11/12 diperbarui, KMB-08 menjadi telaah karena bertentangan dengan ICD-10/BA 2019 butir 89.",
   "_tentang_diverifikasi": "false = kode ICD-nya belum dipastikan koder. Dokumen sumber menyebut aturan ini dengan NAMA penyakit (mis. 'GTCS', 'stupor', 'trombositopenia'), bukan kode, jadi pemetaannya ke ICD-10 adalah tafsir yang wajib ditelaah tim casemix sebelum diaktifkan.",
   "aturan": [
     {
-      "kode": "KMB-01", "nama": "Stroke + GTCS",
-      "kode_diagnosis": ["I60", "I61", "I62", "I63", "I64"],
-      "kode_pasangan": ["G40.3", "R56.8"],
+      "kode": "KMB-01",
+      "nama": "Stroke + GTCS",
+      "kode_diagnosis": [
+        "I60",
+        "I61",
+        "I62",
+        "I63",
+        "I64"
+      ],
+      "kode_pasangan": [
+        "G40.3",
+        "R56.8"
+      ],
       "aksi": "buang_pasangan",
       "pesan": "GTCS adalah manifestasi stroke, cukup kode stroke saja.",
-      "sumber": "casemix_rs", "kutipan_sumber": "Stroke + GTCS: cukup kode stroke - GTCS adalah manifestasi",
-      "diverifikasi": false, "alasan_belum": "Kode untuk GTCS belum dipastikan: G40.3 (epilepsi umum idiopatik) atau R56.8 (kejang lain). Perlu konfirmasi koder."
+      "sumber": "casemix_rs",
+      "kutipan_sumber": "Stroke + GTCS: cukup kode stroke - GTCS adalah manifestasi",
+      "diverifikasi": false,
+      "alasan_belum": "Kode untuk GTCS belum dipastikan: G40.3 (epilepsi umum idiopatik) atau R56.8 (kejang lain). Perlu konfirmasi koder."
     },
     {
-      "kode": "KMB-02", "nama": "Stroke + stupor",
-      "kode_diagnosis": ["I60", "I61", "I62", "I63", "I64"],
-      "kode_pasangan": ["R40.1"],
+      "kode": "KMB-02",
+      "nama": "Stroke + stupor",
+      "kode_diagnosis": [
+        "I60",
+        "I61",
+        "I62",
+        "I63",
+        "I64"
+      ],
+      "kode_pasangan": [
+        "R40.1"
+      ],
       "aksi": "buang_pasangan",
       "pesan": "Stupor adalah manifestasi stroke, cukup kode stroke saja.",
-      "sumber": "casemix_rs", "kutipan_sumber": "Stroke + stupor: cukup kode stroke",
+      "sumber": "casemix_rs",
+      "kutipan_sumber": "Stroke + stupor: cukup kode stroke",
       "diverifikasi": true
     },
     {
-      "kode": "KMB-03", "nama": "Tifoid + GEA",
-      "kode_diagnosis": ["A01.0"],
-      "kode_pasangan": ["A09"],
+      "kode": "KMB-03",
+      "nama": "Tifoid + diare/gastroenteritis",
+      "kode_diagnosis": [
+        "A01"
+      ],
+      "kode_pasangan": [
+        "A09"
+      ],
       "aksi": "buang_pasangan",
-      "pesan": "GEA tidak perlu dikoding bersama tifoid.",
-      "sumber": "casemix_rs", "kutipan_sumber": "Tifoid + GEA: GEA tidak perlu dikoding",
+      "pesan": "A09 tidak dikode bila sudah ada demam tifoid (A01) yang tegak; eksklusi A09 mengarah ke kode organisme spesifik.",
+      "sumber": "keduanya",
+      "kutipan_sumber": "Catatan casemix RS dan BA Kesepakatan 2019 (JP.02.03/3/1693/2020; 411/BA/0720), aspek koding no. 3 dan 4 (mengukuhkan BA 2018)",
       "diverifikasi": true
     },
     {
-      "kode": "KMB-04", "nama": "Renal colic + ISK",
-      "kode_diagnosis": ["N23"],
-      "kode_pasangan": ["N39.0"],
+      "kode": "KMB-04",
+      "nama": "Batu saluran kemih/kolik renal + ISK",
+      "kode_diagnosis": [
+        "N20",
+        "N21",
+        "N22",
+        "N23"
+      ],
+      "kode_pasangan": [
+        "N39.0"
+      ],
       "aksi": "buang_pasangan",
-      "pesan": "Cukup N23 (renal colic).",
-      "sumber": "casemix_rs", "kutipan_sumber": "Renal colic + ISK: cukup N23",
+      "pesan": "ISK bersama batu saluran kemih memakai kode gabungan di N20-N23 (kriteria eksklusi N30-N39); N39.0 tidak dikode terpisah.",
+      "sumber": "keduanya",
+      "kutipan_sumber": "Catatan casemix RS (N23 + N39.0) dan BA Kesepakatan Koding 2023 (JP.02.03/H.IV/1627/2023; 415/BA/0623), aspek koding no. 3 dan 33",
       "diverifikasi": true
     },
     {
-      "kode": "KMB-05", "nama": "N19 + I10 jadi I12.0",
-      "kode_diagnosis": ["N19"],
-      "kode_pasangan": ["I10"],
-      "aksi": "ganti_gabungan", "kode_gabungan": "I12.0",
+      "kode": "KMB-05",
+      "nama": "N19 + I10 jadi I12.0",
+      "kode_diagnosis": [
+        "N19"
+      ],
+      "kode_pasangan": [
+        "I10"
+      ],
+      "aksi": "ganti_gabungan",
+      "kode_gabungan": "I12.0",
       "pesan": "Gagal ginjal dengan hipertensi digabung jadi I12.0.",
-      "sumber": "casemix_rs", "kutipan_sumber": "N19 + I10: jadi I12.0",
+      "sumber": "casemix_rs",
+      "kutipan_sumber": "N19 + I10: jadi I12.0",
       "diverifikasi": true
     },
     {
-      "kode": "KMB-06", "nama": "Trombositopenia + A90",
-      "kode_diagnosis": ["A90"],
-      "kode_pasangan": ["D69.6"],
+      "kode": "KMB-06",
+      "nama": "Trombositopenia + A90",
+      "kode_diagnosis": [
+        "A90"
+      ],
+      "kode_pasangan": [
+        "D69.6"
+      ],
       "aksi": "buang_pasangan",
       "pesan": "Trombositopenia adalah bagian dari dengue, cukup A90.",
-      "sumber": "casemix_rs", "kutipan_sumber": "Trombositopenia + A90: cukup A90",
-      "diverifikasi": false, "alasan_belum": "Kode trombositopenia D69.6 (tidak spesifik) belum dipastikan koder; bisa juga D69.5."
+      "sumber": "casemix_rs",
+      "kutipan_sumber": "Trombositopenia + A90: cukup A90",
+      "diverifikasi": false,
+      "alasan_belum": "Kode trombositopenia D69.6 (tidak spesifik) belum dipastikan koder; bisa juga D69.5."
     },
     {
-      "kode": "KMB-07", "nama": "Pneumonia + kejang demam",
-      "kode_diagnosis": ["J22", "J18.0"],
-      "kode_pasangan": ["R56.0"],
+      "kode": "KMB-07",
+      "nama": "Pneumonia + kejang demam",
+      "kode_diagnosis": [
+        "J22",
+        "J18.0"
+      ],
+      "kode_pasangan": [
+        "R56.0"
+      ],
       "aksi": "buang_pasangan",
       "pesan": "R56.0 tidak dikode bersama J22/J18.0.",
-      "sumber": "casemix_rs", "kutipan_sumber": "J22 / J18.0 + R56.0: R56.0 tidak dikode",
+      "sumber": "casemix_rs",
+      "kutipan_sumber": "J22 / J18.0 + R56.0: R56.0 tidak dikode",
       "diverifikasi": true
     },
     {
-      "kode": "KMB-08", "nama": "Asma + COPD",
-      "kode_diagnosis": ["J45"],
-      "kode_pasangan": ["J44"],
-      "aksi": "ganti_gabungan", "kode_gabungan": "J45.9",
-      "pesan": "Asma bersama COPD digabung jadi J45.9.",
-      "sumber": "casemix_rs", "kutipan_sumber": "Asma + COPD: jadi J45.9",
-      "diverifikasi": true
+      "kode": "KMB-08",
+      "nama": "Asma + COPD",
+      "kode_diagnosis": [
+        "J45"
+      ],
+      "kode_pasangan": [
+        "J44"
+      ],
+      "aksi": "telaah",
+      "pesan": "Catatan casemix RS menggabungkan asma + PPOK menjadi J45.9, tetapi ICD-10 2010 (eksklusi J45) dan BA 2019 butir 89 menggolongkan chronic obstructive asthma/asthmatic bronchitis ke J44.-. Telaah diagnosis akhir DPJP; jangan diganti otomatis.",
+      "sumber": "casemix_rs",
+      "kutipan_sumber": "Catatan casemix RS; BA Kesepakatan 2019 (JP.02.03/3/1693/2020; 411/BA/0720), aspek koding no. 89 (mengukuhkan BA 2018)",
+      "diverifikasi": true,
+      "keparahan": "sedang",
+      "kode_saran": "J44.- atau J45.9 sesuai diagnosis DPJP"
     },
     {
-      "kode": "KMB-09", "nama": "HHD + Cardiomegaly",
-      "kode_diagnosis": ["I11"],
-      "kode_pasangan": ["I51.7"],
+      "kode": "KMB-09",
+      "nama": "HHD + Cardiomegaly",
+      "kode_diagnosis": [
+        "I11"
+      ],
+      "kode_pasangan": [
+        "I51.7"
+      ],
       "aksi": "buang_pasangan",
       "pesan": "Cukup HHD. Berlaku juga bila pasangannya angina pektoris.",
-      "sumber": "casemix_rs", "kutipan_sumber": "HHD + Cardiomegaly: cukup HHD - berlaku juga untuk angina pektoris",
-      "diverifikasi": false, "alasan_belum": "Dokumen menyebut aturan ini berlaku juga untuk angina pektoris (I20.-), tapi tidak menyebut kode pasangannya secara eksplisit."
+      "sumber": "casemix_rs",
+      "kutipan_sumber": "HHD + Cardiomegaly: cukup HHD - berlaku juga untuk angina pektoris",
+      "diverifikasi": false,
+      "alasan_belum": "Dokumen menyebut aturan ini berlaku juga untuk angina pektoris (I20.-), tapi tidak menyebut kode pasangannya secara eksplisit."
     },
     {
-      "kode": "KMB-10", "nama": "HF/HHD + Pulmonary oedema",
-      "kode_diagnosis": ["I50", "I11"],
-      "kode_pasangan": ["J81"],
+      "kode": "KMB-10",
+      "nama": "HF/HHD + Pulmonary oedema",
+      "kode_diagnosis": [
+        "I50",
+        "I11"
+      ],
+      "kode_pasangan": [
+        "J81"
+      ],
       "aksi": "buang_pasangan",
       "pesan": "J81 tidak perlu dikoding lagi bersama HF/HHD.",
-      "sumber": "keduanya", "kutipan_sumber": "HF/HHD + Pulmonary oedema: J81 tidak perlu dikoding lagi",
+      "sumber": "keduanya",
+      "kutipan_sumber": "HF/HHD + Pulmonary oedema: J81 tidak perlu dikoding lagi",
       "diverifikasi": true
     },
-    {"kode": "KMB-11", "nama": "Oligohidramnion + KPD", "kode_diagnosis": ["O42"], "kode_pasangan": ["O41.0"], "aksi": "buang_pasangan", "pesan": "Oligohidramnion dengan KPD jadi satu kode O42.- (O41.0 tidak dikode terpisah; subkode O42 yang sudah ada dipertahankan)", "sumber": "casemix_rs", "kutipan_sumber": "Oligohidramnion + KPD: jadi satu kode O42.-", "diverifikasi": false, "alasan_belum": "Bentuk aturan sudah disesuaikan: O41.0 dibuang, subkode O42 (O42.0/O42.1 menurut lama ketuban pecah) dipertahankan -- sama dengan lembar grouper casemix YETY NOVIATI 0170R0111225V003427 (O42.1, tanpa O41.0). Tinggal disahkan koder."},
     {
-      "kode": "KMB-12", "nama": "Pneumonia + PPOK",
-      "kode_diagnosis": ["J18", "J22"],
-      "kode_pasangan": ["J44"],
-      "aksi": "ganti_gabungan", "kode_gabungan": "J44.0",
-      "pesan": "J44.0 sudah mencakup PPOK dengan infeksi saluran napas bawah.",
-      "sumber": "ba_2018", "kutipan_sumber": "BA: J44.0 sudah menggantikan PPOK dengan infeksi saluran napas bawah",
+      "kode": "KMB-11",
+      "nama": "Oligohidramnion + KPD",
+      "kode_diagnosis": [
+        "O42"
+      ],
+      "kode_pasangan": [
+        "O41.0"
+      ],
+      "aksi": "buang_pasangan",
+      "pesan": "Oligohidramnion dengan ketuban pecah dini cukup dikode O42.- (O41.0 mengecualikan KPD).",
+      "sumber": "keduanya",
+      "kutipan_sumber": "Catatan casemix RS dan BA Kesepakatan 2019 (JP.02.03/3/1693/2020; 411/BA/0720), aspek koding no. 125 (mengukuhkan BA 2018)",
+      "diverifikasi": true,
+      "alasan_belum": "Bentuk aturan sudah disesuaikan: O41.0 dibuang, subkode O42 (O42.0/O42.1 menurut lama ketuban pecah) dipertahankan -- sama dengan lembar grouper casemix YETY NOVIATI 0000R0000126V000007 (O42.1, tanpa O41.0). Tinggal disahkan koder."
+    },
+    {
+      "kode": "KMB-12",
+      "nama": "Pneumonia + PPOK",
+      "kode_diagnosis": [
+        "J18",
+        "J20",
+        "J22"
+      ],
+      "kode_pasangan": [
+        "J44"
+      ],
+      "aksi": "ganti_gabungan",
+      "kode_gabungan": "J44.0",
+      "pesan": "J44.0 sudah mencakup PPOK dengan infeksi saluran napas bawah. Pengecualian: pneumonia bersama PPOK eksaserbasi akut (J44.1) dikode terpisah J44.1 + J18.9 (BA 2019 butir 81).",
+      "sumber": "ba_2018",
+      "kutipan_sumber": "BA 2018; BA Kesepakatan 2019 (JP.02.03/3/1693/2020; 411/BA/0720), aspek koding no. 80, 81, 88 (mengukuhkan BA 2018)",
+      "diverifikasi": true,
+      "kode_pasangan_kecuali": [
+        "J44.1"
+      ]
+    },
+    {
+      "kode": "KMB-13",
+      "nama": "Apendisitis + perforasi/peritonitis",
+      "kode_diagnosis": [
+        "K35"
+      ],
+      "kode_pasangan": [
+        "K63.1",
+        "K65.0",
+        "K65.8",
+        "K65.9"
+      ],
+      "aksi": "buang_pasangan",
+      "pesan": "Peritonitis, perforasi atau abses peritoneal yang disertai apendisitis cukup memakai kode gabungan K35.- (mis. K35.2/K35.3); K63.1 mengecualikan perforasi apendiks.",
+      "kutipan_sumber": "BA Kesepakatan Koding 2023 (JP.02.03/H.IV/2739/2023; 668/BA/0823), aspek koding no. 3",
+      "sumber": "ba_2023",
+      "diverifikasi": true
+    },
+    {
+      "kode": "KMB-14",
+      "nama": "Hidronefrosis + batu ginjal/ureter",
+      "kode_diagnosis": [
+        "N13.0",
+        "N13.3"
+      ],
+      "kode_pasangan": [
+        "N20"
+      ],
+      "aksi": "ganti_gabungan",
+      "kode_gabungan": "N13.2",
+      "pesan": "Hidronefrosis dengan obstruksi batu ginjal/ureter memakai N13.2 (hydronephrosis with renal and ureteral calculous obstruction).",
+      "kutipan_sumber": "BA Kesepakatan Koding 2023 (JP.02.03/H.IV/1627/2023; 415/BA/0623), aspek koding no. 6 dan 29",
+      "sumber": "ba_2023",
+      "diverifikasi": true
+    },
+    {
+      "kode": "KMB-15",
+      "nama": "Kolik renal + hidronefrosis",
+      "kode_diagnosis": [
+        "N13.0",
+        "N13.1",
+        "N13.2",
+        "N13.3"
+      ],
+      "kode_pasangan": [
+        "N23"
+      ],
+      "aksi": "buang_pasangan",
+      "pesan": "Kolik renal adalah gejala hidronefrosis dan tidak dikode terpisah; hidronefrosis karena batu N13.2, penyebab belum diketahui N13.3.",
+      "kutipan_sumber": "BA Kesepakatan Koding 2023 (JP.02.03/H.IV/1627/2023; 415/BA/0623), aspek koding no. 29",
+      "sumber": "ba_2023",
+      "diverifikasi": true
+    },
+    {
+      "kode": "KMB-16",
+      "nama": "Pionefrosis + batu saluran kemih",
+      "kode_diagnosis": [
+        "N13.6"
+      ],
+      "kode_pasangan": [
+        "N20",
+        "N21",
+        "N22",
+        "N23"
+      ],
+      "aksi": "buang_pasangan",
+      "pesan": "Pionefrosis dengan batu ginjal/ureter cukup dikode N13.6.",
+      "kutipan_sumber": "BA Kesepakatan Koding 2023 (JP.02.03/H.IV/1627/2023; 415/BA/0623), aspek koding no. 32",
+      "sumber": "ba_2023",
+      "diverifikasi": true
+    },
+    {
+      "kode": "KMB-17",
+      "nama": "Hidronefrosis + penyempitan ureter",
+      "kode_diagnosis": [
+        "N13.0",
+        "N13.3"
+      ],
+      "kode_pasangan": [
+        "N13.5"
+      ],
+      "aksi": "ganti_gabungan",
+      "kode_gabungan": "N13.1",
+      "pesan": "Hidronefrosis dengan penyempitan ureter dikode N13.1, tidak dikode terpisah.",
+      "kutipan_sumber": "BA Kesepakatan Koding 2023 (JP.02.03/H.IV/1627/2023; 415/BA/0623), aspek koding no. 7",
+      "sumber": "ba_2023",
+      "diverifikasi": true
+    },
+    {
+      "kode": "KMB-18",
+      "nama": "Periodic paralysis + miopati",
+      "kode_diagnosis": [
+        "G72.3"
+      ],
+      "kode_pasangan": [
+        "G72.9"
+      ],
+      "aksi": "buang_pasangan",
+      "pesan": "Kelemahan otot pada periodic paralysis sudah termasuk G72.3.",
+      "kutipan_sumber": "BA Kesepakatan Koding 2023 (JP.02.03/H.IV/1627/2023; 415/BA/0623), aspek koding no. 8",
+      "sumber": "ba_2023",
+      "diverifikasi": true
+    },
+    {
+      "kode": "KMB-19",
+      "nama": "Malunion/nonunion + kode fraktur",
+      "kode_diagnosis": [
+        "M84.0",
+        "M84.1"
+      ],
+      "kode_pasangan": [
+        "S02",
+        "S12",
+        "S22",
+        "S32",
+        "S42",
+        "S52",
+        "S62",
+        "S72",
+        "S82",
+        "S92",
+        "T02",
+        "T08",
+        "T10",
+        "T12"
+      ],
+      "aksi": "buang_pasangan",
+      "pesan": "Episode perawatan malunion/nonunion dikode M84.0-/M84.1-; kode fraktur tidak dikode (dikecualikan Bab XIX).",
+      "kutipan_sumber": "BA Kesepakatan Koding 2023 (JP.02.03/H.IV/1627/2023; 415/BA/0623), aspek koding no. 28",
+      "sumber": "ba_2023",
+      "diverifikasi": true
+    },
+    {
+      "kode": "KMB-20",
+      "nama": "Kolelitiasis + obstruksi duktus biliaris",
+      "kode_diagnosis": [
+        "K80"
+      ],
+      "kode_pasangan": [
+        "K83.1"
+      ],
+      "aksi": "buang_pasangan",
+      "pesan": "K83.1 dikecualikan dari K80.-; obstruksi duktus biliaris tidak dikode terpisah.",
+      "kutipan_sumber": "BA Kesepakatan Koding 2023 (JP.02.03/H.IV/1627/2023; 415/BA/0623), aspek koding no. 30",
+      "sumber": "ba_2023",
+      "diverifikasi": true
+    },
+    {
+      "kode": "KMB-21",
+      "nama": "Batu saluran empedu + kolangitis",
+      "kode_diagnosis": [
+        "K80"
+      ],
+      "kode_pasangan": [
+        "K83.0"
+      ],
+      "aksi": "telaah",
+      "kode_saran": "K80.3",
+      "pesan": "Batu saluran empedu dengan kolangitis dikode K80.3; bila juga kolesistitis K80.4. Kolangitis tidak dikode terpisah.",
+      "kutipan_sumber": "BA Kesepakatan Koding 2023 (JP.02.03/H.IV/1627/2023; 415/BA/0623), aspek koding no. 31",
+      "sumber": "ba_2023",
+      "diverifikasi": true
+    },
+    {
+      "kode": "KMB-22",
+      "nama": "Syok pada/pasca persalinan",
+      "kode_diagnosis": [
+        "R57"
+      ],
+      "kode_pasangan": [
+        "O6",
+        "O70",
+        "O71",
+        "O72",
+        "O73",
+        "O74",
+        "O75",
+        "O80",
+        "O81",
+        "O82",
+        "O83",
+        "O84",
+        "Z37"
+      ],
+      "aksi": "telaah",
+      "kode_saran": "O75.1",
+      "pesan": "Syok selama atau sesudah persalinan dikode O75.1 (shock during or following labour and delivery), bukan R57.",
+      "kutipan_sumber": "BA Kesepakatan Koding 2023 (JP.02.03/H.IV/1627/2023; 415/BA/0623), aspek koding no. 5 dan 25",
+      "sumber": "ba_2023",
+      "diverifikasi": true
+    },
+    {
+      "kode": "KMB-23",
+      "nama": "Gagal ginjal akut pasca persalinan",
+      "kode_diagnosis": [
+        "N17"
+      ],
+      "kode_pasangan": [
+        "O80",
+        "O81",
+        "O82",
+        "O83",
+        "O84",
+        "O85",
+        "O86",
+        "O87",
+        "O88",
+        "O89",
+        "O90",
+        "O91",
+        "O92",
+        "Z37",
+        "Z39"
+      ],
+      "aksi": "telaah",
+      "kode_saran": "O90.4",
+      "pesan": "Gagal ginjal akut pada masa nifas dikode O90.4 (postpartum acute renal failure). Pastikan awitan pada masa nifas.",
+      "kutipan_sumber": "BA Kesepakatan Koding 2023 (JP.02.03/H.IV/1627/2023; 415/BA/0623), aspek koding no. 4",
+      "sumber": "ba_2023",
+      "diverifikasi": true
+    },
+    {
+      "kode": "KMB-24",
+      "nama": "DM dengan komplikasi + penyakit jantung iskemik",
+      "kode_diagnosis": [
+        "E10.6",
+        "E10.8",
+        "E11.6",
+        "E11.8",
+        "E12.6",
+        "E12.8",
+        "E13.6",
+        "E13.8",
+        "E14.6",
+        "E14.8"
+      ],
+      "kode_pasangan": [
+        "I20",
+        "I21",
+        "I22",
+        "I23",
+        "I24",
+        "I25"
+      ],
+      "aksi": "telaah",
+      "pesan": "Pastikan hubungan PJK dengan DM di resume: bila PJK komplikasi DM dikode E1x.6 dan I20-I25 tidak dikode; bila tidak berhubungan dikode I20-I25 dan DM tanpa komplikasi (E1x.9).",
+      "kutipan_sumber": "BA Kesepakatan Koding 2023 (JP.02.03/H.IV/2739/2023; 668/BA/0823), aspek koding no. 1; BA Kesepakatan Koding 2023 (JP.02.03/H.IV/1627/2023; 415/BA/0623), aspek koding no. 1",
+      "sumber": "ba_2023",
+      "diverifikasi": true
+    },
+    {
+      "kode": "KMB-25",
+      "nama": "P03.4 sebagai diagnosis utama bayi",
+      "kode_diagnosis": [
+        "P03.4"
+      ],
+      "utama_saja": true,
+      "kode_pasangan": [
+        "*"
+      ],
+      "aksi": "urutan",
+      "pesan": "Diagnosis utama bayi adalah kondisi sakitnya; P03.4 (fetus affected by caesarean delivery) ditambahkan sebagai diagnosis sekunder.",
+      "kutipan_sumber": "BA Kesepakatan Koding 2023 (JP.02.03/H.IV/2739/2023; 668/BA/0823), aspek koding no. 2",
+      "sumber": "ba_2023",
+      "diverifikasi": true
+    },
+    {
+      "kode": "KMB-26",
+      "nama": "Persalinan pervaginam dengan riwayat SC",
+      "kode_diagnosis": [
+        "O34.2"
+      ],
+      "kode_pasangan": [
+        "*"
+      ],
+      "px_ada": [
+        "72.",
+        "73."
+      ],
+      "px_tidak_ada": [
+        "74."
+      ],
+      "aksi": "ganti_kode",
+      "kode_saran": "O75.7",
+      "pesan": "Persalinan pervaginam pada riwayat SC dikode O75.7 (vaginal delivery following previous caesarean section), bukan O34.2.",
+      "kutipan_sumber": "BA Kesepakatan Koding 2023 (JP.02.03/H.IV/1627/2023; 415/BA/0623), aspek koding no. 2",
+      "sumber": "ba_2023",
+      "diverifikasi": true
+    },
+    {
+      "kode": "KMB-27",
+      "nama": "Respiratory distress bayi + BBLR dengan bantuan napas",
+      "kode_diagnosis": [
+        "P07"
+      ],
+      "utama_saja": true,
+      "kode_pasangan": [
+        "P22.0"
+      ],
+      "px_ada": [
+        "93.90",
+        "96.7"
+      ],
+      "aksi": "telaah",
+      "pesan": "Bila P07.- dan P22.0 sudah ada saat masuk, diagnosis utama mengikuti sumber daya terbesar yang ditetapkan DPJP (ventilator/CPAP). Bila P22.0 muncul selama perawatan, tetap diagnosis sekunder.",
+      "kutipan_sumber": "BA Kesepakatan Koding 2023 (JP.02.03/H.IV/1627/2023; 415/BA/0623), aspek koding no. 26",
+      "sumber": "ba_2023",
+      "diverifikasi": true
+    },
+    {
+      "kode": "KMB-28",
+      "nama": "Diare + organisme penyebab spesifik",
+      "kode_diagnosis": [
+        "A00",
+        "A02",
+        "A03",
+        "A04",
+        "A05",
+        "A06",
+        "A07",
+        "A08"
+      ],
+      "kode_pasangan": [
+        "A09"
+      ],
+      "aksi": "buang_pasangan",
+      "pesan": "Bila penyebab diare sudah diketahui (A00-A08), A09 tidak dikode lagi.",
+      "kutipan_sumber": "BA Kesepakatan 2019 (JP.02.03/3/1693/2020; 411/BA/0720), aspek koding no. 4 (mengukuhkan BA 2018)",
+      "sumber": "ba_2019",
+      "diverifikasi": true
+    },
+    {
+      "kode": "KMB-29",
+      "nama": "TB paru + pneumonia/bronkiektasis/pneumotoraks",
+      "kode_diagnosis": [
+        "A15",
+        "A16"
+      ],
+      "kode_pasangan": [
+        "J12",
+        "J13",
+        "J14",
+        "J15",
+        "J16",
+        "J17",
+        "J18",
+        "J47",
+        "J84.1",
+        "J93"
+      ],
+      "aksi": "buang_pasangan",
+      "pesan": "Pneumonia, bronkiektasis, fibrosis paru dan pneumotoraks tuberkulosa termasuk kode TB paru (A15/A16); tidak dikode terpisah.",
+      "kutipan_sumber": "BA Kesepakatan 2019 (JP.02.03/3/1693/2020; 411/BA/0720), aspek koding no. 5, 10, 14 (mengukuhkan BA 2018)",
+      "sumber": "ba_2019",
+      "diverifikasi": true
+    },
+    {
+      "kode": "KMB-30",
+      "nama": "Tifoid pada kehamilan",
+      "kode_diagnosis": [
+        "A01"
+      ],
+      "utama_saja": true,
+      "kode_pasangan": [
+        "O",
+        "Z33",
+        "Z34",
+        "Z35",
+        "Z36",
+        "Z37"
+      ],
+      "aksi": "urutan",
+      "kode_saran": "O98.8",
+      "pesan": "Tifoid pada kehamilan: diagnosis utama O98.8 dan A01.0 sebagai diagnosis sekunder (PMK 76/2016).",
+      "kutipan_sumber": "BA Kesepakatan 2019 (JP.02.03/3/1693/2020; 411/BA/0720), aspek koding no. 2 (mengukuhkan BA 2018)",
+      "sumber": "ba_2019",
+      "diverifikasi": true
+    },
+    {
+      "kode": "KMB-31",
+      "nama": "HIV dengan beberapa infeksi",
+      "kode_diagnosis": [
+        "B20.0",
+        "B20.1",
+        "B20.2",
+        "B20.3",
+        "B20.4",
+        "B20.5",
+        "B20.6",
+        "B20.8"
+      ],
+      "minimal_dua_kode": true,
+      "aksi": "ganti_gabungan",
+      "kode_gabungan": "B20.7",
+      "pesan": "HIV dengan lebih dari satu infeksi memakai B20.7 sebagai diagnosis utama.",
+      "kutipan_sumber": "BA Kesepakatan 2019 (JP.02.03/3/1693/2020; 411/BA/0720), aspek koding no. 26, 27 (mengukuhkan BA 2018)",
+      "sumber": "ba_2019",
+      "diverifikasi": true
+    },
+    {
+      "kode": "KMB-32",
+      "nama": "Gangren + diabetes melitus",
+      "kode_diagnosis": [
+        "E10",
+        "E11",
+        "E12",
+        "E13",
+        "E14"
+      ],
+      "kode_pasangan": [
+        "R02"
+      ],
+      "aksi": "telaah",
+      "kode_saran": "E1x.5 sesuai jenis DM",
+      "pesan": "Gangren diabetik dikode E10-E14 dengan karakter keempat .5 (mis. E11.5); R02 mengecualikan gangren DM. Pastikan hubungan gangren dengan DM.",
+      "kutipan_sumber": "BA Kesepakatan 2019 (JP.02.03/3/1693/2020; 411/BA/0720), aspek koding no. 19, 136 (mengukuhkan BA 2018)",
+      "sumber": "ba_2019",
+      "diverifikasi": true
+    },
+    {
+      "kode": "KMB-33",
+      "nama": "Gangren + aterosklerosis/penyakit vaskular perifer",
+      "kode_diagnosis": [
+        "I70.2",
+        "I73"
+      ],
+      "kode_pasangan": [
+        "R02"
+      ],
+      "aksi": "buang_pasangan",
+      "pesan": "R02 mengecualikan gangren pada aterosklerosis (I70.2) dan penyakit vaskular perifer (I73.-).",
+      "kutipan_sumber": "BA Kesepakatan 2019 (JP.02.03/3/1693/2020; 411/BA/0720), aspek koding no. 136 (mengukuhkan BA 2018)",
+      "sumber": "ba_2019",
+      "diverifikasi": true
+    },
+    {
+      "kode": "KMB-34",
+      "nama": "DM dengan komplikasi perifer + ulkus/gangren",
+      "kode_diagnosis": [
+        "E10.5",
+        "E11.5",
+        "E12.5",
+        "E13.5",
+        "E14.5"
+      ],
+      "kode_pasangan": [
+        "L97",
+        "L98.4",
+        "R02"
+      ],
+      "aksi": "buang_pasangan",
+      "pesan": "DM dengan komplikasi sirkulasi perifer (E1x.5) sudah mencakup ulkus kulit/gangren; tidak dikode sebagai diagnosis sekunder.",
+      "kutipan_sumber": "BA Kesepakatan 2019 (JP.02.03/3/1693/2020; 411/BA/0720), aspek koding no. 48 (mengukuhkan BA 2018)",
+      "sumber": "ba_2019",
+      "diverifikasi": true
+    },
+    {
+      "kode": "KMB-35",
+      "nama": "DM + ulkus (tanpa .5)",
+      "kode_diagnosis": [
+        "E10.0",
+        "E10.1",
+        "E10.2",
+        "E10.3",
+        "E10.4",
+        "E10.6",
+        "E10.7",
+        "E10.8",
+        "E10.9",
+        "E11.0",
+        "E11.1",
+        "E11.2",
+        "E11.3",
+        "E11.4",
+        "E11.6",
+        "E11.7",
+        "E11.8",
+        "E11.9",
+        "E12.0",
+        "E12.1",
+        "E12.2",
+        "E12.3",
+        "E12.4",
+        "E12.6",
+        "E12.7",
+        "E12.8",
+        "E12.9",
+        "E13.0",
+        "E13.1",
+        "E13.2",
+        "E13.3",
+        "E13.4",
+        "E13.6",
+        "E13.7",
+        "E13.8",
+        "E13.9",
+        "E14.0",
+        "E14.1",
+        "E14.2",
+        "E14.3",
+        "E14.4",
+        "E14.6",
+        "E14.7",
+        "E14.8",
+        "E14.9"
+      ],
+      "kode_pasangan": [
+        "L97",
+        "L98.4",
+        "L89"
+      ],
+      "aksi": "telaah",
+      "kode_saran": "E1x.5 sesuai jenis DM",
+      "pesan": "Ulkus karena DM dikode E1x.5; ulkus dekubitus yang dipicu faktor selain DM tetap L89.",
+      "kutipan_sumber": "BA Kesepakatan 2019 (JP.02.03/3/1693/2020; 411/BA/0720), aspek koding no. 51, 100 (mengukuhkan BA 2018)",
+      "sumber": "ba_2019",
+      "diverifikasi": true
+    },
+    {
+      "kode": "KMB-36",
+      "nama": "DM terkait malnutrisi + malnutrisi",
+      "kode_diagnosis": [
+        "E12"
+      ],
+      "kode_pasangan": [
+        "E46"
+      ],
+      "aksi": "buang_pasangan",
+      "pesan": "E12 (malnutrition-related DM) sudah mencakup malnutrisi; E46 tidak dikode terpisah.",
+      "kutipan_sumber": "BA Kesepakatan 2019 (JP.02.03/3/1693/2020; 411/BA/0720), aspek koding no. 49 (mengukuhkan BA 2018)",
+      "sumber": "ba_2019",
+      "diverifikasi": true
+    },
+    {
+      "kode": "KMB-37",
+      "nama": "Anemia tidak spesifik pada keganasan",
+      "kode_diagnosis": [
+        "C"
+      ],
+      "kode_pasangan": [
+        "D64.9"
+      ],
+      "aksi": "telaah",
+      "kode_saran": "D63.0",
+      "pesan": "Anemia pada keganasan memakai kode spesifik D63.0, bukan D64.9.",
+      "kutipan_sumber": "BA Kesepakatan 2019 (JP.02.03/3/1693/2020; 411/BA/0720), aspek koding no. 44 (mengukuhkan BA 2018)",
+      "sumber": "ba_2019",
+      "diverifikasi": true
+    },
+    {
+      "kode": "KMB-38",
+      "nama": "Anemia tidak spesifik pada penyakit ginjal kronik",
+      "kode_diagnosis": [
+        "N18"
+      ],
+      "kode_pasangan": [
+        "D64.9"
+      ],
+      "aksi": "telaah",
+      "kode_saran": "D63.8",
+      "pesan": "Anemia pada penyakit kronik memakai kode spesifik D63.8, bukan D64.9.",
+      "kutipan_sumber": "BA Kesepakatan 2019 (JP.02.03/3/1693/2020; 411/BA/0720), aspek koding no. 44 (mengukuhkan BA 2018)",
+      "sumber": "ba_2019",
+      "diverifikasi": true
+    },
+    {
+      "kode": "KMB-39",
+      "nama": "Anemia tidak spesifik pada perdarahan akut",
+      "kode_diagnosis": [
+        "K92.0",
+        "K92.1",
+        "K92.2",
+        "K25.0",
+        "K25.4",
+        "K26.0",
+        "K26.4",
+        "K27.0",
+        "K27.4",
+        "K28.0",
+        "K28.4",
+        "O72",
+        "O67",
+        "O46"
+      ],
+      "kode_pasangan": [
+        "D64.9"
+      ],
+      "aksi": "telaah",
+      "kode_saran": "D62",
+      "pesan": "Anemia karena perdarahan akut memakai kode spesifik D62, bukan D64.9.",
+      "kutipan_sumber": "BA Kesepakatan 2019 (JP.02.03/3/1693/2020; 411/BA/0720), aspek koding no. 44 (mengukuhkan BA 2018)",
+      "sumber": "ba_2019",
+      "diverifikasi": true
+    },
+    {
+      "kode": "KMB-40",
+      "nama": "Hipertensi + gagal jantung",
+      "kode_diagnosis": [
+        "I10"
+      ],
+      "kode_pasangan": [
+        "I50"
+      ],
+      "aksi": "telaah",
+      "kode_saran": "I11.0",
+      "pesan": "Gagal jantung yang disebabkan hipertensi dikode I11.0 (I50 mengecualikan gagal jantung karena hipertensi). Pastikan hubungan sebab tertulis; bila tidak berhubungan, kedua kode tetap.",
+      "kutipan_sumber": "BA Kesepakatan 2019 (JP.02.03/3/1693/2020; 411/BA/0720), aspek koding no. 62, 63, 71 (mengukuhkan BA 2018)",
+      "sumber": "ba_2019",
+      "diverifikasi": true
+    },
+    {
+      "kode": "KMB-41",
+      "nama": "Hipertensi + penyakit ginjal kronik",
+      "kode_diagnosis": [
+        "I10"
+      ],
+      "kode_pasangan": [
+        "N18"
+      ],
+      "aksi": "telaah",
+      "kode_saran": "I12.0",
+      "pesan": "I12 mencakup N00-N07, N18, N19, N26 karena hipertensi. Pastikan hubungan sebab tertulis. Gagal ginjal akut (N17) tidak digabung ke I12.",
+      "kutipan_sumber": "BA Kesepakatan 2019 (JP.02.03/3/1693/2020; 411/BA/0720), aspek koding no. 60, 64 (mengukuhkan BA 2018)",
+      "sumber": "ba_2019",
+      "diverifikasi": true
+    },
+    {
+      "kode": "KMB-42",
+      "nama": "PPOK + infeksi saluran napas atas akut",
+      "kode_diagnosis": [
+        "J44"
+      ],
+      "kode_pasangan": [
+        "J06"
+      ],
+      "aksi": "ganti_gabungan",
+      "kode_gabungan": "J44.1",
+      "pesan": "Eksaserbasi akut (mis. ISPA) yang disertai PPOK cukup memakai J44.1.",
+      "kutipan_sumber": "BA Kesepakatan 2019 (JP.02.03/3/1693/2020; 411/BA/0720), aspek koding no. 78 (mengukuhkan BA 2018)",
+      "sumber": "ba_2019",
+      "diverifikasi": true
+    },
+    {
+      "kode": "KMB-43",
+      "nama": "Efusi pleura ganas",
+      "kode_diagnosis": [
+        "C78.2"
+      ],
+      "kode_pasangan": [
+        "J90"
+      ],
+      "aksi": "buang_pasangan",
+      "pesan": "Efusi pleura ganas dikode C78.2 (bila sitologi cairan pleura ganas); J90 mengecualikan efusi ganas.",
+      "kutipan_sumber": "BA Kesepakatan 2019 (JP.02.03/3/1693/2020; 411/BA/0720), aspek koding no. 41, 90 (mengukuhkan BA 2018)",
+      "sumber": "ba_2019",
+      "diverifikasi": true
+    },
+    {
+      "kode": "KMB-44",
+      "nama": "Efusi pleura pada TB",
+      "kode_diagnosis": [
+        "A15",
+        "A16"
+      ],
+      "kode_pasangan": [
+        "J90"
+      ],
+      "aksi": "telaah",
+      "kode_saran": "A15.6/A16.5",
+      "pesan": "J90 mengecualikan efusi tuberkulosa (A15-A16); bila efusi tuberkulosa, pakai pleuritis TB (A15.6/A16.5).",
+      "kutipan_sumber": "BA Kesepakatan 2019 (JP.02.03/3/1693/2020; 411/BA/0720), aspek koding no. 90 (mengukuhkan BA 2018)",
+      "sumber": "ba_2019",
+      "diverifikasi": true
+    },
+    {
+      "kode": "KMB-45",
+      "nama": "Hernia + obstruksi usus",
+      "kode_diagnosis": [
+        "K40",
+        "K41",
+        "K42",
+        "K43",
+        "K44",
+        "K45",
+        "K46"
+      ],
+      "kode_pasangan": [
+        "K56"
+      ],
+      "aksi": "telaah",
+      "kode_saran": "Kode hernia dengan obstruksi/gangren",
+      "pesan": "Sub bab hernia (K40-K46) sudah memiliki kode hernia dengan obstruksi atau gangren; ileus/obstruksi tidak dikode terpisah.",
+      "kutipan_sumber": "BA Kesepakatan 2019 (JP.02.03/3/1693/2020; 411/BA/0720), aspek koding no. 96, 97 (mengukuhkan BA 2018)",
+      "sumber": "ba_2019",
+      "diverifikasi": true
+    },
+    {
+      "kode": "KMB-46",
+      "nama": "Tifoid + pneumonia",
+      "kode_diagnosis": [
+        "A01"
+      ],
+      "kode_pasangan": [
+        "J18"
+      ],
+      "aksi": "telaah",
+      "kode_saran": "A01.0† + J17.0*",
+      "pesan": "Pneumonia pada demam tifoid dikode dagger-asterisk A01.0† dengan J17.0*, bukan kode kombinasi atau J18.",
+      "kutipan_sumber": "BA Kesepakatan 2019 (JP.02.03/3/1693/2020; 411/BA/0720), aspek koding no. 83 (mengukuhkan BA 2018)",
+      "sumber": "ba_2019",
+      "diverifikasi": true
+    },
+    {
+      "kode": "KMB-47",
+      "nama": "Hidronefrosis karena batu + ISK",
+      "kode_diagnosis": [
+        "N13.2"
+      ],
+      "kode_pasangan": [
+        "N39.0"
+      ],
+      "aksi": "ganti_gabungan",
+      "kode_gabungan": "N13.6",
+      "pesan": "Hidronefrosis dengan batu ginjal/ureter yang disertai ISK digabung menjadi N13.6 (pyonephrosis/obstructive uropathy with infection).",
+      "kutipan_sumber": "BA Kesepakatan 2019 (JP.02.03/3/1693/2020; 411/BA/0720), aspek koding no. 103, 104 (mengukuhkan BA 2018)",
+      "sumber": "ba_2019",
+      "diverifikasi": true
+    },
+    {
+      "kode": "KMB-48",
+      "nama": "Batu ureter + pielonefritis",
+      "kode_diagnosis": [
+        "N20.1"
+      ],
+      "kode_pasangan": [
+        "N10",
+        "N11",
+        "N12"
+      ],
+      "aksi": "ganti_gabungan",
+      "kode_gabungan": "N20.9",
+      "pesan": "Batu ureter dengan pielonefritis digabung menjadi N20.9 (pyelonephritis, calculous).",
+      "kutipan_sumber": "BA Kesepakatan 2019 (JP.02.03/3/1693/2020; 411/BA/0720), aspek koding no. 109 (mengukuhkan BA 2018)",
+      "sumber": "ba_2019",
+      "diverifikasi": true
+    },
+    {
+      "kode": "KMB-49",
+      "nama": "Batu ginjal + pielonefritis",
+      "kode_diagnosis": [
+        "N20.0",
+        "N20.2",
+        "N20.9"
+      ],
+      "kode_pasangan": [
+        "N10",
+        "N11",
+        "N12"
+      ],
+      "aksi": "buang_pasangan",
+      "pesan": "Kategori N20 sudah mencakup calculous pyelonephritis; pielonefritis tidak dikode terpisah.",
+      "kutipan_sumber": "BA Kesepakatan 2019 (JP.02.03/3/1693/2020; 411/BA/0720), aspek koding no. 108, 109 (mengukuhkan BA 2018)",
+      "sumber": "ba_2019",
+      "diverifikasi": true
+    },
+    {
+      "kode": "KMB-50",
+      "nama": "Preeklampsia pada hipertensi kronik",
+      "kode_diagnosis": [
+        "O14"
+      ],
+      "kode_pasangan": [
+        "O10",
+        "I10",
+        "I11",
+        "I12",
+        "I13",
+        "I15"
+      ],
+      "aksi": "telaah",
+      "kode_saran": "O11",
+      "pesan": "Hipertensi sebelum kehamilan dengan proteinuria yang meningkat selama kehamilan dikode O11 (superimposed pre-eclampsia); O14 mengecualikannya.",
+      "kutipan_sumber": "BA Kesepakatan 2019 (JP.02.03/3/1693/2020; 411/BA/0720), aspek koding no. 121 (mengukuhkan BA 2018)",
+      "sumber": "ba_2019",
+      "diverifikasi": true
+    },
+    {
+      "kode": "KMB-51",
+      "nama": "Persalinan tanpa Z37",
+      "kode_diagnosis": [
+        "O80",
+        "O81",
+        "O82",
+        "O83",
+        "O84"
+      ],
+      "kode_tidak_ada": [
+        "Z37"
+      ],
+      "aksi": "telaah",
+      "kode_saran": "Z37.-",
+      "pesan": "Pada semua kasus persalinan ditambahkan kode Z37.- (outcome of delivery) sebagai diagnosis sekunder.",
+      "kutipan_sumber": "BA Kesepakatan 2019 (JP.02.03/3/1693/2020; 411/BA/0720), aspek koding no. 127, 128 (mengukuhkan BA 2018)",
+      "sumber": "ba_2019",
+      "diverifikasi": true
+    },
+    {
+      "kode": "KMB-52",
+      "nama": "Anemia pada kehamilan/persalinan tanpa O99.0",
+      "kode_diagnosis": [
+        "D50",
+        "D51",
+        "D52",
+        "D53",
+        "D55",
+        "D56",
+        "D57",
+        "D58",
+        "D59",
+        "D60",
+        "D61",
+        "D62",
+        "D63",
+        "D64"
+      ],
+      "kode_pasangan": [
+        "O",
+        "Z33",
+        "Z34",
+        "Z35",
+        "Z36",
+        "Z37"
+      ],
+      "kode_pasangan_kecuali": [
+        "O99.0"
+      ],
+      "kode_tidak_ada": [
+        "O99.0"
+      ],
+      "aksi": "telaah",
+      "kode_saran": "O99.0",
+      "pesan": "Anemia yang menyertai kehamilan, persalinan atau nifas dikode O99.0 sebagai diagnosis sekunder (kode D boleh sebagai tambahan).",
+      "kutipan_sumber": "BA Kesepakatan 2019 (JP.02.03/3/1693/2020; 411/BA/0720), aspek koding no. 129 (mengukuhkan BA 2018)",
+      "sumber": "ba_2019",
+      "diverifikasi": true
+    },
+    {
+      "kode": "KMB-53",
+      "nama": "TB paru + hemoptisis",
+      "kode_diagnosis": [
+        "A15",
+        "A16"
+      ],
+      "kode_pasangan": [
+        "R04.2"
+      ],
+      "aksi": "buang_pasangan",
+      "pesan": "Hemoptisis pada TB paru cukup dikode dengan diagnosis TB paru.",
+      "kutipan_sumber": "BA Kesepakatan 2019 (JP.02.03/3/1693/2020; 411/BA/0720), aspek koding no. 138 (mengukuhkan BA 2018)",
+      "sumber": "ba_2019",
+      "diverifikasi": true
+    },
+    {
+      "kode": "KMB-54",
+      "nama": "Nyeri perut + penyebab spesifik",
+      "kode_diagnosis": [
+        "N23",
+        "K56",
+        "K92.0",
+        "K92.1",
+        "K92.2"
+      ],
+      "kode_pasangan": [
+        "R10"
+      ],
+      "aksi": "buang_pasangan",
+      "pesan": "R10 mengecualikan kolik renal, obstruksi usus dan perdarahan saluran cerna; gejala tidak dikode terpisah.",
+      "kutipan_sumber": "BA Kesepakatan 2019 (JP.02.03/3/1693/2020; 411/BA/0720), aspek koding no. 140, 141 (mengukuhkan BA 2018)",
+      "sumber": "ba_2019",
+      "diverifikasi": true
+    },
+    {
+      "kode": "KMB-55",
+      "nama": "Demam + penyakit infeksi yang tegak",
+      "kode_diagnosis": [
+        "A",
+        "B",
+        "J00",
+        "J01",
+        "J02",
+        "J03",
+        "J04",
+        "J05",
+        "J06",
+        "J09",
+        "J10",
+        "J11",
+        "J12",
+        "J13",
+        "J14",
+        "J15",
+        "J16",
+        "J17",
+        "J18",
+        "J20",
+        "J21",
+        "J22",
+        "N10",
+        "N30",
+        "N39.0",
+        "K35",
+        "K65",
+        "L03",
+        "G00",
+        "G01",
+        "G02",
+        "G03",
+        "G04"
+      ],
+      "kode_pasangan": [
+        "R50"
+      ],
+      "aksi": "buang_pasangan",
+      "pesan": "Demam yang merupakan tanda dan gejala penyakit yang sudah tegak tidak dikode terpisah.",
+      "kutipan_sumber": "BA Kesepakatan 2019 (JP.02.03/3/1693/2020; 411/BA/0720), aspek koding no. 142 (mengukuhkan BA 2018)",
+      "sumber": "ba_2019",
+      "diverifikasi": true
+    },
+    {
+      "kode": "KMB-56",
+      "nama": "Syok pada trauma",
+      "kode_diagnosis": [
+        "S",
+        "T00",
+        "T01",
+        "T02",
+        "T03",
+        "T04",
+        "T05",
+        "T06",
+        "T07",
+        "T08",
+        "T09",
+        "T10",
+        "T11",
+        "T12",
+        "T13",
+        "T14"
+      ],
+      "kode_pasangan": [
+        "R57"
+      ],
+      "aksi": "telaah",
+      "kode_saran": "T79.4",
+      "pesan": "Syok pada pasien trauma dikode T79.4 (traumatic shock); R57 mengecualikannya. Pastikan syok karena trauma; cedera tetap dikode bila ditatalaksana.",
+      "kutipan_sumber": "BA Kesepakatan 2019 (JP.02.03/3/1693/2020; 411/BA/0720), aspek koding no. 146, 148, 149 (mengukuhkan BA 2018)",
+      "sumber": "ba_2019",
+      "diverifikasi": true
+    },
+    {
+      "kode": "KMB-57",
+      "nama": "Cedera intrakranial + kompresi/edema otak",
+      "kode_diagnosis": [
+        "S06"
+      ],
+      "kode_pasangan": [
+        "G93.5",
+        "G93.6"
+      ],
+      "aksi": "buang_pasangan",
+      "pesan": "Kompresi atau edema otak karena trauma termasuk S06.-; G93.5/G93.6 tidak dikode bila traumatik.",
+      "kutipan_sumber": "BA Kesepakatan 2019 (JP.02.03/3/1693/2020; 411/BA/0720), aspek koding no. 147 (mengukuhkan BA 2018)",
+      "sumber": "ba_2019",
+      "diverifikasi": true
+    },
+    {
+      "kode": "KMB-58",
+      "nama": "Persalinan dengan penyulit: penyulit sebagai diagnosis utama",
+      "kode_diagnosis": [
+        "O80",
+        "O81",
+        "O82",
+        "O83",
+        "O84"
+      ],
+      "utama_saja": true,
+      "kode_pasangan": [
+        "O1",
+        "O2",
+        "O3",
+        "O4",
+        "O6",
+        "O7",
+        "O98",
+        "O99"
+      ],
+      "aksi": "urutan",
+      "kode_saran": "Penyulit/komplikasi sebagai diagnosis utama",
+      "pesan": "Bila terdapat penyulit/komplikasi, penyulit menjadi diagnosis utama; kode cara persalinan (O80-O84) dan Z37.- sebagai diagnosis sekunder.",
+      "sumber": "ba_2019",
+      "kutipan_sumber": "BA Kesepakatan 2019 (JP.02.03/3/1693/2020; 411/BA/0720), aspek koding no. 127, 128, 177, 180",
       "diverifikasi": true
     }
   ],
   "_belum_dimasukkan": [
-    { "nama": "Anemia saat operasi", "alasan": "Butuh konteks operasi, bukan sekadar membaca DIAGLIST. Masuk Tipe 2 (syarat tindakan), bukan Tipe 3." },
-    { "nama": "Kode R sebagai dx utama", "alasan": "Bukan aturan kombinasi dua kode, melainkan syarat kapan kode R boleh jadi diagnosis utama. Perlu bentuk aturan tersendiri." },
-    { "nama": "I12.0 + Ascites (R18)", "alasan": "Dokumen menyebut 'kriteria tersendiri di BA' tanpa merinci aksinya. Perlu dibaca langsung dari Berita Acara." }
+    {
+      "nama": "Anemia saat operasi",
+      "alasan": "Butuh konteks operasi, bukan sekadar membaca DIAGLIST. Masuk Tipe 2 (syarat tindakan), bukan Tipe 3."
+    },
+    {
+      "nama": "Kode R sebagai dx utama",
+      "alasan": "Bukan aturan kombinasi dua kode, melainkan syarat kapan kode R boleh jadi diagnosis utama. Perlu bentuk aturan tersendiri."
+    },
+    {
+      "nama": "I12.0 + Ascites (R18)",
+      "alasan": "Dokumen menyebut 'kriteria tersendiri di BA' tanpa merinci aksinya. Perlu dibaca langsung dari Berita Acara."
+    }
   ]
 }

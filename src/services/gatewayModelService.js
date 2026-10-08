@@ -142,6 +142,12 @@ async function panggilModel(tugas, payload, opsi = {}) {
   const klinis=payload?.prioritasKlinis===true || ['baca_berkas','tinjau_kasus_lanjutan','putuskan_pending'].includes(tugas);
   if(scope && klinis && rute.model==='gpt-6-luna') reasoningEffort='high';
   let completionLimit = scope ? (tugas==='ekstrak_pdf' ? 4000 : tugas==='baca_berkas' ? 12000 : klinis ? 8000 : 6000) : undefined;
+  // Tahap yang keluarannya tumbuh bersama isi kasus (mis. penalaran per
+  // diagnosis) boleh meminta jatah lebih besar -- hanya menaikkan, maks 16000.
+  // KASUS ACUAN SLE (SLE, 5 diagnosis): 8000 token habis untuk penalaran sebelum
+  // JSON selesai -> output_terpotong, lalu tahap berikutnya tertahan anggaran.
+  if(scope && Number.isFinite(payload?.batasKeluaran) && payload.batasKeluaran>completionLimit)
+    completionLimit=Math.min(16000,Math.round(payload.batasKeluaran));
   const alasanMendalam=new Set(['tinjauan_awal_belum_terverifikasi','diagnosis_atau_urutan_belum_jelas','dukungan_diagnosis_perlu_klarifikasi','diagnosis_bertentangan_dengan_bukti','prosedur_dan_bukti_perlu_ditinjau','risiko_klinis_perlu_penafsiran','kriteria_igd_borderline','alasan_pending_belum_tegas','inacbg_atau_tarif_belum_pasti','agen_belum_yakin','keberatan_kritis_berat','permintaan_koder']);
   const pendalaman=tugas==='tinjau_kasus_lanjutan' && Array.isArray(payload?.pemicuPendalaman) && payload.pemicuPendalaman.some(p=>alasanMendalam.has(p));
   if(scope && rute.model==='gpt-6.1-sol' && pendalaman) completionLimit=16000;
@@ -166,6 +172,7 @@ async function panggilModel(tugas, payload, opsi = {}) {
     const kunciAwal=scope ? buatKey(rute,reasoningEffort,completionLimit) : null;
     let cacheKey=kunciAwal;
     let penyesuaian=null;
+    let ulangSetelahRestart=false;
     const invoke=async()=>{
       if(scope) {
         const pilihan=[{rute,effort:reasoningEffort,limit:completionLimit}];
@@ -182,7 +189,14 @@ async function panggilModel(tugas, payload, opsi = {}) {
         // Kegagalan berbiaya tersimpan melewati restart/klik ulang. Tidak
         // mengubah model untuk melewati pencegahan pembayaran ganda.
         for(const p of pilihan) {
-          const failed=await anggaranAi.ambilKegagalan(db,buatKey(p.rute,p.effort,p.limit),scope);
+          const kunciP=buatKey(p.rute,p.effort,p.limit);
+          const failed=await anggaranAi.ambilKegagalan(db,kunciP,scope);
+          // Terputus karena server dimulai ulang (bukan kegagalan jawaban):
+          // dikirim ulang tepat satu kali; bila terputus/gagal lagi, diblokir.
+          if(failed && failed.kode==='terputus_restart' && await anggaranAi.izinkanUlangSetelahRestart(db,kunciP,scope)) {
+            ulangSetelahRestart=true;
+            continue;
+          }
           if(failed) {
             const e=new Error('Tahap ini sebelumnya gagal dan mungkin sudah berbiaya. Permintaan yang sama ditahan agar biaya tidak berulang; hasil tahap lain tetap tersedia.');
             e.kode='pengulangan_berbiaya_dicegah';throw e;
@@ -191,7 +205,7 @@ async function panggilModel(tugas, payload, opsi = {}) {
         if(rute.model==='gpt-6.1-sol') {
           const available=await anggaranAi.ringkasan(db,scope);
           const total=(available?.terpakai_idr||0)+(available?.dicadangkan_idr||0)+(available?.belum_pasti_idr||0);
-          const cap=pendalaman ? (!available?.gagal_idr && !available?.belum_pasti_idr ? 5000 : available?.batas_idr||600)
+          const cap=pendalaman ? (!available?.gagal_idr && (available?.belum_pasti_idr||0)<=(available?.belum_pasti_restart_idr||0) ? 5000 : available?.batas_idr||600)
             : Math.min(600,available?.batas_idr||600);
           // Reservasi aktif diselesaikan sebelum menentukan apakah perlu fallback.
           if((batasBiaya(rute.model,system,prompt,completionLimit,rute.penyedia)?.idr || Infinity)>cap-total+(available?.dicadangkan_idr||0)) {
@@ -223,7 +237,7 @@ async function panggilModel(tugas, payload, opsi = {}) {
         try {
           // Penanda atomik tersimpan SEBELUM request. Setelah proses mati atau
           // ada pekerja lain, permintaan yang sama tidak dikirim dua kali.
-          if(scope && !await anggaranAi.mulaiPanggilan(db,cacheKey,scope)) {
+          if(scope && !await anggaranAi.mulaiPanggilan(db,cacheKey,scope,ulangSetelahRestart ? 'permintaan_ulang_setelah_restart' : undefined)) {
             const e=new Error('Permintaan yang sama sudah diproses atau perlu verifikasi biaya. Pengiriman ganda dicegah.');
             e.kode='pengulangan_berbiaya_dicegah';throw e;
           }

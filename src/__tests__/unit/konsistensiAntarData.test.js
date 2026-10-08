@@ -52,7 +52,7 @@ describe('KD-01 — tindakan tanpa obat pendukung', () => {
 });
 
 describe('KD-02 — SEP menjadi dasar penjamin BPJS', () => {
-  test.each([{ sep: '0170R0110926V001943' }, { SEP: '0170R0110926V001943' }])('resume UMUM dengan SEP tidak menjadi alasan pending (%j)', record => {
+  test.each([{ sep: '0000R0000126V000004' }, { SEP: '0000R0000126V000004' }])('resume UMUM dengan SEP tidak menjadi alasan pending (%j)', record => {
     expect(cari(evaluasiKonsistensi(record, [RESUME_UMUM], []), 'KD-02')).toBeUndefined();
   });
   test('pasien umum tanpa SEP tetap tidak mendapat temuan pertentangan penjamin', () => {
@@ -161,7 +161,7 @@ describe('kehati-hatian', () => {
 });
 
 describe('KD-14 — DIAGLIST tidak cocok dengan resume medis (verifikasi silang)', () => {
-  // Kasus NUR ASIAH sungguhan (SEP 0170R0110126V001476, backtest 2026-10-01):
+  // Kasus NUR ASIAH sungguhan (SEP 0000R0000126V000005, backtest 2026-10-01):
   // DIAGLIST dari halaman Berkas Klaim Individual = I51.7;I48. Resume medis
   // (hal. 3) menulis "susp syok kardiogenik", "dyspneu susp ec ALO",
   // "hemiparese sinistra ec post snh" -- R57.0/J81.0/I69.3, kategori lain
@@ -181,7 +181,7 @@ describe('KD-14 — DIAGLIST tidak cocok dengan resume medis (verifikasi silang)
     expect(t[0].yang_ditemukan.kutipan).toBe('susp syok kardiogenik');
   });
 
-  // Kasus DWI ARIYANI sungguhan (SEP 0170R0110126V000287): DIAGLIST
+  // Kasus DWI ARIYANI sungguhan (SEP 0000R0000126V000006): DIAGLIST
   // I11.9;H81.4;K30, AI cuma menemukan I25.9 ("3. IHD") dari resume --
   // kategori I25 vs I11/H81/K30, tidak beririsan juga.
   test('kasus DWI ARIYANI: satu-satunya temuan resume beda kategori -> KD-14 muncul', () => {
@@ -257,4 +257,22 @@ test('baris utuh yang tidak bersambung tidak ditempeli label berikutnya', () => 
   const { kutipanBaris } = require('../../services/konsistensiAntarDataService');
   const teks = 'Cara Bayar : UMUM\nAlergi Obat\n-';
   expect(kutipanBaris(teks, teks.indexOf('Cara Bayar'))).toBe('Cara Bayar : UMUM');
+});
+
+describe('KD-01 bukti nebulisasi dari terapi resume dan rincian biaya', () => {
+  const { cekKondisi, kelompokkanHalaman } = require('../../services/konsistensiAntarDataService');
+  const aturan = require('../../data/konsistensiAntarData.json').aturan.find(a => a.id === 'KD-01');
+  const cek = (halaman) => cekKondisi(aturan.maka, { record: {}, petaHalaman: kelompokkanHalaman(halaman), tindakan: [] });
+  test('terapi selama di rumah sakit pada resume memuat obat nebul (Lasalcom)', () => {
+    const resume = { page_number: 3, ocr_text: 'RESUME MEDIS RAWAT INAP\nDiagnosis Utama : BRPN\nTerapi/pengobatan selama di rumah sakit :\n(9) Paracetamol syr\n(10) Lasalcom (ipratropium+salbu) NEBU\nReaksi Obat dan Terapi :\nTidak' };
+    expect(cek([resume])).toMatchObject({ benar: true, bukti: { kata: 'terapi_resume', page_number: 3 } });
+  });
+  test('rincian biaya alat/obat nebulisasi', () => {
+    const tagihan = { page_number: 14, ocr_text: 'DETAIL RINCIAN BIAYA\nTgl Rawat : 2 Jan 2026 - 4 Jan 2026\nPerincian Harga Jml Biaya\n• Nebulaizer 50,000 7.00 350,000\n• Masker Nebul ANAK 1 34,825\nTotal' };
+    expect(cek([tagihan])).toMatchObject({ benar: true, bukti: { kata: 'rincian_biaya' } });
+  });
+  test('rencana nebul di luar daftar terapi resume tidak dihitung', () => {
+    const resume = { page_number: 3, ocr_text: 'RESUME MEDIS RAWAT INAP\nInstruksi/Anjuran : rencana nebul ventolin bila sesak\nTerapi Pulang :\nAmbroxol syr' };
+    expect(cek([resume]).benar).toBe(false);
+  });
 });

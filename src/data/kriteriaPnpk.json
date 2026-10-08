@@ -1,0 +1,1629 @@
+{
+  "versi": "KRITERIA-PNPK-2026-10-08.3",
+  "diperiksa_pada": "2026-10-08",
+  "keterangan": "Kriteria PNPK yang sudah dibaca dari PDF Katalog Pedoman (src/data/katalogPedoman.json) dan dapat dinilai dari berkas klaim. Setiap aturan menunjuk katalog_id; versi dipilih menurut tanggal awal episode. Kriteria klinis PNPK menjadi telaah valid/pending (sedang; tinggi hanya bila angka terbaca bertentangan dengan definisi), tidak pernah pending wajib, tidak mengganti kode. Butir bertopik sama dengan aturan lain memakai gabung_ke.",
+  "aturan": [
+    {
+      "id": "PNPK-SEPSIS-ANAK-01",
+      "nama": "Sepsis anak: infeksi dan PELOD-2 >=10",
+      "katalog_id": "KMK-2021-4722",
+      "dx": [
+        "A40",
+        "A41"
+      ],
+      "usia_max": 17,
+      "halaman": [
+        13,
+        14,
+        18
+      ],
+      "butir": "Bab III D (penegakan diagnosis) dan D.3 (kriteria disfungsi organ)",
+      "gabung_ke": [
+        "TK-25-09"
+      ],
+      "kriteria": [
+        [
+          "bukti_infeksi"
+        ],
+        [
+          "pelod_10"
+        ]
+      ],
+      "syarat": "semua",
+      "kontradiksi_tinggi": true,
+      "catatan": "PNPK Sepsis pada Anak: diagnosis sepsis memerlukan bukti/kecurigaan infeksi dan disfungsi organ yang mengancam kehidupan dengan skor PELOD-2 >=10 (alur Gambar 1). Warning signs dan tanda SIRS adalah penapisan, bukan pengganti PELOD-2. Parameter PELOD-2 yang tidak diperiksa bukan nol."
+    },
+    {
+      "id": "PNPK-HIPERBILIRUBINEMIA-01",
+      "nama": "Hiperbilirubinemia neonatus: keputusan terapi memakai TSB",
+      "katalog_id": "KMK-2019-240",
+      "dx": [
+        "P58",
+        "P59"
+      ],
+      "jenis_klaim": [
+        "RAWAT_INAP"
+      ],
+      "halaman": [
+        22,
+        27,
+        28
+      ],
+      "butir": "Rekomendasi 3.1; G.1 fototerapi dan transfusi tukar",
+      "gabung_ke": [
+        "TK-25-06"
+      ],
+      "kriteria": [
+        [
+          "hasil_tsb"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "TcB dan/atau TSB diperiksa bila bayi tampak ikterus; untuk menentukan fototerapi atau transfusi tukar, nilai yang diplot di nomogram adalah bilirubin serum total menurut usia (jam) dan faktor risiko. TSB >=25 mg/dL kapan pun adalah kegawatan untuk fototerapi intensif."
+    },
+    {
+      "id": "PNPK-EPILEPSI-ANAK-01",
+      "nama": "Epilepsi anak: kriteria diagnosis",
+      "katalog_id": "KMK-2017-367",
+      "dx": [
+        "G40"
+      ],
+      "usia_max": 17,
+      "halaman": [
+        22
+      ],
+      "butir": "Bab IV diagnosis",
+      "kriteria": [
+        [
+          "kejang_berulang_atau_sindrom"
+        ],
+        [
+          "bukan_kejang_terprovokasi"
+        ]
+      ],
+      "syarat": "semua",
+      "catatan": "Diagnosis epilepsi ditegakkan bila >=2 episode kejang tanpa provokasi dengan interval >=24 jam, atau ada manifestasi khas sindrom epilepsi. Kejang yang dicetuskan demam, gangguan elektrolit/metabolik akut, trauma atau kelainan intrakranial akut bukan kejang tanpa provokasi. EEG bukan baku emas; diagnosis terutama klinis."
+    },
+    {
+      "id": "PNPK-THALASEMIA-01",
+      "nama": "Transfusi thalasemia: Hb pratransfusi",
+      "katalog_id": "KMK-2018-1",
+      "dx": [
+        "D56"
+      ],
+      "px": [
+        "99.04"
+      ],
+      "pemicu": "dx_dan_px",
+      "halaman": [
+        23,
+        24,
+        30
+      ],
+      "butir": "Bab tata laksana B.1 transfusi darah",
+      "gabung_ke": [
+        "BA-18-M10-ANAK",
+        "BA-18-M10",
+        "BDD-19"
+      ],
+      "kriteria": [
+        [
+          "hasil_hb"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "Transfusi dimulai bila terbukti thalasemia mayor, atau Hb <7 g/dL pada 2 kali pemeriksaan berselang >2 minggu tanpa infeksi, atau Hb >7 dengan gagal tumbuh/deformitas tulang. Transfusi rutin menjaga Hb pratransfusi 9-10 g/dL (10-12 bila masalah jantung); kadar Hb pratransfusi dipastikan sebelum setiap transfusi."
+    },
+    {
+      "id": "PNPK-DM-ANAK-01",
+      "nama": "DM anak: kriteria diagnosis",
+      "katalog_id": "KMK-2024-2009",
+      "dx": [
+        "E10",
+        "E11",
+        "E12",
+        "E13",
+        "E14"
+      ],
+      "usia_max": 17,
+      "halaman": [
+        16,
+        17
+      ],
+      "butir": "Bab B diagnosis",
+      "kriteria": [
+        [
+          "gds_200",
+          "gejala_dm"
+        ],
+        [
+          "gdp_126"
+        ],
+        [
+          "hba1c_65",
+          "gejala_dm"
+        ],
+        [
+          "riwayat_dm_terapi"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "Diagnosis DM anak: gejala klasik (poliuria, polidipsia, nokturia, enuresis, penurunan BB, polifagia) dengan glukosa plasma sewaktu >=200 mg/dL; atau glukosa puasa >=126; atau TTGO 2 jam >=200; atau HbA1c >6,5%. Tanpa gejala, pemeriksaan diulang pada hari berbeda; satu GDS saat stres (trauma, infeksi berat) tanpa gejala bukan dasar diagnosis. HbA1c saja tidak disarankan. DM yang sudah terdiagnosis sebelumnya ditelaah dari riwayat dan terapinya."
+    },
+    {
+      "id": "PNPK-ISK-01",
+      "nama": "ISK: piuria atau kultur urin",
+      "katalog_id": "KMK-2025-762",
+      "dx": [
+        "N39.0",
+        "N30",
+        "N10",
+        "N12"
+      ],
+      "halaman": [
+        26,
+        28
+      ],
+      "butir": "Pemeriksaan penunjang: urinalisis mikroskopik dan kultur",
+      "gabung_ke": [
+        "BA-18-M37",
+        "BDD-13"
+      ],
+      "kriteria": [
+        [
+          "gejala_isk",
+          "piuria_5"
+        ],
+        [
+          "kultur_urin_tumbuh"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "Piuria >5-10 leukosit/LPB (urin sentrifugasi) sensitif tetapi tidak spesifik; piuria tanpa gejala belum tentu ISK. Kultur bermakna menurut metode dan gejala (mis. >=10^3 CFU/mL sistitis perempuan, >=10^4 pielonefritis, >=10^5 bakteriuria asimtomatik). BA 2018 butir 37 memakai gejala + leukosit urin >10/LPB atau kultur positif. Leu/uL tidak dikonversi ke /LPB; dibandingkan dengan nilai rujukan lab pada baris yang sama. Urinalisis terbaca normal tanpa kultur bermakna = bertentangan dengan kriteria (tinggi).",
+      "kontradiksi_tinggi": true,
+      "bukti_info": [
+        "kesan_radiologi_isk",
+        "temuan_urin_lain"
+      ]
+    },
+    {
+      "id": "PNPK-TB-ANAK-01",
+      "nama": "TB anak: konfirmasi bakteriologis atau skoring",
+      "katalog_id": "KMK-2019-755",
+      "dx": [
+        "A15",
+        "A16",
+        "A17",
+        "A18",
+        "A19"
+      ],
+      "usia_max": 17,
+      "halaman": [
+        15,
+        93,
+        103
+      ],
+      "butir": "Klasifikasi pasien TB; Bab diagnosis TB anak",
+      "gabung_ke": [
+        "RK-07",
+        "BA-18-M04"
+      ],
+      "kriteria": [
+        [
+          "konfirmasi_bakteriologis_tb"
+        ],
+        [
+          "skor_tb_anak_6"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "TB anak terdiagnosis bakteriologis (BTA, TCM, biakan/PCR dari sputum, bilas lambung, cairan atau jaringan) atau klinis dengan sistem skoring (skor >=6). TB anak yang hanya terdiagnosis klinis tidak terkonfirmasi bakteriologis; kode A15 menghendaki konfirmasi bakteriologis/histologis."
+    },
+    {
+      "id": "PNPK-BBLR-01",
+      "nama": "BBLR/prematur: kode sesuai berat lahir dan usia gestasi",
+      "katalog_id": "KMK-2018-295",
+      "dx": [
+        "P07"
+      ],
+      "halaman": [
+        5,
+        12
+      ],
+      "butir": "Definisi BBLR, BBLSR, BBLASR",
+      "pemeriksa_ba": "bblr",
+      "catatan": "PNPK: BBLR berat lahir <2500 g, BBLSR <1500 g, BBLASR <1000 g. ICD-10: P07.0 berat lahir <=999 g, P07.1 1000-2499 g; P07.2 usia gestasi <28 minggu, P07.3 28 sampai <37 minggu. Berat lahir/usia gestasi terbaca yang tidak sesuai kode = bertentangan (tinggi)."
+    },
+    {
+      "id": "PNPK-DM2-DEWASA-01",
+      "nama": "DM tipe 2 dewasa: kriteria diagnosis",
+      "katalog_id": "KMK-2026-302",
+      "dx": [
+        "E11"
+      ],
+      "usia_min": 18,
+      "halaman": [
+        10,
+        11
+      ],
+      "butir": "Tabel 4 kriteria diagnosis DM",
+      "kriteria": [
+        [
+          "hba1c_65_dewasa"
+        ],
+        [
+          "gdp_126"
+        ],
+        [
+          "gds_200",
+          "gejala_dm"
+        ],
+        [
+          "gds_200_dua"
+        ],
+        [
+          "riwayat_dm_terapi"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "Diagnosis DM: HbA1c >=6,5% (metode NGSP/DCCT), atau glukosa plasma puasa >=126 mg/dL, atau glukosa plasma 2 jam TTGO >=200 mg/dL, atau glukosa sewaktu >=200 mg/dL dengan gejala klasik (dua kali pada hari yang sama bila tanpa gejala). Diagnosis tidak ditegakkan atas dasar glukosuria. DM yang sudah terdiagnosis ditelaah dari riwayat dan terapinya."
+    },
+    {
+      "id": "PNPK-ONKO-PAYUDARA-2026",
+      "nama": "Kanker payudara: konfirmasi patologi",
+      "katalog_id": "KMK-2026-657",
+      "dx": [
+        "C50"
+      ],
+      "dx_utama_atau_terapi": true,
+      "halaman": [
+        11
+      ],
+      "butir": "Definisi dan diagnosis",
+      "kriteria": [
+        [
+          "konfirmasi_pa_kanker"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "Kanker payudara adalah neoplasma ganas sel jaringan payudara; diagnosis dan subtipe (ER/PR/HER2, grade SBR) memerlukan patologi anatomi/IHK."
+    },
+    {
+      "id": "PNPK-ONKO-PAYUDARA-2018",
+      "nama": "Kanker payudara: konfirmasi patologi",
+      "katalog_id": "KMK-2018-414",
+      "dx": [
+        "C50"
+      ],
+      "dx_utama_atau_terapi": true,
+      "halaman": [
+        11
+      ],
+      "butir": "Diagnosis",
+      "kriteria": [
+        [
+          "konfirmasi_pa_kanker"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "Diagnosis kanker payudara memerlukan konfirmasi patologi anatomi (versi PNPK 2018 untuk episode sebelum PNPK 2026 berlaku)."
+    },
+    {
+      "id": "PNPK-ONKO-PARU",
+      "nama": "Kanker paru: konfirmasi patologi",
+      "katalog_id": "KMK-2023-1438",
+      "dx": [
+        "C34"
+      ],
+      "dx_utama_atau_terapi": true,
+      "halaman": [
+        15,
+        17
+      ],
+      "butir": "F. Diagnosis, d. Pemeriksaan PA",
+      "kriteria": [
+        [
+          "konfirmasi_pa_kanker"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "Diagnosis kanker paru ditegakkan berdasarkan anamnesis, pemeriksaan fisis, penunjang dan patologi anatomi; PA adalah baku emas (sampai tipe histologi dan penanda molekuler)."
+    },
+    {
+      "id": "PNPK-ONKO-KOLOREKTAL",
+      "nama": "Kanker kolorektal: kolonoskopi dan histopatologi",
+      "katalog_id": "KMK-2018-406",
+      "dx": [
+        "C18",
+        "C19",
+        "C20"
+      ],
+      "dx_utama_atau_terapi": true,
+      "halaman": [
+        117
+      ],
+      "butir": "B. Diagnosis",
+      "kriteria": [
+        [
+          "konfirmasi_pa_kanker"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "Diagnosis KKR yang hanya berdasarkan klinik tidak dapat dipercaya; semua kasus dicurigai dilakukan kolonoskopi dengan biopsi histopatologi."
+    },
+    {
+      "id": "PNPK-ONKO-SERVIKS",
+      "nama": "Kanker serviks: biopsi serviks",
+      "katalog_id": "KMK-2018-349",
+      "dx": [
+        "C53"
+      ],
+      "dx_utama_atau_terapi": true,
+      "halaman": [
+        10
+      ],
+      "butir": "F. Diagnosis",
+      "kriteria": [
+        [
+          "konfirmasi_pa_kanker"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "Diagnosis atas dasar anamnesis dan pemeriksaan klinik termasuk biopsi serviks; metastasis ke kandung kemih/rektum dikonfirmasi biopsi dan histologik."
+    },
+    {
+      "id": "PNPK-ONKO-PROSTAT",
+      "nama": "Kanker prostat: biopsi prostat",
+      "katalog_id": "KMK-2018-291",
+      "dx": [
+        "C61"
+      ],
+      "dx_utama_atau_terapi": true,
+      "halaman": [
+        12
+      ],
+      "butir": "TRUS dan biopsi prostat",
+      "kriteria": [
+        [
+          "konfirmasi_pa_kanker"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "Diagnosis dari hasil biopsi prostat atau spesimen operasi; PSA organ-spesifik tetapi tidak spesifik kanker (meningkat juga pada BPH/prostatitis)."
+    },
+    {
+      "id": "PNPK-ONKO-NASOFARING",
+      "nama": "Kanker nasofaring: biopsi nasofaring",
+      "katalog_id": "KMK-2019-684",
+      "dx": [
+        "C11"
+      ],
+      "dx_utama_atau_terapi": true,
+      "halaman": [
+        11,
+        12
+      ],
+      "butir": "B. Diagnostik",
+      "kriteria": [
+        [
+          "konfirmasi_pa_nasofaring"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "Diagnosis dengan biopsi nasofaring (tang biopsi lewat hidung/mulut dengan tuntunan rinoskopi/nasofaringoskopi); BAJH atau biopsi kelenjar getah bening leher bukan diagnosis pasti. Pelaporan menurut WHO."
+    },
+    {
+      "id": "PNPK-ONKO-LARING",
+      "nama": "Kanker laring: konfirmasi patologi",
+      "katalog_id": "KMK-2026-156",
+      "dx": [
+        "C32"
+      ],
+      "dx_utama_atau_terapi": true,
+      "halaman": [
+        14,
+        18
+      ],
+      "butir": "Diagnosis; PA baku emas",
+      "kriteria": [
+        [
+          "konfirmasi_pa_kanker"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "Diagnosis ditegakkan dengan anamnesis, pemeriksaan fisik dan penunjang termasuk PA; PA adalah baku emas memastikan ganas/jinak."
+    },
+    {
+      "id": "PNPK-ONKO-OSTEOSARKOMA",
+      "nama": "Osteosarkoma: histopatologi",
+      "katalog_id": "KMK-2019-88",
+      "dx": [
+        "C40",
+        "C41"
+      ],
+      "dx_utama_atau_terapi": true,
+      "halaman": [
+        10
+      ],
+      "butir": "e. Biopsi",
+      "kriteria": [
+        [
+          "konfirmasi_pa_kanker"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "Pemeriksaan histopatologi dengan FNAB atau core biopsy bila FNAB inkonklusif."
+    },
+    {
+      "id": "PNPK-ONKO-KSH",
+      "nama": "Karsinoma sel hati: kriteria diagnosis",
+      "katalog_id": "KMK-2022-1355",
+      "dx": [
+        "C22.0"
+      ],
+      "dx_utama_atau_terapi": true,
+      "usia_min": 18,
+      "halaman": [
+        28
+      ],
+      "butir": "Diagnosis radiologik KSH (Tabel 2)",
+      "kriteria": [
+        [
+          "imaging_hati_khas",
+          "penanda_tumor_hati"
+        ],
+        [
+          "konfirmasi_pa_kanker"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "Diagnosis pasti KSH dari penyakit hati kronik yang mendasari (sirosis, hepatitis B/C kronik), peningkatan penanda tumor dan gambaran khas pencitraan (hipervaskular fase arterial dengan wash out; LI-RADS), atau histopatologi."
+    },
+    {
+      "id": "PNPK-ONKO-TUMOR-OTAK",
+      "nama": "Tumor otak: pencitraan atau PA",
+      "katalog_id": "KMK-2020-397",
+      "dx": [
+        "C71",
+        "D33",
+        "D43"
+      ],
+      "dx_utama_atau_terapi": true,
+      "halaman": [
+        18,
+        24
+      ],
+      "butir": "Pencitraan (MRI baku emas) dan diagnosis PA",
+      "kriteria": [
+        [
+          "imaging_otak_tumor"
+        ],
+        [
+          "konfirmasi_pa_kanker"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "MRI otak/spinal (dengan/tanpa kontras) adalah standar baku emas pencitraan; operasi bertujuan reseksi dan penegakan diagnosis patologi anatomi."
+    },
+    {
+      "id": "PNPK-ONKO-LLA-ANAK",
+      "nama": "LLA anak: sumsum tulang/imunofenotipe",
+      "katalog_id": "KMK-2025-986",
+      "dx": [
+        "C91.0"
+      ],
+      "dx_utama_atau_terapi": true,
+      "usia_max": 17,
+      "halaman": [
+        13,
+        14
+      ],
+      "butir": "Diagnosis leukemia akut",
+      "kriteria": [
+        [
+          "bmp_blas"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "Diagnosis leukemia akut ditegakkan dengan >=20% sel blas pada aspirasi sumsum tulang; WHO memerlukan sitomorfologi, imunofenotipe dan genetik."
+    },
+    {
+      "id": "PNPK-ONKO-LLA-DEWASA",
+      "nama": "LLA dewasa: sumsum tulang/imunofenotipe",
+      "katalog_id": "KMK-2026-160",
+      "dx": [
+        "C91.0"
+      ],
+      "dx_utama_atau_terapi": true,
+      "usia_min": 18,
+      "halaman": [
+        19,
+        24
+      ],
+      "butir": "Kriteria diagnosis LLA (NCCN)",
+      "kriteria": [
+        [
+          "bmp_blas"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "Diagnosis LLA: limfoblas sumsum tulang >20% dengan penilaian morfologi aspirat (Wright/MGG), biopsi sumsum tulang, dan immunophenotyping (flow cytometry)."
+    },
+    {
+      "id": "PNPK-ONKO-RETINOBLASTOMA",
+      "nama": "Retinoblastoma: funduskopi/pencitraan",
+      "katalog_id": "KMK-2022-1455",
+      "dx": [
+        "C69.2"
+      ],
+      "dx_utama_atau_terapi": true,
+      "halaman": [
+        17
+      ],
+      "butir": "Pemeriksaan funduskopi dan pencitraan",
+      "kriteria": [
+        [
+          "imaging_retinoblastoma"
+        ],
+        [
+          "konfirmasi_pa_kanker"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "Retinoblastoma ditegakkan klinis dengan funduskopi direk/indirek dan pencitraan; PA dari spesimen enukleasi bila ada."
+    },
+    {
+      "id": "PNPK-HIV-01",
+      "nama": "HIV: tes diagnosis",
+      "katalog_id": "KMK-2019-90",
+      "dx": [
+        "B20",
+        "B21",
+        "B22",
+        "B23",
+        "B24"
+      ],
+      "halaman": [
+        8,
+        11
+      ],
+      "butir": "Tes diagnosis HIV",
+      "kriteria": [
+        [
+          "hasil_hiv"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "Diagnosis HIV dengan pemeriksaan serologis (tes cepat/EIA, strategi tiga tes) atau virologis; anak <18 bulan presumtif harus segera dikonfirmasi virologis. ODHA yang sudah terdiagnosis ditelaah dari riwayat ARV."
+    },
+    {
+      "id": "PNPK-MALARIA-01",
+      "nama": "Malaria: konfirmasi parasit",
+      "katalog_id": "KMK-2019-556",
+      "dx": [
+        "B50",
+        "B51",
+        "B52",
+        "B53",
+        "B54"
+      ],
+      "halaman": [
+        13,
+        14,
+        50
+      ],
+      "butir": "D. Diagnosis malaria",
+      "kriteria": [
+        [
+          "hasil_malaria"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "Diagnosis pasti malaria bila ditemukan parasit malaria dan/atau produknya dalam darah; mikroskopik sediaan darah tebal/tipis adalah baku emas, atau RDT. Knowlesi memerlukan pemeriksaan molekuler."
+    },
+    {
+      "id": "PNPK-HEPATITIS-B-01",
+      "nama": "Hepatitis B: penanda serologis",
+      "katalog_id": "KMK-2019-322",
+      "dx": [
+        "B16",
+        "B18.0",
+        "B18.1"
+      ],
+      "halaman": [
+        11,
+        13
+      ],
+      "butir": "Kriteria diagnosis infeksi VHB",
+      "kriteria": [
+        [
+          "hbsag_reaktif"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "Hepatitis B kronik: HBsAg seropositif >6 bulan, DNA VHB serum, peningkatan ALT persisten/intermiten, atau biopsi hati. Infeksi akut ditandai IgM anti-HBc. Kronisitas >6 bulan ditelaah dari riwayat."
+    },
+    {
+      "id": "PNPK-HEPATITIS-C-01",
+      "nama": "Hepatitis C: anti-HCV/RNA VHC",
+      "katalog_id": "KMK-2019-681",
+      "dx": [
+        "B17.1",
+        "B18.2"
+      ],
+      "halaman": [
+        13,
+        14
+      ],
+      "butir": "Diagnosis hepatitis C",
+      "kriteria": [
+        [
+          "hcv_reaktif"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "Hepatitis C kronik bila anti-HCV dan RNA-VHC terdeteksi >6 bulan; anti-HCV saja dapat keliru pada sekitar 30% hepatitis C akut, sehingga RNA VHC dipakai untuk konfirmasi."
+    },
+    {
+      "id": "PNPK-KUSTA-01",
+      "nama": "Kusta: tanda kardinal",
+      "katalog_id": "KMK-2019-308",
+      "dx": [
+        "A30"
+      ],
+      "halaman": [
+        23
+      ],
+      "butir": "F. Diagnosis",
+      "kriteria": [
+        [
+          "tanda_kardinal_kusta"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "Diagnosis kusta berdasarkan satu dari tiga tanda kardinal: lesi kulit khas (hipopigmentasi/eritema) yang mati rasa; penebalan saraf tepi dengan gangguan fungsi (sensoris, motoris, otonom); BTA pada kerokan jaringan kulit."
+    },
+    {
+      "id": "PNPK-SIFILIS-01",
+      "nama": "Sifilis: tes serologi",
+      "katalog_id": "KMK-2026-291",
+      "dx": [
+        "A50",
+        "A51",
+        "A52",
+        "A53"
+      ],
+      "halaman": [
+        25,
+        26
+      ],
+      "butir": "Tes serologi sifilis",
+      "kriteria": [
+        [
+          "serologi_sifilis"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "Diagnosis sifilis didasarkan tes serologi: tes nontreponema (RPR/VDRL) untuk skrining dan tes treponema untuk konfirmasi; TSS menghasilkan diagnosis presumtif bersama klinis."
+    },
+    {
+      "id": "PNPK-HIPERTENSI-DEWASA-2026",
+      "nama": "Hipertensi dewasa: tekanan darah",
+      "katalog_id": "KMK-2026-303",
+      "dx": [
+        "I10",
+        "I11",
+        "I12",
+        "I13",
+        "I15"
+      ],
+      "usia_min": 18,
+      "halaman": [
+        9,
+        65
+      ],
+      "butir": "A. Definisi dan klasifikasi",
+      "kriteria": [
+        [
+          "td_hipertensi"
+        ],
+        [
+          "terapi_antihipertensi"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "gabung_ke": [
+        "BDD-15"
+      ],
+      "catatan": "Hipertensi: TD sistolik >140 mmHg dan/atau diastolik >90 mmHg; diagnosis ditegakkan dari beberapa kali pemeriksaan pada hari berbeda. Hipertensi terkontrol ditelaah dari riwayat dan obat antihipertensi."
+    },
+    {
+      "id": "PNPK-HIPERTENSI-DEWASA-2021",
+      "nama": "Hipertensi dewasa: tekanan darah",
+      "katalog_id": "KMK-2021-4634",
+      "dx": [
+        "I10",
+        "I11",
+        "I12",
+        "I13",
+        "I15"
+      ],
+      "usia_min": 18,
+      "halaman": [
+        9
+      ],
+      "butir": "Definisi",
+      "kriteria": [
+        [
+          "td_hipertensi"
+        ],
+        [
+          "terapi_antihipertensi"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "gabung_ke": [
+        "BDD-15"
+      ],
+      "catatan": "Hipertensi: TD >=140/90 mmHg pada pengukuran berulang (versi PNPK 2021 untuk episode sebelum PNPK 2026 berlaku). Hipertensi terkontrol ditelaah dari riwayat dan obat antihipertensi."
+    },
+    {
+      "id": "PNPK-HDK-2026",
+      "nama": "Hipertensi dalam kehamilan: tekanan darah",
+      "katalog_id": "KMK-2026-701",
+      "dx": [
+        "O10",
+        "O11",
+        "O13",
+        "O14",
+        "O15",
+        "O16"
+      ],
+      "halaman": [
+        8,
+        69
+      ],
+      "butir": "A. Definisi dan klasifikasi",
+      "kriteria": [
+        [
+          "td_hipertensi"
+        ],
+        [
+          "mgso4_hdk"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "gabung_ke": [
+        "RK-12",
+        "BDD-29"
+      ],
+      "catatan": "HDK: kehamilan atau pascapersalinan dengan TD >=140 sistolik dan/atau >=90 diastolik pada dua kali pemeriksaan berjarak 15 menit pada lengan yang sama; hipertensi berat >=160/110 menetap. Diagnosis dengan proteinuria dan laboratorium organ target sesuai klasifikasi."
+    },
+    {
+      "id": "PNPK-ANGINA-STABIL-01",
+      "nama": "Angina pektoris stabil: karakteristik angina dan uji iskemia",
+      "katalog_id": "KMK-2023-1419",
+      "dx": [
+        "I20.1",
+        "I20.8",
+        "I20.9",
+        "I25.1",
+        "I25.9"
+      ],
+      "halaman": [
+        9,
+        23
+      ],
+      "butir": "Definisi dan kriteria iskemia",
+      "kriteria": [
+        [
+          "nyeri_dada_angina"
+        ],
+        [
+          "ekg_iskemia"
+        ],
+        [
+          "stress_test_positif"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "Angina tipikal memenuhi tiga karakteristik: rasa tidak nyaman substernal dengan kualitas/durasi khas, diprovokasi aktivitas/stres emosional, hilang dengan istirahat/nitrat (atipikal dua karakteristik). Respons iskemia positif: depresi ST >=1 mm (horizontal/downsloping) atau >=1,5 mm (upsloping) atau elevasi ST >=1 mm."
+    },
+    {
+      "id": "PNPK-HIPOTIROID-01",
+      "nama": "Hipotiroid: fungsi tiroid",
+      "katalog_id": "KMK-2026-582",
+      "dx": [
+        "E03"
+      ],
+      "halaman": [
+        11,
+        28
+      ],
+      "butir": "B. Diagnosis; kriteria diagnosis hipotiroid",
+      "kriteria": [
+        [
+          "tsh_tinggi"
+        ],
+        [
+          "terapi_hipotiroid"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "Diagnosis hipotiroid dari anamnesis, pemeriksaan fisik dan fungsi tiroid: TSH tinggi dengan T4 total/FT4 rendah (subklinis: TSH tinggi, FT4 normal). Koma miksedema dikonfirmasi TSH dan FT4. Hipotiroid lama ditelaah dari terapi levotiroksin.",
+      "usia_min": 18
+    },
+    {
+      "id": "PNPK-OBESITAS-01",
+      "nama": "Obesitas dewasa: IMT",
+      "katalog_id": "KMK-2025-509",
+      "dx": [
+        "E66"
+      ],
+      "halaman": [
+        10,
+        21
+      ],
+      "butir": "Definisi; penegakan diagnosis",
+      "kriteria": [
+        [
+          "imt_25"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "Diagnosis obesitas berdasarkan IMT >25 kg/m2 dan lingkar pinggang (Asia-Pasifik), dari anamnesis, antropometri dan pemeriksaan klinis.",
+      "usia_min": 18,
+      "kontradiksi_tinggi": true
+    },
+    {
+      "id": "PNPK-MALNUTRISI-DEWASA-01",
+      "nama": "Malnutrisi dewasa: antropometri/klinis/laboratorium",
+      "katalog_id": "KMK-2019-393",
+      "dx": [
+        "E40",
+        "E41",
+        "E42",
+        "E43",
+        "E44",
+        "E45",
+        "E46"
+      ],
+      "halaman": [
+        30
+      ],
+      "butir": "Diagnosis malnutrisi",
+      "kriteria": [
+        [
+          "imt_185"
+        ],
+        [
+          "bb_turun"
+        ],
+        [
+          "albumin_30"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "Diagnosis malnutrisi ditegakkan bila memenuhi kriteria antropometri atau klinis dan/atau laboratorium; ESPEN: IMT <18,5, atau penurunan BB tidak disengaja >10% (atau >5% dalam 3 bulan) disertai IMT rendah/FFMI rendah.",
+      "usia_min": 18,
+      "gabung_ke": [
+        "BDD-28"
+      ]
+    },
+    {
+      "id": "PNPK-OSTEOPOROSIS-01",
+      "nama": "Osteoporosis: BMD/fraktur kerapuhan",
+      "katalog_id": "KMK-2023-2171",
+      "dx": [
+        "M80",
+        "M81"
+      ],
+      "halaman": [
+        28,
+        29
+      ],
+      "butir": "6. Diagnosis (WHO T-score)",
+      "kriteria": [
+        [
+          "tscore_osteoporosis"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "Osteoporosis menurut WHO: T-score <=-2,5 pada perempuan pascamenopause dan laki-laki >=50 tahun (osteopenia -1 sampai -2,5); usia lebih muda memakai Z-score <=-2. M80 menandai osteoporosis dengan fraktur patologis."
+    },
+    {
+      "id": "PNPK-PGK-01",
+      "nama": "Penyakit ginjal kronik: kronisitas/eGFR",
+      "katalog_id": "KMK-2023-1634",
+      "dx": [
+        "N18"
+      ],
+      "halaman": [
+        13
+      ],
+      "butir": "C. Definisi dan klasifikasi",
+      "kriteria": [
+        [
+          "bukti_pgk"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "PGK: kelainan struktur/fungsi ginjal yang menetap >=3 bulan dengan atau tanpa penurunan eGFR (<60 mL/menit/1,73m2), dengan kategori G1-G5."
+    },
+    {
+      "id": "PNPK-PSCA-01",
+      "nama": "Perdarahan saluran cerna: manifestasi klinis",
+      "katalog_id": "KMK-2023-2162",
+      "dx": [
+        "K92.0",
+        "K92.1",
+        "K92.2"
+      ],
+      "halaman": [
+        11
+      ],
+      "butir": "A.1 Definisi PSCA",
+      "kriteria": [
+        [
+          "hematemesis_melena"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "PSCA datang dengan hematemesis (muntah darah/seperti kopi) dan/atau melena (tinja hitam seperti aspal), dengan atau tanpa anemia/gangguan hemodinamik."
+    },
+    {
+      "id": "PNPK-BSK-01",
+      "nama": "Batu saluran kemih: konfirmasi pencitraan",
+      "katalog_id": "KMK-2022-1560",
+      "dx": [
+        "N20",
+        "N21"
+      ],
+      "halaman": [
+        10,
+        49
+      ],
+      "butir": "Definisi; diagnosis",
+      "kriteria": [
+        [
+          "imaging_batu"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "BSK adalah batu pada kaliks, pelvis renalis, ureter, buli atau uretra; diagnosis pasti memerlukan pencitraan (USG/BNO/CT), terutama batu buli yang gejalanya tidak khas."
+    },
+    {
+      "id": "PNPK-EPILEPSI-DEWASA-01",
+      "nama": "Epilepsi dewasa: kriteria ILAE",
+      "katalog_id": "KMK-2026-274",
+      "dx": [
+        "G40"
+      ],
+      "halaman": [
+        4,
+        24
+      ],
+      "butir": "Definisi epilepsi (ILAE)",
+      "kriteria": [
+        [
+          "kejang_berulang_atau_sindrom"
+        ],
+        [
+          "bukan_kejang_terprovokasi"
+        ]
+      ],
+      "syarat": "semua",
+      "catatan": "Diagnosis epilepsi: minimal dua bangkitan epileptik tanpa provokasi dengan jarak >24 jam, atau satu bangkitan tanpa provokasi dengan risiko berulang tinggi, atau sindrom epilepsi. Bangkitan nonepileptik (psikogenik, sinkop) dibedakan.",
+      "usia_min": 18
+    },
+    {
+      "id": "PNPK-HEMOFILIA-01",
+      "nama": "Hemofilia: aktivitas faktor VIII/IX",
+      "katalog_id": "KMK-2021-243",
+      "dx": [
+        "D66",
+        "D67"
+      ],
+      "halaman": [
+        17,
+        20
+      ],
+      "butir": "a. Kriteria diagnosis",
+      "kriteria": [
+        [
+          "faktor_pembekuan"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "Diagnosis pasti hemofilia dengan pemeriksaan aktivitas FVIII (hemofilia A) atau FIX (hemofilia B); derajat berat <1%, sedang 1-5%, ringan >5-<40%. BA 2019 administrasi butir 1: protokol terapi dari PPK 3 diperlukan."
+    },
+    {
+      "id": "PNPK-COT-01",
+      "nama": "Cedera otak traumatik: kriteria diagnosis",
+      "katalog_id": "KMK-2022-1600",
+      "dx": [
+        "S06"
+      ],
+      "halaman": [
+        15,
+        33
+      ],
+      "butir": "D. Kriteria diagnosis",
+      "kriteria": [
+        [
+          "mekanisme_trauma_kepala",
+          "tanda_cot"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "Diagnosis COT dari riwayat trauma (ruda paksa) pada kepala disertai tanda: luka/jejas kepala-leher, penurunan kesadaran, nyeri kepala, muntah, kejang, gangguan saraf. Rawat jalan dimungkinkan bila SKG 15, aktivitas mandiri, dan nilai TOAG >75 (hal 33)."
+    },
+    {
+      "id": "PNPK-KATARAK-DEWASA-2026",
+      "nama": "Katarak dewasa: indikasi operasi visus <6/12",
+      "katalog_id": "KMK-2026-67",
+      "dx": [
+        "H25",
+        "H26",
+        "H28"
+      ],
+      "halaman": [
+        17
+      ],
+      "butir": "Indikasi operasi",
+      "kriteria": [
+        [
+          "visus_612"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "Kebutuhan operasi katarak bila tajam penglihatan <6/12 (hasil baik 6/12 atau lebih); fakoemulsifikasi baku emas.",
+      "px": [
+        "13.1",
+        "13.2",
+        "13.3",
+        "13.4",
+        "13.5",
+        "13.6"
+      ],
+      "pemicu": "dx_dan_px",
+      "usia_min": 18,
+      "gabung_ke": [
+        "TK-25-12"
+      ],
+      "kontradiksi_tinggi": true
+    },
+    {
+      "id": "PNPK-GLAUKOMA-01",
+      "nama": "Glaukoma: TIO/gonioskopi/papil",
+      "katalog_id": "KMK-2023-1488",
+      "dx": [
+        "H40",
+        "H42"
+      ],
+      "halaman": [
+        11,
+        13
+      ],
+      "butir": "Penegakan diagnosis",
+      "kriteria": [
+        [
+          "tio_glaukoma"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "Diagnosis glaukoma dari gonioskopi (sudut), TIO (tonometri aplanasi Goldmann baku emas) dan penilaian papil/lapang pandang sesuai jenis glaukoma."
+    },
+    {
+      "id": "PNPK-RETINOPATI-DM-01",
+      "nama": "Retinopati diabetik: temuan fundus",
+      "katalog_id": "KMK-2023-1914",
+      "dx": [
+        "H36.0",
+        "E10.3",
+        "E11.3",
+        "E12.3",
+        "E13.3",
+        "E14.3"
+      ],
+      "halaman": [
+        14,
+        16
+      ],
+      "butir": "Penegakan diagnosis",
+      "kriteria": [
+        [
+          "fundus_retinopati"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "Diagnosis dari ketajaman visual, slit lamp biomikroskopi dan pemeriksaan fundus (dilatasi) dengan temuan NPDR/PDR/edema makula (CSME)."
+    },
+    {
+      "id": "PNPK-STUNTING-01",
+      "nama": "Stunting: TB/U < -2 SD",
+      "katalog_id": "KMK-2022-1928",
+      "dx": [
+        "E45"
+      ],
+      "halaman": [
+        13,
+        20
+      ],
+      "butir": "A. Definisi; E. Diagnosis",
+      "kriteria": [
+        [
+          "tbu_minus2"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "Stunting: panjang/tinggi badan rendah menurut usia dan jenis kelamin pada kurva WHO 2006 (< -2 SD); ditegakkan dari anamnesis, pemeriksaan fisik dan antropometri, membedakan pendek varian normal dari patologis.",
+      "usia_max": 17
+    },
+    {
+      "id": "PNPK-LUKA-BAKAR-01",
+      "nama": "Luka bakar: luas dan derajat tercatat",
+      "katalog_id": "KMK-2019-555",
+      "dx": [
+        "T20",
+        "T21",
+        "T22",
+        "T23",
+        "T24",
+        "T25",
+        "T26",
+        "T27",
+        "T28",
+        "T29",
+        "T30",
+        "T31"
+      ],
+      "halaman": [
+        12,
+        14,
+        33
+      ],
+      "butir": "Penilaian luas luka bakar (rule of nines)",
+      "kriteria": [
+        [
+          "tbsa_luka_bakar"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "Luas luka bakar (TBSA) dinilai dengan rule of nines/Lund-Browder dan derajat luka dicatat. Kode T31.x menyandikan persentase luas permukaan tubuh (T31.0 <10%, T31.1 10-19%, dst.).",
+      "kontradiksi_tinggi": true
+    },
+    {
+      "id": "PNPK-ASFIKSIA-01",
+      "nama": "Asfiksia neonatorum: rujukan PNPK",
+      "katalog_id": "KMK-2019-214",
+      "dx": [
+        "P21"
+      ],
+      "halaman": [
+        9,
+        17
+      ],
+      "butir": "Definisi asfiksia",
+      "syarat": "informasi",
+      "gabung_ke": [
+        "TK-25-07",
+        "BA-18-M31"
+      ],
+      "catatan": "PNPK: asfiksia ditegakkan dari gejala fisis, perubahan metabolik (asidosis) dan gangguan fungsi organ akibat hipoksik-iskemik; nilai Apgar sendiri memiliki sensitivitas/spesifisitas rendah sebagai penanda tunggal. Bandingkan dengan BA koding 2023 no. 34 (P21.0 dengan Apgar menit pertama 0-3)."
+    },
+    {
+      "id": "PNPK-RSK-01",
+      "nama": "Rinosinusitis kronik: gejala ≥12 minggu",
+      "katalog_id": "KMK-2022-1257",
+      "dx": [
+        "J32"
+      ],
+      "halaman": [
+        19,
+        26
+      ],
+      "butir": "3. Diagnosis RSK, a. Gejala klinis",
+      "kriteria": [
+        [
+          "gejala_rsk_12_minggu"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "RSK ditegakkan bila ≥2 gejala, salah satunya hidung tersumbat/kongesti atau beringus (anterior/posterior), disertai nyeri/rasa tertekan wajah atau gangguan penghidu, berlangsung ≥12 minggu."
+    },
+    {
+      "id": "PNPK-OMSK-01",
+      "nama": "OMSK: perforasi membran timpani",
+      "katalog_id": "KMK-2018-350",
+      "dx": [
+        "H66.1",
+        "H66.2",
+        "H66.3"
+      ],
+      "halaman": [
+        4,
+        14
+      ],
+      "butir": "Definisi dan diagnosis OMSK",
+      "kriteria": [
+        [
+          "perforasi_mt"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "OMSK ditegakkan dari pemeriksaan telinga yang memperlihatkan perforasi membran timpani dengan tanda inflamasi telinga tengah, disertai otorea menetap atau hilang timbul >2 minggu."
+    },
+    {
+      "id": "PNPK-TONSILEKTOMI-01",
+      "nama": "Tonsilektomi: indikasi tercatat",
+      "katalog_id": "KMK-2018-157",
+      "dx": [
+        "J35",
+        "J03"
+      ],
+      "halaman": [
+        33,
+        56
+      ],
+      "butir": "Indikasi tonsilektomi",
+      "kriteria": [
+        [
+          "indikasi_tonsilektomi"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "Indikasi: ≥7 episode dalam 1 tahun, ≥5/tahun dalam 2 tahun, atau ≥3/tahun dalam 3 tahun (tiap episode nyeri tenggorok + ≥1 dari suhu >38,3°C, limfadenopati servikal, eksudat, GABHS positif); indikasi absolut: hipertrofi tonsil dengan OSAS, disfagia berat, gangguan tidur, riwayat abses peritonsil, keperluan biopsi; indikasi relatif: tonsilitis kronik/berulang yang tidak membaik dengan terapi adekuat.",
+      "px": [
+        "28.2",
+        "28.3"
+      ],
+      "pemicu": "dx_dan_px"
+    },
+    {
+      "id": "PNPK-SKOLIOSIS-01",
+      "nama": "Skoliosis: sudut Cobb ≥10°",
+      "katalog_id": "KMK-2021-6542",
+      "dx": [
+        "M41"
+      ],
+      "halaman": [
+        5,
+        12
+      ],
+      "butir": "Definisi skoliosis",
+      "kriteria": [
+        [
+          "cobb_10"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "Diagnosis skoliosis ditegakkan bila sudut Cobb 10° atau lebih (SRS).",
+      "kontradiksi_tinggi": true
+    },
+    {
+      "id": "PNPK-HIRSCHSPRUNG-01",
+      "nama": "Hirschsprung: biopsi/radiologi konfirmasi",
+      "katalog_id": "KMK-2017-474",
+      "dx": [
+        "Q43.1"
+      ],
+      "halaman": [
+        11,
+        15,
+        19
+      ],
+      "butir": "Penegakan diagnosis",
+      "kriteria": [
+        [
+          "konfirmasi_hirschsprung"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "Diagnosis pasti dengan histopatologi biopsi rektum (tidak ditemukan sel ganglion); pemeriksaan radiografik (barium enema, zona transisi) mendukung."
+    },
+    {
+      "id": "PNPK-SIROSIS-01",
+      "nama": "Sirosis hati: penunjang",
+      "katalog_id": "KMK-2025-778",
+      "dx": [
+        "K74",
+        "K70.3"
+      ],
+      "halaman": [
+        11,
+        14,
+        16,
+        18
+      ],
+      "butir": "Penegakan diagnosis sirosis",
+      "kriteria": [
+        [
+          "imaging_sirosis"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "Diagnosis sirosis didukung USG/CT/MRI (nodularitas, ekogenisitas meningkat, rasio lobus kaudatus), elastografi transien (F4), biopsi hati (standar emas), serta tanda hipertensi porta (asites, varises, splenomegali).",
+      "usia_min": 18
+    },
+    {
+      "id": "PNPK-PPOK-01",
+      "nama": "PPOK: rujukan PNPK spirometri",
+      "katalog_id": "KMK-2019-687",
+      "dx": [
+        "J44"
+      ],
+      "halaman": [
+        25
+      ],
+      "butir": "Spirometri",
+      "syarat": "informasi",
+      "gabung_ke": [
+        "BA-19-M65",
+        "BDD-06",
+        "KD-12"
+      ],
+      "catatan": "PNPK PPOK: obstruksi bila VEP1/KVP <70% pascabronkodilator (GOLD); VEP1% prediksi menilai derajat berat."
+    },
+    {
+      "id": "PNPK-GAGAL-JANTUNG-01",
+      "nama": "Gagal jantung dewasa: rujukan PNPK",
+      "katalog_id": "KMK-2021-4801",
+      "dx": [
+        "I50"
+      ],
+      "usia_min": 18,
+      "halaman": [
+        11,
+        15
+      ],
+      "butir": "Kriteria diagnosis",
+      "syarat": "informasi",
+      "gabung_ke": [
+        "BA-19-M64",
+        "BDD-10"
+      ],
+      "catatan": "PNPK: gejala dan tanda gagal jantung disertai bukti objektif gangguan struktur/fungsi jantung (kardiomegali, S3, murmur, abnormalitas ekokardiografi, peningkatan peptida natriuretik); ekokardiografi metode paling berguna."
+    },
+    {
+      "id": "PNPK-GAGAL-JANTUNG-ANAK-01",
+      "nama": "Gagal jantung anak: rujukan PNPK",
+      "katalog_id": "KMK-2023-85",
+      "dx": [
+        "I50"
+      ],
+      "usia_max": 17,
+      "halaman": [
+        44
+      ],
+      "butir": "Pemeriksaan penunjang",
+      "syarat": "informasi",
+      "gabung_ke": [
+        "BA-19-M64",
+        "BDD-10"
+      ],
+      "catatan": "PNPK gagal jantung anak: ekokardiografi sebagai pemeriksaan penunjang utama."
+    },
+    {
+      "id": "PNPK-FRAKTUR-01",
+      "nama": "Fraktur: konfirmasi foto polos/CT",
+      "katalog_id": "KMK-2019-270",
+      "dx": [
+        "S02",
+        "S12",
+        "S22",
+        "S32",
+        "S42",
+        "S52",
+        "S62",
+        "S72",
+        "S82",
+        "S92",
+        "T02",
+        "T08",
+        "T10",
+        "T12"
+      ],
+      "halaman": [
+        9,
+        10
+      ],
+      "butir": "Pemeriksaan penunjang",
+      "kriteria": [
+        [
+          "radiologi_fraktur"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "Pemeriksaan sinar-X/foto polos wajib dilakukan dengan rule of two (dua proyeksi AP-lateral, dua sendi); CT untuk fraktur kompleks."
+    },
+    {
+      "id": "PNPK-OSTEOARTRITIS-01",
+      "nama": "Osteoartritis: kriteria klinis/radiologi ACR-EULAR",
+      "katalog_id": "KMK-2025-1167",
+      "dx": [
+        "M15",
+        "M16",
+        "M17",
+        "M18",
+        "M19"
+      ],
+      "halaman": [
+        22
+      ],
+      "butir": "2. Kriteria diagnosis",
+      "kriteria": [
+        [
+          "radiologi_oa"
+        ],
+        [
+          "krepitasi_sendi"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "Kriteria diagnosis mengacu ACR/EULAR: nyeri sendi dengan temuan klinis (krepitasi, kaku <30 menit, usia >50, pembesaran tulang) dan/atau radiologi (osteofit, penyempitan celah sendi, sklerosis subkondral).",
+      "usia_min": 18
+    },
+    {
+      "id": "PNPK-DEMENSIA-01",
+      "nama": "Demensia: uji kognitif tercatat",
+      "katalog_id": "KMK-2026-273",
+      "dx": [
+        "F00",
+        "F01",
+        "F02",
+        "F03",
+        "G30"
+      ],
+      "halaman": [
+        9,
+        12
+      ],
+      "butir": "Uji kognitif",
+      "kriteria": [
+        [
+          "tes_kognitif"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "Uji kognitif (MoCA, MMSE, AD8) tervalidasi untuk skrining demensia; diagnosis demensia Alzheimer menurut NIA-AA 2011.",
+      "usia_min": 18
+    },
+    {
+      "id": "PNPK-TULI-KONGENITAL-01",
+      "nama": "Tuli sensorineural kongenital: pemeriksaan audiologi",
+      "katalog_id": "KMK-2022-1989",
+      "dx": [
+        "H90.3",
+        "H90.4",
+        "H90.5"
+      ],
+      "halaman": [
+        4
+      ],
+      "butir": "Derajat ketulian (ambang dengar)",
+      "kriteria": [
+        [
+          "audiologi_tuli"
+        ]
+      ],
+      "syarat": "salah_satu",
+      "catatan": "Derajat ketulian ditentukan dari ambang dengar (ringan 26-40 dB, sedang, berat 61-80 dB, sangat berat >81 dB) melalui pemeriksaan audiologi.",
+      "usia_max": 17
+    }
+  ],
+  "tanpa_aturan": [
+    {
+      "katalog_id": "KMK-2026-304",
+      "alasan": "Stroke: sudah dinilai aturan RK/TKMKB (CT kepala, defisit neurologis); PNPK sebagai rujukan."
+    },
+    {
+      "katalog_id": "KMK-2026-876",
+      "alasan": "SKA: sudah dinilai aturan RK/BA (EKG, troponin); PNPK sebagai rujukan."
+    },
+    {
+      "katalog_id": "KMK-2026-875",
+      "alasan": "Demam tifoid dewasa: sudah dinilai aturan RK (serologi/kultur)."
+    },
+    {
+      "katalog_id": "KMK-2025-1168",
+      "alasan": "Pneumonia dewasa: sudah dinilai BA-18 (infiltrat + gejala) dan RK."
+    },
+    {
+      "katalog_id": "KMK-2021-4636",
+      "alasan": "Dengue anak/remaja: sudah dinilai aturan RK (trombosit, hematokrit, NS1/serologi)."
+    },
+    {
+      "katalog_id": "KMK-2020-9845",
+      "alasan": "Dengue dewasa: sudah dinilai aturan RK."
+    },
+    {
+      "katalog_id": "KMK-2017-342",
+      "alasan": "Sepsis dewasa: sudah dinilai BA-18 (SIRS/kultur) dan RK."
+    },
+    {
+      "katalog_id": "KMK-2017-91",
+      "alasan": "Komplikasi kehamilan: sudah dinilai aturan RK/BA obstetri; PNPK sebagai rujukan."
+    },
+    {
+      "katalog_id": "PNPK-PNEUMONIA-ANAK-IDAI",
+      "alasan": "Dinilai oleh pemeriksa pneumonia anak (baPnpkAnak)."
+    },
+    {
+      "katalog_id": "KMK-2014-305",
+      "alasan": "TB 2014 digantikan PNPK TB terbaru; kriteria TB anak/dewasa dinilai PNPK-TB-ANAK-01 dan BA-18."
+    },
+    {
+      "katalog_id": "KMK-2021-4613",
+      "alasan": "Hipertensi anak: ambang memakai tabel persentil TD menurut usia/jenis kelamin/tinggi (AAP) yang tidak dapat dihitung andal dari dokumen klaim."
+    },
+    {
+      "katalog_id": "KMK-2020-2849",
+      "alasan": "Katarak anak: keputusan operasi oleh subspesialis mata anak; tidak ada ambang angka yang dapat diperiksa dari dokumen."
+    },
+    {
+      "katalog_id": "KMK-2025-723",
+      "alasan": "Ulkus kornea bakteri: diagnosis klinis slit lamp; pemeriksaan mikrobiologi untuk etiologi, bukan syarat diagnosis."
+    },
+    {
+      "katalog_id": "KMK-2025-970",
+      "alasan": "Skizofrenia: kriteria PPDGJ/DSM (durasi, gejala) merupakan penilaian psikiatri, tidak dapat diverifikasi otomatis dari resume."
+    },
+    {
+      "katalog_id": "KMK-2015-73",
+      "alasan": "PNPK jiwa 2015: kriteria diagnosis klinis psikiatri; sebagai rujukan."
+    },
+    {
+      "katalog_id": "KMK-2024-2005",
+      "alasan": "Sarkopenia: jarang menjadi diagnosis klaim; kriteria (kekuatan genggam, massa otot) sebagai rujukan."
+    },
+    {
+      "katalog_id": "KMK-2024-1933",
+      "alasan": "Akupunktur medik: pedoman tindakan, bukan kriteria diagnosis."
+    },
+    {
+      "katalog_id": "KMK-2022-1541",
+      "alasan": "Anestesiologi dan terapi intensif: pedoman tindakan; kriteria ICU dinilai aturan RK/TKMKB."
+    },
+    {
+      "katalog_id": "KMK-2019-481",
+      "alasan": "Tata laksana nyeri: pedoman terapi, bukan kriteria diagnosis klaim."
+    },
+    {
+      "katalog_id": "KMK-2017-132",
+      "alasan": "Trauma (ATLS): pedoman tata laksana; diagnosis per cedera dinilai aturan fraktur/COT."
+    },
+    {
+      "katalog_id": "KMK-2021-4622",
+      "alasan": "Fraktur kraniomaksilofasial: dinilai bersama PNPK-FRAKTUR-01 (konfirmasi radiologi/CT)."
+    },
+    {
+      "katalog_id": "KMK-2017-359",
+      "alasan": "Infeksi intraabdominal: diagnosis klinis-pencitraan beragam; sebagai rujukan."
+    },
+    {
+      "katalog_id": "KMK-2025-978",
+      "alasan": "Penyakit periodontal: diagnosis klinis gigi; sebagai rujukan."
+    },
+    {
+      "katalog_id": "KMK-2025-15",
+      "alasan": "Karies gigi: diagnosis klinis gigi; sebagai rujukan."
+    },
+    {
+      "katalog_id": "KMK-2023-1492",
+      "alasan": "Penyakit pulpa/periapikal: diagnosis klinis gigi; sebagai rujukan."
+    },
+    {
+      "katalog_id": "KMK-2022-777",
+      "alasan": "Impaksi gigi: dinilai BA-19-M69/RK-17 (odontektomi rawat inap)."
+    },
+    {
+      "katalog_id": "KMK-2019-213",
+      "alasan": "Dermatitis seboroik: diagnosis klinis kulit; sebagai rujukan."
+    },
+    {
+      "katalog_id": "KMK-2019-321",
+      "alasan": "Bibir sumbing dan lelangit: diagnosis klinis yang tampak; sebagai rujukan tindakan."
+    }
+  ]
+}

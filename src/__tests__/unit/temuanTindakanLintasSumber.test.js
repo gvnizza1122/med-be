@@ -109,8 +109,8 @@ describe('waktu triase tidak wajar (KW-01)', () => {
 
 describe('ketentuan penunjang untuk Pneumonia/PPOK (KD-09, KD-12, KD-13, KD-15)', () => {
   const tanpaPenunjang = [hal(2, 'RESUME MEDIS IGD\nDiagnosa PPOK, Pneumonia\nPenunjang lain: -')];
-  const RI = { jenis_klaim: 'RAWAT_INAP' };
-  const RJ = { jenis_klaim: 'RAWAT_JALAN' };
+  const RI = { jenis_klaim: 'RAWAT_INAP', umur_tahun:35 };
+  const RJ = { jenis_klaim: 'RAWAT_JALAN', umur_tahun:35 };
 
   test('rawat inap: J44 di DIAGLIST tanpa penunjang -> KD-12', () => {
     const f = evaluasiKonsistensi({ ...RI, diagnosa_list: 'J44.1' }, tanpaPenunjang, []);
@@ -134,7 +134,7 @@ describe('ketentuan penunjang untuk Pneumonia/PPOK (KD-09, KD-12, KD-13, KD-15)'
     expect(f.map(x => x.id)).not.toContain('KD-13');
   });
 
-  // MUNAWIR (0170R0110926V001943): PPOK eksaserbasi + nebulisasi di IGD, dipulangkan.
+  // MUNAWIR (0000R0000126V000004): PPOK eksaserbasi + nebulisasi di IGD, dipulangkan.
   test('rawat jalan: PPOK tanpa penunjang tidak dipersoalkan (KD-12/KD-13 tidak menyala)', () => {
     for (const diagnosa_list of ['', 'J44.1']) {
       const id = evaluasiKonsistensi({ ...RJ, diagnosa_list }, tanpaPenunjang, []).map(x => x.id);
@@ -151,7 +151,7 @@ describe('ketentuan penunjang untuk Pneumonia/PPOK (KD-09, KD-12, KD-13, KD-15)'
   });
 
   test('record alur sungguhan (huruf besar JENIS_KLAIM/DIAGLIST) dibaca sama', () => {
-    expect(evaluasiKonsistensi({ JENIS_KLAIM: 'RAWAT_INAP', DIAGLIST: 'J44.1' }, tanpaPenunjang, []).map(x => x.id)).toContain('KD-12');
+    expect(evaluasiKonsistensi({ JENIS_KLAIM: 'RAWAT_INAP', DIAGLIST: 'J44.1', UMUR_TAHUN:35 }, tanpaPenunjang, []).map(x => x.id)).toContain('KD-12');
     expect(evaluasiKonsistensi({ JENIS_KLAIM: 'RAWAT_JALAN', DIAGLIST: 'J44.1' }, tanpaPenunjang, []).map(x => x.id)).not.toContain('KD-12');
   });
 

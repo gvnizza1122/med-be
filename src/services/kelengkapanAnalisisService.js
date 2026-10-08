@@ -12,6 +12,12 @@ function nilaiKelengkapanAnalisis(review, { evidencePool, classification, ganggu
   if (!ai || !Object.keys(ai).length || ai.analisis_tidak_tersedia === true) {
     tambah('review_ai', 'Review AI belum tersedia. Periksa tahap analisis yang belum selesai.');
   } else {
+    const hashLama=ai.pembelajaran_berkas?.hash_bukti_analisis;
+    const hashLokal=ai.pembelajaran_dokumen?.hash_bukti_dipelajari;
+    if(hashLokal&&hashLokal!==hashLama)tambah('telaah_lokal_tanpa_ai','Bukti operasi telah ditelaah lokal; analisis AI sebelumnya belum diperbarui dari telaah dokumen ini.');
+    const berubah=ai.laporan_operasi?.cakupan?.analisis_berkas_berubah===true
+      || ((hashLama||hashLokal)&&Array.isArray(evidencePool)&&(hashLama||hashLokal)!==require('./laporanOperasiService').hashBukti(evidencePool));
+    if(berubah)tambah('berkas_berubah','Bukti berkas berubah setelah analisis. Analisis harus diperbarui memakai seluruh halaman terbaru.');
     for (const a of ai.gangguan_tahap || []) tambah(a.kode, a.pesan);
     const lama = ai.kelengkapan_analisis;
     if (lama && lama.status !== 'lengkap') {

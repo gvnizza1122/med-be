@@ -189,4 +189,4 @@ describe('evaluasiSyaratPenunjang — kehati-hatian', () => {
   });
 });
 
-function evaluasiSyaratPenunjang(dx,px,pages,opsi={}) { return evaluasiSyaratPenunjangAsli(dx,px,pages,{hospitalCode:'3371084',...opsi}); }
+function evaluasiSyaratPenunjang(dx,px,pages,opsi={}) { return evaluasiSyaratPenunjangAsli(dx,px,pages,{hospitalCode:'3371084',usia:35,...opsi}); }

@@ -166,6 +166,9 @@ function periksaAturan({ record, ai, pages, hitungInacbgDanTarif }) {
   for (const k of dx) {
     if (!deskripsiDiagnosis(k) && !kodeIm(k)) temuan.push({ jenis: 'kode_tidak_didukung', keparahan: 'sedang', pesan: `Kode ${k} belum ada di ICD-10 WHO.`, saran: 'Pilih padanan ICD-10 WHO sebelum diunggah.' });
   }
+  temuan.push(...require('./bpjsDoDontService').temuanKritisDokumen({...record,DIAGLIST:dx},pages));
+  const referensi=require('./referensiKlaimService').evaluasiReferensiKlaim({...record,DIAGLIST:dx,PROCLIST:px},pages,{kegawatdaruratan:ai.kegawatdaruratan_assessment});
+  temuan.push(...require('./baTkmkbService').temuanKritis(referensi.temuan));
   return temuan;
 }
 
@@ -207,6 +210,8 @@ SISTEM SARAN: INA-CBG dengan ICD-10 WHO dan ICD-9-CM. Kode IM untuk iDRG dinilai
 REFERENSI KAMUS PROSEDUR: ${['75.32','75.34','90.59','91.39','91.69','91.79'].map(k => `${k}: ${deskripsiProsedur(k)}`).join('; ')}
 TEMUAN PENUNJANG (anotasi; verifikasi kutipan/halaman): ${JSON.stringify(ai.temuan_penunjang || [])}
 SYARAT DIAGNOSIS: ${JSON.stringify(ai.syarat_penunjang || [])}
+${require('./laporanOperasiService').konteksOperasiUntukAi(pages)}
+${konteksPneumoniaAnak(record, dx, pages)}
 BUKTI:\n${penting.map(p => `=== Halaman ${p.page_number} ===\n${String(p.ocr_text)}`).join('\n\n').slice(0, 60000)}`;
   const muatan = { system: SYSTEM.replace(KONVENSI_KODING_RS,require('./konvensiKodingRs').konvensiUntukRs({ ...record, DIAGLIST:dx, PROCLIST:px },pages)), prompt, json: true, maxTokens: 1500, dikenal, jenisKlaim: record.jenis_klaim || record.JENIS_KLAIM, versi: 'kritik-v2-referensi' };
   muatan.prioritasKlinis=true;
@@ -235,6 +240,18 @@ BUKTI:\n${penting.map(p => `=== Halaman ${p.page_number} ===\n${String(p.ocr_tex
 /**
  * @returns {Promise<object>} analisis_kritis
  */
+// Pasien anak dengan pneumonia dinilai memakai PNPK IDAI, bukan kriteria
+// dewasa (gram sputum, CURB-65/PSI). Konteks ini data telaah, bukan instruksi.
+function konteksPneumoniaAnak(record, dx, pages) {
+  try {
+    const r = require('./pneumoniaAnakService').nilaiPneumoniaAnak({ record, dx, pages });
+    if (!r) return `CAKUPAN USIA: ${require('./usiaPasienService').resolveUsia(record).kelompok}. Jangan menerapkan kriteria kelompok lain; usia belum terkonfirmasi harus diklarifikasi.`;
+    return `PASIEN ANAK (${r.usia_bulan === null ? r.usia.tahun+' tahun; usia bulan belum pasti' : r.usia_bulan+' bulan'}) DENGAN PNEUMONIA: nilai memakai PNPK Pneumonia pada Anak (IDAI). Jangan memakai gram sputum, CURB-65/PSI atau kriteria dewasa. `
+      + `Batas napas cepat sesuai usia; kriteria rawat inap ${r.kelompok}: ${r.kriteria_rawat_inap.map(k => `${k.nama} [${k.status}]`).join('; ')}. `
+      + `Foto toraks dan kultur darah tidak rutin pada pneumonia tanpa komplikasi. ${r.catatan.join(' ')}`;
+  } catch (_) { return ''; }
+}
+
 async function periksaKritis({ record, ai, pages, hitungInacbgDanTarif, db = null, dikenal = {}, gateway = gatewayModelService }) {
   const aturan = periksaAturan({ record, ai, pages, hitungInacbgDanTarif }).map(t => ({ ...t, sumber: 'aturan' }));
   // Pembanding dari berkas lain yang sudah diklaim (pola istilah -> kode casemix).
@@ -283,7 +300,7 @@ async function periksaKritis({ record, ai, pages, hitungInacbgDanTarif, db = nul
   }
   // Keberatan AI "kode tidak didukung" untuk penunjang yang hasilnya ADA di
   // halaman hasil (rekaman EKG, laporan radiologi, hasil lab) dibantah bukti:
-  // AI hanya membaca resume. SUPRIYATI (0170R0111225V003428): "89.52 tidak
+  // AI hanya membaca resume. PASIEN CONTOH A (0000R0000126V000002): "89.52 tidak
   // didukung" padahal rekaman EKG ada di hal. 8-9 dan casemix mengodenya.
   const HALAMAN_HASIL = new Set(['lab_results', 'radiology', 'ekg', 'rekaman_ctg']);
   const terbukti = new Map();

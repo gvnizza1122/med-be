@@ -1,5 +1,5 @@
 {
-  "versi": "2026-10-06.2",
+  "versi": "2026-10-08.2",
   "diperiksa_pada": "2026-10-06",
   "sumber": [
     {
@@ -206,7 +206,8 @@
       "bukti": [
         "terapi_elektrolit"
       ],
-      "catatan": "Nilai Na rendah dan tata laksana perlu dibuktikan; diagnosis sekunder tetap mengikuti DPJP dan aturan koding."
+      "catatan": "Nilai Na rendah dan tata laksana perlu dibuktikan; diagnosis sekunder tetap mengikuti DPJP dan aturan koding.",
+      "usia_min": 18
     },
     {
       "id": "RK-05",
@@ -221,7 +222,8 @@
       "bukti": [
         "terapi_elektrolit"
       ],
-      "catatan": "Nilai K rendah dan tata laksana perlu dibuktikan; resep bukan bukti pemberian."
+      "catatan": "Nilai K rendah dan tata laksana perlu dibuktikan; resep bukan bukti pemberian.",
+      "usia_min": 18
     },
     {
       "id": "RK-06",

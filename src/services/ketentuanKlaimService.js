@@ -44,24 +44,51 @@ function cariCocok(daftarKode, polaList) {
  * @param {string|string[]} diaglist - isi DIAGLIST (dipisah ';' atau ',')
  * @returns {{kode:string,nama:string,aksi:string,pesan:string,kode_terdampak:string[],kode_utama:string[],kode_gabungan:string|null,sumber:string,kutipan_sumber:string}[]}
  */
-function evaluasiKombinasiKode(diaglist) {
+function evaluasiKombinasiKode(diaglist, opsi = {}) {
   const kodeList = pecahDaftarKode(diaglist);
-  if (kodeList.length < 2) return []; // aturan kombinasi butuh minimal dua kode
+  if (kodeList.length === 0) return [];
+  // Prosedur hanya dinilai bila pemanggil memberikannya; aturan bersyarat
+  // prosedur dilewati (bukan dianggap terpenuhi) bila daftar prosedur tidak ada.
+  const pxList = opsi.px === undefined || opsi.px === null ? null : pecahDaftarKode(opsi.px);
 
   const temuan = [];
   for (const aturan of ketentuan.aturan) {
     if (!aturan.diverifikasi) continue; // belum ditelaah koder -- jangan dipakai
+    if ((aturan.px_ada || aturan.px_tidak_ada) && !pxList) continue;
+    if (aturan.px_ada && cariCocok(pxList, aturan.px_ada).length === 0) continue;
+    if (aturan.px_tidak_ada && cariCocok(pxList, aturan.px_tidak_ada).length > 0) continue;
 
-    const utama = cariCocok(kodeList, aturan.kode_diagnosis);
-    const pasangan = cariCocok(kodeList, aturan.kode_pasangan);
-    if (utama.length === 0 || pasangan.length === 0) continue;
+    // utama_saja: kode_diagnosis harus menjadi diagnosis utama (urutan pertama).
+    const utama = cariCocok(aturan.utama_saja ? kodeList.slice(0, 1) : kodeList, aturan.kode_diagnosis);
+    // pasangan '*' = diagnosis lain apa pun.
+    if (utama.length === 0) continue;
+    // kode_tidak_ada: kode pelengkap yang wajib ada (mis. Z37 pada persalinan) belum dikode.
+    if (aturan.kode_tidak_ada && cariCocok(kodeList, aturan.kode_tidak_ada).length) continue;
+    // minimal_dua_kode: dua subkode berbeda dari kelompok yang sama (mis. B20.0 + B20.1 -> B20.7).
+    if (aturan.minimal_dua_kode) {
+      const beda = [...new Set(utama)];
+      if (beda.length < 2) continue;
+      temuan.push(buatTemuan(aturan, beda.slice(0, 1), beda.slice(1)));
+      continue;
+    }
+    if (!aturan.kode_pasangan && aturan.kode_tidak_ada) { temuan.push(buatTemuan(aturan, utama, [])); continue; }
+    const pasangan = (aturan.kode_pasangan || []).includes('*') ? kodeList.filter(k => !utama.includes(k))
+      : cariCocok(aturan.pasangan_sekunder_saja ? kodeList.slice(1) : kodeList, aturan.kode_pasangan)
+        .filter(k => !cariCocok([k], aturan.kode_pasangan_kecuali).length);
+    if (pasangan.length === 0) continue;
 
     // Kode yang sama tidak boleh dihitung sebagai utama sekaligus pasangan
     // (mis. aturan yang kode_diagnosis & kode_pasangan-nya beririsan).
     const pasanganBersih = pasangan.filter(k => !utama.includes(k));
     if (pasanganBersih.length === 0) continue;
 
-    temuan.push({
+    temuan.push(buatTemuan(aturan, utama, pasanganBersih));
+  }
+  return temuan;
+}
+
+function buatTemuan(aturan, utama, pasanganBersih) {
+    return {
       kode: aturan.kode,
       nama: aturan.nama,
       aksi: aturan.aksi,
@@ -69,11 +96,12 @@ function evaluasiKombinasiKode(diaglist) {
       kode_utama: utama,
       kode_terdampak: pasanganBersih,
       kode_gabungan: aturan.kode_gabungan || null,
+      ...(aturan.kode_saran ? { kode_saran: aturan.kode_saran } : {}),
+      // 'telaah' = perlu konteks klinis/dokumen; tidak diterapkan otomatis ke saran kode.
+      keparahan: aturan.keparahan || (aturan.aksi === 'telaah' ? 'sedang' : 'tinggi'),
       sumber: aturan.sumber,
       kutipan_sumber: aturan.kutipan_sumber,
-    });
-  }
-  return temuan;
+    };
 }
 
 /** Aturan yang sengaja belum aktif — dipakai halaman Aturan Validasi agar telaah koder tidak terlupakan. */

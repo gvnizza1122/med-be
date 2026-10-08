@@ -144,6 +144,7 @@ app.use('/api/v1/dashboard', dashboardRoutes);
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/bridging', bridgingRoutes);
 app.use('/api/v1/hospital-settings', hospitalSettingsRoutes);
+app.use('/api/v1/katalog-pedoman', require('./routes/katalogPedoman'));
 app.use('/api/v1/prb-exempt', prbExemptRoutes);
 app.use('/api/v1/audit-logs', auditLogRoutes);
 app.use('/api/v1/ai-usage', aiUsageRoutes);

@@ -1,0 +1,908 @@
+{
+  "versi": "2026-10-08.1",
+  "diperiksa_pada": "2026-10-08",
+  "hospital_codes": [
+    "3371084"
+  ],
+  "sumber": {
+    "id": "BPJS-DO-DONT-PENGGUNA-20261008",
+    "judul": "BPJS DO AND DON’T",
+    "nama_berkas": "BPJS DO N DONT (1).docx",
+    "sha256": "0df45f6995b9a18e40909900e5f420ce8abec26aa25c31d3211b81987551c6b3",
+    "jenis": "catatan_casemix",
+    "status_verifikasi": "catatan_pengguna_belum_diverifikasi",
+    "nomor": null,
+    "url": "",
+    "versi": "Berkas diterima 8 Oktober 2026",
+    "berlaku_mulai": null,
+    "berlaku_sampai": null,
+    "catatan": "Catatan yang disampaikan pemilik aplikasi untuk telaah RS Lestari Raharja. Dokumen tidak memuat nomor aturan, pengesah, tanggal berlaku atau wilayah. Bukan pernyataan bahwa seluruh butir merupakan ketentuan BPJS nasional."
+  },
+  "aturan": [
+    {
+      "id": "BDD-01",
+      "butir": 1,
+      "nama": "Hipokalemia",
+      "halaman": 1,
+      "paragraf": [
+        3
+      ],
+      "teks_asli": "Kode hypokalemia bisa ditegakkan jika ada evaluasi nilai kalium, pemeriksaan elektrolit serial",
+      "dx_semua": [
+        [
+          "E87.6"
+        ]
+      ],
+      "bukti": [
+        "terapi_elektrolit"
+      ],
+      "catatan": "Telaah kalium, waktu pemeriksaan, koreksi dan evaluasi serial; diagnosis tetap mengikuti DPJP.",
+      "pemeriksa": "telaah",
+      "pemicu_gejala_utama": false
+    },
+    {
+      "id": "BDD-02",
+      "butir": 2,
+      "nama": "Stroke akut atau sekuel",
+      "halaman": 1,
+      "paragraf": [
+        4
+      ],
+      "teks_asli": "Kode stroke WAJIB disertakan CT-SCAN. Jika riwayat/bukan serangan pertama dikode sekuel I69.- ",
+      "dx_semua": [
+        [
+          "I60",
+          "I61",
+          "I62",
+          "I63",
+          "I64",
+          "I69"
+        ]
+      ],
+      "bukti": [
+        "pencitraan_kepala",
+        "neurologis"
+      ],
+      "catatan": "Telaah CT atau MRI dan episode akut versus sekuel. Serangan berulang tidak dengan sendirinya merupakan sekuel I69.",
+      "pemeriksa": "telaah",
+      "pemicu_gejala_utama": false
+    },
+    {
+      "id": "BDD-03",
+      "butir": 3,
+      "nama": "Stroke dan kejang",
+      "halaman": 1,
+      "paragraf": [
+        5
+      ],
+      "teks_asli": "Stroke dan GTCS adalah manifestasi, cukup kode stroke",
+      "dx_semua": [
+        [
+          "I60",
+          "I61",
+          "I62",
+          "I63",
+          "I64"
+        ],
+        [
+          "R56",
+          "G40",
+          "G41"
+        ]
+      ],
+      "bukti": [],
+      "catatan": "Telaah hubungan kejang dengan stroke, diagnosis akhir dan tata laksana; jangan menghapus kode kejang secara otomatis.",
+      "pemeriksa": "telaah",
+      "pemicu_gejala_utama": false
+    },
+    {
+      "id": "BDD-04",
+      "butir": 4,
+      "nama": "Stroke dan stupor",
+      "halaman": 1,
+      "paragraf": [
+        6
+      ],
+      "teks_asli": "Stroke dan stupor, cukup stroke",
+      "dx_semua": [
+        [
+          "I60",
+          "I61",
+          "I62",
+          "I63",
+          "I64"
+        ],
+        [
+          "R40"
+        ]
+      ],
+      "bukti": [],
+      "catatan": "Telaah apakah stupor merupakan manifestasi episode stroke atau kondisi lain yang didiagnosis dan ditangani.",
+      "pemeriksa": "telaah",
+      "pemicu_gejala_utama": false
+    },
+    {
+      "id": "BDD-05",
+      "butir": 5,
+      "nama": "Dehidrasi sebagai diagnosis utama",
+      "halaman": 1,
+      "paragraf": [
+        7
+      ],
+      "teks_asli": "Dehidrasi sedang (E86) rawan dipending BPJS jika dijadikan dx utama karena akan disanggah bahwa dehidrasi adalah suatu manifestasi ",
+      "dx_semua": [
+        [
+          "E86"
+        ]
+      ],
+      "bukti": [],
+      "catatan": "Telaah alasan rawat, diagnosis akhir dan penanganan. Catatan risiko dehidrasi utama bukan larangan nasional yang sudah dibuktikan.",
+      "pemeriksa": "telaah",
+      "pemicu_gejala_utama": false
+    },
+    {
+      "id": "BDD-06",
+      "butir": 6,
+      "nama": "PPOK dan spirometri",
+      "halaman": 1,
+      "paragraf": [
+        8
+      ],
+      "teks_asli": "Kode PPOK (J44.-) jika tidak ada cek spirometri tidak dapat dikode (opsi J40)",
+      "dx_semua": [
+        [
+          "J44"
+        ]
+      ],
+      "bukti": [],
+      "catatan": "Telaah bukti diagnosis PPOK dan hasil spirometri yang tersedia, termasuk riwayat. Ketiadaan lampiran tidak otomatis membenarkan penggantian ke J40.",
+      "pemeriksa": "telaah",
+      "pemicu_gejala_utama": false
+    },
+    {
+      "id": "BDD-07",
+      "butir": 7,
+      "nama": "Kode gejala sebagai diagnosis utama",
+      "halaman": 1,
+      "paragraf": [
+        9
+      ],
+      "teks_asli": "kode R bisa dijadikan dx utama jika sampai akhir perawatan tidak ada dx lain",
+      "dx_semua": [],
+      "bukti": [],
+      "catatan": "Kode gejala perlu ditelaah terhadap diagnosis akhir dokter. Jangan mengarang diagnosis penyakit bila sampai akhir episode belum ditetapkan.",
+      "pemeriksa": "telaah",
+      "pemicu_gejala_utama": true
+    },
+    {
+      "id": "BDD-08",
+      "butir": 8,
+      "nama": "Pneumonia dan bronkopneumonia",
+      "halaman": 1,
+      "paragraf": [
+        10,
+        11,
+        12,
+        13,
+        14,
+        15
+      ],
+      "teks_asli": "KODE PNEUMONIA/BRPN\n- CURB PSI\n- ada lab. Sputum gram\n- diberikan antibiotik intravena min 72 jam\n- jika pasien anak, antibiotik iv 72 jam dan rontgen thorax\n- jika salah satu gugur opsi Kode J22",
+      "dx_semua": [
+        [
+          "J18"
+        ]
+      ],
+      "bukti": [
+        "radiologi_toraks",
+        "mikrobiologi"
+      ],
+      "catatan": "Telaah CURB/PSI sesuai usia dan indikasi, radiologi, hasil mikrobiologi serta catatan antibiotik IV bertanggal. IV 72 jam dan penggantian ke J22 memerlukan sumber/cakupan klaim; bukan kesimpulan otomatis.",
+      "pemeriksa": "telaah",
+      "pemicu_gejala_utama": false
+    },
+    {
+      "id": "BDD-09",
+      "butir": 9,
+      "nama": "Gastritis dan GERD",
+      "halaman": 1,
+      "paragraf": [
+        16
+      ],
+      "teks_asli": "dx Gastritis/GERD harus ada endoskopi, opsi K30/R11",
+      "dx_semua": [
+        [
+          "K29",
+          "K21"
+        ]
+      ],
+      "bukti": [],
+      "catatan": "Telaah diagnosis akhir dan dasar pemeriksaan. Syarat endoskopi universal serta penggantian ke K30/R11 belum diverifikasi.",
+      "pemeriksa": "telaah",
+      "pemicu_gejala_utama": false
+    },
+    {
+      "id": "BDD-10",
+      "butir": 10,
+      "nama": "Gagal jantung dan ekokardiografi",
+      "halaman": 1,
+      "paragraf": [
+        17
+      ],
+      "teks_asli": "Penegakan dx CHF harus disertai echocardiography, opsi I25.0",
+      "dx_semua": [
+        [
+          "I50"
+        ]
+      ],
+      "bukti": [],
+      "catatan": "Telaah diagnosis dan hasil ekokardiografi yang tersedia. I25.0 bukan kode pengganti otomatis untuk gagal jantung tanpa lampiran echo.",
+      "pemeriksa": "telaah",
+      "pemicu_gejala_utama": false
+    },
+    {
+      "id": "BDD-11",
+      "butir": 11,
+      "nama": "Hepatitis dan kenaikan transaminase",
+      "halaman": 1,
+      "paragraf": [
+        18
+      ],
+      "teks_asli": "Hepatitis jika hanya OT PT yg meningkat dikode R74",
+      "dx_semua": [
+        [
+          "B15",
+          "B16",
+          "B17",
+          "B18",
+          "B19",
+          "K75",
+          "R74"
+        ]
+      ],
+      "bukti": [],
+      "catatan": "Telaah diagnosis akhir, etiologi dan hasil SGOT/SGPT; kenaikan enzim saja tidak menetapkan hepatitis atau menentukan kode pengganti.",
+      "pemeriksa": "telaah",
+      "pemicu_gejala_utama": false
+    },
+    {
+      "id": "BDD-12",
+      "butir": 12,
+      "nama": "Hepatopati dan hasil fungsi hati",
+      "halaman": 1,
+      "paragraf": [
+        19
+      ],
+      "teks_asli": "Hepatopathy jika tidak ada inflamasi dikode R94.5",
+      "dx_semua": [
+        [
+          "K76",
+          "R94.5"
+        ]
+      ],
+      "bukti": [],
+      "catatan": "Telaah diagnosis akhir dan bukti fungsi hati; R94.5 adalah kategori hasil pemeriksaan abnormal, bukan pengganti semua hepatopati.",
+      "pemeriksa": "telaah",
+      "pemicu_gejala_utama": false
+    },
+    {
+      "id": "BDD-13",
+      "butir": 13,
+      "nama": "ISK dan leukosit urine",
+      "halaman": 1,
+      "paragraf": [
+        20
+      ],
+      "teks_asli": "dx ISK (N39.0), nilai leukosit urine wajib > 10 Leu/uL, opsi N39.8",
+      "dx_semua": [
+        [
+          "N39.0"
+        ]
+      ],
+      "bukti": [],
+      "catatan": "Bandingkan leukosit urine numerik dengan >10 Leu/uL pada butir 13. Pisahkan dipstick +1, nilai mikroskopis, satuan dan nilai rujukan. LPB/HPF tidak dikonversi menjadi Leu/uL. N39.8 bukan pengganti otomatis.",
+      "pemeriksa": "leukosit_urine",
+      "pemicu_gejala_utama": false
+    },
+    {
+      "id": "BDD-14",
+      "butir": 14,
+      "nama": "AKI dan perubahan kreatinin",
+      "halaman": 1,
+      "paragraf": [
+        21,
+        22,
+        23
+      ],
+      "teks_asli": "AKI (N17.9)  bisa ditegakkan jika ada lab creatinin serial, dan kenaikan setelah 48 jam, opsi N28.8\n- kreatinin serum 0,3 mg/dl selama 48 jam\n- output urin <0.5 m//kgBB/jam dalam 6 jam",
+      "dx_semua": [
+        [
+          "N17"
+        ]
+      ],
+      "bukti": [],
+      "catatan": "Telaah perubahan kreatinin, baseline, waktu dan diuresis terukur. Frasa setelah 48 jam perlu diklarifikasi; satu kreatinin tinggi dan penggantian ke N28.8 tidak diputuskan otomatis.",
+      "pemeriksa": "telaah",
+      "pemicu_gejala_utama": false
+    },
+    {
+      "id": "BDD-15",
+      "butir": 15,
+      "nama": "Gagal ginjal dan hipertensi",
+      "halaman": 1,
+      "paragraf": [
+        24
+      ],
+      "teks_asli": "N19 + I10 = I12.0",
+      "dx_semua": [
+        [
+          "N19"
+        ],
+        [
+          "I10"
+        ]
+      ],
+      "bukti": [],
+      "catatan": "Telaah hubungan penyakit ginjal dengan hipertensi serta aturan WHO; jangan menerapkan kombinasi I12.0 hanya dari dua kode.",
+      "pemeriksa": "telaah",
+      "pemicu_gejala_utama": false
+    },
+    {
+      "id": "BDD-16",
+      "butir": 16,
+      "nama": "Tifoid dan Widal",
+      "halaman": 1,
+      "paragraf": [
+        25
+      ],
+      "teks_asli": "Thypoid (A01.0) lab widal wajib 1/320",
+      "dx_semua": [
+        [
+          "A01"
+        ]
+      ],
+      "bukti": [
+        "hasil_tifoid"
+      ],
+      "catatan": "Telaah diagnosis DPJP, kultur/alternatif dan waktu penyakit. Widal 1/320 tunggal bukan gerbang universal atau kepastian diagnosis.",
+      "pemeriksa": "telaah",
+      "pemicu_gejala_utama": false
+    },
+    {
+      "id": "BDD-17",
+      "butir": 17,
+      "nama": "Tifoid dan gastroenteritis",
+      "halaman": 1,
+      "paragraf": [
+        26
+      ],
+      "teks_asli": "Thypoid + GEA (GEA tidak perlu dikoding)",
+      "dx_semua": [
+        [
+          "A01"
+        ],
+        [
+          "A09",
+          "K52"
+        ]
+      ],
+      "bukti": [],
+      "catatan": "Telaah apakah gastroenteritis merupakan manifestasi tifoid atau diagnosis tambahan yang berdiri sendiri; penghapusan perlu dasar koding.",
+      "pemeriksa": "telaah",
+      "pemicu_gejala_utama": false
+    },
+    {
+      "id": "BDD-18",
+      "butir": 18,
+      "nama": "Henti jantung dan resusitasi",
+      "halaman": 1,
+      "paragraf": [
+        27
+      ],
+      "teks_asli": "Cardiac arrest jika ada tindakan RJP bisa dikode",
+      "dx_semua": [
+        [
+          "I46"
+        ]
+      ],
+      "bukti": [],
+      "catatan": "Telaah diagnosis henti jantung dan bukti RJP serta kondisi ketika resusitasi tidak dilakukan; jangan menyimpulkan penyakit dari tindakan saja.",
+      "pemeriksa": "telaah",
+      "pemicu_gejala_utama": false
+    },
+    {
+      "id": "BDD-19",
+      "butir": 19,
+      "nama": "Anemia dan transfusi",
+      "halaman": 1,
+      "paragraf": [
+        28
+      ],
+      "teks_asli": "Kode anemia bisa dikode jika ada transfusi  dan HB <8",
+      "dx_semua": [
+        [
+          "D50",
+          "D51",
+          "D52",
+          "D53",
+          "D55",
+          "D56",
+          "D57",
+          "D58",
+          "D59",
+          "D60",
+          "D61",
+          "D62",
+          "D63",
+          "D64"
+        ]
+      ],
+      "bukti": [],
+      "catatan": "Telaah jenis anemia, Hb, penanganan dan sumber klaim. Hb <8 serta transfusi tidak diangkat menjadi syarat semua anemia.",
+      "pemeriksa": "telaah",
+      "pemicu_gejala_utama": false
+    },
+    {
+      "id": "BDD-20",
+      "butir": 20,
+      "nama": "Anemia saat operasi",
+      "halaman": 2,
+      "paragraf": [
+        29
+      ],
+      "teks_asli": "dx anemia saat operasi tidak dikode",
+      "dx_semua": [
+        [
+          "D50",
+          "D51",
+          "D52",
+          "D53",
+          "D55",
+          "D56",
+          "D57",
+          "D58",
+          "D59",
+          "D60",
+          "D61",
+          "D62",
+          "D63",
+          "D64"
+        ]
+      ],
+      "bukti": [
+        "laporan_operasi"
+      ],
+      "catatan": "Telaah anemia yang telah ditetapkan dan ditangani, termasuk waktu terhadap operasi; tidak menghapus diagnosis hanya karena terjadi saat operasi.",
+      "pemeriksa": "telaah",
+      "pemicu_gejala_utama": false
+    },
+    {
+      "id": "BDD-21",
+      "butir": 21,
+      "nama": "Stomatitis dan kandidiasis oral",
+      "halaman": 2,
+      "paragraf": [
+        30
+      ],
+      "teks_asli": "Stomatitis oral/candidiasis stomatitis dikode K12.0",
+      "dx_semua": [
+        [
+          "K12",
+          "B37.0"
+        ]
+      ],
+      "bukti": [],
+      "catatan": "Telaah etiologi dan kamus WHO. Kandidiasis oral dan stomatitis aftosa tidak diperlakukan sebagai diagnosis yang selalu berkode sama.",
+      "pemeriksa": "telaah",
+      "pemicu_gejala_utama": false
+    },
+    {
+      "id": "BDD-22",
+      "butir": 22,
+      "nama": "Dengue dan hematokrit",
+      "halaman": 2,
+      "paragraf": [
+        31
+      ],
+      "teks_asli": "DHF, ada peningkatan hematokrit >20%",
+      "dx_semua": [
+        [
+          "A91"
+        ]
+      ],
+      "bukti": [
+        "hasil_dengue"
+      ],
+      "catatan": "Telaah tren hematokrit, baseline, fase penyakit, klinis dan bukti kebocoran plasma; satu persentase tanpa konteks tidak memastikan diagnosis.",
+      "pemeriksa": "telaah",
+      "pemicu_gejala_utama": false
+    },
+    {
+      "id": "BDD-23",
+      "butir": 23,
+      "nama": "Kolik renal dan ISK",
+      "halaman": 2,
+      "paragraf": [
+        32
+      ],
+      "teks_asli": "Renal colic + ISK cukup N23",
+      "dx_semua": [
+        [
+          "N23"
+        ],
+        [
+          "N39.0"
+        ]
+      ],
+      "bukti": [],
+      "catatan": "Telaah diagnosis akhir dokter dan hubungan keluhan dengan ISK. Catatan kolik renal pada diagnosis masuk yang masih observasi tidak menggantikan ISK akhir menjadi N23.",
+      "pemeriksa": "telaah",
+      "pemicu_gejala_utama": false
+    },
+    {
+      "id": "BDD-24",
+      "butir": 24,
+      "nama": "Syok hipovolemik dan cairan",
+      "halaman": 2,
+      "paragraf": [
+        33
+      ],
+      "teks_asli": "Shock hipovolemic bisa dikode jika ada bukti loading cairan 1000ml/jam ",
+      "dx_semua": [
+        [
+          "R57.1"
+        ]
+      ],
+      "bukti": [
+        "syok_klinis",
+        "resusitasi"
+      ],
+      "catatan": "Telaah hemodinamik dan resusitasi yang benar-benar diberikan. Loading 1000 mL/jam tidak dijadikan gerbang untuk semua usia dan kondisi.",
+      "pemeriksa": "telaah",
+      "pemicu_gejala_utama": false
+    },
+    {
+      "id": "BDD-25",
+      "butir": 25,
+      "nama": "Sepsis dan syok septik",
+      "halaman": 2,
+      "paragraf": [
+        34
+      ],
+      "teks_asli": "Shock septic/sepsis bisa dikode jika ada pemberian antibiotik lini 4 selama 5 hari, opsi R65",
+      "dx_semua": [
+        [
+          "A40",
+          "A41",
+          "R57.2",
+          "R65"
+        ]
+      ],
+      "bukti": [
+        "infeksi",
+        "disfungsi_organ"
+      ],
+      "catatan": "Telaah infeksi, disfungsi organ, hemodinamik dan terapi. Antibiotik lini 4 selama 5 hari serta penggantian ke R65 belum merupakan syarat universal yang terverifikasi.",
+      "pemeriksa": "telaah",
+      "pemicu_gejala_utama": false
+    },
+    {
+      "id": "BDD-26",
+      "butir": 26,
+      "nama": "Syok kardiogenik",
+      "halaman": 2,
+      "paragraf": [
+        35,
+        36,
+        37,
+        38,
+        39
+      ],
+      "teks_asli": "Shock cardogenik, kriteria klinis\n- penurunan TD\n- TD < 90 mmhg tanpa inotropik, atau\n- TD < 80 mmhg dengan inotropik\n- penurunan Ejection Fraction (EF <50%)",
+      "dx_semua": [
+        [
+          "R57.0"
+        ]
+      ],
+      "bukti": [
+        "tanda_vital"
+      ],
+      "catatan": "Telaah TD, dukungan inotropik, hipoperfusi, fungsi jantung dan diagnosis DPJP. Ambang EF <50% pada catatan bukan bukti tunggal syok.",
+      "pemeriksa": "telaah",
+      "pemicu_gejala_utama": false
+    },
+    {
+      "id": "BDD-27",
+      "butir": 27,
+      "nama": "Parkinson dan pencitraan",
+      "halaman": 2,
+      "paragraf": [
+        40
+      ],
+      "teks_asli": " Kode G20 Parkinson bisa ditegakkan jika ada MRI/CT Scan/PET Scan",
+      "dx_semua": [
+        [
+          "G20"
+        ]
+      ],
+      "bukti": [],
+      "catatan": "Telaah diagnosis klinis dan pencitraan bila relevan. Ketiadaan MRI/CT/PET tidak otomatis menggugurkan G20.",
+      "pemeriksa": "telaah",
+      "pemicu_gejala_utama": false
+    },
+    {
+      "id": "BDD-28",
+      "butir": 28,
+      "nama": "Malnutrisi dan penilaian gizi",
+      "halaman": 2,
+      "paragraf": [
+        41
+      ],
+      "teks_asli": "dx Malnutrisi bisa dikode jika ada konsul SP.GK dan IMT",
+      "dx_semua": [
+        [
+          "E40",
+          "E41",
+          "E42",
+          "E43",
+          "E44",
+          "E45",
+          "E46"
+        ]
+      ],
+      "bukti": [],
+      "catatan": "Telaah penilaian gizi, IMT/antropometri sesuai usia serta konsultasi bila tersedia. Diagnosis tidak disimpulkan dari IMT saja.",
+      "pemeriksa": "telaah",
+      "pemicu_gejala_utama": false
+    },
+    {
+      "id": "BDD-29",
+      "butir": 29,
+      "nama": "Preeklampsia berat",
+      "halaman": 2,
+      "paragraf": [
+        42,
+        43,
+        44,
+        45,
+        46,
+        47,
+        48,
+        49,
+        50,
+        51,
+        52
+      ],
+      "teks_asli": "PRE EKLAMPSIA BERAT\n- usia kehamilan >20 mgg\n- td >160/100 atau td HT 140/90\n- kejang\n- nyeri kepala\n- nyeri ulu hati\n- gangguan penglihatan\n- Peningkatan Ur, Cr\n- Peningkatan OT, PT\n- Penurunan trombosit\n- Peningkatan LDH",
+      "dx_semua": [
+        [
+          "O14.1",
+          "O14.2",
+          "O15"
+        ]
+      ],
+      "bukti": [
+        "hipertensi_kehamilan"
+      ],
+      "catatan": "Telaah usia kehamilan, tekanan darah, gejala berat dan disfungsi organ. Kejang memerlukan telaah eklampsia; protein negatif tidak otomatis menggugurkan diagnosis.",
+      "pemeriksa": "telaah",
+      "pemicu_gejala_utama": false
+    },
+    {
+      "id": "BDD-30",
+      "butir": 30,
+      "nama": "Oligohidramnion dan KPD",
+      "halaman": 2,
+      "paragraf": [
+        53
+      ],
+      "teks_asli": "dx Olygohydramnion dan KPD jadi satu kode O42.-",
+      "dx_semua": [
+        [
+          "O41.0"
+        ],
+        [
+          "O42"
+        ]
+      ],
+      "bukti": [],
+      "catatan": "Telaah hubungan dan diagnosis akhir kedua kondisi serta waktu ketuban pecah. Kombinasi ke O42.- tidak diterapkan tanpa dasar WHO dan dokumentasi.",
+      "pemeriksa": "telaah",
+      "pemicu_gejala_utama": false
+    },
+    {
+      "id": "BDD-31",
+      "butir": 31,
+      "nama": "VES dan terapi",
+      "halaman": 2,
+      "paragraf": [
+        54
+      ],
+      "teks_asli": "VES (I49) bisa dikode jika ada pemberian beta blocker",
+      "dx_semua": [
+        [
+          "I49.3",
+          "I49.4"
+        ]
+      ],
+      "bukti": [
+        "ekg"
+      ],
+      "catatan": "Telaah hasil EKG, diagnosis dokter dan penanganan VES. Pemberian beta blocker bukan syarat tunggal untuk menetapkan aritmia.",
+      "pemeriksa": "telaah",
+      "pemicu_gejala_utama": false
+    },
+    {
+      "id": "BDD-32",
+      "butir": 32,
+      "nama": "Dengue dan trombositopenia",
+      "halaman": 2,
+      "paragraf": [
+        55
+      ],
+      "teks_asli": "Trombositopenia + A90, cukup kode A90 ",
+      "dx_semua": [
+        [
+          "A90"
+        ],
+        [
+          "D69.6"
+        ]
+      ],
+      "bukti": [],
+      "catatan": "Telaah apakah trombositopenia merupakan manifestasi dengue atau diagnosis tersendiri; kode tidak dihapus otomatis dari catatan ini.",
+      "pemeriksa": "telaah",
+      "pemicu_gejala_utama": false
+    },
+    {
+      "id": "BDD-33",
+      "butir": 33,
+      "nama": "Gagal napas",
+      "halaman": 2,
+      "paragraf": [
+        56
+      ],
+      "teks_asli": "Respiratory failure didukung dengan AGD dan alat bantu pernafasan",
+      "dx_semua": [
+        [
+          "J96"
+        ]
+      ],
+      "bukti": [],
+      "catatan": "Telaah diagnosis DPJP, hasil AGD, oksigenasi dan bantuan napas yang diberikan, termasuk alternatif dan konteks klinis.",
+      "pemeriksa": "telaah",
+      "pemicu_gejala_utama": false
+    },
+    {
+      "id": "BDD-34",
+      "butir": 34,
+      "nama": "Disfagia",
+      "halaman": 2,
+      "paragraf": [
+        57
+      ],
+      "teks_asli": "Dysphagia didukung dengan NGT",
+      "dx_semua": [
+        [
+          "R13"
+        ]
+      ],
+      "bukti": [],
+      "catatan": "Telaah diagnosis disfagia, gangguan menelan dan tata laksana; keberadaan atau ketiadaan NGT bukan bukti tunggal diagnosis.",
+      "pemeriksa": "telaah",
+      "pemicu_gejala_utama": false
+    },
+    {
+      "id": "BDD-35",
+      "butir": 35,
+      "nama": "Infeksi saluran napas dan kejang demam",
+      "halaman": 2,
+      "paragraf": [
+        58
+      ],
+      "teks_asli": "J22/J18.0 + R56.0 (R56.0 tidak dikode)",
+      "dx_semua": [
+        [
+          "J22",
+          "J18.0"
+        ],
+        [
+          "R56.0"
+        ]
+      ],
+      "bukti": [],
+      "catatan": "Telaah hubungan kejang demam dengan penyakit dan aturan WHO; tidak menghapus R56.0 secara otomatis.",
+      "pemeriksa": "telaah",
+      "pemicu_gejala_utama": false
+    },
+    {
+      "id": "BDD-36",
+      "butir": 36,
+      "nama": "Asma dan PPOK",
+      "halaman": 2,
+      "paragraf": [
+        59
+      ],
+      "teks_asli": "Asthma + COPD = J45.9",
+      "dx_semua": [
+        [
+          "J45"
+        ],
+        [
+          "J44"
+        ]
+      ],
+      "bukti": [],
+      "catatan": "Telaah diagnosis akhir, pola obstruksi dan aturan WHO. Asma bersama PPOK tidak otomatis selalu disederhanakan menjadi J45.9.",
+      "pemeriksa": "telaah",
+      "pemicu_gejala_utama": false
+    },
+    {
+      "id": "BDD-37",
+      "butir": 37,
+      "nama": "HHD dan kelainan jantung lain",
+      "halaman": 2,
+      "paragraf": [
+        60
+      ],
+      "teks_asli": "HHD + Cardiomegaly, cukup HHD. Berlaku juga untuk angina pectoris ",
+      "dx_semua": [
+        [
+          "I11"
+        ],
+        [
+          "I51.7",
+          "I20"
+        ]
+      ],
+      "bukti": [],
+      "catatan": "Telaah hubungan HHD dengan kardiomegali/angina, diagnosis akhir dan aturan kombinasi yang sudah diverifikasi.",
+      "pemeriksa": "telaah",
+      "pemicu_gejala_utama": false
+    },
+    {
+      "id": "BDD-38",
+      "butir": 38,
+      "nama": "Gagal jantung dan edema paru",
+      "halaman": 2,
+      "paragraf": [
+        61
+      ],
+      "teks_asli": "HF/HHD + Pulmonary oedem, J81 tidak perlu dikoding lagi",
+      "dx_semua": [
+        [
+          "I50",
+          "I11"
+        ],
+        [
+          "J81"
+        ]
+      ],
+      "bukti": [],
+      "catatan": "Telaah apakah edema paru merupakan manifestasi kondisi jantung atau penyakit tersendiri; jangan menghapus kode tanpa hubungan terdokumentasi.",
+      "pemeriksa": "telaah",
+      "pemicu_gejala_utama": false
+    },
+    {
+      "id": "BDD-39",
+      "butir": 39,
+      "nama": "Hemiplegia dan hemiparesis",
+      "halaman": 3,
+      "paragraf": [
+        62
+      ],
+      "teks_asli": "Hemiplegia/hemiparese bisa dikode jika ada tindakan fisioterapi",
+      "dx_semua": [
+        [
+          "G81"
+        ]
+      ],
+      "bukti": [
+        "neurologis"
+      ],
+      "catatan": "Telaah defisit neurologis, diagnosis akhir, pelaksanaan fisioterapi serta profil rehabilitasi RS; ketiadaan layanan bukan izin mengklaim tindakan atau otomatis menghapus diagnosis.",
+      "pemeriksa": "telaah",
+      "pemicu_gejala_utama": false
+    }
+  ]
+}
