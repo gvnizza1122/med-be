@@ -16,7 +16,7 @@ test('NS1 positif tanpa IgG/IgM terbaca sebagai bukti, bukan kewajiban kedua ant
   expect(r[0].blokir_submit).toBe(false);expect(r[0].catatan).toMatch(/Tidak mewajibkan/);
 });
 test('dengue anak memakai acuan anak, bayi usia 0 bukan dewasa',()=>{
-  expect(t('A91',[],{umur_tahun:0}).map(r=>r.id)).toEqual(['RK-02']);
+  expect(t('A91',[],{umur_tahun:0}).map(r=>r.id)).toEqual(['RK-02','TK-25-11']);
 });
 test('usia tak diketahui bukan otomatis dewasa atau dua aturan dengue berulang',()=>{
   const r=t('A90',[],{umur_tahun:null});expect(r).toHaveLength(1);expect(r[0].keterbatasan.join(' ')).toMatch(/usia belum/);
@@ -87,7 +87,7 @@ test('BA 2024 tidak diterapkan sebagai kewajiban pada episode 2023',()=>{
 });
 test('BA terverifikasi: bukti belum cukup menjadi telaah sedang, tanpa larangan rawat inap',()=>{
   const r=t('K01.1',[],{prosedur_list:'23.19'})[0];const putusan=susunPutusan({referensi_klaim:{temuan:[r]}});
-  expect(putusan.alasan[0].keparahan).toBe('sedang');expect(r.catatan).toMatch(/Rawat jalan maupun rawat inap/);
+  expect(putusan.alasan[0].keparahan).toBe('sedang');expect(r.catatan).toMatch(/rawat jalan\/rawat inap/);
 });
 test('benjolan R22 tidak otomatis menjadi STT atau neoplasma',()=>{
   expect(t('R22.9',[],{prosedur_list:'86.3'})).toEqual([]);

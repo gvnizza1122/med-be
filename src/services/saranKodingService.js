@@ -21,7 +21,7 @@ const { createHash } = require('crypto');
 const { PROSEDUR_RUTIN_TIDAK_DIKODE, ALASAN_PROSEDUR_RUTIN, penunjangBerhasil } = require('./konvensiKodingRs');
 
 const SUMBER_TINDAKAN_SAH = new Set(['resume_medis', 'triase_igd']);
-const NAMA_SUMBER_ATURAN = { ba_2018: 'Berita Acara Kesepakatan 2018' };
+const NAMA_SUMBER_ATURAN = { ba_2018: 'Berita Acara Kesepakatan 2018', ba_2023: 'Berita Acara Kesepakatan Koding 2023', ba_2019: 'Berita Acara Kesepakatan 2019' };
 
 function tambahKode(daftar, kode, isi) {
   const k = normalisasiKode(kode);

@@ -2255,7 +2255,7 @@ async function isiKodeDariSaranDalamTransaksi(db, recordId, record, aiReview) {
   const perubahan = {};
   // Kode di DIAGLIST yang tidak ada di ICD-10 WHO diganti dengan padanannya.
   //
-  // Ditemukan pada klaim SEP 0170R0110826V003045: DIAGLIST berisi "r10.84"
+  // Ditemukan pada klaim SEP 0000R0000126V000008: DIAGLIST berisi "r10.84"
   // (ICD-10-CM Amerika) dan tampil "Valid". BPJS hanya mengenal ICD-10 WHO,
   // padanannya R10.4. Penggantinya sudah dihitung saat saran kode dianotasi
   // (aiReviewService.annotateKamusValid) dan tercatat di kode_asal — di sini
@@ -2423,7 +2423,7 @@ async function isiKodeDariSaranDalamTransaksi(db, recordId, record, aiReview) {
     // Tindakan yang terbaca dari berkas ikut mengisi daftar prosedur.
     //
     // Saran kode dari AI sering tidak memuat tindakan yang jelas-jelas tertulis
-    // di resume: nebulisasi tertulis tiga kali di berkas 0170R0110926V001943
+    // di resume: nebulisasi tertulis tiga kali di berkas 0000R0000126V000004
     // dan daftar prosedurnya tetap kosong. Pembacaan tindakan bersifat
     // deterministik — kata "Nebulisasi" pada kolom Tindakan resume, bukan
     // tebakan model — sehingga kodenya layak diisikan.
@@ -2458,7 +2458,7 @@ async function isiKodeDariSaranDalamTransaksi(db, recordId, record, aiReview) {
   // Catatan AI ("DIAGLIST kosong, ...") ditulis SEBELUM kolom ini diisi
   // otomatis di atas, jadi begitu terisi catatan itu jadi basi dan
   // membingungkan (kartu klaim sudah menampilkan kode valid, tapi masih ada
-  // kotak AI menyuruh mengisi DIAGLIST). Ditemukan pada SEP 0170R0110826V003045
+  // kotak AI menyuruh mengisi DIAGLIST). Ditemukan pada SEP 0000R0000126V000008
   // (SUMIDAH). Dibuang di sini, sesudah nilai akhir perubahan diketahui.
   let catatanBasiDibuang = false;
   if (aiReview && aiReview.field_notes && typeof aiReview.field_notes === 'object') {
@@ -2542,7 +2542,7 @@ async function isiKodeDariSaranDalamTransaksi(db, recordId, record, aiReview) {
   // yang ada SAAT AI review dijalankan -- sering masih kosong kalau DIAGLIST
   // baru terisi di FUNGSI INI. Akibatnya panel FE menampilkan "Pending
   // verifikasi" terus walau DIAGLIST/PROCLIST akhirnya valid (ditemukan pada
-  // SEP 0170R0110826V003045 / SUMIDAH). Dihitung ulang di sini dengan kode
+  // SEP 0000R0000126V000008 / SUMIDAH). Dihitung ulang di sini dengan kode
   // FINAL (setelah perubahan di atas), hanya kalau belum pernah berhasil
   // (aiReview.inacbg_result masih null) -- tidak pernah menimpa hasil yang
   // sudah ada, dan tidak pernah mengarang tarif (hitungInacbgDanTarif hanya
@@ -2644,7 +2644,7 @@ async function isiKodeDariSaranDalamTransaksi(db, recordId, record, aiReview) {
     // Upload) dihitung SEBELUM fungsi ini mengisi DIAGLIST/PROCLIST otomatis
     // dan mengubah validation_status record ini -- tanpa baris ini, klaim yang
     // baru saja jadi valid tetap terhitung pending/error di ringkasan atas
-    // walau badge per-baris sudah benar. Ditemukan pada SEP 0170R0110826V003045
+    // walau badge per-baris sudah benar. Ditemukan pada SEP 0000R0000126V000008
     // (SUMIDAH): kartu klaim menampilkan "VALID" tapi ringkasan atas
     // menampilkan "100% PENDING".
     if (barisTerbaru.file_id) await recomputeFileCounts(db, barisTerbaru.file_id);
@@ -3373,6 +3373,21 @@ router.get('/records/:recordId/pemeriksaan-penunjang', authenticate, async (req,
     console.error('[pemeriksaan-penunjang] gagal:', error);
     res.status(500).json({ error: 'Pemeriksaan penunjang gagal disusun.' });
   }
+});
+
+// Tab operasi selalu disusun dari bukti terbaru, bukan ringkasan AI yang lama.
+router.get('/records/:recordId/laporan-operasi',authenticate,async(req,res)=>{
+  try {
+    const db=getDb();
+    const record=await db.get('SELECT * FROM claim_records WHERE id=?',[req.params.recordId]);
+    if(!record)return res.status(404).json({error:'Record tidak ditemukan.'});
+    const file=await db.get('SELECT * FROM claim_files WHERE id=?',[record.file_id]);
+    if(!canAccessFile(file,req.user))return res.status(404).json({error:'Record tidak ditemukan.'});
+    const pages=await db.all('SELECT page_number,ocr_text FROM ocr_results WHERE record_id=? ORDER BY page_number',[record.id]);
+    let ai={};try{ai=typeof record.ai_review==='string'?JSON.parse(record.ai_review):record.ai_review||{};}catch{/* tetap tampilkan bukti tersimpan */}
+    res.setHeader('Cache-Control','no-store');
+    res.json(require('../services/laporanOperasiService').susunLaporanOperasi(pages,ai));
+  }catch(error){console.error('[laporan-operasi]',error.message);res.status(500).json({error:'Laporan operasi belum dapat dimuat. Coba lagi.'});}
 });
 
 // Pratinjau tinjauan kasus pada berkas lama, tanpa mengubah record/putusan pending.

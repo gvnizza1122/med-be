@@ -248,4 +248,25 @@ function kegawatdaruratanMemicuPending(assessment) {
   return !assessment.kriteria.some(k => k && (k.status === 'ya' || k.status === 'TERPENUHI'));
 }
 
-module.exports = { aggregateKriteria, kegawatdaruratanMemicuPending, KRITERIA_LABELS };
+/**
+ * Penilaian tersimpan dinilai ulang dengan ambang band terkini tanpa AI ulang:
+ * band tiap tanda vital dihitung ulang (lookupBand), lalu K2-K4 diagregasi
+ * ulang. K1 (penilaian bahasa) dan K5 (tindakan) dibawa apa adanya. Nilai dari
+ * Resume Medis Rawat Inap tetap tidak ikut menilai (sama dengan alur analisis).
+ */
+function segarkanKriteriaVital(assessment, pages = []) {
+  if (!assessment || assessment.has_data !== true || !Array.isArray(assessment.kriteria) || !assessment.age_group) return assessment;
+  const ranap = new Set((pages || []).filter(p => /resume\s+medis\s+rawat\s+inap/i.test(p?.ocr_text || '')).map(p => p.page_number));
+  const vital = Object.fromEntries(Object.entries(assessment.vital_findings || {}).map(([k, v]) => {
+    if (!v || v.nilai === null || v.nilai === undefined) return [k, v];
+    return [k, { ...v, band: lookupBand(k, v.nilai, assessment.age_group) ?? v.band }];
+  }));
+  const vitalNilai = Object.fromEntries(Object.entries(vital).map(([k, v]) => [k, v && ranap.has(v.page_number) ? { ...v, nilai: null, band: null } : v]));
+  const temuan = (assessment.parameter_findings || []).filter(p => !ranap.has(p.page_number));
+  const baru = aggregateKriteria(temuan, vitalNilai, null, [], [], null);
+  const kriteria = assessment.kriteria.map(k => (['K2', 'K3', 'K4'].includes(k?.kriteria) ? baru.find(b => b.kriteria === k.kriteria) || k : k));
+  const berubah = JSON.stringify(kriteria.map(k => k?.status)) !== JSON.stringify(assessment.kriteria.map(k => k?.status));
+  return { ...assessment, vital_findings: vital, kriteria, ...(berubah ? { kriteria_disegarkan: true } : {}) };
+}
+
+module.exports = { aggregateKriteria, kegawatdaruratanMemicuPending, segarkanKriteriaVital, KRITERIA_LABELS };

@@ -25,7 +25,9 @@ describe('ketentuanKlaimService — Tipe 3 (aturan kombinasi kode)', () => {
 
   test('kode gabungan disertakan untuk aksi ganti_gabungan', () => {
     expect(evaluasiKombinasiKode('N19;I10')[0].kode_gabungan).toBe('I12.0');
-    expect(evaluasiKombinasiKode('J45.0;J44.1')[0].kode_gabungan).toBe('J45.9');
+    expect(evaluasiKombinasiKode('J44.9;J06.9')[0].kode_gabungan).toBe('J44.1'); // BA 2019 butir 78
+    // KMB-08 (catatan RS asma+PPOK -> J45.9) bertentangan dengan ICD-10/BA 2019 butir 89: kini telaah, tidak digabung otomatis.
+    expect(evaluasiKombinasiKode('J45.0;J44.1')[0]).toMatchObject({ kode: 'KMB-08', aksi: 'telaah', kode_gabungan: null });
   });
 
   // Aturan yang kode ICD-nya belum dipastikan koder tidak boleh ikut menilai

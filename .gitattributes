@@ -1,0 +1,4 @@
+# Preserve reference archives byte-for-byte and avoid text diffs for documents.
+*.pdf binary
+*.docx binary
+*.gz binary

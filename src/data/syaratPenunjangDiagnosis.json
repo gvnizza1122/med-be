@@ -21,10 +21,13 @@
             "perselubungan",
             "bercak"
           ],
-          "tingkat_risiko": "wajib"
+          "tingkat_risiko": "wajib",
+          "konfirmasi_cakupan_anak": true
         },
         {
           "nama": "Pemeriksaan gram sputum",
+          "usia_min": 18,
+          "catatan_usia": "Anak (<18 tahun) tidak disyaratkan gram sputum: catatan casemix RS (BPJS DO N DONT butir 8) -- jika pasien anak, antibiotik IV 72 jam dan rontgen toraks; PNPK IDAI pneumonia anak -- kultur sputum hanya dipertimbangkan pada remaja, diagnosis klinis.",
           "kode_prosedur": [
             "90.41"
           ],
@@ -40,7 +43,8 @@
           "kode_prosedur": [],
           "tingkat_risiko": "wajib",
           "catatan_batasan": "Durasi antibiotik IV memerlukan catatan pemberian bertanggal dan rute yang jelas. Resep, tagihan, atau lama rawat saja tidak membuktikan pemberian selama 72 jam.",
-          "jenis_pemeriksaan": "antibiotik_iv_72_jam"
+          "jenis_pemeriksaan": "antibiotik_iv_72_jam",
+          "konfirmasi_cakupan_anak": true
         }
       ],
       "disahkan_oleh": "Tim casemix RS Lestari Raharja",

@@ -14,7 +14,26 @@
       "maka": {
         "kata_di_halaman": {
           "jenis": "resep",
-          "atau_obat_nebul_dilaksanakan": ["salbutamol", "ventasal", "combivent", "ipratropium", "budesonide", "budesma", "pulmicort"],
+          "atau_obat_nebul_dilaksanakan": [
+            "salbutamol",
+            "ventasal",
+            "combivent",
+            "ipratropium",
+            "budesonide",
+            "budesma",
+            "pulmicort",
+            "lasalcom",
+            "lasal",
+            "farbivent",
+            "berotec",
+            "flixotide",
+            "fluticason",
+            "ventolin",
+            "bricasma",
+            "terbutalin",
+            "fenoterol",
+            "bisolvon inhalasi"
+          ],
           "salah_satu": [
             "salbutamol",
             "ventasal",
@@ -23,8 +42,20 @@
             "ipratropium",
             "budesonide",
             "pulmicort",
-            "nacl"
-          ]
+            "nacl",
+            "lasalcom",
+            "lasal",
+            "farbivent",
+            "berotec",
+            "flixotide",
+            "fluticason",
+            "ventolin",
+            "bricasma",
+            "terbutalin",
+            "fenoterol",
+            "bisolvon inhalasi"
+          ],
+          "atau_terapi_resume_atau_tagihan": true
         }
       },
       "yang_dicari": "Obat atau alat nebulisasi pada resep, atau bukti obat yang diberikan pada catatan pelaksanaan",
@@ -55,7 +86,7 @@
       },
       "yang_dicari": "Cara bayar BPJS/JKN di resume, sesuai SEP",
       "pesan": "Resume medis mencatat cara bayar UMUM, sementara klaim ini diajukan dengan SEP BPJS. Pertentangan ini terlihat langsung oleh verifikator dan mempertanyakan keabsahan penjaminan.",
-      "sumber_aturan": "Ditemukan pada berkas 0170R0110926V001943 (MUNAWIR): resume tertulis UMUM, SEP-nya BPJS PBI (APBN)."
+      "sumber_aturan": "Ditemukan pada berkas 0000R0000126V000004 (MUNAWIR): resume tertulis UMUM, SEP-nya BPJS PBI (APBN)."
     },
     {
       "id": "KD-03",
@@ -237,7 +268,7 @@
       },
       "yang_dicari": "Hasil laboratorium atau radiologi",
       "pesan": "Pneumonia dikoding tetapi berkas tidak memuat hasil laboratorium maupun radiologi sama sekali. Diagnosis berat tanpa satu pun penunjang adalah risiko pending tertinggi.",
-      "sumber_aturan": "Ditemukan pada berkas 0170R0110926V001943: 'Penunjang lain: -' padahal diagnosisnya Pneumonia dan PPOK.",
+      "sumber_aturan": "Ditemukan pada berkas 0000R0000126V000004: 'Penunjang lain: -' padahal diagnosisnya Pneumonia dan PPOK.",
       "_catatan_jenis_klaim": "Dibatasi ke RAWAT_INAP (1 Okt 2026): pada rawat jalan/IGD yang dipulangkan, diagnosis ditegakkan klinis dan tarif INA-CBG rawat jalan tidak bergantung pada penunjang -- klaim PPOK eksaserbasi + nebulisasi di IGD (MUNAWIR) sah tanpa lab/rontgen, dan kegawatannya dibuktikan lewat kriteria K1-K5, bukan penunjang."
     },
     {
@@ -269,7 +300,7 @@
       },
       "yang_dicari": "Hasil laboratorium, radiologi, atau spirometri",
       "pesan": "PPOK (J44) dikoding tetapi berkas tidak memuat hasil laboratorium, radiologi, maupun spirometri. Diagnosis kronis-eksaserbasi tanpa satu pun penunjang adalah risiko pending yang tinggi.",
-      "sumber_aturan": "Ditemukan pada berkas 0170R0110926V001943: 'Penunjang lain: -' padahal diagnosisnya PPOK dan Pneumonia. KD-09 hanya menjangkau J18.",
+      "sumber_aturan": "Ditemukan pada berkas 0000R0000126V000004: 'Penunjang lain: -' padahal diagnosisnya PPOK dan Pneumonia. KD-09 hanya menjangkau J18.",
       "_catatan_jenis_klaim": "Dibatasi ke RAWAT_INAP (1 Okt 2026): pada rawat jalan/IGD yang dipulangkan, diagnosis ditegakkan klinis dan tarif INA-CBG rawat jalan tidak bergantung pada penunjang -- klaim PPOK eksaserbasi + nebulisasi di IGD (MUNAWIR) sah tanpa lab/rontgen, dan kegawatannya dibuktikan lewat kriteria K1-K5, bukan penunjang."
     },
     {
@@ -312,7 +343,7 @@
       },
       "yang_dicari": "Hasil laboratorium atau radiologi",
       "pesan": "Resume menuliskan pneumonia/PPOK tetapi berkas tidak memuat penunjang sama sekali. Aturan ini hanya berlaku selagi kolom diagnosis klaim masih kosong; begitu kodenya terisi, KD-09 (J18) dan KD-12 (J44) yang menilai.",
-      "sumber_aturan": "Ditemukan pada berkas 0170R0110926V001943: diagnosis tertulis di resume, 'Penunjang lain: -'.",
+      "sumber_aturan": "Ditemukan pada berkas 0000R0000126V000004: diagnosis tertulis di resume, 'Penunjang lain: -'.",
       "_catatan_rancangan": "Pelengkap KD-09/KD-12 yang membaca kode. Dibatasi pada DIAGLIST kosong supaya satu masalah tidak melaporkan dua temuan.",
       "_catatan_jenis_klaim": "Dibatasi ke RAWAT_INAP (1 Okt 2026): pada rawat jalan/IGD yang dipulangkan, diagnosis ditegakkan klinis dan tarif INA-CBG rawat jalan tidak bergantung pada penunjang -- klaim PPOK eksaserbasi + nebulisasi di IGD (MUNAWIR) sah tanpa lab/rontgen, dan kegawatannya dibuktikan lewat kriteria K1-K5, bukan penunjang."
     },
@@ -373,7 +404,7 @@
       },
       "yang_dicari": "Temuan paru abnormal di triase",
       "pesan": "Resume mencatat ronki pada kedua paru, sementara triase mencatat thorak normal. Pemeriksaan dokter di resume menjadi acuan; selaraskan catatan triase bila perlu. Ini catatan untuk dicek, bukan alasan pending tersendiri.",
-      "sumber_aturan": "Ditemukan pada berkas 0170R0110926V001943: resume 'rh +/+, wh +/+', triase 'Thorak Normal'.",
+      "sumber_aturan": "Ditemukan pada berkas 0000R0000126V000004: resume 'rh +/+, wh +/+', triase 'Thorak Normal'.",
       "_catatan_keparahan": "Diturunkan dari 'sedang' ke 'rendah' (1 Okt 2026): kolom KEADAAN triase adalah centang templat perawat ('Thorak Normal'), sedangkan resume memuat pemeriksaan dokter yang lebih rinci. Belum ada data pending BPJS yang menunjukkan perbedaan ini sendiri menyebabkan pending."
     },
     {

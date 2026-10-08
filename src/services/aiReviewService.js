@@ -42,7 +42,6 @@ const { tinjauLanjutan } = require('./tinjauanLanjutanService');
 const putusanPendingAiService = require('./putusanPendingAiService');
 const { aggregateKriteria, KRITERIA_LABELS } = require('./kegawatdaruratanAggregation');
 const { getDb } = require('../database/init');
-const { assessPneumoniaSeverityMismatch } = require('./pneumoniaSeverityAssessment');
 const { getInacbgEstimasi } = require('./inacbgTarifDictionary');
 const { resolveFieldFormStatus } = require('./documentFieldTemplate');
 const { matchTindakanSegera, checkProcedureCodability } = require('./procedureRulesService');
@@ -386,7 +385,7 @@ async function lookupCodesInTable(table, codes) {
  * tetapi kode yang masuk lewat tahap EKSTRAKSI tidak pernah diperiksa sama
  * sekali, padahal justru kolom itulah yang dikirim ke BPJS.
  *
- * Ditemukan pada klaim SUMIDAH (SEP 0170R0110826V003045): DIAGLIST berisi
+ * Ditemukan pada klaim SUMIDAH (SEP 0000R0000126V000008): DIAGLIST berisi
  * "r10.84", kode ICD-10-CM Amerika untuk nyeri perut menyeluruh. Kode itu
  * TIDAK ADA di ICD-10 WHO yang dipakai BPJS — padanannya R10.4. Di layar ia
  * tampil sebagai "Valid" karena tidak ada satu pun pemeriksaan yang
@@ -453,7 +452,7 @@ async function periksaKodeKlaimTerhadapKamus(record) {
  */
 /**
  * Saran diagnosis KONDISIONAL dari kutipan yang sama adalah alternatif, bukan
- * diagnosis yang berdiri sendiri: SLAMET FAHRODIN (0170R0111225V003444)
+ * diagnosis yang berdiri sendiri: SLAMET FAHRODIN (0000R0000126V000009)
  * "anemia et causa blood loss" -> D62 "bila akut" DAN D50.0 "bila kronis";
  * keduanya terisi otomatis seolah dua diagnosis dan menaikkan severity.
  * Yang pertama dipertahankan; sisanya ditandai alternatif_dari dan tidak diisi
@@ -1307,7 +1306,7 @@ async function assessKegawatdaruratan(evidencePool, triagePageNumbers, umurTahun
       const v = rawVitals[key];
       // null/"" berarti TIDAK tercatat. Number(null) dan Number("") sama-sama 0,
       // jadi tanpa pengecekan ini vital yang kosong terbaca "tertulis 0" dan
-      // tampil "Dokumen mencatat 0" (TD & SpO2 berkas 0170R0110826V000083).
+      // tampil "Dokumen mencatat 0" (TD & SpO2 berkas 0000R0000126V000010).
       const mentah = v ? v.nilai : null;
       const adaAngka = mentah !== null && mentah !== undefined && String(mentah).trim() !== '';
       const nilai = adaAngka && Number.isFinite(Number(mentah)) ? Number(mentah) : null;
@@ -1906,7 +1905,7 @@ async function assessPendingRiskPatterns(record, evidencePool, dikenal = identit
  * review dijalankan -- sering masih kosong kalau DIAGLIST baru terisi
  * belakangan -- jadi inacbg_result/tariff_result tetap null walau DIAGLIST
  * akhirnya valid, dan panel FE menampilkan "Pending verifikasi" terus
- * (ditemukan pada SEP 0170R0110826V003045 / SUMIDAH).
+ * (ditemukan pada SEP 0000R0000126V000008 / SUMIDAH).
  *
  * Duplikasi (bukan ekstraksi dari generateAiReview) sengaja dipilih supaya
  * alur generateAiReview yang sudah teruji untuk perhitungan tarif TIDAK
@@ -2100,7 +2099,8 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
   const maxAttempts = require('./konteksPenggunaanAiService').saatIni().anggaran_ai ? 1 : Number(process.env.AI_MAX_ATTEMPTS || 3);
   const timeoutMs = Number(process.env.AI_TIMEOUT_MS || 60000);
 
-  const userPrompt = buildPrompt(record, validationErrors, evidencePool, codes, knowledgeEntries, bpjsExamples);
+  const userPrompt = buildPrompt(record, validationErrors, evidencePool, codes, knowledgeEntries, bpjsExamples)
+    + require('./laporanOperasiService').konteksOperasiUntukAi(evidencePool);
 
   // Agen Casemix mulai begitu OCR selesai: menyiapkan peta dokumen, fakta
   // klinis, kronologi, dan pola casemix RS sebagai bekal Luna & Sol, lalu
@@ -2443,7 +2443,8 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
           record.PROCLIST || record.prosedur_list,
           evidencePool,
           { pakaiBacaLab: process.env.SYARAT_PAKAI_BACA_LAB !== 'false',
-            tanggalPelayanan: require('./referensiKlaimService').tanggalRecord(record) }
+            tanggalPelayanan: require('./referensiKlaimService').tanggalRecord(record),
+            usia: require('./referensiKlaimService').usiaRecord(record) }
         );
       } catch (syaratErr) {
         console.warn(`[AI-REVIEW] evaluasiSyaratPenunjang error: ${syaratErr.message}`);
@@ -2589,15 +2590,9 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
         result.kode_luar_kamus = [];
       }
 
-      // Modul Pneumonia (Fase 2, 12-13 Sep 2026) -- MURNI kode deterministik,
-      // dijalankan SETELAH kegawatdaruratanAssessment tersedia (piggyback pada
-      // Tabel 1/2 yang sudah diekstrak & divalidasi), TIDAK ada panggilan AI
-      // tambahan. Lihat pneumoniaSeverityAssessment.js utk scope & batasan.
-      const pneumoniaFinding = assessPneumoniaSeverityMismatch(
-        record.DIAGLIST || record.diagnosa_list, kegawatdaruratanAssessment, jenisKlaimRecord,
-        hasIgdVisitSignal(evidencePool.map(e => (e && e.ocr_text) || '').join(String.fromCharCode(10)))
-      );
-      if (pneumoniaFinding) result.pending_risk_notes = [...result.pending_risk_notes, pneumoniaFinding];
+      // Telaah PNPK anak dihitung dari seluruh bukti klinis pada tahap akhir.
+      // Hindari flag lama yang menilai indikasi rawat hanya dari vital triase,
+      // sehingga tidak bertentangan dengan bukti dehidrasi/asupan/distres.
 
       // Fallback panggilan terpisah: kalau DIAGLIST kosong total DAN panggilan
       // utama di atas tidak menghasilkan suggested_codes apapun, coba sekali
@@ -2793,7 +2788,8 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
             .map(s => s.code),
         ].map(k => String(k).trim()).filter(Boolean);
 
-        const temuanKombinasi = evaluasiKombinasiKode([...new Set(kodeFinal)]);
+        const temuanKombinasi = evaluasiKombinasiKode([...new Set(kodeFinal)],
+          { px: record.PROCLIST ?? record.prosedur_list ?? null });
         if (temuanKombinasi.length > 0) {
           result.kombinasi_kode = temuanKombinasi;
           console.log(`[Ketentuan] ${temuanKombinasi.length} aturan kombinasi kode terpicu: ${temuanKombinasi.map(t => t.kode).join(', ')}`);
@@ -2816,9 +2812,11 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
       result.kode_final = kodeGrouper;
       result.syarat_penunjang = evaluasiSyaratPenunjang(kodeGrouper.dx, kodeGrouper.px, evidencePool,
         { pakaiBacaLab: process.env.SYARAT_PAKAI_BACA_LAB !== 'false',
-          tanggalPelayanan: require('./referensiKlaimService').tanggalRecord(record) });
+          tanggalPelayanan: require('./referensiKlaimService').tanggalRecord(record),
+          usia: require('./referensiKlaimService').usiaRecord(record) });
       result.referensi_klaim = require('./referensiKlaimService').evaluasiReferensiKlaim(record,evidencePool,
-        { dx:kodeGrouper.dx, px:kodeGrouper.px, profil:require('./konteksPenggunaanAiService').saatIni().profil_klaim_rs });
+        { dx:kodeGrouper.dx, px:kodeGrouper.px, profil:require('./konteksPenggunaanAiService').saatIni().profil_klaim_rs,
+          kegawatdaruratan:result.kegawatdaruratan_assessment });
       result.tindakan_belum_dikode = require('./konvensiKodingRs').tindakanBelumDikode(record, result);
       const { inacbgCodeForLookup, inacbgResult, tarifResult } = sesiAgen
         ? sesiAgen.hitungGrouper(hitungInacbgDanTarif, kodeGrouper.dx, kodeGrouper.px, aiResult.suggested_inacbg)
@@ -2871,6 +2869,21 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
         result.tokens_used += result.tinjauan_diagnosis.tokens_used || 0;
       } catch (_) {
         result.tinjauan_diagnosis = { status: 'belum_dinilai', ringkasan: 'Tinjauan diagnosis belum tersedia. Periksa pilihan kode bersama koder.', kode_rekomendasi: [], kandidat: [], klarifikasi: [] };
+      }
+
+      try {
+        const finalStt = kodeFinal(record, result);
+        result.kesesuaian_stt = require('./kesesuaianSttService').nilaiKesesuaianStt({
+          jenisKlaim: record.jenis_klaim || record.JENIS_KLAIM, dx: finalStt.dx, px: finalStt.px,
+          pages: evidencePool, tanggal: require('./referensiKlaimService').tanggalRecord(record) });
+      } catch (sttErr) {
+        console.warn(`[AI-REVIEW] kesesuaian STT dilewati: ${sttErr.message}`);
+      }
+      try {
+        result.pneumonia_anak = require('./pneumoniaAnakService').nilaiPneumoniaAnak({ record,
+          dx: kodeFinal(record, result).dx, pages: evidencePool, jenisKlaim: record.jenis_klaim || record.JENIS_KLAIM });
+      } catch (anakErr) {
+        console.warn(`[AI-REVIEW] telaah pneumonia anak dilewati: ${anakErr.message}`);
       }
 
       // Putusan pending dijalankan paling akhir agar semua temuan, termasuk
@@ -2943,6 +2956,8 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
       }
 
       if (sesiAgen) result.agen_casemix = sesiAgen.ringkasan();
+      result.laporan_operasi=require('./laporanOperasiService').susunLaporanOperasi(evidencePool);
+      result.pembelajaran_berkas=require('./laporanOperasiService').catatPembacaan(evidencePool);
       result.generated_at = new Date().toISOString();
       result.kelengkapan_analisis = require('./kelengkapanAnalisisService').nilaiKelengkapanAnalisis(result, { evidencePool, wajibTahap: true });
       await simpanJejakEnamTahap(record, evidencePool, result, codes);
@@ -2977,6 +2992,7 @@ module.exports = {
   // mock seluruh alur generateAiReview (yang juga memanggil pending-risk &
   // suggested_codes secara paralel).
   assessKegawatdaruratan,
+  buildRingkasan,
   getIgdTriagePageNumbers,
   tentukanKunjunganIgd,
   getResumeMedisPageNumbers,

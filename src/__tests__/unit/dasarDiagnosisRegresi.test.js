@@ -221,4 +221,4 @@ test('pemeriksa memakai kode/kelompok yang sama dengan hasil utama, tidak menghi
   expect(r.dinilai).toMatchObject({ inacbg: 'B-4-14-I', tarif: 3436700 });
 });
 
-function evaluasiSyaratPenunjang(dx,px,pages,opsi={}) { return evaluasiSyaratPenunjangAsli(dx,px,pages,{hospitalCode:'3371084',...opsi}); }
+function evaluasiSyaratPenunjang(dx,px,pages,opsi={}) { return evaluasiSyaratPenunjangAsli(dx,px,pages,{hospitalCode:'3371084',usia:35,...opsi}); }

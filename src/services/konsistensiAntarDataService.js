@@ -133,6 +133,35 @@ function cariKata(petaHalaman, jenis, daftarKata) {
 
 // Catatan pemberian obat dapat berada pada lembar pelaksanaan keperawatan,
 // bukan halaman resep. Nama obat dalam rencana atau tagihan saja tidak cukup.
+// Bukti pemberian nebulisasi selain resep/catatan pelaksanaan:
+//  - "Terapi/pengobatan selama di rumah sakit" pada resume (pernyataan DPJP
+//    atas terapi yang DIBERIKAN), dan
+//  - rincian biaya obat/alat nebulisasi (dispensing farmasi, "Masker Nebul").
+// ARBY (BRPN anak): "(10) Lasalcom (ipratropium+salbu) NEBU" di resume dan
+// "Nebulaizer 50,000 x7", "Masker Nebul ANAK" di tagihan -- dulu KD-01 tetap
+// menyatakan obat belum terbaca dan klaim berisiko pending.
+function cariNebulTerapiResumeAtauTagihan(petaHalaman, daftarObat) {
+  const obat = (daftarObat || []).map(teksNormal);
+  const adaObat = (line) => obat.some(o => o && teksNormal(line).includes(o));
+  for (const hal of petaHalaman.get('resume_medis') || []) {
+    if (isLembarGrouper(hal.teks)) continue;
+    let diTerapi = false;
+    for (const line of hal.teks.split(/\n/)) {
+      if (/terapi\s*\/?\s*pengobatan\s+selama|terapi\s+selama\s+(?:di\s+)?(?:rumah\s+sakit|dirawat|perawatan)/i.test(line)) { diTerapi = true; continue; }
+      if (diTerapi && /^\s*(?:reaksi\s+obat|diet|instruksi|keadaan\s+keluar|terapi\s+pulang|cara\s+keluar|prognosis)\b/i.test(line)) diTerapi = false;
+      if (diTerapi && /\bnebu\w*/i.test(line) && adaObat(line)) return { kata: 'terapi_resume', page_number: hal.page_number, kutipan: line.trim() };
+    }
+  }
+  for (const hal of petaHalaman.get('rincian_biaya') || []) {
+    for (const line of hal.teks.split(/\n/)) {
+      if ((/\bnebu\w*/i.test(line) && adaObat(line)) || /\bmasker\s+nebu\w*|\bnebul(?:izer|aizer|iser|isasi)\b/i.test(line)) {
+        return { kata: 'rincian_biaya', page_number: hal.page_number, kutipan: line.trim() };
+      }
+    }
+  }
+  return null;
+}
+
 function cariObatNebulDilaksanakan(petaHalaman, daftarObat) {
   for (const hal of [...petaHalaman.values()].flat()) {
     if (isLembarGrouper(hal.teks)) continue;
@@ -209,9 +238,10 @@ function cekKondisi(kond, konteks) {
     if (!(petaHalaman.get(kond.ada_halaman) || []).length) return { benar: false, bukti };
   }
   if (kond.kata_di_halaman) {
-    const { jenis, salah_satu, atau_obat_nebul_dilaksanakan } = kond.kata_di_halaman;
+    const { jenis, salah_satu, atau_obat_nebul_dilaksanakan, atau_terapi_resume_atau_tagihan } = kond.kata_di_halaman;
     const temuan = cariKata(petaHalaman, jenis, salah_satu)
-      || (atau_obat_nebul_dilaksanakan && cariObatNebulDilaksanakan(petaHalaman, atau_obat_nebul_dilaksanakan));
+      || (atau_obat_nebul_dilaksanakan && cariObatNebulDilaksanakan(petaHalaman, atau_obat_nebul_dilaksanakan))
+      || (atau_terapi_resume_atau_tagihan && cariNebulTerapiResumeAtauTagihan(petaHalaman, atau_obat_nebul_dilaksanakan || salah_satu));
     if (!temuan) return { benar: false, bukti };
     bukti = temuan;
   }
@@ -234,6 +264,7 @@ function evaluasiKonsistensi(record, halaman = [], tindakan = []) {
 
   for (const aturan of ATURAN.aturan || []) {
     if (aturan.aktif === false) continue;
+    if (['KD-09','KD-12','KD-13','KD-15'].includes(aturan.id) && require('./usiaPasienService').resolveUsia(record).kelompok !== 'dewasa') continue;
     const jika = cekKondisi(aturan.jika, konteks);
     if (!jika.benar) continue; // aturan ini tidak berlaku untuk klaim ini
 

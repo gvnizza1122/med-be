@@ -26,11 +26,38 @@ async function ensureSchema(db) {
   await db.query(`ALTER TABLE ai_anggaran_berkas
     ADD COLUMN IF NOT EXISTS gagal_idr NUMERIC NOT NULL DEFAULT 0,
     ADD COLUMN IF NOT EXISTS tambahan_alasan JSONB NOT NULL DEFAULT '[]'::jsonb`);
+  // Biaya belum pasti karena server dimulai ulang (bukan kegagalan jawaban
+  // model) dicatat terpisah: tetap dihitung, tetapi tidak menahan anggaran klinis.
+  await db.query(`ALTER TABLE ai_anggaran_berkas ADD COLUMN IF NOT EXISTS belum_pasti_restart_idr NUMERIC NOT NULL DEFAULT 0`);
   await db.query(`CREATE TABLE IF NOT EXISTS ai_kegagalan_berkas (
     kunci TEXT PRIMARY KEY, anggaran_id TEXT NOT NULL REFERENCES ai_anggaran_berkas(id) ON DELETE CASCADE,
     kode TEXT NOT NULL, dibuat TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
   )`);
   await require('../database/schemaIdempotent').pastikanKolom(db, 'claim_files', { ai_anggaran_id:'TEXT' });
+  await pulihkanSisaProsesLama(db);
+}
+
+// Proses ini baru menyala: tidak ada permintaan AI maupun reservasi yang masih
+// hidup dari proses sebelumnya. Penanda "sedang berjalan" yang tertinggal karena
+// server dimulai ulang di tengah permintaan (KASUS ACUAN SLE 0000R0000126V000003,
+// 8 Okt 2026 11:56) dulu memblokir tahap itu SELAMANYA sebagai "mungkin sudah
+// berbiaya", sehingga review AI tidak pernah selesai dan DIAGLIST kosong.
+// Sekarang: penanda pertama yang terputus diberi kode terputus_restart (boleh
+// dikirim ulang SATU kali); penanda percobaan ulang yang terputus lagi menjadi
+// biaya_belum_pasti (tetap diblokir). Reservasi yang menggantung dipindah ke
+// belum_pasti -- tetap dihitung terhadap batas, tidak dihapus.
+const PROSES_MULAI = new Date();
+async function pulihkanSisaProsesLama(db) {
+  try {
+    await db.run(`UPDATE ai_kegagalan_berkas SET kode = CASE
+        WHEN kode='permintaan_sedang_berjalan' THEN 'terputus_restart' ELSE 'biaya_belum_pasti' END
+      WHERE kode IN ('permintaan_sedang_berjalan','permintaan_ulang_setelah_restart') AND dibuat < ?`, [PROSES_MULAI]);
+    await db.run(`UPDATE ai_anggaran_berkas SET belum_pasti_idr = belum_pasti_idr + dicadangkan_idr,
+        belum_pasti_restart_idr = belum_pasti_restart_idr + dicadangkan_idr, dicadangkan_idr = 0
+      WHERE dicadangkan_idr > 0`);
+  } catch (e) {
+    console.warn('[AnggaranAi] pemulihan sisa proses lama dilewati:', e.message);
+  }
 }
 async function siap(db) {
   if (!skema) skema=ensureSchema(db).catch(e=>{skema=null;throw e;});
@@ -72,7 +99,7 @@ async function cadangkan(db, scope, nilai, optional=false, opsi={}) {
       THEN tambahan_alasan || ?::jsonb ELSE tambahan_alasan END
     WHERE id=? AND hospital_code=? AND terpakai_idr+belum_pasti_idr+dicadangkan_idr+?::numeric <=
     CASE WHEN ?::boolean THEN LEAST(target_idr,?::numeric-175)
-      WHEN gagal_idr=0 AND belum_pasti_idr=0 THEN GREATEST(batas_idr,?::numeric) ELSE batas_idr END RETURNING id`,
+      WHEN gagal_idr=0 AND belum_pasti_idr<=belum_pasti_restart_idr THEN GREATEST(batas_idr,?::numeric) ELSE batas_idr END RETURNING id`,
     [nilai,optional,nilai,optional,nilai,JSON.stringify([alasan]),scope.id,scope.hospital_code,nilai,optional,BATAS_NORMAL,limit]);
   return Boolean(row);
 }
@@ -125,15 +152,21 @@ async function ringkasan(db,scope) {
   return {versi:KEBIJAKAN,profil:'Analisis tinggi · biaya adaptif',target_idr:n('target_idr'),batas_normal_idr:BATAS_NORMAL,
     batas_maksimum_idr:BATAS_MENDALAM,tambahan_alasan:[...new Set(r.tambahan_alasan||[])],gagal_idr:n('gagal_idr'),batas_idr:n('batas_idr'),
     terpakai_idr:n('terpakai_idr'),dicadangkan_idr:n('dicadangkan_idr'),belum_pasti_idr:n('belum_pasti_idr'),
+    belum_pasti_restart_idr:n('belum_pasti_restart_idr'),
     sisa_idr:Math.max(0,n('batas_idr')-n('terpakai_idr')-n('dicadangkan_idr')-n('belum_pasti_idr')),
     dasar:'Estimasi tarif Standard teks dan kurs aplikasi; biaya yang belum diketahui tetap dicadangkan.'};
 }
 async function ambilKegagalan(db,key,scope) {
   return db.get('SELECT kode FROM ai_kegagalan_berkas WHERE kunci=? AND anggaran_id=?',[key,scope.id]);
 }
-async function mulaiPanggilan(db,key,scope) {
-  const row=await db.get(`INSERT INTO ai_kegagalan_berkas(kunci,anggaran_id,kode) VALUES(?,?,'permintaan_sedang_berjalan')
-    ON CONFLICT(kunci) DO NOTHING RETURNING kunci`,[key,scope.id]);
+async function mulaiPanggilan(db,key,scope,kode='permintaan_sedang_berjalan') {
+  const row=await db.get(`INSERT INTO ai_kegagalan_berkas(kunci,anggaran_id,kode) VALUES(?,?,?)
+    ON CONFLICT(kunci) DO NOTHING RETURNING kunci`,[key,scope.id,kode]);
+  return Boolean(row);
+}
+/** Penanda terputus karena restart dilepas agar permintaan itu dapat dikirim ulang sekali. */
+async function izinkanUlangSetelahRestart(db,key,scope) {
+  const row=await db.get(`DELETE FROM ai_kegagalan_berkas WHERE kunci=? AND anggaran_id=? AND kode='terputus_restart' RETURNING kunci`,[key,scope.id]);
   return Boolean(row);
 }
 async function hapusPenanda(db,key,scope) {
@@ -163,4 +196,4 @@ function satuPanggilan(key,fn) {
   const p=Promise.resolve().then(fn).finally(()=>sedangJalan.delete(key));
   sedangJalan.set(key,p);return p;
 }
-module.exports={VERSI,KEBIJAKAN,ensureSchema,untukBerkas,cadangkan,cadangkanSaatSiap,tandaiAktif,lunasi,ringkasan,kunciCache,ambilCache,simpanCache,ambilKegagalan,mulaiPanggilan,hapusPenanda,simpanKegagalan,satuPanggilan,sidikBerkas};
+module.exports={VERSI,KEBIJAKAN,ensureSchema,untukBerkas,cadangkan,cadangkanSaatSiap,tandaiAktif,lunasi,ringkasan,kunciCache,ambilCache,simpanCache,ambilKegagalan,mulaiPanggilan,izinkanUlangSetelahRestart,hapusPenanda,simpanKegagalan,satuPanggilan,sidikBerkas};

@@ -57,23 +57,119 @@ function tambah(daftar, alasan) {
  * @param {Array} validationErrors baris validation_errors
  * @returns {{status, ringkasan, alasan: Array, jumlah: Object}}
  */
+const CATATAN_UMUM = /^Kutipan menunjukkan dokumentasi terkait/i;
+/** Kalimat pertama catatan kriteria beserta bagian "Terbaca: ..." bila ada. */
+function intiCatatan(c) {
+  const t = String(c || '').trim();
+  // Hanya catatan yang menyebut isi berkas (terbaca/tidak tertulis); catatan pedoman umum tidak memperjelas.
+  if (!t || CATATAN_UMUM.test(t) || !/\b(?:terbaca|tidak tertulis|belum tertulis|tidak ada|tidak terbaca)\b/i.test(t)) return '';
+  const kalimat = t.split(/(?<=\.)\s+/);
+  const terbaca = kalimat.find(k => /^Terbaca\s*:/i.test(k));
+  return [kalimat[0], terbaca && terbaca !== kalimat[0] ? terbaca : null].filter(Boolean).join(' ').replace(/\.$/, '');
+}
+
+/**
+ * Ringkasan kartu referensi (RK/TKMKB/catatan casemix) yang terbaca sekilas:
+ * sebut kriteria yang belum ada dan isi yang terbaca, bukan "dokumentasi perlu
+ * ditinjau". Bukti titipan aturan lain (id "ATURAN:kriteria") tidak dihitung.
+ */
+function ringkasKartu(t, cadangan) {
+  const gagal = (t.bukti || []).filter(x => x.status !== 'bukti_ditemukan' && !String(x.id || '').includes(':'));
+  if (!gagal.length) return `${t.nama}: ${cadangan}`;
+  const rinci = gagal.map(x => intiCatatan(x.catatan)).filter(Boolean);
+  return rinci.length === 1 && gagal.length === 1 ? `${t.nama}: ${rinci[0]}`
+    : `${t.nama}: belum ada di berkas -- ${gagal.map(x => x.nama).join(' / ')}`;
+}
+function rincianKartu(t) {
+  const milik = (t.bukti || []).filter(x => !String(x.id || '').includes(':'));
+  const ada = milik.filter(x => x.status === 'bukti_ditemukan').map(x => `${x.nama}${kutipBukti(x)}`);
+  const kurang = milik.filter(x => x.status !== 'bukti_ditemukan').map(x => `${x.nama}${intiCatatan(x.catatan) ? ` (${intiCatatan(x.catatan)})` : ''}`);
+  return `${ada.length ? ` Sudah tertulis: ${ada.join('; ')}.` : ''}${kurang.length ? ` Belum ada/tidak memenuhi: ${kurang.join('; ')}.` : ''}`;
+}
+
+/** Kombinasi kode: sebut kode yang terkena dan arah perbaikannya. */
+function ringkasKombinasi(k) {
+  const kode = [...(k.kode_utama || []), ...(k.kode_terdampak || [])].join(' + ');
+  const arah = k.kode_gabungan ? `dikode gabungan ${k.kode_gabungan}`
+    : k.aksi === 'buang_pasangan' ? `${(k.kode_terdampak || []).join(', ')} tidak dikode terpisah`
+    : k.kode_saran ? `disarankan ${k.kode_saran}` : k.aksi === 'urutan' ? 'urutan diagnosis utama perlu diubah' : 'perlu ditelaah';
+  return `${k.nama || k.kode}: ${kode ? `${kode} -- ` : ''}${arah}`;
+}
+
+/** Nilai vital saat datang yang terbaca, untuk alasan kegawatdaruratan. */
+function vitalTerbaca(kgd) {
+  const v = kgd?.vital_findings || {};
+  const n = k => v[k]?.nilai ?? null;
+  return [kgd?.esi?.skor ? `ESI ${kgd.esi.skor}` : null,
+    n('GCS') !== null ? `GCS ${n('GCS')}` : null,
+    n('TD_sistolik') !== null ? `TD ${n('TD_sistolik')}/${n('TD_diastolik') ?? '-'}` : null,
+    n('HR') !== null ? `nadi ${n('HR')}` : null, n('RR') !== null ? `napas ${n('RR')}` : null,
+    n('SpO2') !== null ? `SpO2 ${n('SpO2')}%` : null, n('Suhu') !== null ? `suhu ${n('Suhu')}` : null].filter(Boolean);
+}
+
+/** Kutipan singkat bukti pertama sebuah kriteria: ' -- "..." (hal. n)'. */
+function kutipBukti(x) {
+  const r = x.bukti?.[0];
+  return r?.kutipan ? ` -- "${String(r.kutipan).trim().slice(0, 90)}"${r.page_number ? ` (hal. ${r.page_number})` : ''}` : '';
+}
+
+/**
+ * Ringkasan alasan BA/PNPK yang terbaca sekilas: menyebut syarat yang tidak
+ * ada atau angka yang bertentangan beserta halamannya -- bukan "kriteria belum
+ * terlihat". Ringkasan kurasi pada aturan (ringkas_telaah) tetap didahulukan.
+ */
+/** Isi kriteria yang gagal: angka terbaca dikutip apa adanya (satuan asli), bukan "tidak memenuhi ambang". */
+function rincianKriteria(x) {
+  const r = x.bukti?.[0];
+  const umum = !x.catatan || /terbaca, tidak memenuhi ambang/i.test(x.catatan);
+  const kutip = x.nilai_terbaca && r?.kutipan ? `tertulis "${String(r.kutipan).trim().slice(0, 80)}"${r.page_number ? ` (hal. ${r.page_number})` : ''}` : '';
+  if (umum) return kutip || (x.catatan ? String(x.catatan).replace(/\.$/, '') : '');
+  return [String(x.catatan).replace(/\.$/, ''), kutip].filter(Boolean).join('; ');
+}
+
+function ringkasButir(b, label) {
+  const topik = String(b.nama || b.id).split(':')[0].trim();
+  const kriteria = (b.bukti || []).filter(x => !x.info && !String(x.id || '').includes(':'));
+  if (b.kontradiksi_angka === true) {
+    const x = kriteria.find(k => k.status !== 'bukti_ditemukan' && k.nilai_terbaca) || kriteria.find(k => k.status !== 'bukti_ditemukan');
+    if (x) {
+      return `${topik}: tidak memenuhi syarat ${label} "${x.nama}" -- ${rincianKriteria(x) || 'nilai tertulis tidak memenuhi'}`;
+    }
+    return `${topik}: nilai terbaca tidak memenuhi ambang ${label}`;
+  }
+  if (b.ringkas_telaah) return `${b.nama}: ${b.ringkas_telaah}`;
+  const kurang = kriteria.filter(x => x.status !== 'bukti_ditemukan').map(x => x.nama);
+  return kurang.length ? `${topik}: belum ada di berkas -- ${kurang.join(' / ')} (syarat ${label})`
+    : `${topik}: kriteria ${label} belum terlihat di berkas`;
+}
+
 function susunPutusan(aiReviewMasuk = {}, validationErrorsMasuk = []) {
   // Nilai bawaan parameter hanya berlaku untuk undefined, bukan null — dan
   // ai_review yang belum pernah diisi memang tersimpan sebagai null.
   const aiReview = aiReviewMasuk || {};
   const validationErrors = validationErrorsMasuk || [];
   const alasan = [];
+  if(aiReview.laporan_operasi?.cakupan?.analisis_berkas_berubah===true)tambah(alasan,{
+    sumber_pemeriksaan:'Versi berkas',kode:'BERKAS-BARU',ringkas:'Berkas berubah setelah analisis terakhir',
+    keparahan:'sedang',diverifikasi:false,wajib_pending:false,dari_rekap_pending:false,
+    tindakan:'Baca ulang seluruh berkas terbaru sebelum memakai saran dan kesimpulan analisis sebelumnya.'});
 
   // 1. Aturan validasi yang sudah lama ada.
   for (const e of validationErrors || []) {
+    // RV-13..16 dapat berasal dari perkiraan lintas-kunjungan, termasuk
+    // temuan lama dengan severity major. Label itu belum membuktikan
+    // pengembalian konsul, kesamaan obat, atau nomor iterasi resep asli.
+    const adminManual=['RV-13','RV-14','RV-15','RV-16'].includes(e.rule_id);
     tambah(alasan, {
       sumber_pemeriksaan: 'Aturan validasi',
       kode: e.rule_id || null,
-      ringkas: e.error_message || e.field_name,
-      keparahan: e.severity === 'critical' ? 'tinggi' : e.severity === 'major' ? 'tinggi' : 'sedang',
+      ringkas: adminManual ? `${e.rule_id}: dokumentasi administrasi perlu ditelaah` : e.error_message || e.field_name,
+      penjelasan: adminManual ? 'Temuan dapat berasal dari perkiraan kunjungan/diagnosis. Cocokkan surat konsul/rujukan, pengembalian ke perujuk, obat yang sama dan urutan resep sesuai BA 2024 sebelum menetapkan kesalahan klaim.' : undefined,
+      keparahan: adminManual ? 'sedang' : e.severity === 'critical' ? 'tinggi' : e.severity === 'major' ? 'tinggi' : 'sedang',
       bukti: e.actual_value || null,
-      tindakan: e.expected_value || null,
-      diverifikasi: true,
+      tindakan: adminManual ? 'Periksa dokumen administrasi asli dan pengecualian; jangan menetapkan dari perkiraan kunjungan saja.' : e.expected_value || null,
+      diverifikasi: !adminManual,
+      ...(adminManual?{wajib_pending:false}:{}),
       dari_rekap_pending: false,
     });
   }
@@ -110,8 +206,9 @@ function susunPutusan(aiReviewMasuk = {}, validationErrorsMasuk = []) {
     tambah(alasan, {
       sumber_pemeriksaan: 'Kriteria kegawatdaruratan',
       kode: 'KGD-IGD',
-      ringkas: 'Kunjungan IGD tidak memenuhi kriteria kegawatdaruratan',
+      ringkas: `Kunjungan IGD tanpa kriteria gawat darurat K1-K5${vitalTerbaca(kgd).length ? `: tercatat ${vitalTerbaca(kgd).join(', ')}` : ''}`,
       penjelasan: 'Tidak ada kriteria K1-K5 (Permenkes 47/2018 Pasal 3 ayat 2) yang terpenuhi dari pemeriksaan fisik dan tanda vital di Triase/Resume IGD.'
+        + ` ${kgd.kriteria.map(k => `${k.kriteria} ${k.label || ''}: ${k.status}${k.catatan ? ` (${String(k.catatan).replace(/\.$/, '')})` : ''}`).join('; ')}.`
         + (borderline.length > 0
           ? ` Mendekati ambang: ${borderline.map(k => `${k.kriteria} (${k.catatan || k.label || 'borderline'})`).join('; ')}.`
           : ''),
@@ -149,6 +246,7 @@ function susunPutusan(aiReviewMasuk = {}, validationErrorsMasuk = []) {
   //    berkasnya, dan menyebutnya sebagai alasan pending akan menyalahkan
   //    rumah sakit atas kegagalan sistem membaca.
   for (const s of aiReview.syarat_penunjang || []) {
+    if(s.perlu_konfirmasi_cakupan) tambah(alasan,{sumber_pemeriksaan:'Syarat penunjang diagnosis',kode:`${s.id}-CAKUPAN`,ringkas:`${s.kode_diagnosis}: syarat rekap pending RS (${(s.syarat||[]).map(x=>x.nama).join(', ')}) perlu dicek berlakunya untuk ${s.usia_pasien!=null?`pasien usia ${s.usia_pasien} tahun`:'pasien anak/usia belum terbaca'}`,penjelasan:s.sumber_aturan,keparahan:'sedang',wajib_pending:false,diverifikasi:false,dari_rekap_pending:true,tindakan:'Konfirmasi cakupan syarat rekap pending RS terhadap usia, indikasi pemeriksaan, dan pedoman yang berlaku pada episode.'});
     if (s.perlu_konfirmasi_tanggal === true || s.diverifikasi !== true) continue;
     for (const syarat of s.syarat || []) {
       if (syarat.status === 'terpenuhi' || syarat.status === 'perlu_cek_manual') continue;
@@ -166,15 +264,95 @@ function susunPutusan(aiReviewMasuk = {}, validationErrorsMasuk = []) {
     }
   }
 
+  const usiaBelum = (aiReview.referensi_klaim?.temuan || []).find(t=>t.id==='RK-USIA');
+  if(usiaBelum) tambah(alasan,{sumber_pemeriksaan:'Cakupan usia',kode:'RK-USIA',ringkas:'Usia belum terkonfirmasi; kriteria kasus belum dapat dipilih',penjelasan:usiaBelum.catatan,keparahan:'sedang',wajib_pending:false,diverifikasi:false,dari_rekap_pending:false,tindakan:'Konfirmasi tanggal lahir dan awal episode atau umur pasien sebelum menentukan jalur anak/dewasa.'});
+
   // Ketentuan BA dengan masa berlaku terkonfirmasi menjadi temuan telaah,
   // bukan keputusan penolakan. PNPK dan manual lama tidak menjadi syarat wajib.
   for (const t of aiReview.referensi_klaim?.temuan || []) {
     if (t.jenis_ketentuan !== 'verifikasi_klaim_bpjs' || t.status !== 'bukti_belum_cukup'
       || t.berlaku_pada_episode !== true || t.sumber?.status_verifikasi !== 'terverifikasi') continue;
     tambah(alasan, { sumber_pemeriksaan:'Referensi klaim BPJS', kode:t.id,
-      ringkas:`${t.nama}: dukungan dokumentasi perlu ditinjau`, penjelasan:t.catatan,
+      ringkas:ringkasKartu(t,'dukungan dokumentasi perlu ditinjau'), penjelasan:`${t.catatan}${rincianKartu(t)}`,
       keparahan:'sedang', tindakan:'Tinjau bukti dan pengecualian sesuai butir sumber; jangan mengganti diagnosis otomatis.',
       bukti:`${t.sumber.judul} (${t.sumber.nomor}), halaman ${t.sumber.halaman}`, diverifikasi:true, dari_rekap_pending:false });
+  }
+
+  // Catatan pengguna menambah telaah, bukan putusan pending wajib atau aturan nasional.
+  for (const t of aiReview.referensi_klaim?.temuan || []) {
+    if (t.jenis_ketentuan !== 'catatan_casemix' || t.perlu_telaah_koding !== true) continue;
+    const b=t.bukti.flatMap(b=>b.bukti).find(b=>b.metode==='numerik') || t.bukti.flatMap(b=>b.bukti)[0];
+    tambah(alasan,{sumber_pemeriksaan:'Telaah catatan casemix',kode:t.id,
+      ringkas:ringkasKartu(t,'nilai dan syarat perlu ditelaah'),penjelasan:`${t.catatan}${rincianKartu(t)}`,
+      keparahan:'sedang',bukti:b?`${b.kutipan} (hal. ${b.page_number})`:null,
+      tindakan:'Konfirmasi bersama casemix/DPJP; jangan mengganti kode otomatis.',
+      diverifikasi:false,dari_rekap_pending:false,wajib_pending:false});
+  }
+
+  // Rekomendasi TKMKB menambah telaah dokumentasi; masa berlaku belum dikonfirmasi.
+  for(const t of aiReview.referensi_klaim?.temuan||[]) {
+    if(t.jenis_ketentuan!=='rekomendasi_tkmkb'||!t.perlu_telaah_dokumen)continue;
+    tambah(alasan,{sumber_pemeriksaan:'Telaah rekomendasi TKMKB',kode:t.id,ringkas:ringkasKartu(t,'dokumentasi perlu ditelaah'),
+      penjelasan:`${t.catatan}${rincianKartu(t)}`,keparahan:'sedang',bukti:`${t.sumber.judul}, halaman ${t.sumber.halaman}`,
+      tindakan:'Cocokkan bukti, kelompok usia, pengecualian dan pedoman episode bersama DPJP/casemix.',
+      diverifikasi:false,dari_rekap_pending:false,wajib_pending:false});
+  }
+
+  // BA kesepakatan 2018 (aspek medis): butir dengan kriteria yang terbaca dari
+  // berkas. Satu alasan per topik -- dilewati bila aturan yang ditempeli
+  // (gabung_ke) sudah memberi alasan. Angka terbaca yang bertentangan dengan
+  // ambang = tinggi; selain itu sedang. Tidak pernah wajib (masa berlaku BA
+  // dan pembaruan sesudahnya tetap ditelaah).
+  for (const t of aiReview.referensi_klaim?.temuan || []) {
+    const butirBa = [...(/^(?:BA-\d{2}|PNPK)-/.test(String(t.id)) ? [t] : []), ...(t.rujukan_ba_2018 || [])];
+    for (const b of butirBa) {
+      if (b.menilai_putusan !== true || b.status !== 'bukti_belum_cukup') continue;
+      const topik = [t.id, b.id, ...(b.gabung_ke || [])];
+      const sama = alasan.filter(a => topik.includes(a.kode));
+      // Satu alasan per topik. Angka yang bertentangan dengan ambang BA (tinggi)
+      // menggantikan telaah topik sama yang lebih ringan; isinya tetap disebut.
+      if (sama.length && (b.kontradiksi_angka !== true || sama.some(a => a.wajib_pending || bobot(a.keparahan) === 0))) continue;
+      const digantikan = sama.map(a => a.ringkas);
+      for (const a of sama) alasan.splice(alasan.indexOf(a), 1);
+      const milik = (b.bukti || []).filter(x => !String(x.id || '').includes(':'));
+      const kurang = milik.filter(x => x.status !== 'bukti_ditemukan').map(x => `${x.nama}${rincianKriteria(x) ? ` (${rincianKriteria(x)})` : ''}`);
+      const tertulis = milik.filter(x => !x.info && x.status === 'bukti_ditemukan').map(x => `${x.nama}${kutipBukti(x)}`);
+      const pendukung = (b.bukti || []).filter(x => x.info).map(x => `${x.nama}: ${x.bukti?.[0]?.kutipan || ''}${x.bukti?.[0]?.page_number ? ` (hal. ${x.bukti[0].page_number})` : ''}`);
+      const butir = b.butir || t.sumber?.butir, halaman = b.halaman || t.sumber?.halaman, sumberBa = b.sumber || t.sumber || {};
+      const pnpk = sumberBa.jenis === 'pedoman_klinis';
+      const label = `${pnpk ? 'PNPK' : 'BA'} ${(String(sumberBa.versi || sumberBa.id).match(/20\d\d/) || [''])[0]}`.trim();
+      tambah(alasan, { sumber_pemeriksaan: pnpk ? 'PNPK Kemenkes' : 'BA kesepakatan Kemenkes-BPJS', kode: b.id,
+        ringkas: ringkasButir(b, label),
+        penjelasan: `Syarat ${label} (${butir}, hal. ${halaman}): ${b.catatan}${tertulis.length ? ` Sudah tertulis: ${tertulis.join('; ')}.` : ''}${kurang.length ? ` Belum ada/tidak memenuhi: ${kurang.join('; ')}.` : ''}${pendukung.length ? ` Temuan pendukung yang tertulis: ${pendukung.join('; ')}.` : ''}${digantikan.length ? ` Juga ditelaah pada topik yang sama: ${digantikan.join('; ')}.` : ''}`,
+        keparahan: b.kontradiksi_angka === true ? 'tinggi' : 'sedang',
+        bukti: `${sumberBa.judul || label} (${sumberBa.nomor || '-'}), ${butir}, halaman ${halaman}`,
+        tindakan: 'Lengkapi atau tunjukkan bukti kriteria pada berkas, atau konfirmasi diagnosis/indikasi bersama DPJP dan casemix. Kode tidak diganti otomatis.',
+        diverifikasi: false, dari_rekap_pending: false, wajib_pending: false });
+    }
+  }
+
+  // Rawat inap STT (BA 2024 aspek medis no. 1): kode yang diajukan harus
+  // mencerminkan lesi yang memenuhi kriteria rawat inap. Yang berat WAJIB --
+  // di luar kriteria BA diklaimkan sebagai rawat jalan (KASUS ACUAN STT).
+  const stt = aiReview.kesesuaian_stt;
+  if (stt && stt.ringkas) {
+    tambah(alasan, { sumber_pemeriksaan: 'Kesesuaian STT (BA 2024)', kode: stt.id, ringkas: stt.ringkas,
+      penjelasan: stt.penjelasan, keparahan: stt.keparahan, bukti: stt.bukti_ringkas || null, tindakan: stt.tindakan,
+      diverifikasi: true, dari_rekap_pending: false, wajib_pending: stt.wajib_pending === true });
+  }
+
+  // Pneumonia anak dinilai dengan PNPK IDAI (bukan kriteria dewasa). Telaah
+  // dokumentasi indikasi rawat inap; bukan alasan wajib.
+  const anak = aiReview.pneumonia_anak;
+  if (anak && anak.perlu_telaah) {
+    const nilai = [anak.rr_tertinggi ? `RR tertinggi ${anak.rr_tertinggi.nilai} x/menit (hal. ${anak.rr_tertinggi.page_number})` : null,
+      anak.spo2_terendah ? `SpO2 terendah ${anak.spo2_terendah.nilai}% (hal. ${anak.spo2_terendah.page_number})` : null].filter(Boolean).join('; ');
+    tambah(alasan, { sumber_pemeriksaan: 'PNPK IDAI pneumonia anak', kode: 'PNPK-IDAI-PNEUMONIA',
+      ringkas: anak.vital_terbaca ? `Pneumonia anak rawat inap tanpa kriteria rawat inap PNPK IDAI yang tertulis${nilai ? `: ${nilai}` : ''}` : 'Pneumonia anak: tanda vital untuk indikasi rawat inap (napas, SpO2) tidak terbaca',
+      penjelasan: `${anak.catatan.join(' ')} Kriteria rawat inap ${anak.kelompok}: ${anak.kriteria_rawat_inap.map(k => k.nama).join('; ')}.`,
+      keparahan: 'sedang', bukti: nilai || null,
+      tindakan: 'Pastikan indikasi rawat inap anak tercatat (mis. SpO2, frekuensi napas sesuai usia, distres/grunting, dehidrasi, asupan) pada triase/resume; gram sputum dan CURB-65/PSI tidak berlaku untuk anak.',
+      diverifikasi: false, dari_rekap_pending: false, wajib_pending: false });
   }
 
   // 4. Ketentuan kombinasi kode.
@@ -182,9 +360,9 @@ function susunPutusan(aiReviewMasuk = {}, validationErrorsMasuk = []) {
     tambah(alasan, {
       sumber_pemeriksaan: 'Ketentuan kombinasi kode',
       kode: k.kode || null,
-      ringkas: k.nama || k.pesan,
+      ringkas: ringkasKombinasi(k),
       penjelasan: k.pesan,
-      keparahan: 'tinggi',
+      keparahan: k.keparahan || 'tinggi',
       bukti: k.kutipan_sumber || null,
       tindakan: k.pesan || null,
       diverifikasi: true,
@@ -261,7 +439,7 @@ function susunPutusan(aiReviewMasuk = {}, validationErrorsMasuk = []) {
  * PROCLIST masih kosong; begitu kolom itu diisi otomatis, error validasinya
  * hilang tetapi alasannya (mis. RV-05 "DIAGLIST wajib diisi ... (kosong)")
  * tetap tampil di Analisis Risiko dan tetap menahan klaim di status pending.
- * Ditemukan pada MUNAWIR (0170R0110926V001943, 1 Okt 2026).
+ * Ditemukan pada MUNAWIR (0000R0000126V000004, 1 Okt 2026).
  *
  * Alasan dari pemeriksaan lain tidak disentuh. Status diturunkan hanya bila
  * alasan berat yang tersisa sudah tidak ada.
@@ -273,8 +451,10 @@ function susunPutusan(aiReviewMasuk = {}, validationErrorsMasuk = []) {
 function segarkanAlasanValidasi(putusan, errorBaru = []) {
   if (!putusan || !Array.isArray(putusan.alasan)) return null;
   const masihBerlaku = new Set((errorBaru || []).map(e => e && e.rule_id).filter(Boolean));
-  const sisa = putusan.alasan.filter(a => !a || a.sumber_pemeriksaan !== 'Aturan validasi' || masihBerlaku.has(a.kode));
-  if (sisa.length === putusan.alasan.length) return null;
+  const adminBaru=new Map(susunPutusan({},(errorBaru||[]).filter(e=>['RV-13','RV-14','RV-15','RV-16'].includes(e.rule_id))).alasan.map(a=>[a.kode,a]));
+  const sisa = putusan.alasan.filter(a => !a || a.sumber_pemeriksaan !== 'Aturan validasi' || masihBerlaku.has(a.kode))
+    .map(a=>a?.sumber_pemeriksaan==='Aturan validasi'&&adminBaru.has(a.kode)?adminBaru.get(a.kode):a);
+  if (JSON.stringify(sisa) === JSON.stringify(putusan.alasan)) return null;
 
   const berat = sisa.filter(a => bobot(a.keparahan) === 0 || a.wajib_pending === true);
   let status = putusan.status;
