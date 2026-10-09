@@ -3238,6 +3238,82 @@ async function reprocessExistingRecordDenganKonteks(db, { fileId, recordId, file
  * sudah ada, pakai PDF yang sudah tersimpan. Lihat reprocessExistingRecord().
  */
 /**
+ * GET /records/:recordId/sebulan -- daftar pasien di samping halaman Hasil
+ * Validasi: semua klaim dengan periode pelayanan yang SAMA dengan klaim ini
+ * (periode = bulan SEP, lihat periodeKlaimService), supaya casemix bisa
+ * menelusuri alasan pending pasien satu bulan tanpa kembali ke Riwayat Upload.
+ * Berkas terarsip/uji ikut status berkas klaim acuan, sama seperti Riwayat
+ * Upload. Query: status=semua|pending|valid, cari (nama/SEP/RM), page, limit.
+ * "pending" = validation_status pending ATAU error (label di UI sama-sama
+ * PENDING), konsisten dengan kolom Pending di Riwayat Upload.
+ */
+router.get('/records/:recordId/sebulan', authenticate, async (req, res) => {
+  try {
+    const db = getDb();
+    const acuan = await db.prepare(`
+      SELECT cr.id, cr.periode, cf.hospital_code, cf.is_testing, cf.diarsipkan_pada
+      FROM claim_records cr JOIN claim_files cf ON cf.id = cr.file_id WHERE cr.id = ?
+    `).get(req.params.recordId);
+    if (!acuan || !canAccessFile(acuan, req.user)) return res.status(404).json({ error: 'Klaim tidak ditemukan.' });
+
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 200);
+    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+    const status = ['pending', 'valid'].includes(req.query.status) ? req.query.status : 'semua';
+
+    let where = acuan.periode ? 'WHERE cr.periode = ?' : 'WHERE cr.periode IS NULL';
+    const params = acuan.periode ? [acuan.periode] : [];
+    where += acuan.is_testing ? ' AND cf.is_testing = TRUE' : ' AND cf.is_testing = FALSE';
+    where += acuan.diarsipkan_pada ? ' AND cf.diarsipkan_pada IS NOT NULL' : ' AND cf.diarsipkan_pada IS NULL';
+    if (req.user.hospital_code) {
+      where += ' AND (cf.hospital_code = ? OR cf.hospital_code IS NULL)';
+      params.push(req.user.hospital_code);
+    }
+    const cari = String(req.query.cari || '').trim();
+    if (cari) {
+      where += ' AND (cr.nama_pasien ILIKE ? OR cr.sep ILIKE ? OR cr.mrn ILIKE ?)';
+      params.push(`%${cari}%`, `%${cari}%`, `%${cari}%`);
+    }
+
+    const ringkas = await db.prepare(`
+      SELECT COUNT(*) AS semua,
+             COUNT(*) FILTER (WHERE cr.validation_status IN ('pending', 'error')) AS pending,
+             COUNT(*) FILTER (WHERE cr.validation_status = 'valid') AS valid
+      FROM claim_records cr JOIN claim_files cf ON cf.id = cr.file_id ${where}
+    `).get(...params);
+
+    let whereStatus = where;
+    if (status === 'pending') whereStatus += " AND cr.validation_status IN ('pending', 'error')";
+    else if (status === 'valid') whereStatus += " AND cr.validation_status = 'valid'";
+
+    // Pending lebih dulu (itu yang dikerjakan casemix), lalu urut nama.
+    const items = await db.prepare(`
+      SELECT cr.id AS record_id, cr.file_id, cr.nama_pasien, cr.mrn, cr.sep, cr.validation_status,
+             cr.admission_date, cf.jenis_klaim
+      FROM claim_records cr JOIN claim_files cf ON cf.id = cr.file_id ${whereStatus}
+      ORDER BY CASE WHEN cr.validation_status IN ('pending', 'error') THEN 0 ELSE 1 END,
+               cr.nama_pasien ASC NULLS LAST, cr.id
+      LIMIT ? OFFSET ?
+    `).all(...params, limit, (page - 1) * limit);
+
+    res.json({
+      periode: acuan.periode || null,
+      status,
+      page,
+      limit,
+      ringkasan: {
+        semua: Number(ringkas?.semua || 0),
+        pending: Number(ringkas?.pending || 0),
+        valid: Number(ringkas?.valid || 0),
+      },
+      items,
+    });
+  } catch (error) {
+    console.error('[sebulan] gagal:', error);
+    res.status(500).json({ error: 'Daftar pasien bulan ini gagal dimuat.' });
+  }
+});
+
+/**
  * GET /records/:recordId/saran-koding -- tab "Saran AI": diagnosis, prosedur,
  * INA-CBG, dan tarif yang disusun dari isi berkas (lihat saranKodingService).
  * Dihitung dari data tersimpan tanpa panggilan AI, jadi klaim lama langsung
