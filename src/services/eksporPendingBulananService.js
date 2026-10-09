@@ -16,12 +16,12 @@ const { labelPeriode } = require('./periodeKlaimService');
 
 const KOLOM = [
   { header: 'No', key: 'no', width: 5 },
+  { header: 'Status', key: 'status', width: 11 },
   { header: 'SEP', key: 'sep', width: 22, teks: true },
   { header: 'Nama Pasien', key: 'nama', width: 26 },
   { header: 'Tanggal', key: 'tanggal', width: 14 },
   { header: 'ICD-10 (Diagnosis)', key: 'icd10', width: 18, teks: true },
   { header: 'ICD-9-CM (Prosedur)', key: 'icd9', width: 18, teks: true },
-  { header: 'Status', key: 'status', width: 11 },
   { header: 'Alasan Pending', key: 'alasan', width: 55 },
   { header: 'Saran / Tindakan', key: 'saran', width: 55 },
   { header: 'Jawaban Rumah Sakit', key: 'jawaban', width: 50 },

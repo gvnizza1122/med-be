@@ -56,7 +56,7 @@ describe('bentuk berkas', () => {
   test('kolom tabel: Masalah data klaim diganti Jawaban Rumah Sakit', async () => {
     const ws = (await bacaLembar(KLAIM)).worksheets[0];
     const header = isiBaris(ws, BARIS_JUDUL_TABEL);
-    expect(header).toEqual(['No', 'SEP', 'Nama Pasien', 'Tanggal', 'ICD-10 (Diagnosis)', 'ICD-9-CM (Prosedur)', 'Status', 'Alasan Pending', 'Saran / Tindakan', 'Jawaban Rumah Sakit']);
+    expect(header).toEqual(['No', 'Status', 'SEP', 'Nama Pasien', 'Tanggal', 'ICD-10 (Diagnosis)', 'ICD-9-CM (Prosedur)', 'Alasan Pending', 'Saran / Tindakan', 'Jawaban Rumah Sakit']);
     expect(header).not.toContain('Masalah data klaim');
     expect(header).not.toContain('Ringkasan');
   });
@@ -66,13 +66,13 @@ describe('bentuk berkas', () => {
     const b1 = ws.getRow(BARIS_JUDUL_TABEL + 1);
     const b2 = ws.getRow(BARIS_JUDUL_TABEL + 2);
     expect(b1.getCell(1).value).toBe(1);
-    expect(b1.getCell(2).value).toBe('0170R0110826V009901');
-    expect(b2.getCell(2).value).toBe('0170R0110826V009902');
+    expect(b1.getCell(3).value).toBe('0170R0110826V009901');
+    expect(b2.getCell(3).value).toBe('0170R0110826V009902');
     for (const b of [b1, b2]) {
       expect([null, undefined, ''].includes(b.getCell(KOLOM.length).value)).toBe(true);
       expect(b.getCell(KOLOM.length).fill.fgColor.argb).toBe('FFFFF2CC');
     }
-    expect(b2.getCell(7).value).toBe('PENDING');
+    expect(b2.getCell(2).value).toBe('PENDING');
   });
 
   test('keterangan ada di bawah tabel, jam ekspor dalam WIB', async () => {
@@ -107,7 +107,7 @@ describe('bentuk berkas', () => {
   test('SEP tidak terbaca: ditandai dengan nama berkas, bukan dibiarkan kosong', async () => {
     const tanpaSep = [{ id: 't1', sep: '', file_name: '178677.pdf', nama_pasien: 'PASIEN UJI', validation_status: 'error', created_at: '2026-09-01', ai_review: '{}', errors: [] }];
     const ws = (await bacaLembar(tanpaSep)).worksheets[0];
-    expect(ws.getCell(BARIS_JUDUL_TABEL + 1, 2).value).toBe('(SEP tidak terbaca — berkas 178677.pdf)');
+    expect(ws.getCell(BARIS_JUDUL_TABEL + 1, 3).value).toBe('(SEP tidak terbaca — berkas 178677.pdf)');
   });
 });
 
@@ -214,8 +214,8 @@ describe('kolom Tanggal & ICD', () => {
     const ws = (await bacaLembar(d)).worksheets[0];
     const b1 = isiBaris(ws, BARIS_JUDUL_TABEL + 1);
     const b2 = isiBaris(ws, BARIS_JUDUL_TABEL + 2);
-    expect(b1.slice(3, 6)).toEqual(['15/09/2026 – 18/09/2026', 'I51.7; I48', '90.59; 89.52']);
-    expect(b2.slice(3, 6)).toEqual(['20/09/2026', 'R10.4', '-']);
+    expect(b1.slice(4, 7)).toEqual(['15/09/2026 – 18/09/2026', 'I51.7; I48', '90.59; 89.52']);
+    expect(b2.slice(4, 7)).toEqual(['20/09/2026', 'R10.4', '-']);
   });
 });
 
