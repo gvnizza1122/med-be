@@ -56,8 +56,9 @@ describe('bentuk berkas', () => {
   test('kolom tabel: Masalah data klaim diganti Jawaban Rumah Sakit', async () => {
     const ws = (await bacaLembar(KLAIM)).worksheets[0];
     const header = isiBaris(ws, BARIS_JUDUL_TABEL);
-    expect(header).toEqual(['No', 'SEP', 'Nama Pasien', 'Status', 'Ringkasan', 'Alasan Pending', 'Saran / Tindakan', 'Jawaban Rumah Sakit']);
+    expect(header).toEqual(['No', 'SEP', 'Nama Pasien', 'Tanggal', 'ICD-10 (Diagnosis)', 'ICD-9-CM (Prosedur)', 'Status', 'Alasan Pending', 'Saran / Tindakan', 'Jawaban Rumah Sakit']);
     expect(header).not.toContain('Masalah data klaim');
+    expect(header).not.toContain('Ringkasan');
   });
 
   test('baris data urut SEP, Jawaban Rumah Sakit kosong untuk diisi casemix', async () => {
@@ -71,7 +72,7 @@ describe('bentuk berkas', () => {
       expect([null, undefined, ''].includes(b.getCell(KOLOM.length).value)).toBe(true);
       expect(b.getCell(KOLOM.length).fill.fgColor.argb).toBe('FFFFF2CC');
     }
-    expect(b2.getCell(4).value).toBe('PENDING');
+    expect(b2.getCell(7).value).toBe('PENDING');
   });
 
   test('keterangan ada di bawah tabel, jam ekspor dalam WIB', async () => {
@@ -83,7 +84,7 @@ describe('bentuk berkas', () => {
     expect(ket).toEqual({
       Periode: 'Agustus 2026',
       Isi: 'Klaim berstatus pending menurut medaudit (bukan keputusan BPJS)',
-      'Cara hitung': 'Satu baris per kunjungan (SEP). Bila berkas yang sama diunggah berkali-kali, yang dipakai unggahan terakhir.',
+      'Cara hitung': 'Satu baris per kunjungan (SEP) yang masih punya unggahan berstatus pending. Bila berkas yang sama diunggah berkali-kali, alasan diambil dari unggahan pending terbaru.',
       'Jumlah klaim': 2,
       'Tanggal ekspor': '07/10/2026 22:19 WIB',
       'Diekspor oleh': 'uji@medaudit',
@@ -155,13 +156,23 @@ describe('satu baris per kunjungan, unggahan terakhir menentukan (kasus 7 Okt 20
     });
   });
 
-  test('hanya kunjungan yang unggahan terakhirnya pending yang diekspor', () => {
-    expect(pilihKlaimPending(DATA).map(x => x.id)).toEqual(['a5']);
+  test('setiap kunjungan yang masih punya unggahan pending diekspor (sama dengan layar)', () => {
+    // A: unggahan pending terbaru a5. B: masih punya 2 unggahan error di layar
+    // -> masuk, diwakili error terbaru b4, SEP dari unggahan lain. C: valid.
+    const hasil = pilihKlaimPending(DATA);
+    expect(hasil.map(x => [x.id, x.sep])).toEqual([
+      ['b4', '0170R0110926V001733'],
+      ['a5', '0170R0110926V001943'],
+    ]);
   });
 
-  test('unggahan lama pending tidak terekspor bila unggahan terbaru valid', () => {
+  test('unggahan lama pending tetap terekspor walau unggahan terbaru valid', () => {
     const d = [A('lama', 'pending', '2026-09-01'), A('baru', 'valid', '2026-09-02')];
-    expect(pilihKlaimPending(d)).toEqual([]);
+    expect(pilihKlaimPending(d).map(x => x.id)).toEqual(['lama']);
+  });
+
+  test('kunjungan yang semua unggahannya valid tidak diekspor', () => {
+    expect(pilihKlaimPending([A('v1', 'valid', '2026-09-01'), A('v2', 'valid', '2026-09-02')])).toEqual([]);
   });
 
   test('tanpa SEP & tanpa padanan: kunjungan berdiri sendiri per MRN + tanggal masuk', () => {
@@ -186,6 +197,25 @@ describe('satu baris per kunjungan, unggahan terakhir menentukan (kasus 7 Okt 20
       u('d2', { sep: '', mrn: 'M9', admission_date: '2026-09-15', validation_status: 'error', created_at: '2026-09-16' }),
     ];
     expect(kelompokkanKunjungan(d)).toHaveLength(1);
+  });
+});
+
+describe('kolom Tanggal & ICD', () => {
+  test('tanggal masuk–pulang dan kode ICD tampil di baris', async () => {
+    const d = [{
+      id: 'i1', sep: 'SEP1', nama_pasien: 'PASIEN UJI', validation_status: 'pending', created_at: '2026-09-01',
+      admission_date: '2026-09-15', discharge_date: new Date(2026, 8, 18), diagnosa_list: 'I51.7;I48', prosedur_list: '90.59;89.52',
+      ai_review: '{}', errors: [],
+    }, {
+      id: 'i2', sep: 'SEP2', nama_pasien: 'PASIEN UJI 2', validation_status: 'error', created_at: '2026-09-02',
+      admission_date: '2026-09-20', discharge_date: '2026-09-20', diagnosa_list: 'R10.4', prosedur_list: '',
+      ai_review: '{}', errors: [],
+    }];
+    const ws = (await bacaLembar(d)).worksheets[0];
+    const b1 = isiBaris(ws, BARIS_JUDUL_TABEL + 1);
+    const b2 = isiBaris(ws, BARIS_JUDUL_TABEL + 2);
+    expect(b1.slice(3, 6)).toEqual(['15/09/2026 – 18/09/2026', 'I51.7; I48', '90.59; 89.52']);
+    expect(b2.slice(3, 6)).toEqual(['20/09/2026', 'R10.4', '-']);
   });
 });
 
