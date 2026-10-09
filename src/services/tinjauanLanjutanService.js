@@ -89,7 +89,7 @@ function pilihHalaman(pages, resumePages, ai) {
     if (HALAMAN_ADMINISTRASI.has(jenis)) return false;
     return /resume|triase|anamnes|pemeriksaan|diagnos|cppt|laboratorium|radiologi|rontgen|toraks|terapi|tindakan|operasi|catatan perkembangan/i.test(p.ocr_text || '');
   });
-  return ringkasHalamanLab(relevan.length ? relevan : pages);
+  return ringkasHalamanLab(relevan.length ? relevan : pages).map(p => ({...p,ocr_text:require('./konteksIcuService').teksUntukAnalisis(p)}));
 }
 
 /**
@@ -171,7 +171,7 @@ async function tinjauLanjutan(record, ai, pages, resumePages, putusanKandidat = 
   if (!terbaca.length || !resumePages.length) return { metadata: { ...awal, status: 'perlu_lengkapi_berkas',
     pesan: 'Bukti resume belum tersedia atau belum terbaca. Lengkapi berkas sebelum pemeriksaan lanjutan.' } };
   const candidates = buatKandidat(record, ai, terbaca, resumePages);
-  const diagnosisBisaDinilai = candidates.length > 0 && candidates.some(c => c.diagnosis_resume.length);
+  const diagnosisBisaDinilai = candidates.length > 0 && (candidates.some(c => c.diagnosis_resume.length) || require('./dasarDiagnosisService').bacaDiagnosisAkhir(terbaca).length > 0);
   if (!diagnosisBisaDinilai && !putusanKandidat) return { metadata: { ...awal, status: 'perlu_lengkapi_berkas',
     pesan: 'Diagnosis pada resume belum berhasil diverifikasi. Periksa pembacaan dokumen.' } };
   const pilihan = pilihHalaman(terbaca, resumePages, ai);

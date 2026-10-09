@@ -21,8 +21,17 @@ function nilaiKelengkapanAnalisis(review, { evidencePool, classification, ganggu
     for (const a of ai.gangguan_tahap || []) tambah(a.kode, a.pesan);
     const lama = ai.kelengkapan_analisis;
     if (lama && lama.status !== 'lengkap') {
-      for (const a of lama.alasan || []) tambah(a.kode, a.pesan);
-      if (!alasan.length) tambah('analisis_belum_lengkap', 'Tahapan analisis belum dinyatakan lengkap.');
+      const pulih = new Set();
+      if (ai.tinjauan_diagnosis && ai.tinjauan_diagnosis.status !== 'belum_dinilai' && !ai.tinjauan_diagnosis.alasan_ditolak) pulih.add('tinjauan_diagnosis');
+      if (ai.penalaran_diagnosis?.status === 'selesai') pulih.add('penalaran_diagnosis');
+      if (ai.analisis_kritis && ai.analisis_kritis.ai_gagal === false) pulih.add('pemeriksa_kritis');
+      if (['selesai','perlu_klarifikasi','tidak_diperlukan'].includes(ai.pemeriksaan_lanjutan?.status)) pulih.add('pemeriksaan_lanjutan');
+      if (ai.putusan_pending && ai.putusan_pending.sumber_keputusan !== 'ai_tidak_tersedia') pulih.add('putusan');
+      if (['tinjauan_diagnosis','penalaran_diagnosis','pemeriksa_kritis','pemeriksaan_lanjutan','putusan'].every(k => pulih.has(k))) pulih.add('analisis_belum_lengkap');
+      for (const a of lama.alasan || []) if (!pulih.has(a.kode)) tambah(a.kode, a.pesan);
+      // Ringkasan lama tidak boleh mengunci hasil tahap yang sudah pulih.
+      if (!alasan.length && !ai.penalaran_diagnosis && !ai.analisis_kritis)
+        tambah('analisis_belum_lengkap', 'Tahapan analisis belum dinyatakan lengkap.');
     }
     if (ai.tinjauan_diagnosis?.alasan_ditolak || ai.tinjauan_diagnosis?.status === 'belum_dinilai')
       tambah('tinjauan_diagnosis', 'Tinjauan diagnosis belum berhasil atau bukti belum cukup untuk menilai pilihan kode.');

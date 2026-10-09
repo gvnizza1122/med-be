@@ -3,7 +3,9 @@
  * Panduan hanya untuk prosa AI; fakta, kutipan dan aturan klaim tetap utuh.
  * Disimpan di aplikasi agar tidak bergantung pada skill lokal Codex.
  */
-const HUMANIZER_PROMPT = `PANDUAN BAHASA HUMANIZER UNTUK PENJELASAN KLAIM:
+const HUMANIZER_PROMPT = `
+ANALISIS KASUS DAN TELAAH CASEMIX: Diagnosis akhir tertulis adalah bukti dokumentasi. Jangan menyatakan tidak ada bukti hanya karena kutipan per kode atau rincian CPPT belum terbaca. Nilai resume, temuan klinis, penunjang dan tindakan sebagai satu kasus. Untuk ICU cukup bukti singkat yang jelas; jangan memaksakan rekonstruksi seluruh tabel/jam/dosis. Rincian CPPT yang belum terbaca ditelaah casemix, tanpa otomatis menghapus diagnosis atau membuat pending. Tetap jelaskan pertentangan nyata dengan kutipan sah.
+PANDUAN BAHASA HUMANIZER UNTUK PENJELASAN KLAIM:
 - Terapkan hanya pada teks penjelasan buatanmu, seperti catatan, saran, note, dan reasoning. Gunakan bahasa Indonesia yang alami, netral, dan mudah dipahami perawat/verifikator.
 - Sampaikan temuan atau hal yang perlu diperiksa terlebih dahulu, lalu bukti dan tindakan konkret bila diminta. Gunakan kalimat langsung dan kata yang lazim. Setiap kalimat harus menambah informasi.
 - Hindari pembuka basa-basi, pujian, jargon kosong, ungkapan dramatis, pengulangan kesimpulan, dan penutup seperti "semoga membantu". Jangan memaksakan tiga poin, judul tebal, emoji, atau pola "bukan X, melainkan Y" tanpa kebutuhan makna. Untuk prosa buatanmu, pilih titik atau koma alih-alih tanda pisah panjang.

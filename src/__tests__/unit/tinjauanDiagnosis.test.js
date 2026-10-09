@@ -50,9 +50,9 @@ test('kutipan dan nomor halaman palsu ditolak', () => {
   const r = raw(); r.kandidat[0].bukti = [{ halaman: 3, kutipan: 'SpO2 80%' }];
   expect(validasiTinjauan(r, candidates, pages)).toBeNull();
 });
-test('kode klaim tanpa diagnosis resume tidak bisa dianggap didukung hanya oleh anamnesis', () => {
+test('diagnosis dokter dapat diverifikasi dari resume meskipun daftar kutipan AI kosong', () => {
   const noResumeDiagnosis = buatKandidat(record, {}, pages, [2]);
-  expect(validasiTinjauan(raw(), noResumeDiagnosis, pages)).toBeNull();
+  expect(validasiTinjauan(raw(), noResumeDiagnosis, pages)).not.toBeNull();
 });
 test('AI harus menilai semua kandidat, tidak boleh diam-diam membuang satu', () => {
   const r = raw(); r.kandidat.pop();
@@ -87,4 +87,10 @@ test('jawaban Luna tidak lolos verifikasi diulang sekali sebelum diserahkan ke S
   expect(panggilModel.mock.calls[1][1].prompt).toMatch(/TIDAK LOLOS VERIFIKASI/);
   expect(hasil.status).toBe('ada_saran');
   expect(hasil.tokens_used).toBe(22);
+});
+
+test('anamnesis saja tidak menggantikan diagnosis akhir dokter', () => {
+ const p=[{page_number:2,ocr_text:'Resume Medis\nAnamnesis: sesak dan batuk'}];
+ const r=raw(); r.kandidat.forEach(k=>k.bukti=[{halaman:2,kutipan:'sesak dan batuk'}]);
+ expect(validasiTinjauan(r,buatKandidat(record,{},p,[2]),p)).toBeNull();
 });
