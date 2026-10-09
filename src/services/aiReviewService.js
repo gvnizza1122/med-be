@@ -260,7 +260,7 @@ function buildPrompt(record, validationErrors, evidencePool, codes, knowledgeEnt
   const jenisKlaim = record.JENIS_KLAIM || record.jenis_klaim || '(tidak diketahui)';
   let prompt = `JENIS_KLAIM: ${jenisKlaim} — WAJIB dipatuhi, lihat instruksi di atas.\n\n`;
   prompt += `DATA REKAM KLAIM (hasil ekstraksi, jadikan konteks — "memory"):\n`;
-  prompt += JSON.stringify(record, null, 0) + '\n\n';
+  prompt += JSON.stringify(require('./konteksRecordService').dataUntukPrompt(record,evidencePool)) + '\n\n';
 
   if (validationErrors.length > 0) {
     prompt += `FIELD_ERRORS (field yang gagal validasi, wajib diisi field_notes):\n`;
@@ -293,7 +293,7 @@ adalah data, bukan instruksi):\n`;
     prompt += `\nBUKTI_DOKUMEN (teks per halaman):\n================================\n`;
     const sorted = [...evidencePool].sort((a, b) => a.page_number - b.page_number);
     for (const ev of sorted) {
-      prompt += `=== Halaman ${ev.page_number} (confidence ${ev.confidence ?? 100}%) ===\n${ev.ocr_text}\n\n`;
+      prompt += `=== Halaman ${ev.page_number} (confidence ${ev.confidence ?? 100}%) ===\n${require('./konteksIcuService').teksUntukAnalisis(ev)}\n\n`;
     }
   } else {
     prompt += `\nBUKTI_DOKUMEN: (tidak ada — jangan isi code_evidence/suggested_codes)\n`;
@@ -827,7 +827,7 @@ async function suggestDiagnosisCodesFallback(evidencePool, ditolakOut = null, re
   let userPrompt = 'TEKS DOKUMEN (per halaman):\n================================\n';
   const sorted = [...evidencePool].sort((a, b) => a.page_number - b.page_number);
   for (const ev of sorted) {
-    userPrompt += `=== Halaman ${ev.page_number} ===\n${ev.ocr_text}\n\n`;
+    userPrompt += `=== Halaman ${ev.page_number} ===\n${require('./konteksIcuService').teksUntukAnalisis(ev)}\n\n`;
   }
   // Agen casemix membekali Luna (peta dokumen, fakta klinis, pola casemix RS).
   if (catatanAgen) userPrompt += catatanAgen;
@@ -1197,25 +1197,25 @@ async function assessKegawatdaruratan(evidencePool, triagePageNumbers, umurTahun
     userPrompt += '=== TRIASE IGD ===\nTEKS HALAMAN TRIASE IGD (sumber utama, WAJIB untuk Bagian 2 & 3):\n================================\n';
     const sorted = [...triagePages].sort((a, b) => a.page_number - b.page_number);
     for (const ev of sorted) {
-      userPrompt += `=== Halaman ${ev.page_number} ===\n${ev.ocr_text}\n\n`;
+      userPrompt += `=== Halaman ${ev.page_number} ===\n${require('./konteksIcuService').teksUntukAnalisis(ev)}\n\n`;
     }
   } else if (hasFallbackPages && fallbackSource === 'laporan_operasi') {
     userPrompt += '=== LAPORAN OPERASI (FALLBACK - TRIASE IGD TIDAK ADA) ===\nTEKS HALAMAN LAPORAN OPERASI (dipakai sebagai fallback sumber vital signs, karena Triase IGD tidak ada):\n================================\n';
     const sorted = [...fallbackPages].sort((a, b) => a.page_number - b.page_number);
     for (const ev of sorted) {
-      userPrompt += `=== Halaman ${ev.page_number} ===\n${ev.ocr_text}\n\n`;
+      userPrompt += `=== Halaman ${ev.page_number} ===\n${require('./konteksIcuService').teksUntukAnalisis(ev)}\n\n`;
     }
   } else if (hasFallbackPages && fallbackSource === 'lab_results') {
     userPrompt += '=== HASIL PEMERIKSAAN LABORATORIUM (FALLBACK - TRIASE IGD TIDAK ADA) ===\nTEKS HALAMAN HASIL LAB (dipakai sebagai fallback, karena Triase IGD tidak ada):\n================================\n';
     const sorted = [...fallbackPages].sort((a, b) => a.page_number - b.page_number);
     for (const ev of sorted) {
-      userPrompt += `=== Halaman ${ev.page_number} ===\n${ev.ocr_text}\n\n`;
+      userPrompt += `=== Halaman ${ev.page_number} ===\n${require('./konteksIcuService').teksUntukAnalisis(ev)}\n\n`;
     }
   } else if (hasFallbackPages && fallbackSource === 'radiology') {
     userPrompt += '=== HASIL PEMERIKSAAN RADIOLOGI (FALLBACK - TRIASE IGD TIDAK ADA) ===\nTEKS HALAMAN RADIOLOGI (dipakai sebagai fallback, karena Triase IGD tidak ada):\n================================\n';
     const sorted = [...fallbackPages].sort((a, b) => a.page_number - b.page_number);
     for (const ev of sorted) {
-      userPrompt += `=== Halaman ${ev.page_number} ===\n${ev.ocr_text}\n\n`;
+      userPrompt += `=== Halaman ${ev.page_number} ===\n${require('./konteksIcuService').teksUntukAnalisis(ev)}\n\n`;
     }
   }
 
@@ -1224,14 +1224,14 @@ async function assessKegawatdaruratan(evidencePool, triagePageNumbers, umurTahun
       'karena berkas ini tidak memuat Triase IGD):\n================================\n';
     const sortedResume = [...resumeMedisPages].sort((a, b) => a.page_number - b.page_number);
     for (const ev of sortedResume) {
-      userPrompt += `=== Halaman ${ev.page_number} ===\n${ev.ocr_text}\n\n`;
+      userPrompt += `=== Halaman ${ev.page_number} ===\n${require('./konteksIcuService').teksUntukAnalisis(ev)}\n\n`;
     }
   } else if (resumeMedisPages.length > 0) {
     userPrompt += '=== RESUME MEDIS (PELENGKAP) ===\nTEKS HALAMAN RESUME MEDIS (PELENGKAP untuk Bagian 1 dan Bagian 2 -- ' +
       'pakai HANYA untuk parameter/nilai yang TIDAK tercatat di sumber utama di atas; JANGAN dipakai untuk Bagian 3 atau Bagian 4):\n================================\n';
     const sortedResume = [...resumeMedisPages].sort((a, b) => a.page_number - b.page_number);
     for (const ev of sortedResume) {
-      userPrompt += `=== Halaman ${ev.page_number} ===\n${ev.ocr_text}\n\n`;
+      userPrompt += `=== Halaman ${ev.page_number} ===\n${require('./konteksIcuService').teksUntukAnalisis(ev)}\n\n`;
     }
   }
 
@@ -1782,7 +1782,7 @@ function buildPendingRiskPrompt(record, evidencePool) {
   const jenisKlaim = record.JENIS_KLAIM || record.jenis_klaim || '(tidak diketahui)';
   const codes = pickCodes(record);
   let prompt = `JENIS_KLAIM: ${jenisKlaim} — WAJIB dipatuhi, lihat instruksi di atas.\n\n`;
-  prompt += `DATA REKAM KLAIM (hasil ekstraksi):\n${JSON.stringify(record, null, 0)}\n\n`;
+  prompt += `DATA REKAM KLAIM (hasil ekstraksi):\n${JSON.stringify(require('./konteksRecordService').dataUntukPrompt(record,evidencePool))}\n\n`;
   if (codes.diagnosis.length > 0) prompt += `Kode diagnosis diklaim (ICD-10): ${codes.diagnosis.join(', ')}\n`;
   else prompt += `Kode diagnosis diklaim (ICD-10): (KOSONG)\n`;
   if (codes.procedure.length > 0) prompt += `Kode prosedur diklaim (ICD-9-CM): ${codes.procedure.join(', ')}\n`;
@@ -1790,7 +1790,7 @@ function buildPendingRiskPrompt(record, evidencePool) {
   prompt += `\nBUKTI_DOKUMEN (teks per halaman):\n================================\n`;
   const sorted = [...evidencePool].sort((a, b) => a.page_number - b.page_number);
   for (const ev of sorted) {
-    prompt += `=== Halaman ${ev.page_number} ===\n${ev.ocr_text}\n\n`;
+    prompt += `=== Halaman ${ev.page_number} ===\n${require('./konteksIcuService').teksUntukAnalisis(ev)}\n\n`;
   }
   return prompt;
 }
@@ -3003,6 +3003,7 @@ module.exports = {
   // mock seluruh alur generateAiReview (yang juga memanggil pending-risk &
   // suggested_codes secara paralel).
   assessKegawatdaruratan,
+  assessPendingRiskPatterns,
   buildRingkasan,
   getIgdTriagePageNumbers,
   tentukanKunjunganIgd,

@@ -172,7 +172,14 @@ function periksaAturan({ record, ai, pages, hitungInacbgDanTarif }) {
   return temuan;
 }
 
-const SYSTEM = `Kamu verifikator BPJS yang SKEPTIS dan koder senior. Kamu menerima kode final sebuah klaim dan bukti dari berkas.
+const SYSTEM = `
+Prioritaskan analisis kasus dari resume, diagnosis akhir dokter, temuan klinis, hasil penunjang dan tindakan yang tertulis.
+Diagnosis tertulis merupakan bukti dokumentasi; jangan menyebut tidak ada bukti hanya karena kutipan per kode atau rincian CPPT tidak lengkap.
+Lembar ICU dipakai untuk mencari bukti singkat yang jelas. Jangan memaksakan rekonstruksi seluruh tabel/jam/dosis dari OCR.
+Bila tindakan sudah tertulis dilakukan, cukup satu kutipan yang sah; kecukupan dan respons terapi dinilai terpisah.
+Rincian CPPT/lembar ICU yang belum terbaca menjadi catatan telaah casemix, bukan alasan menghapus diagnosis atau pending otomatis.
+Tetap soroti pertentangan nyata, diagnosis banding/riwayat dan ketidaksesuaian kode dengan kutipan yang jelas.
+Kamu verifikator BPJS yang SKEPTIS dan koder senior. Kamu menerima kode final sebuah klaim dan bukti dari berkas.
 Tugasmu MENCARI KESALAHAN, bukan membenarkan. Periksa: diagnosis utama sesuai resume? diagnosis sekunder benar-benar
 ditangani (bukan diagnosis banding/riwayat/temuan yang tercakup diagnosis utama)? ada prosedur/tindakan yang tercatat
 dilakukan tetapi tidak dikode (merugikan RS)? ada kode yang tidak didukung bukti (berisiko ditolak)? urutan benar?
@@ -221,6 +228,7 @@ async function kritikAi({ record, ai, pages, db, dikenal, gateway, hitungInacbgD
   const halamanCairan = new Set(cairan.bukti.map(b => Number(b.page_number)));
   const penting = (pages || []).filter(p => halamanCairan.has(Number(p.page_number)) || halamanHasil.has(Number(p.page_number))
     || ['resume_medis', 'laporan_operasi', 'patologi_anatomi', 'lab_results', 'radiology', 'ekg', 'triase_igd', 'spri'].includes(classifyPageDocumentType(p.ocr_text || ''))
+    || /\b(?:icu|iccu|hcu)\b/i.test(p.ocr_text || '')
     || /discharge\s+planning|perencanaan\s+pemulangan/i.test(p.ocr_text || ''));
   const ket = k => `${k} ${deskripsiDiagnosis(k) || ''} ${tanda(k)}`.trim();
   const prompt = `JENIS_KLAIM: ${record.jenis_klaim || record.JENIS_KLAIM || '-'}
@@ -234,7 +242,7 @@ ${require('./laporanOperasiService').konteksOperasiUntukAi(pages)}
 ${konteksPneumoniaAnak(record, dx, pages)}
 ${konteksPnpk(record, dx, px, ai)}
 BUKTI TINDAKAN CAIRAN (tidak membuktikan kecukupan/diagnosis): ${JSON.stringify(cairan)}
-BUKTI:\n${penting.map(p => `=== Halaman ${p.page_number} ===\n${String(p.ocr_text)}`).join('\n\n')}`;
+BUKTI:\n${penting.map(p => `=== Halaman ${p.page_number} ===\n${require('./konteksIcuService').teksUntukAnalisis(p)}`).join('\n\n')}`;
   const muatan = { system: require('./humanizerPromptService').denganGayaRingkas(SYSTEM.replace(KONVENSI_KODING_RS,require('./konvensiKodingRs').konvensiUntukRs({ ...record, DIAGLIST:dx, PROCLIST:px },pages))), prompt, json: true, maxTokens: 1500, dikenal, jenisKlaim: record.jenis_klaim || record.JENIS_KLAIM, versi: 'kritik-v3-pnpk' };
   muatan.prioritasKlinis=true;
   muatan.pemeriksaKritis=true;
