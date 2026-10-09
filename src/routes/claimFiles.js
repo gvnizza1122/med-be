@@ -1030,7 +1030,7 @@ router.post('/:id/approve', authenticate, authorize('supervisor', 'admin'), asyn
   try {
     const db = getDb();
     const file = await db.prepare('SELECT * FROM claim_files WHERE id = ?').get(req.params.id);
-    if (!file) return res.status(404).json({ error: 'File tidak ditemukan.' });
+    if (!file || !canAccessFile(file, req.user)) return res.status(404).json({ error: 'File tidak ditemukan.' });
     if (file.status !== 'completed') {
       return res.status(400).json({ error: 'File belum selesai divalidasi.' });
     }
@@ -4062,8 +4062,17 @@ router.post('/:record_id/update-values', authenticate, async (req, res) => {
     dbRecord.has_hasil_pa = existing.has_hasil_pa === true;
     const activeRules = await db.prepare('SELECT * FROM validation_rules WHERE is_active = 1').all();
     const validationErrors = await validasiRecordDenganKamus(db, dbRecord, activeRules);
-    const validationStatus = determineStatus(validationErrors);
     const review = typeof existing.ai_review === 'string' ? JSON.parse(existing.ai_review) : (existing.ai_review || {});
+    // Sama seperti isiKodeDariSaranDalamTransaksi: rule engine buta terhadap
+    // alasan pending dari AI (kegawatdaruratan, kode luar kamus, dst). Edit
+    // manual tidak boleh menurunkan klaim berisiko ke 'valid' hanya karena
+    // format kolomnya kini bersih -- ambil yang lebih parah dari keduanya.
+    const putusanSegar = segarkanAlasanValidasi(review.putusan_pending, validationErrors);
+    if (putusanSegar) review.putusan_pending = putusanSegar;
+    const URUTAN_STATUS = { valid: 0, pending: 1, error: 2 };
+    const statusRuleEngine = determineStatus(validationErrors);
+    const statusAi = review.putusan_pending && review.putusan_pending.status === 'berisiko_pending' ? 'pending' : 'valid';
+    const validationStatus = (URUTAN_STATUS[statusAi] || 0) > (URUTAN_STATUS[statusRuleEngine] || 0) ? statusAi : statusRuleEngine;
     review.ekstraksi_kode_asli = review.ekstraksi_kode_asli || {
       DIAGLIST: pristineData.DIAGLIST || existing.diagnosa_list || '',
       PROCLIST: pristineData.PROCLIST || existing.prosedur_list || '',

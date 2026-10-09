@@ -82,3 +82,27 @@ test('tarif-ganda: INA-CBG dari data klaim, iDRG belum dapat dihitung tanpa grou
   expect(dx['S73.0'].kandidat).toEqual([]);
   expect(dx['J45.3']).toMatchObject({ status: 'im', kode_idrg: 'J45.3' });
 });
+
+describe('edit manual tidak menurunkan putusan pending AI', () => {
+  const pakaiPutusan = putusan => {
+    const asal = mockDb.prepare;
+    mockDb.prepare = sql => ({ ...asal(sql),
+      get: async () => /claim_files/.test(sql) ? { status: 'completed' }
+        : { id: 'rec', file_id: 'file', raw_data: '{}', diagnosa_list: 'R10.84', prosedur_list: '93.94', ai_review: JSON.stringify({ putusan_pending: putusan }) } });
+  };
+
+  test('alasan AI di luar aturan validasi tetap membuat klaim pending walau kolom bersih', async () => {
+    pakaiPutusan({ status: 'berisiko_pending', alasan: [{ kode: 'kegawatan_lemah', keparahan: 'tinggi', wajib_pending: true, sumber_pemeriksaan: 'Analisis AI' }] });
+    const response = await request(app).post('/claims/rec/update-values').send({ updates: { DIAGLIST: 'J45.9' } });
+    expect(response.status).toBe(200);
+    expect(response.body.validation_errors).toEqual([]);
+    expect(response.body.validation_status).toBe('pending');
+  });
+
+  test('alasan yang hanya berasal dari aturan validasi yang sudah teratasi tidak menahan status', async () => {
+    pakaiPutusan({ status: 'berisiko_pending', alasan: [{ kode: 'RV-05', keparahan: 'tinggi', wajib_pending: true, sumber_pemeriksaan: 'Aturan validasi' }] });
+    const response = await request(app).post('/claims/rec/update-values').send({ updates: { DIAGLIST: 'J45.9' } });
+    expect(response.status).toBe(200);
+    expect(response.body.validation_status).toBe('valid');
+  });
+});
