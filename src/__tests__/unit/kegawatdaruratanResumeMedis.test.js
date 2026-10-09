@@ -1,3 +1,8 @@
+// Layanan jaringan tiruan tetap memakai fetch yang disiapkan setiap skenario.
+jest.mock('../../services/httpTanpaTenggatService', () => ({
+  kirim: (...args) => global.fetch(...args),
+}));
+
 /**
  * Resume Medis (IGD / rawat jalan poli) sebagai sumber pemeriksaan fisik dan
  * tanda vital -- permintaan klien 1 Okt 2026, menggantikan Opsi A 11 Sep 2026.

@@ -1,3 +1,8 @@
+// Layanan jaringan tiruan tetap memakai fetch yang disiapkan setiap skenario.
+jest.mock('../../services/httpTanpaTenggatService', () => ({
+  kirim: (...args) => global.fetch(...args),
+}));
+
 /**
  * Integrasi pagar pasca-AI ke generateAiReview (fetch dan DB dimock) serta
  * regresi perilaku lama: pengisian DIAGLIST dari saran tervalidasi, kode_asal,

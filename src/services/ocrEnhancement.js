@@ -663,7 +663,7 @@ function validateVitalSigns(vitalSigns) {
  * @param {number[]} pageNumbers - Nomor halaman target (opsional)
  * @returns {Promise<Object>} Enhanced extraction result dengan vital signs & clinical findings
  */
-async function enhancedOcrExtraction(pdfPath, pageNumbers = null) {
+async function enhancedOcrExtraction(pdfPath, pageNumbers = null, options = {}) {
   const result = {
     success: false,
     pass1_general_ocr: null,
@@ -680,9 +680,9 @@ async function enhancedOcrExtraction(pdfPath, pageNumbers = null) {
   try {
     // PASS 1: Standard OCR text extraction
     console.log('[EnhancedOCR] Pass 1: General text extraction...');
-    const awal = await ocrPdfPages(pdfPath, pageNumbers || 'all');
+    const awal = await ocrPdfPages(pdfPath, pageNumbers || 'all', undefined, options);
     const ocrMentah = await require('./pemulihanPembacaanService').pulihkanPembacaan(awal,
-      halaman => ocrPdfPages(pdfPath, halaman, undefined, { timeoutMs: 180000 }));
+      halaman => ocrPdfPages(pdfPath, halaman, undefined, options));
     // Lembar grouper E-Klaim (hasil casemix) dipisahkan: tidak ikut ekstraksi
     // klinis maupun teks klaim, hanya disimpan sebagai pembanding.
     const halamanOcr = (ocrMentah && ocrMentah.pages) || [];

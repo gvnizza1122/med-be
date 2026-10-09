@@ -20,7 +20,8 @@ function evaluasiBaPnpk(record = {}, pages = [], options = {}) {
   const dx = pecah(options.dx ?? record.DIAGLIST ?? record.diagnosa_list), usia = resolveUsia(record);
   const px = pecah(options.px ?? record.PROCLIST ?? record.prosedur_list);
   const jenis = String(record.jenis_klaim || record.JENIS_KLAIM || '').toUpperCase();
-  const episode = require('./usiaPasienService').tanggal(record.admission_date || record.ADMISSION_DATE);
+  let raw = record.raw_data || {}; if (typeof raw === 'string') { try { raw = JSON.parse(raw); } catch { raw = {}; } }
+  const episode = require('./usiaPasienService').tanggal(record.admission_date || record.ADMISSION_DATE || raw.ADMISSION_DATE);
   const tanggal = require('./referensiKlaimService').tanggalRecord(record);
   const klinis = require('./referensiKlaimService').halamanKlinis(pages), out = [];
   const ba2018 = require('./baKesepakatan2018Service');
@@ -33,12 +34,14 @@ function evaluasiBaPnpk(record = {}, pages = [], options = {}) {
     const kenaPx = px.filter(k => (a.px || []).some(p => cocokPx(k,p)));
     const picu = a.pemicu === 'dx_dan_px' ? kena.length && kenaPx.length : kena.length || kenaPx.length;
     if (!picu || (options.profil?.referensi_dinonaktifkan || []).includes(a.id) || cakupanUsia(a,usia) !== true) continue;
+    if (a.konteks_klinis && !klinis.some(p => new RegExp(a.konteks_klinis, 'i').test(String(p.ocr_text ?? p.text ?? '')))) continue;
     if (a.jenis_klaim && !a.jenis_klaim.includes(jenis)) continue;
     if ((a.dx_bersama && !ada(dx, a.dx_bersama)) || ada(dx, a.dx_kecuali)) continue;
     if (a.px_bersama && !px.some(k => a.px_bersama.some(p => cocokPx(k,p)))) continue;
     if (a.px_kecuali && px.some(k => a.px_kecuali.some(p => cocokPx(k,p)))) continue;
     const sumber = a.katalog_id ? sumberPnpk(a.katalog_id) : katalog.sumber.find(s => s.id === a.sumber_id);
     if (!sumber) continue;
+    if (!a.katalog_id && tanggal && tanggal < '2018-11-29') continue;
     const berlakuPnpk = a.katalog_id ? require('./katalogPedomanService').berlakuPadaEpisode(a.katalog_id, episode) : null;
     if (berlakuPnpk === false) continue; // versi lain PNPK yang berlaku pada episode ini
     const batas = [sumber.catatan, ...(a.katalog_id && berlakuPnpk === null ? ['Tanggal awal episode atau awal berlaku PNPK belum terkonfirmasi; versi pedoman perlu dicek.'] : [])];
@@ -72,8 +75,17 @@ function evaluasiBaPnpk(record = {}, pages = [], options = {}) {
       batas.push('Butir BA lama ditampilkan untuk telaah; awal berlaku dan perubahan berikutnya belum memastikan putusan klaim otomatis.');
       if (tanggal && tanggal < '2018-11-29') batas.push('Episode mendahului surat pengantar BA; jangan menerapkan butir secara retrospektif.');
     }
+    if ((a.konfirmasi_spesialis || a.mode_penilaian === 'dukungan_dokumentasi') && status === 'bukti_ditemukan') {
+      status = 'perlu_cek_manual'; menilai = true;
+      catatan += ' Bukti terkait ditemukan, tetapi dukungan diagnosis spesifik belum dapat dipastikan otomatis; diperlukan evaluasi spesialis/casemix.';
+    }
+    if (a.katalog_id && berlakuPnpk === null) {
+      status = status === 'bukti_ditemukan' ? 'perlu_cek_manual' : status;
+      bukti = [...(bukti || []), {id:'versi_pedoman',nama:'Tanggal awal episode dan masa berlaku pedoman terkonfirmasi',status:'bukti_belum_cukup',bukti:[]}];
+    }
     out.push({ id:a.id, nama:a.nama, kelompok_usia:usia.kelompok, jenis_ketentuan:sumber.jenis, kode_diagnosis:kena, kode_prosedur:kenaPx,
       gabung_ke:a.gabung_ke || [], menilai_putusan:menilai, kontradiksi_angka:kontradiksi, ...(a.ringkas_telaah ? {ringkas_telaah:a.ringkas_telaah} : {}),
+      tanpa_putusan:a.tanpa_putusan === true || a.syarat === 'informasi',
       sumber:{...sumber,halaman:a.halaman.join(', '),butir:a.butir || 'Pneumonia pada anak'}, tanggal_acuan:tanggal,
       status, bukti, catatan, keterbatasan:batas, berlaku_pada_episode:null, blokir_submit:false, mengubah_kode:false, wajib_pending:false,
       ...(penilaian ? {penilaian_pneumonia:penilaian} : {}) });

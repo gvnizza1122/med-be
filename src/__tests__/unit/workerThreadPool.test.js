@@ -51,3 +51,11 @@ test('shutdown menolak tugas aktif dan antrean serta tidak menyalakan worker bar
 test('ukuran pool tidak sah tetap memiliki satu pembaca', async () => {
   await expect(pool(NaN).run('selesai')).resolves.toBe('selesai');
 });
+test.each([undefined, 0])('PDF lambat tetap selesai tanpa tenggat (%s)', async timeout => {
+  jest.useFakeTimers();
+  const p = createWorkerPool(script, 1, { taskTimeoutMs: timeout }); pools.push(p);
+  const result = p.run('lambat').catch(error => ({ error }));
+  jest.advanceTimersByTime(30 * 60 * 1000);
+  jest.useRealTimers();
+  expect(await result).toBe('lambat');
+});

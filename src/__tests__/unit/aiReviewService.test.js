@@ -1,3 +1,8 @@
+// Layanan jaringan tiruan tetap memakai fetch yang disiapkan setiap skenario.
+jest.mock('../../services/httpTanpaTenggatService', () => ({
+  kirim: (...args) => global.fetch(...args),
+}));
+
 const { generateAiReview, validateQuotation, normalizeText } = require('../../services/aiReviewService');
 
 describe('normalizeText', () => {
@@ -165,7 +170,7 @@ describe('generateAiReview — dengan AI dikonfigurasi (fetch dimock)', () => {
     );
 
     expect(hasil.putusan_pending.status).toBe('berisiko_pending');
-    expect(hasil.putusan_pending.sumber_keputusan).toBe('ai');
+    expect(hasil.putusan_pending.sumber_keputusan).toBe('ai_dan_pemeriksaan_otomatis');
     expect(hasil.putusan_pending.alasan).toHaveLength(1);
     expect(hasil.putusan_pending.alasan[0].kode).toBe('RV-05');
   });

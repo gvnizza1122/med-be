@@ -47,17 +47,7 @@ const TESSERACT_WORKER_OPTIONS = {
   cacheMethod: 'readOnly' // jangan pernah menulis/mengunduh ulang ke tessdata/
 };
 
-// ===== OCR Phase 1: Critical page prioritization & timeout reduction =====
-// (19 Sep 2026, client approved) Total budget SATU pemanggilan ocrPdfPages()
-// buat memproses SEMUA halaman target, turun jadi 3 menit — dipakai dua
-// tempat: (1) di sini, sebagai penanda kapan halaman NON-CRITICAL mulai
-// di-skip (lihat prioritizePagesForOcr() & loop di ocrPdfPages di bawah);
-// (2) di ocrIntegration.js sebagai batas keras Promise.race pembungkus
-// seluruh enhancement pass. Keduanya SENGAJA pakai env var yang sama supaya
-// tidak pernah lebih longgar dari batas keras eksternalnya — kalau beda,
-// budget internal yang lebih longgar jadi percuma karena Promise.race di
-// luar sudah keburu membuang SELURUH hasil (termasuk halaman critical yang
-// sudah selesai) sebelum budget internal sempat berhenti sendiri.
+// Konstanta kompatibilitas untuk estimasi lama; tidak membatasi pembacaan halaman.
 const ENHANCEMENT_TIMEOUT_MS = parseInt(process.env.OCR_ENHANCEMENT_TIMEOUT || '180000', 10);
 // Berhenti mulai halaman NON-CRITICAL 5 detik sebelum budget benar-benar
 // habis — jaga-jaga durasi render+OCR halaman yang lagi berjalan (bukan
@@ -303,11 +293,7 @@ process.on('SIGINT', () => { shutdownOcrPool(); shutdownRenderPool(); });
 // ("3k6", "163kKali"). Gagal/timeout -> jatuh ke Tesseract untuk halaman itu,
 // upload tidak pernah gagal karena layanan OCR mati.
 const PADDLE_OCR_URL = process.env.PADDLE_OCR_URL || 'http://ocr_rapid:8866';
-// 120 dtk: layanan OCR memproses satu halaman sekali jalan dan halaman scan
-// buruk dibaca ulang (perbaikan gambar, maks +12 dtk) -- 60 dtk membuat antrean
-// beberapa berkas sekaligus timeout dan jatuh ke Tesseract.
-const PADDLE_OCR_TIMEOUT_MS = Number(process.env.PADDLE_OCR_TIMEOUT_MS || 120000);
-
+// Durasi halaman dan waktu antre di layanan OCR tidak dibatasi.
 function pakaiPaddle() {
   return (process.env.OCR_ENGINE || 'tesseract').toLowerCase() === 'paddle';
 }
@@ -338,15 +324,12 @@ async function ocrDenganPaddleLangsung(input) {
   const startTime = Date.now();
   // Alur upload mengirim PNG hasil render mupdf sebagai Uint8Array (bukan
   // Buffer); hanya string yang berarti path file.
-  const body = typeof input === 'string' ? fs.readFileSync(input) : Buffer.from(input);
-  const ac = new AbortController();
-  const timer = setTimeout(() => ac.abort(), PADDLE_OCR_TIMEOUT_MS);
-  try {
-    const res = await fetch(`${PADDLE_OCR_URL}/ocr`, {
+  const body = typeof input === 'string' ? await fs.promises.readFile(input) : Buffer.from(input);
+  {
+    const res = await require('./httpTanpaTenggatService').kirim(`${PADDLE_OCR_URL}/ocr`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/octet-stream' },
       body,
-      signal: ac.signal,
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 160)}`);
     const data = await res.json();
@@ -364,8 +347,6 @@ async function ocrDenganPaddleLangsung(input) {
         bounds: Array.isArray(l.bbox) ? { x0: l.bbox[0], y0: l.bbox[1], x1: l.bbox[2], y1: l.bbox[3] } : {},
       })),
     };
-  } finally {
-    clearTimeout(timer);
   }
 }
 
@@ -374,7 +355,7 @@ async function ocrSingleFile(input, language = OCR_CONFIG.language) {
     try {
       return await ocrDenganPaddle(input);
     } catch (err) {
-      const msg = err.name === 'AbortError' ? `timeout ${PADDLE_OCR_TIMEOUT_MS}ms` : err.message;
+      const msg = err.message;
       console.warn(`[OCR] Layanan OCR PaddleOCR (${PADDLE_OCR_URL}) gagal (${msg}) -- halaman ini dibaca Tesseract.`);
     }
   }
@@ -429,9 +410,7 @@ async function ocrSingleFile(input, language = OCR_CONFIG.language) {
  * @param {string} pdfPath - Path to PDF file
  * @param {number[]|string} pageNumbers - Page numbers (1-indexed) or 'all' or 'auto-scan'
  * @param {string} language - Language code
- * @param {{timeoutMs?: number}} options - timeoutMs: override budget total (ms)
- *   dipakai buat skip halaman non-critical (default ENHANCEMENT_TIMEOUT_MS,
- *   lihat catatan OCR Phase 1 di atas OCR_CONFIG).
+ * @param {{classification?: Object}} options - hasil klasifikasi yang dapat digunakan ulang.
  * @returns {Promise<{success, pages: {page_number, text, confidence, block_count, duration_ms}[], skipped_pages: {page_number, reason}[]}>}
  */
 async function ocrPdfPages(pdfPath, pageNumbers = 'auto-scan', language = OCR_CONFIG.language, options = {}) {
@@ -458,17 +437,17 @@ async function ocrPdfPages(pdfPath, pageNumbers = 'auto-scan', language = OCR_CO
   };
 
   const startTime = Date.now();
-  let deadline = startTime + (options.timeoutMs || ENHANCEMENT_TIMEOUT_MS);
+  // Tidak ada batas waktu total; seluruh halaman tetap mendapat giliran.
   let berkasDihitung = false;
 
   try {
     const mupdf = await import('mupdf');
-    const buf = fs.readFileSync(pdfPath);
+    const buf = await fs.promises.readFile(pdfPath);
     const doc = mupdf.Document.openDocument(buf, 'application/pdf');
     const totalPages = doc.countPages();
     berkasOcrAktif++;
     berkasDihitung = true;
-    deadline = startTime + (options.timeoutMs || anggaranOcrMs(totalPages, berkasOcrAktif));
+    doc.destroy?.();
 
     // Tentukan halaman mana yang mau di-OCR, DAN halaman mana yang CRITICAL
     // (TRIAGE IGD/RESUME MEDIS — lihat isCriticalPage() di
@@ -507,7 +486,7 @@ async function ocrPdfPages(pdfPath, pageNumbers = 'auto-scan', language = OCR_CO
       // 'auto-scan' (default): pakai klasifikasi halaman yang sudah ada —
       // cuma halaman SCAN (bukan hasil ketik/NATIVE) yang perlu di-OCR.
       const { classifyPdfPages } = require('./pdfPageClassifier');
-      const classified = await classifyPdfPages(buf);
+      const classified = options.classification?.success ? options.classification : await classifyPdfPages(pdfPath);
       if (!classified.success) {
         throw new Error('Gagal klasifikasi halaman: ' + (classified.errors[0]?.message || 'unknown'));
       }
@@ -521,7 +500,7 @@ async function ocrPdfPages(pdfPath, pageNumbers = 'auto-scan', language = OCR_CO
         : Array.from({ length: totalPages }, (_, i) => i + 1);
       try {
         const { classifyPdfPages, isSepPage } = require('./pdfPageClassifier');
-        const classified = await classifyPdfPages(buf);
+        const classified = options.classification?.success ? options.classification : await classifyPdfPages(pdfPath);
         if (classified.success) {
           classified.pages.filter(p => p.is_critical).forEach(p => criticalPageNums.add(p.page_num));
           classified.pages
@@ -544,32 +523,7 @@ async function ocrPdfPages(pdfPath, pageNumbers = 'auto-scan', language = OCR_CO
 
     console.log(`[OCR][Phase1] Target OCR: ${targetPages.length} halaman [${targetPages.join(',')}], critical dari teks native: ${criticalPageNums.size} [${[...criticalPageNums].join(',')}]`);
 
-    // BUGFIX (lihat catatan panjang di atas prioritizePagesForOcr()): teks
-    // native (pdf-parse) hampir selalu KOSONG untuk halaman scan murni, jadi
-    // criticalPageNums di atas biasanya kosong untuk dokumen full-scan.
-    // Quick-scan resolusi rendah di bawah ini pakai OCR SUNGGUHAN buat
-    // menemukan TRIAGE IGD/RESUME MEDIS yang tidak lolos deteksi native —
-    // hanya dijalankan kalau masih ada sisa waktu (kalau deadline sudah
-    // mepet, tidak ada gunanya, main loop di bawah akan skip semua non-critical
-    // lagi juga).
-    const pagesNeedingQuickScan = targetPages.filter(p => !criticalPageNums.has(p));
-    // Dengan RapidOCR (~1,5 dtk/halaman) semua halaman terbaca dalam budget,
-    // jadi quick-scan resolusi rendah hanya membuang waktu (YETY NOVIATI 21
-    // halaman: 22,7 dtk quick-scan tanpa temuan + 27 dtk OCR). Quick-scan
-    // tetap dipakai bila perkiraan waktu OCR melebihi sisa budget atau mesin
-    // OCR-nya Tesseract.
-    const perkiraanOcrMs = pagesNeedingQuickScan.filter(p => !nativeTextByPage.has(p)).length * PERKIRAAN_MS_HALAMAN_PADDLE;
-    const quickScanPerlu = !pakaiPaddle() || perkiraanOcrMs > deadline - Date.now() - CRITICAL_PAGE_TIMEOUT_MARGIN_MS;
-    if (pagesNeedingQuickScan.length > 0 && !quickScanPerlu) {
-      console.log(`[OCR][Phase1] Quick-scan dilewati: perkiraan OCR ${Math.round(perkiraanOcrMs / 1000)} dtk muat dalam budget.`);
-    } else if (pagesNeedingQuickScan.length > 0 && Date.now() < deadline - CRITICAL_PAGE_TIMEOUT_MARGIN_MS) {
-      const quickFound = await quickScanCriticalPages(buf, pagesNeedingQuickScan, language, deadline);
-      quickFound.forEach(p => criticalPageNums.add(p));
-      console.log(`[OCR][Phase1] Quick-scan selesai: ${quickFound.size} halaman tambahan terdeteksi critical, total critical sekarang: ${criticalPageNums.size} [${[...criticalPageNums].join(',')}]`);
-    } else if (pagesNeedingQuickScan.length > 0) {
-      console.log('[OCR][Phase1] Quick-scan dilewati — budget sudah mepet sebelum sempat mulai.');
-    }
-
+    // Tanpa tenggat, pre-scan resolusi rendah hanya mengulang OCR.
     // CRITICAL (TRIAGE IGD/RESUME MEDIS) duluan — lihat prioritizePagesForOcr().
     targetPages = prioritizePagesForOcr(targetPages, criticalPageNums);
     console.log(`[OCR][Phase1] Urutan OCR final (critical duluan): [${targetPages.join(',')}]`);
@@ -624,28 +578,13 @@ async function ocrPdfPages(pdfPath, pageNumbers = 'auto-scan', language = OCR_CO
         continue;
       }
 
-      const msRemaining = deadline - Date.now();
-      if (msRemaining <= CRITICAL_PAGE_TIMEOUT_MARGIN_MS) {
-        console.log(`[OCR][Phase1] Deadline mepet (sisa ${msRemaining}ms) saat mau proses halaman ${pageNum} (critical: ${criticalPageNums.has(pageNum)})`);
-      }
-
-      // Budget hampir habis & halaman ini BUKAN critical — skip supaya
-      // halaman critical yang belum sempat diproses (kalau ada) tetap
-      // kebagian waktu, dan Promise.race eksternal (ocrIntegration.js) tidak
-      // memaksa "buang semua hasil" begitu batas keras tercapai.
-      if (!criticalPageNums.has(pageNum) && Date.now() >= deadline - CRITICAL_PAGE_TIMEOUT_MARGIN_MS) {
-        console.log(`[OCR][Phase1] SKIP halaman ${pageNum} (non-critical, budget habis)`);
-        result.skipped_pages.push({ page_number: pageNum, reason: 'ocr_timeout_budget_exceeded_non_critical' });
-        continue;
-      }
-
       console.log(`[OCR][Phase1] Memproses halaman ${pageNum}${criticalPageNums.has(pageNum) ? ' (CRITICAL)' : ''}...`);
       const pageStart = Date.now();
       try {
         // Render (dulu inline: doc.loadPage/toPixmap/asPNG di thread utama —
         // 3.0/~216 DPI CPU-berat) sekarang di worker_threads terpisah, lihat
         // catatan panjang di atas RENDER_POOL_SIZE.
-        const pngBuffer = await getRenderPool().run({ bufferData: buf, pageNum });
+        const pngBuffer = await getRenderPool().run({ filePath: pdfPath, pageNum });
 
         const ocrResult = await ocrSingleFile(pngBuffer, language);
 

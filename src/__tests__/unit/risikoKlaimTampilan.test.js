@@ -3,6 +3,18 @@ const { susunPutusan } = require('../../services/putusanPendingService');
 const lama = { status: 'berisiko_pending', alasan: [{ kode: 'KD-02', sumber_pemeriksaan: 'Konsistensi antar data', keparahan: 'tinggi', ringkas: 'Cara bayar umum' }], jumlah: { total: 1, berat: 1 } };
 const record = (extra = {}) => ({ sep: 'SEP-UJI', diagnosa_list: 'J44.9;J18.9', prosedur_list: '93.94', validation_status: 'pending', ai_review: { konsistensi_data: [{ id: 'KD-02' }], putusan_pending: lama }, ...extra });
 
+test('temuan konsistensi baru muncul pada hasil bersih lama, tidak berlipat dan hilang setelah bukti diperbaiki',()=>{
+  const r={diagnosa_list:'R10.4',jenis_klaim:'RAWAT_JALAN',admission_date:'2026-10-01',umur_tahun:40,
+    ai_review:{putusan_pending:{status:'tidak_ditemukan_alasan',alasan:[]},temuan_tindakan:[{id:'nebulisasi',nama:'Nebulisasi',bukti:[{page_number:2,sumber:'resume_medis',kutipan:'Tindakan Nebulisasi Ventasal'}]}]}};
+  const pages=[{page_number:2,ocr_text:'RESUME MEDIS\nTindakan Nebulisasi Ventasal'},{page_number:3,ocr_text:'R/ Paracetamol 500mg'}];
+  const first=perbaruiRisikoTampilan(r,[],{pages});
+  expect(first.putusan_pending.alasan.filter(a=>a.kode==='KD-01')).toHaveLength(1);
+  const again=perbaruiRisikoTampilan({...r,ai_review:first},[],{pages});
+  expect(again.putusan_pending.alasan.filter(a=>a.kode==='KD-01')).toHaveLength(1);
+  const fixed=perbaruiRisikoTampilan({...r,ai_review:again},[],{pages:[...pages,{page_number:4,ocr_text:'R/ Ventasal (salbutamol) NEBUL'}]});
+  expect(fixed.putusan_pending.alasan.some(a=>a.kode==='KD-01')).toBe(false);
+});
+
 test('SEP BPJS + resume UMUM: buang alarm lama, tampilkan risiko koding dari DIAGLIST saat ini', () => {
   const rec = record();
   const before = JSON.stringify(rec);

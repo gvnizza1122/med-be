@@ -13,13 +13,14 @@ const SYSTEM = [
   'Satu pasien dapat memiliki beberapa diagnosis yang sah. Jumlah diagnosis saja bukan alasan pending.',
   'Jika diberikan tinjauan diagnosis, gunakan diagnosis dokter, anamnesis, pemeriksaan fisik, dan penunjang sebagai konteks untuk menilai relevansi setiap kandidat alasan. Tinjauan tersebut adalah bantuan AI, bukan keputusan dokter atau BPJS.',
   'Bedakan bukti tidak ditemukan dengan penyakit tidak ada. Klarifikasi urutan diagnosis tidak otomatis berarti pending. Jangan menggugurkan alasan wajib atau aturan kombinasi pada data klaim yang belum direvisi hanya karena ada usulan diagnosis berbeda.',
+  'Jika diberikan PEDOMAN_PNPK (kartu persyaratan dan/atau kutipan PNPK), gunakan kriteria diagnosis, penunjang, dan indikasi rawat inap/tindakan di dalamnya untuk menilai apakah kandidat relevan untuk pasien ini (mis. syarat dewasa pada pasien anak tidak relevan). PNPK adalah rujukan klinis, bukan alasan pending baru.',
   'Pilih status berisiko_pending jika ada kandidat yang secara langsung berisiko menyebabkan pending.',
   'Pilih perlu_dicek jika ada kandidat relevan tetapi belum cukup untuk menyimpulkan risiko pending.',
   'Pilih tidak_ditemukan_alasan hanya jika tidak ada kandidat yang relevan.',
   'Kembalikan JSON saja: {"status":"berisiko_pending|perlu_dicek|tidak_ditemukan_alasan","alasan_ids":["kandidat-1"]}.',
 ].join(' ');
 
-function buatPrompt(alasan, tinjauan = null) {
+function buatPrompt(alasan, tinjauan = null, pedoman = '') {
   const kandidat = alasan.map((a, i) => ({
     id: `kandidat-${i + 1}`,
     sumber_pemeriksaan: a.sumber_pemeriksaan,
@@ -35,7 +36,8 @@ function buatPrompt(alasan, tinjauan = null) {
     ? { status: tinjauan.status, ringkasan: tinjauan.ringkasan, kandidat: tinjauan.kandidat, klarifikasi: tinjauan.klarifikasi }
     : null;
   return `Nilai kandidat alasan berikut. Keluaran harus memakai id kandidat yang persis ada.\n${JSON.stringify(kandidat)}`
-    + (konteks ? `\nTINJAUAN_DIAGNOSIS_TERVERIFIKASI (konteks pendukung, bukan alasan pending baru):\n${JSON.stringify(konteks)}` : '');
+    + (konteks ? `\nTINJAUAN_DIAGNOSIS_TERVERIFIKASI (konteks pendukung, bukan alasan pending baru):\n${JSON.stringify(konteks)}` : '')
+    + (pedoman ? `\nPEDOMAN_PNPK (konteks pendukung, bukan alasan pending baru):\n${pedoman}` : '');
 }
 
 function bentukPutusan(putusanKandidat, keputusan, metadata = {}) {
@@ -62,12 +64,16 @@ function bentukPutusan(putusanKandidat, keputusan, metadata = {}) {
   // Alasan wajib (mis. kunjungan IGD tanpa kriteria kegawatdaruratan) tidak
   // boleh digugurkan AI: selalu ikut, dan statusnya selalu berisiko_pending.
   const wajib = putusanKandidat.alasan.filter(a => a && a.wajib_pending === true);
-  const alasan = [...new Set([...wajib, ...ids.map(id => indeks.get(id))])];
-  const status = wajib.length > 0 ? 'berisiko_pending' : keputusan.status;
+  const terlindungi = putusanKandidat.alasan.filter(a => a && a.pertahankan_otomatis === true);
+  const alasan = [...new Set([...wajib, ...terlindungi, ...ids.map(id => indeks.get(id))])];
+  const berat = [...wajib, ...terlindungi].some(a => a.wajib_pending || ['tinggi', 'critical'].includes(a.keparahan));
+  const status = berat ? 'berisiko_pending' : terlindungi.length && keputusan.status === 'tidak_ditemukan_alasan'
+    ? 'perlu_dicek' : keputusan.status;
+  const subjek = terlindungi.length ? 'Pemeriksaan aplikasi' : 'AI';
   const ringkasan = status === 'berisiko_pending'
-    ? `AI menilai ada ${alasan.length} alasan yang berisiko membuat klaim ini dipending.`
+    ? `${subjek} menemukan ${alasan.length} alasan yang berisiko membuat klaim ini dipending.`
     : status === 'perlu_dicek'
-      ? `AI memilih ${alasan.length} hal yang perlu diperiksa lebih lanjut.`
+      ? `${subjek} menemukan ${alasan.length} hal yang perlu diperiksa lebih lanjut.`
       : 'AI tidak menemukan alasan pending dari pemeriksaan yang tersedia.';
 
   return {
@@ -82,23 +88,23 @@ function bentukPutusan(putusanKandidat, keputusan, metadata = {}) {
         berat: alasan.filter(a => ['tinggi', 'critical'].includes(String(a.keparahan).toLowerCase())).length,
         dari_rekap_pending: alasan.filter(a => a.dari_rekap_pending).length,
       },
-      sumber_keputusan: 'ai',
+      sumber_keputusan: terlindungi.length ? 'ai_dan_pemeriksaan_otomatis' : 'ai',
       model: metadata.model || null,
       penyedia: metadata.penyedia || null,
       peringatan_model: metadata.peringatan || null,
-      catatan_keandalan: 'Catatan: keputusan status dan pemilihan alasan berasal dari AI berdasarkan temuan dan bukti yang tersedia. Ini bukan keputusan BPJS; ketepatannya belum pernah terukur.',
+      catatan_keandalan: 'Penilaian aplikasi berdasarkan bukti yang terbaca. Temuan pemeriksaan otomatis yang belum terselesaikan tetap ditampilkan. Evaluasi casemix RS dicatat terpisah; ini bukan keputusan BPJS.',
     },
   };
 }
 
-async function putuskanDenganAi(putusanKandidat, { dikenal = {}, db = null, gateway = gatewayModelService, tinjauanDiagnosis = null, jenisKlaim } = {}) {
+async function putuskanDenganAi(putusanKandidat, { dikenal = {}, db = null, gateway = gatewayModelService, tinjauanDiagnosis = null, jenisKlaim, pedomanPnpk = '' } = {}) {
   if (!putusanKandidat || !Array.isArray(putusanKandidat.alasan)) {
     return { ok: false, error: 'Kandidat alasan tidak sah' };
   }
 
   const hasil = await gateway.panggilModel('putuskan_pending', {
     system: SYSTEM,
-    prompt: buatPrompt(putusanKandidat.alasan, tinjauanDiagnosis),
+    prompt: buatPrompt(putusanKandidat.alasan, tinjauanDiagnosis, pedomanPnpk),
     json: true,
     maxTokens: 900,
     dikenal,

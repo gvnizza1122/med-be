@@ -120,6 +120,16 @@ function nilaiKesesuaianStt({ jenisKlaim, dx = [], px = [], pages = [], tanggal 
     const kodeDiajukan = `${pxSuperfisial.join(', ')} (eksisi lesi kulit/subkutis)${kodeDx.length ? ` + ${kodeDx.join(', ')}` : ''}`;
     return {
       id: 'BA-STT-KODE',
+      poin: [
+        {label:'Alasan',isi:'Lesi dalam yang mendukung rawat inap belum sesuai dengan kode eksisi kulit/subkutis yang diajukan.'},
+        {label:'Temuan berkas',isi:`${lesi} (hal. ${lesiDalam.page_number}).`},
+        {label:'Kode diajukan',isi:kodeDiajukan},
+        {label:'Dasar pemeriksaan',isi:dasar},
+        {label:'Bukti',isi:`"${konteks.slice(0,260)}" (hal. ${lesiDalam.page_number})`},
+        ...(belumDikode ? [{label:'Lokasi',isi:`Cocokkan lokasi ${lokasi.join('/')} pada diagnosis, laporan operasi dan kode.`}] : []),
+        ...(paTanpaLokasi ? [{label:'Patologi anatomi',isi:`Bahan PA "${pa[0]}" belum menyebut lesi ${lokasi.join('/')}.`}] : []),
+        {label:'Perbaikan',isi:'Konfirmasi lesi yang menjadi indikasi rawat inap bersama DPJP/operator dan casemix; cocokkan kode, lokasi serta PA dengan lesi itu. Bila tidak memenuhi kriteria BA, tinjau klaim rawat jalan.'},
+      ],
       keparahan: 'tinggi',
       wajib_pending: true,
       ringkas: `STT rawat inap berisiko dialihkan ke rawat jalan: syarat rawat inap hanya dipenuhi ${lesi} (hal. ${lesiDalam.page_number}), tetapi kode ${pxSuperfisial.join(', ')}${kodeDx.length ? ` + ${kodeDx.join(', ')}` : ''} menggambarkan eksisi benjolan kulit/subkutis`,

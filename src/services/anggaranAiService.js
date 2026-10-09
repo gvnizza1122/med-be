@@ -99,8 +99,8 @@ async function cadangkan(db, scope, nilai, optional=false, opsi={}) {
       THEN tambahan_alasan || ?::jsonb ELSE tambahan_alasan END
     WHERE id=? AND hospital_code=? AND terpakai_idr+belum_pasti_idr+dicadangkan_idr+?::numeric <=
     CASE WHEN ?::boolean THEN LEAST(target_idr,?::numeric-175)
-      WHEN gagal_idr=0 AND belum_pasti_idr<=belum_pasti_restart_idr THEN GREATEST(batas_idr,?::numeric) ELSE batas_idr END RETURNING id`,
-    [nilai,optional,nilai,optional,nilai,JSON.stringify([alasan]),scope.id,scope.hospital_code,nilai,optional,BATAS_NORMAL,limit]);
+      WHEN ?::boolean OR (gagal_idr=0 AND belum_pasti_idr<=belum_pasti_restart_idr) THEN GREATEST(batas_idr,?::numeric) ELSE batas_idr END RETURNING id`,
+    [nilai,optional,nilai,optional,nilai,JSON.stringify([alasan]),scope.id,scope.hospital_code,nilai,optional,BATAS_NORMAL,opsi.kritis===true,opsi.kritis===true ? BATAS_KLINIS : limit]);
   return Boolean(row);
 }
 // Pertahankan paralelisme antartahap, tetapi tunggu reservasi aktif selesai
@@ -112,18 +112,13 @@ async function cadangkanSaatSiap(db,scope,nilai,optional=false,opsi={}) {
   const queued=before.catch(()=>{}).then(()=>lock);antreReservasi.set(scope.id,queued);
   await before.catch(()=>{});
   try {
-    const deadline=Date.now()+Math.max(60000,Number(process.env.AI_BUDGET_RESERVATION_WAIT_MS)||600000);
     while(true) {
       const running=sedangMenghitung.get(scope.id);
       if(running?.size) {
         const r=await ringkasan(db,scope);
         if(r && r.terpakai_idr+r.belum_pasti_idr+r.dicadangkan_idr+nilai>r.batas_idr) {
-          if(Date.now()>=deadline) return null;
-          // Timer dibersihkan ketika reservasi selesai, agar antrean besar
-          // tidak meninggalkan timer aktif yang tidak lagi diperlukan.
-          let timer;
-          try {await Promise.race([...running,new Promise(resolve=>{timer=setTimeout(resolve,deadline-Date.now());})]);}
-          finally {clearTimeout(timer);}
+          // Menunggu panggilan yang aktif; waktu antre bukan kegagalan anggaran.
+          await Promise.race([...running]);
           continue;
         }
       }
@@ -163,8 +158,8 @@ async function mulaiPanggilan(db,key,scope,kode='permintaan_sedang_berjalan') {
   const row=await db.get(`INSERT INTO ai_kegagalan_berkas(kunci,anggaran_id,kode) VALUES(?,?,?)
     ON CONFLICT(kunci) DO UPDATE SET kode=EXCLUDED.kode,dibuat=CURRENT_TIMESTAMP
     WHERE ai_kegagalan_berkas.anggaran_id=EXCLUDED.anggaran_id
-      AND ai_kegagalan_berkas.kode='terputus_restart'
-      AND EXCLUDED.kode='permintaan_ulang_setelah_restart' RETURNING kunci`,[key,scope.id,kode]);
+      AND ((ai_kegagalan_berkas.kode='terputus_restart' AND EXCLUDED.kode='permintaan_ulang_setelah_restart')
+        OR (ai_kegagalan_berkas.kode='ulang_disetujui_pengguna' AND EXCLUDED.kode='permintaan_ulang_disetujui')) RETURNING kunci`,[key,scope.id,kode]);
   return Boolean(row);
 }
 async function hapusPenanda(db,key,scope) {

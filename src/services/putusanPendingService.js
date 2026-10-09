@@ -47,6 +47,19 @@ function dariRekapPending(sumber) {
 
 function tambah(daftar, alasan) {
   if (!alasan || !alasan.ringkas) return;
+  // AI tidak boleh menghapus temuan berbasis pemeriksaan yang masih berlaku.
+  if (['Aturan validasi', 'Kamus kode resmi', 'Ketentuan kombinasi kode', 'Konsistensi antar data',
+    'Syarat penunjang diagnosis', 'Cakupan usia', 'Referensi klaim BPJS', 'Telaah catatan casemix',
+    'Telaah rekomendasi TKMKB', 'BA kesepakatan Kemenkes-BPJS', 'PNPK Kemenkes',
+    'Kesesuaian STT (BA 2024)', 'PNPK IDAI pneumonia anak', 'Casemix Alignment Checklist', 'Versi berkas'].includes(alasan.sumber_pemeriksaan)) {
+    alasan.pertahankan_otomatis = true;
+  }
+  alasan.poin = alasan.poin || [
+    { label: 'Alasan', isi: alasan.ringkas },
+    ...(alasan.bukti ? [{ label: 'Bukti / sumber', isi: alasan.bukti }] : []),
+    ...(alasan.penjelasan ? [{ label: 'Dasar pemeriksaan', isi: alasan.penjelasan }] : []),
+    ...(alasan.tindakan ? [{ label: 'Perbaikan', isi: alasan.tindakan }] : []),
+  ];
   daftar.push(alasan);
 }
 
@@ -139,6 +152,7 @@ function ringkasButir(b, label) {
   }
   if (b.ringkas_telaah) return `${b.nama}: ${b.ringkas_telaah}`;
   const kurang = kriteria.filter(x => x.status !== 'bukti_ditemukan').map(x => x.nama);
+  if (b.status === 'perlu_cek_manual' && kriteria.length && !kurang.length) return `${topik}: bukti dasar ditemukan, tetapi diagnosis/indikasi masih memerlukan evaluasi casemix`;
   return kurang.length ? `${topik}: belum ada di berkas -- ${kurang.join(' / ')} (syarat ${label})`
     : `${topik}: kriteria ${label} belum terlihat di berkas`;
 }
@@ -306,7 +320,10 @@ function susunPutusan(aiReviewMasuk = {}, validationErrorsMasuk = []) {
   for (const t of aiReview.referensi_klaim?.temuan || []) {
     const butirBa = [...(/^(?:BA-\d{2}|PNPK)-/.test(String(t.id)) ? [t] : []), ...(t.rujukan_ba_2018 || [])];
     for (const b of butirBa) {
-      if (b.menilai_putusan !== true || b.status !== 'bukti_belum_cukup') continue;
+      if (b.tanpa_putusan === true) continue;
+      if (!['bukti_belum_cukup', 'belum_dapat_dinilai', 'perlu_cek_manual'].includes(b.status)) continue;
+      if (b.menilai_putusan !== true && !/^(?:PNPK|BA-\d{2})-/.test(String(b.id))) continue;
+      if (b.status === 'perlu_cek_manual' && !b.bukti?.length && !b.katalog_id && !(b.sumber?.jenis === 'pedoman_klinis')) continue;
       const topik = [t.id, b.id, ...(b.gabung_ke || [])];
       const sama = alasan.filter(a => topik.includes(a.kode));
       // Satu alasan per topik. Angka yang bertentangan dengan ambang BA (tinggi)
@@ -322,7 +339,7 @@ function susunPutusan(aiReviewMasuk = {}, validationErrorsMasuk = []) {
       const pnpk = sumberBa.jenis === 'pedoman_klinis';
       const label = `${pnpk ? 'PNPK' : 'BA'} ${(String(sumberBa.versi || sumberBa.id).match(/20\d\d/) || [''])[0]}`.trim();
       tambah(alasan, { sumber_pemeriksaan: pnpk ? 'PNPK Kemenkes' : 'BA kesepakatan Kemenkes-BPJS', kode: b.id,
-        ringkas: ringkasButir(b, label),
+        ringkas: b.status === 'belum_dapat_dinilai' ? `${b.nama}: bukti klinis belum terbaca untuk menilai syarat ${label}` : ringkasButir(b, label),
         penjelasan: `Syarat ${label} (${butir}, hal. ${halaman}): ${b.catatan}${tertulis.length ? ` Sudah tertulis: ${tertulis.join('; ')}.` : ''}${kurang.length ? ` Belum ada/tidak memenuhi: ${kurang.join('; ')}.` : ''}${pendukung.length ? ` Temuan pendukung yang tertulis: ${pendukung.join('; ')}.` : ''}${digantikan.length ? ` Juga ditelaah pada topik yang sama: ${digantikan.join('; ')}.` : ''}`,
         keparahan: b.kontradiksi_angka === true ? 'tinggi' : 'sedang',
         bukti: `${sumberBa.judul || label} (${sumberBa.nomor || '-'}), ${butir}, halaman ${halaman}`,
@@ -337,6 +354,7 @@ function susunPutusan(aiReviewMasuk = {}, validationErrorsMasuk = []) {
   const stt = aiReview.kesesuaian_stt;
   if (stt && stt.ringkas) {
     tambah(alasan, { sumber_pemeriksaan: 'Kesesuaian STT (BA 2024)', kode: stt.id, ringkas: stt.ringkas,
+      poin: stt.poin,
       penjelasan: stt.penjelasan, keparahan: stt.keparahan, bukti: stt.bukti_ringkas || null, tindakan: stt.tindakan,
       diverifikasi: true, dari_rekap_pending: false, wajib_pending: stt.wajib_pending === true });
   }
@@ -481,4 +499,7 @@ function segarkanAlasanValidasi(putusan, errorBaru = []) {
   };
 }
 
-module.exports = { susunPutusan, segarkanAlasanValidasi, STATUS };
+function memerlukanTelaah(putusan) {
+  return [STATUS.BERISIKO,STATUS.PERLU_DICEK].includes(putusan?.status) || (putusan?.alasan || []).some(a => a.pertahankan_otomatis === true || a.wajib_pending === true);
+}
+module.exports = { susunPutusan, segarkanAlasanValidasi, STATUS, memerlukanTelaah };

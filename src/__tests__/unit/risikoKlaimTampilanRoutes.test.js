@@ -20,7 +20,7 @@ test('membuka daftar record menyegarkan penilaian tanpa query tulis dan tanpa me
   expect(res.status).toBe(200);
   expect(res.body.records[0]).toMatchObject({ diagnosa_list: 'J44.9;J18.9', prosedur_list: '93.94', validation_status: 'pending' });
   const review = JSON.parse(res.body.records[0].ai_review);
-  expect(review.putusan_pending.alasan.map(a => a.kode)).toEqual(['KMB-12','RK-USIA']);
+  expect(review.putusan_pending.alasan.map(a => a.kode)).toEqual(['KMB-12','RK-USIA','BA-19-M65']);
   expect(review.penjaminan.jenis).toBe('BPJS');
   expect(writes).not.toHaveBeenCalled();
   expect(JSON.stringify(rec)).toBe(before);

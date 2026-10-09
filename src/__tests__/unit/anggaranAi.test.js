@@ -12,8 +12,8 @@ function database(spent=0) {
     get:async(sql,p=[])=>{
       if(sql.includes('router_model')) return null;
       if(sql.startsWith('UPDATE ai_anggaran_berkas')) {
-        const [value,optional,, , ,alasan,id,hospital,second,,normal,cap]=p;
-        const limit=optional?Math.min(row.target_idr,normal-175):row.gagal_idr===0 && row.belum_pasti_idr===0?Math.max(row.batas_idr,cap):row.batas_idr;
+        const [value,optional,, , ,alasan,id,hospital,second,,normal,kritis,cap]=p;
+        const limit=optional?Math.min(row.target_idr,normal-175):kritis || row.gagal_idr===0 && row.belum_pasti_idr===0?Math.max(row.batas_idr,cap):row.batas_idr;
         const total=row.terpakai_idr+row.belum_pasti_idr+row.dicadangkan_idr+second;
         if(id!==row.id || hospital!==row.hospital_code || total>limit) return null;
         if(!optional && total>row.batas_idr) {row.tambahan_alasan.push(...JSON.parse(alasan));row.batas_idr=Math.ceil(total);}
@@ -21,7 +21,7 @@ function database(spent=0) {
       }
       if(sql.startsWith('INSERT INTO ai_kegagalan_berkas')) {
         const previous=failed.get(p[0]);
-        if(previous && !(previous.scope===p[1] && previous.kode==='terputus_restart' && p[2]==='permintaan_ulang_setelah_restart'))return null;
+        if(previous && !(previous.scope===p[1] && ((previous.kode==='terputus_restart' && p[2]==='permintaan_ulang_setelah_restart') || (previous.kode==='ulang_disetujui_pengguna' && p[2]==='permintaan_ulang_disetujui'))))return null;
         failed.set(p[0],{scope:p[1],kode:p[2]||'permintaan_sedang_berjalan'});return {kunci:p[0]};
       }
       if(sql.startsWith('DELETE FROM ai_kegagalan_berkas')) {const f=failed.get(p[0]);if(f?.scope===p[1]&&f.kode==='terputus_restart'){failed.delete(p[0]);return {kunci:p[0]};}return null;}
@@ -152,7 +152,7 @@ test('klarifikasi bukti memungkinkan Sol high dengan ruang penalaran lebih besar
   const r=await call(db,'tinjau_kasus_lanjutan',{...payload,pemicuPendalaman:['diagnosis_atau_urutan_belum_jelas']});
   expect(r).toMatchObject({ok:true,model:'gpt-6.1-sol',effort:'high'});
   expect(fn.mock.calls[0][0].completionLimit).toBe(16000);
-  expect(fn.mock.calls[0][0].timeoutMs).toBeGreaterThanOrEqual(180000);
+  expect(fn.mock.calls[0][0].timeoutMs).toBe(0);
   expect(db.row.batas_idr).toBeGreaterThan(600);expect(db.row.batas_idr).toBeLessThanOrEqual(5000);
 });
 test('sampel kualitas rutin tidak membuka tambahan biaya Sol',async()=>{
@@ -278,4 +278,36 @@ test.each([[13000,13000],[30000,16000],[3000,8000]])('jatah keluaran tahap klini
   const db=database(),fn=jest.fn(async()=>answer());restore=gateway.pasangAdapter('openai_compat',fn);
   expect((await call(db,'agen_tinjau',{...payload,prioritasKlinis:true,batasKeluaran:minta})).ok).toBe(true);
   expect(fn.mock.calls[0][0].completionLimit).toBe(harap);
+});
+
+test('pemulihan yang diminta pengguna hanya memberi satu kesempatan ulang',async()=>{
+  const db=database();
+  const key=ai.kunciCache(scope,'baca_berkas',{penyedia:'openai_compat',model:'gpt-6-luna'},payload.system,payload.prompt,'high',12000);
+  db.failed.set(key,{scope:'b',kode:'ulang_disetujui_pengguna'});
+  const fn=jest.fn(async()=>{throw Error('koneksi putus');});restore=gateway.pasangAdapter('openai_compat',fn);
+  expect(await call(db)).toMatchObject({ok:false});
+  expect(await call(db)).toMatchObject({ok:false,kode:'pengulangan_berbiaya_dicegah'});
+  expect(fn).toHaveBeenCalledTimes(1);
+});
+
+test('pemeriksa kritis tetap berjalan dengan biaya lama belum pasti tanpa menghapus biayanya',async()=>{
+  const db=database(339);db.row.belum_pasti_idr=124;
+  expect(await ai.cadangkan(db,scope,200,false,{klinis:true})).toBe(false);
+  expect(await ai.cadangkan(db,scope,200,false,{klinis:true,kritis:true})).toBe(true);
+  expect(db.row.belum_pasti_idr).toBe(124);expect(db.row.batas_idr).toBe(663);
+  expect(await ai.cadangkan(db,scope,838,false,{klinis:true,kritis:true})).toBe(false);
+});
+test('gateway hanya memberi ruang pemeriksa kritis pada tugas tinjauan yang ditandai',async()=>{
+  const db=database(550);db.row.belum_pasti_idr=40;
+  const fn=jest.fn(async()=>answer());restore=gateway.pasangAdapter('openai_compat',fn);
+  expect(await call(db,'agen_tinjau',{...payload,prioritasKlinis:true,pemeriksaKritis:true})).toMatchObject({ok:true});
+  expect(db.row.belum_pasti_idr).toBe(40);expect(db.row.batas_idr).toBeLessThanOrEqual(1500);
+});
+
+test('kritik berkas panjang mendapat 16000 token dengan batas biaya klinis',async()=>{
+ const db=database(480);db.row.gagal_idr=124;db.row.belum_pasti_idr=145;
+ const fn=jest.fn(async()=>answer());restore=gateway.pasangAdapter('openai_compat',fn);
+ expect(await call(db,'agen_tinjau',{...payload,prioritasKlinis:true,pemeriksaKritis:true,batasKeluaran:16000})).toMatchObject({ok:true});
+ expect(fn.mock.calls[0][0]).toMatchObject({completionLimit:16000,reasoningEffort:'high',timeoutMs:0});
+ expect(db.row.batas_idr).toBeLessThanOrEqual(1500);expect(db.row.belum_pasti_idr).toBe(145);expect(db.row.gagal_idr).toBe(124);
 });

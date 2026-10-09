@@ -6428,11 +6428,19 @@
       "jenis": "ba",
       "cakupan_usia": "per_butir",
       "berlaku_mulai": null,
-      "status_telaah": "identitas_belum_ditelaah_dari_asli",
+      "status_telaah": "pratinjau_identitas_ditelaah",
       "status_unduh": "belum_terunduh",
       "sumber": [
         {
+          "url": "https://www.scribd.com/document/559068374/BA-PENDING-KLAIM-2017",
+          "id_daftar": "BA-KLAIM-2017-2"
+        },
+        {
           "url": "https://persi.or.id/wp-content/uploads/2019/12/materi_drkuntjoro.pdf",
+          "id_daftar": "BA-KLAIM-2017-2"
+        },
+        {
+          "url": "https://www.persi.or.id/wp-content/uploads/2018/03/panduan_verifikasi_inacbg.pdf",
           "id_daftar": "BA-KLAIM-2017-2"
         }
       ],
@@ -6441,9 +6449,14 @@
       "digantikan_oleh": [],
       "menggantikan": [],
       "catatan": [
-        "Scan BA asli belum berhasil didapat. Angka 730 pada tangkapan layar belum terkonfirmasi; tidak dibuat sebagai BA terpisah. Jangan gunakan metadata ini untuk memutus klaim."
+        "Identitas BA ditelaah dari pratinjau/pengantar Scribd. Surat pengantar 8 Januari 2018; bukan tanggal berlaku nasional yang dipastikan.",
+        "Pratinjau Scribd ditelaah, OCR tidak lengkap dan rawan salah baca. Himpunan Manual BPJS Januari 2018 tersedia sebagai dokumen pelengkap terpisah MANUAL-BPJS-2018; PDF asli BA 2017 belum diarsipkan.",
+        "182 topik dalam pengantar: 165 koding, 10 medis dan 7 administrasi. Terapkan pembaruan BA/PNPK menurut episode; jangan menyalin salah ketik/OCR menjadi aturan."
       ],
-      "keluarga": "ba tahap 2: panduan solusi permasalahan klaim"
+      "keluarga": "ba tahap 2: panduan solusi permasalahan klaim",
+      "arsip_pelengkap_ids": [
+        "MANUAL-BPJS-2018"
+      ]
     },
     {
       "id": "BA-KLAIM-2017-1",

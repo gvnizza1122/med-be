@@ -13,7 +13,7 @@ const { Worker } = require('worker_threads');
 
 function createWorkerPool(workerScriptPath, poolSize, options = {}) {
   const size = Number.isFinite(Number(poolSize)) ? Math.max(1, Math.floor(Number(poolSize))) : 1;
-  const timeoutMs = Number(options.taskTimeoutMs) > 0 ? Number(options.taskTimeoutMs) : 600000;
+  const timeoutMs = Number(options.taskTimeoutMs) > 0 ? Number(options.taskTimeoutMs) : 0;
   const idle = [], waitingTasks = [], workers = new Set(), pending = new Map();
   let nextTaskId = 1, closing = false;
 
@@ -56,8 +56,8 @@ function createWorkerPool(workerScriptPath, poolSize, options = {}) {
 
   function dispatch(worker, task) {
     worker.ref();
-    const timer = setTimeout(() => failed(worker, new Error('Pembacaan PDF melewati batas waktu; file perlu dicoba kembali.')), timeoutMs);
-    timer.unref?.();
+    const timer = timeoutMs > 0 ? setTimeout(() => failed(worker, new Error('Pembacaan PDF melewati batas waktu; file perlu dicoba kembali.')), timeoutMs) : null;
+    timer?.unref?.();
     pending.set(task.taskId, { ...task, worker, timer });
     try { worker.postMessage({ taskId: task.taskId, payload: task.payload }); }
     catch (error) { settle(task.taskId, error); checkin(worker); }

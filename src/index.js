@@ -145,6 +145,7 @@ app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/bridging', bridgingRoutes);
 app.use('/api/v1/hospital-settings', hospitalSettingsRoutes);
 app.use('/api/v1/katalog-pedoman', require('./routes/katalogPedoman'));
+app.use('/api/v1/kartu-persyaratan', require('./routes/kartuPersyaratan'));
 app.use('/api/v1/prb-exempt', prbExemptRoutes);
 app.use('/api/v1/audit-logs', auditLogRoutes);
 app.use('/api/v1/ai-usage', aiUsageRoutes);
@@ -196,8 +197,10 @@ app.use((err, req, res, next) => {
 
 // Start server (wait for DB first)
 const PORT = process.env.PORT || 5000;
-server.requestTimeout = 120 * 60 * 1000;
-server.headersTimeout = 120 * 60 * 1000 + 5000; // harus > requestTimeout (syarat Node)
+// Penerimaan file besar dan analisis tidak dihentikan karena durasi.
+server.requestTimeout = 0;
+server.timeout = 0;
+server.headersTimeout = 60000; // hanya penerimaan header, bukan isi file/analisis
 if (require.main === module) {
 waitForDb().then(() => {
 server.listen(PORT, '0.0.0.0', () => {
@@ -205,6 +208,9 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`   Server running on http://0.0.0.0:${PORT}`);
   console.log(`   Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`   CORS: ${process.env.CORS_ORIGIN || 'http://localhost:3000'}\n`);
+  // Telaah butir kartu persyaratan (ditolak tidak dipakai agen) dimuat ke memori.
+  require('./services/kartuPersyaratanService').muatTelaah(getDb())
+    .catch(e => console.warn('   Telaah kartu persyaratan belum dimuat:', e.message));
   // Hasil casemix tersimpan hanya sebagai pembanding kasus, bukan kalibrasi
   // severity otomatis untuk analisis atau grouper mandiri pasien lain.
   // Unggahan yang terhenti karena server dimulai ulang dilanjutkan otomatis.
@@ -214,11 +220,6 @@ server.listen(PORT, '0.0.0.0', () => {
       .catch(e => console.warn('   Gagal melanjutkan unggahan terputus:', e.message));
   }, 3000);
 });
-// Default Node requestTimeout (~5 menit) lebih pendek dari waktu proses batch
-// besar (upload-pdf-batch: AI+OCR per file). Batch maks naik ke 300 file (26
-// Aug 2026, permintaan klien) — estimasi ~90 menit — naikkan ke 2 jam supaya
-// request tidak diputus server sebelum FE-nya sendiri timeout (lib/api.ts
-// uploadPdfBatch pakai 2 jam juga) atau nginx (proxy_*_timeout, juga 2 jam).
 }).catch(err => {
   console.error('Failed to start server:', err);
   process.exit(1);

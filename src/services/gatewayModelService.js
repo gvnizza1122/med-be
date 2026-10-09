@@ -44,14 +44,14 @@ const adapter = {
   openai_compat: (p) => panggilChatCompletions({
     apiKey: process.env.AI_PROVIDER_API_KEY,
     baseUrl: process.env.AI_PROVIDER_BASE_URL || 'https://api.openai.com/v1',
-    timeoutMs: Number(process.env.AI_TIMEOUT_MS || 60000),
+    timeoutMs: 0,
     label: 'AI',
     ...p,
   }),
   kimi: (p) => panggilChatCompletions({
     apiKey: process.env.KIMI_API_KEY,
     baseUrl: process.env.KIMI_BASE_URL || 'https://api.moonshot.ai/v1',
-    timeoutMs: Number(process.env.KIMI_TIMEOUT_MS || 60000),
+    timeoutMs: 0,
     label: 'Kimi',
     ...p,
   }),
@@ -69,10 +69,8 @@ async function panggilChatCompletions({ apiKey, baseUrl, timeoutMs, label, model
     e.kode = 'tanpa_kunci';
     throw e;
   }
-  const doFetch = fetchImpl || fetch;
-  const ac = new AbortController();
-  const timer = setTimeout(() => ac.abort(), timeoutMs);
-  try {
+  const doFetch = fetchImpl || require('./httpTanpaTenggatService').kirim;
+  {
     const messages = [];
     if (system) messages.push({ role: 'system', content: system });
     messages.push({ role: 'user', content: prompt });
@@ -84,7 +82,6 @@ async function panggilChatCompletions({ apiKey, baseUrl, timeoutMs, label, model
     if (json) body.response_format = { type: 'json_object' };
     const response = await doFetch(`${baseUrl}/chat/completions`, {
       method: 'POST',
-      signal: ac.signal,
       headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
@@ -99,8 +96,6 @@ async function panggilChatCompletions({ apiKey, baseUrl, timeoutMs, label, model
     const content = data.choices?.[0]?.message?.content || '';
     // Penggunaan tetap diteruskan bila JSON kosong/terpotong: biaya terjadi.
     return { content, usage: data.usage || {}, finish_reason:data.choices?.[0]?.finish_reason || null };
-  } finally {
-    clearTimeout(timer);
   }
 }
 
@@ -172,7 +167,7 @@ async function panggilModel(tugas, payload, opsi = {}) {
     const kunciAwal=scope ? buatKey(rute,reasoningEffort,completionLimit) : null;
     let cacheKey=kunciAwal;
     let penyesuaian=null;
-    let ulangSetelahRestart=false;
+    let kodeUlang=null;
     const invoke=async()=>{
       if(scope) {
         const pilihan=[{rute,effort:reasoningEffort,limit:completionLimit}];
@@ -195,8 +190,8 @@ async function panggilModel(tugas, payload, opsi = {}) {
           // dikirim ulang tepat satu kali; bila terputus/gagal lagi, diblokir.
           // Jangan lepaskan penanda saat pemeriksaan anggaran. Hak percobaan
           // ulang baru diklaim atomik setelah reservasi berhasil, sebelum request.
-          if(failed && failed.kode==='terputus_restart') {
-            ulangSetelahRestart=true;
+          if(failed && ['terputus_restart', 'ulang_disetujui_pengguna'].includes(failed.kode)) {
+            kodeUlang=failed.kode==='terputus_restart' ? 'permintaan_ulang_setelah_restart' : 'permintaan_ulang_disetujui';
             continue;
           }
           if(failed) {
@@ -228,7 +223,7 @@ async function panggilModel(tugas, payload, opsi = {}) {
       for(let i=0;i<attempts;i++) {
         const reserve=scope ? batasBiaya(rute.model,system,prompt,completionLimit,rute.penyedia) : null;
         const termine=scope && reserve ? await anggaranAi.cadangkanSaatSiap(db,scope,reserve.idr,
-          !klinis && ['agen_tinjau','agen_casemix'].includes(tugas),{klinis:klinis||tugas==='ekstrak_pdf',pendalaman}) : null;
+          !klinis && ['agen_tinjau','agen_casemix'].includes(tugas),{klinis:klinis||tugas==='ekstrak_pdf',pendalaman,kritis:tugas==='agen_tinjau' && payload?.pemeriksaKritis===true}) : null;
         if(scope && !termine) {
           const e=new Error('Anggaran AI berkas tidak cukup untuk tahap ini. Hasil dan bukti yang sudah tersimpan tetap tersedia.');
           e.kode='anggaran_ai_terbatas';throw e;
@@ -239,15 +234,13 @@ async function panggilModel(tugas, payload, opsi = {}) {
         try {
           // Penanda atomik tersimpan SEBELUM request. Setelah proses mati atau
           // ada pekerja lain, permintaan yang sama tidak dikirim dua kali.
-          if(scope && !await anggaranAi.mulaiPanggilan(db,cacheKey,scope,ulangSetelahRestart ? 'permintaan_ulang_setelah_restart' : undefined)) {
+          if(scope && !await anggaranAi.mulaiPanggilan(db,cacheKey,scope,kodeUlang || undefined)) {
             const e=new Error('Permintaan yang sama sudah diproses atau perlu verifikasi biaya. Pengiriman ganda dicegah.');
             e.kode='pengulangan_berbiaya_dicegah';throw e;
           }
           answer=await batasPanggilan.jalankan(()=>{requestMade=true;return fn({model:rute.model,system,prompt,json:!!payload.json,
             maxTokens:payload.maxTokens,fetchImpl:payload.fetchImpl,reasoningEffort,completionLimit,
-            ...(scope ? {timeoutMs:rute.model==='gpt-6.1-sol'
-              ? Math.max(180000,Number(process.env.AI_DEEP_TIMEOUT_MS)||300000)
-              : Math.max(60000,Number(process.env.AI_BUDGET_TIMEOUT_MS)||120000)} : {})});});
+            timeoutMs: 0});});
           const usage=normalisasiPenggunaan(typeof answer==='string' ? {} : answer?.usage||{});
           requestUsage=usage;
           penggunaan=usage; biaya=cost=biayaUntukAnggaran(rute.model,usage,rute.penyedia,answer?.usage,scope);known=Boolean(cost);

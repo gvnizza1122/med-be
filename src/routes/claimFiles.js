@@ -190,22 +190,12 @@ async function gatherEvidencePool(db, recordId, filePath, classification = null)
     WHERE record_id = ? ORDER BY page_number ASC
   `).all(recordId);
 
-  // Kalau belum pernah di-OCR, coba jalankan sekarang (dibatasi waktu — kalau
-  // lama, lanjut tanpa bukti OCR daripada bikin upload menggantung).
-  // 180 detik (naik dari 120 — item 10): worker pool OCR sudah di-reuse (lihat
-  // ocrService.js), jadi timeout di sini sekarang murni soal dokumen yang
-  // BENAR-BENAR berat (banyak halaman/gambar padat), bukan lagi soal cold-start
-  // worker. Kalau timeout tetap terlampaui, upload tetap lanjut tanpa bukti OCR
-  // (evidence pool kosong) — tidak fatal, cuma saran kode/verifikasi bukti dari
-  // OCR yang tidak muncul untuk record itu; data klaim inti tetap tersimpan benar.
+  // Bukti OCR ditunggu sampai selesai, termasuk pada PDF besar.
   if (ocrResults.length === 0 && (!classification || classification.pages?.some(p=>p.type!=='NATIVE'))) {
     try {
       const { isAvailable, ocrPdfPages } = require('../services/ocrService');
       if (isAvailable()) {
-        const ocrResult = await Promise.race([
-          runDedupedOcr(db, recordId, filePath, 'auto-scan', ocrPdfPages),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('OCR timeout')), 180000)),
-        ]);
+        const ocrResult = await runDedupedOcr(db, recordId, filePath, 'auto-scan', ocrPdfPages);
         if (ocrResult.success && ocrResult.pages?.length > 0) {
           ocrResults = await db.prepare(`
             SELECT page_number, ocr_text, confidence FROM ocr_results
@@ -932,13 +922,18 @@ router.get('/:id/records', authenticate, async (req, res) => {
     }
     const budget=file.ai_anggaran_id ? await require('../services/anggaranAiService').ringkasan(db,
       {id:file.ai_anggaran_id,hospital_code:file.hospital_code}) : null;
+    const svcEvaluasi=require('../services/evaluasiCasemixService');
+    const evaluasiById=await svcEvaluasi.ambilTerakhirBanyak(db,recordIds);
     const recordsWithErrors = records.map(rec => {
       const errors = (errorsByRecordId[rec.id] || []).filter(e => e.rule_id !== 'RV-17');
       const review = perbaruiRisikoTampilan({ ...rec, hospital_code:file.hospital_code,source_file_name:file.file_name }, errors,
         { profil, ...(halamanTersedia ? {pages:halamanById.get(rec.id) || []} : {}) });
       if (!halamanTersedia) review.referensi_klaim = { status:'belum_dapat_dinilai', temuan:[], catatan:'Bukti tersimpan belum berhasil dimuat. Pemeriksaan referensi belum selesai.' };
       if(budget) review.anggaran_ai=budget;
-      return { ...rec, errors, ai_review: typeof rec.ai_review === 'string' ? JSON.stringify(review) : review };
+      const ev=svcEvaluasi.dariBaris(evaluasiById.get(rec.id),rec,halamanById.get(rec.id)||[],review.putusan_pending);
+      if(ev) review.evaluasi_casemix_terakhir=ev;
+      return { ...rec, validation_status: rec.validation_status === 'valid' && ((!halamanTersedia && (rec.ai_review || /\.pdf$/i.test(file.file_name || ''))) || svcEvaluasi.temuanEvaluasi({terakhir:ev}) || require('../services/putusanPendingService').memerlukanTelaah(review.putusan_pending)) ? 'pending' : rec.validation_status,
+        errors, ai_review: typeof rec.ai_review === 'string' ? JSON.stringify(review) : review };
     });
 
     res.json({ total, page: parseInt(page), limit: parseInt(limit), records: recordsWithErrors });
@@ -1030,7 +1025,7 @@ router.post('/:id/approve', authenticate, authorize('supervisor', 'admin'), asyn
   try {
     const db = getDb();
     const file = await db.prepare('SELECT * FROM claim_files WHERE id = ?').get(req.params.id);
-    if (!file) return res.status(404).json({ error: 'File tidak ditemukan.' });
+    if (!canAccessFile(file,req.user)) return res.status(404).json({ error: 'File tidak ditemukan.' });
     if (file.status !== 'completed') {
       return res.status(400).json({ error: 'File belum selesai divalidasi.' });
     }
@@ -1039,6 +1034,8 @@ router.post('/:id/approve', authenticate, authorize('supervisor', 'admin'), asyn
     for (const record of records) {
       const analisis = masalahAnalisisRecord(record, file);
       if (analisis) return res.status(409).json({ error: 'Persetujuan ditunda: analisis berkas belum lengkap. Periksa hasil dan baca ulang berkas.', kelengkapan_analisis: analisis });
+      const risiko = await risikoSebelumSubmit(db,record,file);
+      if (risiko) return res.status(409).json({error:'Persetujuan ditunda: temuan pemeriksaan klaim belum terselesaikan.',putusan_pending:risiko});
       const errors = await galatKamusRecord(db, record);
       if (errors.length) return res.status(errors.some(e => e.dictionary_status === 'unavailable') ? 503 : 409)
         .json({ error: 'Klaim belum siap dikirim: pemeriksaan kamus belum lolos.', errors });
@@ -1256,6 +1253,7 @@ router.get('/export/siap-submit', authenticate, authorize('admin', 'verifikator'
     const { periode, kategori, from_date, to_date, search, arsip } = req.query;
     const where = ["cr.validation_status = 'valid'", 'cf.pending_count = 0', 'cf.error_count = 0', 'cf.is_testing = FALSE'];
     const params = [];
+    if (req.user.hospital_code) {where.push('cf.hospital_code = ?');params.push(req.user.hospital_code);}
     where.push(arsip === '1' ? 'cf.diarsipkan_pada IS NOT NULL' : 'cf.diarsipkan_pada IS NULL');
     if (periode) {
       const sqlPeriode = '(SELECT periode FROM claim_records WHERE file_id = cf.id ORDER BY row_number LIMIT 1)';
@@ -1290,6 +1288,8 @@ router.get('/export/siap-submit', authenticate, authorize('admin', 'verifikator'
     for (const record of klaim) {
       const analisis = masalahAnalisisRecord(record);
       if (analisis) return res.status(409).json({ error: 'Ekspor siap submit ditunda: analisis berkas belum lengkap. Periksa hasil dan baca ulang berkas.', kelengkapan_analisis: analisis });
+      const risiko = await risikoSebelumSubmit(db,record);
+      if (risiko) return res.status(409).json({error:'Ekspor siap submit ditunda: temuan pemeriksaan klaim belum terselesaikan.',putusan_pending:risiko});
       const errors = await galatKamusRecord(db, record);
       if (errors.length) return res.status(errors.some(e => e.dictionary_status === 'unavailable') ? 503 : 409)
         .json({ error: 'Ekspor siap submit ditunda: pemeriksaan kamus belum lolos.', errors });
@@ -2524,8 +2524,7 @@ async function isiKodeDariSaranDalamTransaksi(db, recordId, record, aiReview) {
   //
   // Hanya menaikkan, tidak pernah menurunkan: kalau status saat ini sudah
   // 'pending' atau 'error', dibiarkan.
-  let aiBilangPending = aiReview && aiReview.putusan_pending
-    && aiReview.putusan_pending.status === 'berisiko_pending';
+  let aiBilangPending = require('../services/putusanPendingService').memerlukanTelaah(aiReview?.putusan_pending);
   if (aiBilangPending) {
     try {
       const barisSaatIni = await db.prepare('SELECT validation_status, file_id FROM claim_records WHERE id = ?').get(recordId);
@@ -2621,7 +2620,7 @@ async function isiKodeDariSaranDalamTransaksi(db, recordId, record, aiReview) {
     const putusanSegar = segarkanAlasanValidasi(aiReview && aiReview.putusan_pending, errorBaru);
     if (putusanSegar) {
       aiReview.putusan_pending = putusanSegar;
-      aiBilangPending = putusanSegar.status === 'berisiko_pending';
+      aiBilangPending = require('../services/putusanPendingService').memerlukanTelaah(putusanSegar);
       await db.prepare('UPDATE claim_records SET ai_review = ? WHERE id = ?').run(JSON.stringify(aiReview), recordId);
     }
 
@@ -3178,7 +3177,7 @@ async function reprocessExistingRecordDenganKonteks(db, { fileId, recordId, file
         // 1. Ada pending_risk_notes dari AI review, ATAU
         // 2. Kunjungan IGD tidak memenuhi kriteria kegawatdaruratan.
         let finalStatus = validationStatus;
-        let shouldSetPending = false;
+        let shouldSetPending = require('../services/putusanPendingService').memerlukanTelaah(aiReview.putusan_pending);
 
         if (aiReview.pending_risk_notes && aiReview.pending_risk_notes.length > 0) {
           shouldSetPending = true;
@@ -3287,15 +3286,30 @@ router.get('/records/:recordId/tarif-ganda', authenticate, async (req, res) => {
 // Laporan Agen Casemix (mode otomatis): ringkasan klinis, rekomendasi koding
 // berstatus, persyaratan, klarifikasi, risiko, alternatif koding sah + dampak
 // tarif, jejak kerja. Disusun dari data tersimpan tanpa AI.
-async function muatLaporanCasemix(db, recordId) {
+async function risikoSebelumSubmit(db,record,file={}) {
+  if (!record.ai_review && !/\.pdf$/i.test(file.file_name || file.file_path || record.source_file_name || '')) return null;
+  const pages=await db.prepare('SELECT page_number,ocr_text FROM ocr_results WHERE record_id = ? ORDER BY page_number').all(record.id);
+  const errors=await db.prepare('SELECT * FROM validation_errors WHERE record_id = ?').all(record.id);
+  const ai=perbaruiRisikoTampilan({...record,hospital_code:file.hospital_code || record.hospital_code},errors,{pages});
+  if (require('../services/putusanPendingService').memerlukanTelaah(ai.putusan_pending)) return ai.putusan_pending;
+  const svc=require('../services/evaluasiCasemixService');
+  return svc.temuanEvaluasi(await svc.ambilEvaluasi({db,record,pages,putusan:ai.putusan_pending}));
+}
+
+async function muatLaporanCasemix(db, recordId, user) {
   const record = await db.prepare('SELECT * FROM claim_records WHERE id = ?').get(recordId);
   if (!record) return null;
+  const file = await db.prepare('SELECT * FROM claim_files WHERE id = ?').get(record.file_id);
+  if (!canAccessFile(file,user)) return null;
   let ai = record.ai_review;
   if (typeof ai === 'string') { try { ai = JSON.parse(ai); } catch (_) { ai = {}; } }
   ai = ai || {};
   // Lembar grouper hanya pembanding casemix: tidak pernah dibaca agen.
   const pages = (await db.prepare('SELECT page_number, ocr_text FROM ocr_results WHERE record_id = ? ORDER BY page_number').all(record.id))
     .filter(p => !isLembarGrouper(p.ocr_text));
+  const errors = await db.prepare('SELECT * FROM validation_errors WHERE record_id = ?').all(record.id);
+  ai = perbaruiRisikoTampilan({...record, hospital_code:file.hospital_code, ai_review:ai},errors,{pages});
+  const alignment = require('../services/casemixAlignmentService').evaluasiAlignment(record,pages,ai);
   const faktaKlinis = susunFaktaKlinis(pages, ai);
   const saran = susunSaranKoding(record, ai, hitungInacbgDanTarif);
   const { dx, px } = kodeFinal(record, ai);
@@ -3303,13 +3317,15 @@ async function muatLaporanCasemix(db, recordId) {
     pelajaranRelevan(db, { dx, px, recordId: record.id, jenisKlaim: record.jenis_klaim, untukPerbandingan: true }).catch(() => []),
     ambilKeputusan(db, record.id),
   ]);
-  const laporan = susunLaporanCasemix({ record, ai, faktaKlinis, saran, hitungInacbgDanTarif, kronologi: susunKronologi(pages), pelajaran, keputusan });
+  const laporan = susunLaporanCasemix({ record, ai, faktaKlinis, saran, hitungInacbgDanTarif, kronologi: susunKronologi(pages), pelajaran, keputusan, pages });
+  laporan.alignment_checklist = alignment;
+  laporan.evaluasi_casemix = await require('../services/evaluasiCasemixService').ambilEvaluasi({db,record,pages,putusan:ai.putusan_pending});
   return { record, ai, pages, faktaKlinis, saran, laporan };
 }
 
 router.get('/records/:recordId/laporan-casemix', authenticate, async (req, res) => {
   try {
-    const muat = await muatLaporanCasemix(getDb(), req.params.recordId);
+    const muat = await muatLaporanCasemix(getDb(), req.params.recordId, req.user);
     if (!muat) return res.status(404).json({ error: 'Record tidak ditemukan' });
     res.json(muat.laporan);
   } catch (error) {
@@ -3324,7 +3340,7 @@ router.get('/records/:recordId/laporan-casemix', authenticate, async (req, res) 
 router.post('/records/:recordId/keputusan-casemix', authenticate, async (req, res) => {
   try {
     const db = getDb();
-    const muat = await muatLaporanCasemix(db, req.params.recordId);
+    const muat = await muatLaporanCasemix(db, req.params.recordId, req.user);
     if (!muat) return res.status(404).json({ error: 'Record tidak ditemukan' });
     const hasil = await simpanKeputusan({
       db, record: muat.record, saran: muat.saran, pages: muat.pages, dx: req.body?.diagnosis, px: req.body?.prosedur,
@@ -3338,13 +3354,36 @@ router.post('/records/:recordId/keputusan-casemix', authenticate, async (req, re
   }
 });
 
+router.post('/records/:recordId/evaluasi-casemix', authenticate, async (req,res) => {
+  try {
+    const db=getDb(), muat=await muatLaporanCasemix(db,req.params.recordId,req.user);
+    if (!muat) return res.status(404).json({error:'Record tidak ditemukan'});
+    const hasil=await db.transaction(async tx=>{
+      const h=await require('../services/evaluasiCasemixService').simpanEvaluasi({db:tx,record:muat.record,pages:muat.pages,
+        putusan:muat.ai.putusan_pending,input:req.body,oleh:req.user?.id});
+      if (!h.galat && req.body.status !== 'valid') {
+        await tx.prepare("UPDATE claim_records SET validation_status = 'pending' WHERE id = ? AND validation_status = 'valid'").run(muat.record.id);
+        await recomputeFileCounts(tx,muat.record.file_id);
+      }
+      return h;
+    });
+    if (hasil.galat) return res.status(400).json({error:hasil.galat});
+    logAudit({userId:req.user.id,userEmail:req.user.email,action:'evaluasi_casemix',resourceType:'claim_record',resourceId:muat.record.id,
+      details:{status:hasil.status,evaluasi_id:hasil.id},ipAddress:req.ip});
+    res.json(hasil);
+  } catch(error) {
+    console.error('[evaluasi-casemix] gagal:',error.message);
+    res.status(500).json({error:'Evaluasi casemix belum dapat disimpan. Coba lagi.'});
+  }
+});
+
 // Mode interaktif Agen Casemix: tanya-jawab per berkas. Tidak mengubah data klaim.
 router.post('/records/:recordId/agen-casemix/tanya', authenticate, async (req, res) => {
   try {
     const pertanyaan = String(req.body?.pertanyaan || '').trim();
     if (!pertanyaan) return res.status(400).json({ error: 'Pertanyaan wajib diisi.' });
     const db = getDb();
-    const muat = await muatLaporanCasemix(db, req.params.recordId);
+    const muat = await muatLaporanCasemix(db, req.params.recordId, req.user);
     if (!muat) return res.status(404).json({ error: 'Record tidak ditemukan' });
     const { record, pages, faktaKlinis, laporan } = muat;
     const file=await db.prepare('SELECT * FROM claim_files WHERE id=?').get(record.file_id);
@@ -3681,74 +3720,16 @@ router.post('/upload-pdf-batch', authenticate, pdfUploadBatch.array('files', MAX
       // cuma progresnya tidak kelihatan). Lihat UploadJobContext.tsx di FE.
       if (io) io.emit('pdf-batch:file-start', { batchId, fileName: file.originalname });
 
-      // Kill-switch timeout per file — TIDAK boleh lebih pendek dari total
-      // budget wajar pipeline-nya sendiri, kalau tidak setiap dokumen yang
-      // sekadar "berat/lambat" (bukan benar-benar macet) ikut ditandai
-      // "Gagal" di respons batch walau processSinglePdfUpload TETAP lanjut
-      // di background dan BERHASIL menyimpan data (jadi file muncul benar di
-      // Riwayat Upload walau UI upload sempat bilang gagal — root cause bug
-      // "berhasil diproses tapi status Gagal").
-      // Worst-case realistis 1 file: ekstraksi (3x percobaan @60s ~182s,
-      // pdfExtractionService.js) + OCR evidence (maks 180s,
-      // gatherEvidencePool di atas) + AI review utama (3x percobaan @60s
-      // ~182s) + assessment paralel pendingRisk/kegawatdaruratan (~182s) +
-      // fallback saran diagnosis (hard-timeout 70s, aiReviewService.js) —
-      // bisa >13 menit total TANPA ada yang benar-benar hang, apalagi saat
-      // BATCH_AI_CONCURRENCY tinggi menekan provider AI. Timeout lama (5
-      // menit) SELALU lebih pendek dari budget itu sendiri. 20 menit jauh di
-      // atas worst-case wajar, jadi sekarang murni pengaman untuk file yang
-      // BENAR-BENAR macet (bug), bukan yang cuma lambat.
-      const PER_FILE_TIMEOUT_MS = 20 * 60 * 1000;
       let result;
-      let timedOut = false;
-      const uploadPromise = processSinglePdfUpload(db, {
-        filePath: file.path,
-        originalName: file.originalname,
-        // Kedua kategori selalu dinilai dari dokumen, tanpa kunci pilihan klien.
-        jenisKlaim: undefined,
-        allowedJenisKlaim,
-        userId: req.user.id,
-        hospitalCode: req.user.hospital_code,
-      });
       try {
-        result = await Promise.race([
-          uploadPromise,
-          new Promise((_, reject) =>
-            setTimeout(() => reject(new Error(`Upload timeout: file processing took too long (> ${PER_FILE_TIMEOUT_MS / 60000} minutes)`)), PER_FILE_TIMEOUT_MS)
-          )
-        ]);
-      } catch (err) {
-        timedOut = true;
-        result = {
-          success: false,
-          original_name: file.originalname,
-          error: err.message || 'Terjadi kesalahan saat memproses file'
-        };
-      }
-      if (timedOut) {
-        // uploadPromise TIDAK bisa dibatalkan (sama seperti pola OCR di
-        // runDedupedOcr) — tetap jalan di background dan BISA saja tetap
-        // berhasil. Rekonsiliasi best-effort: kalau nanti sungguh berhasil,
-        // catat di log server + emit event terkoreksi (dipakai kalau ada
-        // listener socket real-time di masa depan) supaya kejadian "gagal
-        // menurut respons HTTP tapi sebenarnya tersimpan" tidak diam-diam
-        // hilang tanpa jejak.
-        uploadPromise.then(realResult => {
-          if (realResult.success) {
-            console.warn(`[upload-pdf-batch] File "${file.originalname}" dilaporkan timeout (>${PER_FILE_TIMEOUT_MS / 60000} menit) tapi TETAP berhasil diproses di background (file_id=${realResult.file_id}). Data sudah tersimpan, lihat Riwayat Upload.`);
-            if (io) {
-              io.emit('pdf-batch:file-done', {
-                batchId, fileName: file.originalname, success: true, error: null,
-                file_id: realResult.file_id,
-                jenis_klaim: realResult.jenis_klaim || null,
-                jenis_klaim_detection: realResult.jenis_klaim_detection || null,
-                reconciled: true,
-              });
-            }
-          }
-        }).catch(bgErr => {
-          console.warn(`[upload-pdf-batch] File "${file.originalname}" gagal permanen di background setelah timeout: ${bgErr.message}`);
+        result = await processSinglePdfUpload(db, {
+          filePath: file.path, originalName: file.originalname,
+          jenisKlaim: undefined, allowedJenisKlaim,
+          userId: req.user.id, hospitalCode: req.user.hospital_code,
         });
+      } catch (err) {
+        result = { success: false, original_name: file.originalname,
+          error: err.message || 'Terjadi kesalahan saat memproses file' };
       }
       completed++;
       if (io) {
@@ -4062,8 +4043,8 @@ router.post('/:record_id/update-values', authenticate, async (req, res) => {
     dbRecord.has_hasil_pa = existing.has_hasil_pa === true;
     const activeRules = await db.prepare('SELECT * FROM validation_rules WHERE is_active = 1').all();
     const validationErrors = await validasiRecordDenganKamus(db, dbRecord, activeRules);
-    const validationStatus = determineStatus(validationErrors);
-    const review = typeof existing.ai_review === 'string' ? JSON.parse(existing.ai_review) : (existing.ai_review || {});
+    let validationStatus = determineStatus(validationErrors);
+    let review = typeof existing.ai_review === 'string' ? JSON.parse(existing.ai_review) : (existing.ai_review || {});
     review.ekstraksi_kode_asli = review.ekstraksi_kode_asli || {
       DIAGLIST: pristineData.DIAGLIST || existing.diagnosa_list || '',
       PROCLIST: pristineData.PROCLIST || existing.prosedur_list || '',
@@ -4097,6 +4078,15 @@ router.post('/:record_id/update-values', authenticate, async (req, res) => {
           tandaiEvidenceDiganti(review, [{ kode_asal: removed[0], kode_baru: added[0] }]);
         }
       }
+    }
+
+    if (existing.ai_review) {
+      const pages=await db.prepare('SELECT page_number,ocr_text FROM ocr_results WHERE record_id = ? ORDER BY page_number').all(existing.id);
+      const current={...existing,...dbRecord,id:existing.id,ai_review:review};
+      review=perbaruiRisikoTampilan(current,validationErrors,{pages});
+      const svc=require('../services/evaluasiCasemixService');
+      const ev=await svc.ambilEvaluasi({db,record:current,pages,putusan:review.putusan_pending});
+      if (validationStatus==='valid' && (svc.temuanEvaluasi(ev) || require('../services/putusanPendingService').memerlukanTelaah(review.putusan_pending))) validationStatus='pending';
     }
 
     await db.transaction(async (tx) => {

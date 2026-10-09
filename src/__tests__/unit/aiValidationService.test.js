@@ -1,3 +1,8 @@
+// Layanan jaringan tiruan tetap memakai fetch yang disiapkan setiap skenario.
+jest.mock('../../services/httpTanpaTenggatService', () => ({
+  kirim: (...args) => global.fetch(...args),
+}));
+
 process.env.AI_PROVIDER_API_KEY = 'test-key';
 process.env.AI_PROVIDER_BASE_URL = 'https://api.openai.com/v1';
 process.env.AI_MODEL = 'gpt-4o-mini';

@@ -22,6 +22,9 @@ const angka = s => Number(String(s).replace(',', '.'));
 // Penyangkalan pada baris yang sama: "sesak (-)", "tidak ada muntah", "tanpa transfusi".
 const NEG_SESUDAH = /^\s*(?:\(\s*-\s*\)|-(?!\s*\d)|:\s*-|\s*negatif|\s*disangkal|\s*tidak\s+ada|\s*\(?\s*neg\b)/i;
 const NEG_SEBELUM = /\b(?:tidak\s+(?:ada|didapatkan|ditemukan|tampak|terdapat|diberikan|dilakukan)|tanpa|bukan|belum|disangkal|tdk|rencana|direncanakan|pro|usul|anjuran)\s*:?\s*$/i;
+// OCR sering memutus baris tepat sesudah kata kunci: "...pusing. Batuk" / "(-) pilek (+)". Awal baris berikutnya
+// dinilai hanya untuk tanda negasi tegas (bukan "-" polos yang bisa berupa butir daftar).
+const NEG_BARIS_BERIKUT = /^\s*(?:\(\s*-\s*\)|negatif\b|disangkal\b|tidak\s+ada\b|\(?\s*neg\b)/i;
 const NEG_HASIL = /\b(?:non[- ]?re?a[ck]ti(?:f|ve)|negatif|negative|not detected|tidak (?:ditemukan|terdeteksi|tumbuh)|no growth)\b|\(\s*-\s*\)/i;
 const RAGU = /\b(?:suspek|susp|suspect|curiga|riwayat|rencana|direncanakan|bila perlu|jika perlu|k\/p|prn)\b/i;
 
@@ -47,6 +50,10 @@ function cari(d, pages, maks = 4) {
           const sebelum = t.slice(Math.max(awal, m.index - 30), m.index);
           const sesudah = line.slice(m.index - awal + m[0].length, m.index - awal + m[0].length + 12);
           if (NEG_SEBELUM.test(sebelum) || NEG_SESUDAH.test(sesudah)) continue;
+          if (!sesudah.trim() && akhir >= 0) {
+            const berikut = t.slice(akhir + 1, t.indexOf('\n', akhir + 1) < 0 ? undefined : t.indexOf('\n', akhir + 1));
+            if (NEG_BARIS_BERIKUT.test(berikut)) continue;
+          }
         }
         if (d.ragu !== false && RAGU.test(line)) continue;
         if (d.tolak && d.tolak.test(line)) continue; // baris hasil negatif ('non reaktif', 'tidak ditemukan')
@@ -555,7 +562,10 @@ Object.assign(DETEKTOR, {
       ['dahak purulen', cari({ pola: /\b(?:dahak|sputum)\b[^\n]{0,25}\b(?:purulen|kuning|hijau|kental)\b|\bpurulen\b/i }, ctx.klinis)],
       ['demam', [...cari({ pola: /\b(?:demam|febris|panas)\b/i }, ctx.klinis), ...bacaPola(ctx.klinis, /\b(?:suhu|temp\w*|T)\s*[:=]?\s*(\d{2}(?:[.,]\d)?)\s*(?:°|o)?\s*C?\b/i, v => v > 38 && v < 43)]],
       ['ronki/konsolidasi', cari({ pola: /\b(?:ronki|rhonki|ronkhi|rh\s*\+|suara napas bronkial|konsolidasi)\b/i }, ctx.klinis)],
-      ['leukosit', ctx.lab().filter(b => b.parameter === 'leukosit' && (b.kewajaran.nilai_dinormalkan > 10000 || b.kewajaran.nilai_dinormalkan < 4500)).map(kutipLab)],
+      // Nilai rujukan lab pada baris yang sama didahulukan (rujukan anak berbeda dari ambang dewasa >10.000/<4.500).
+      ['leukosit', ctx.lab().filter(b => b.parameter === 'leukosit' && (Number.isFinite(b.rujukan?.max) || Number.isFinite(b.rujukan?.min)
+        ? (Number.isFinite(b.rujukan?.max) && b.nilai > b.rujukan.max) || (Number.isFinite(b.rujukan?.min) && b.nilai < b.rujukan.min)
+        : b.kewajaran.nilai_dinormalkan > 10000 || b.kewajaran.nilai_dinormalkan < 4500)).map(kutipLab)],
     ].filter(([, b]) => b.length);
     return { status: g.length >= 2 ? 'bukti_ditemukan' : 'bukti_belum_cukup', bukti: g.flatMap(([, b]) => b.slice(0, 1)).map(({ m, ...b }) => b),
       catatan: `Gejala terbaca: ${g.map(([n]) => n).join(', ') || '-'} (${g.length} dari minimal 2).` };
@@ -851,6 +861,7 @@ function nilaiButir(a, ctx) {
 const BUTIR_BA = /^(?:BA-\d{2}|PNPK)-/;
 const labelBa = t => `${t.sumber?.jenis === 'pedoman_klinis' ? 'PNPK' : 'BA'} ${(String(t.sumber?.versi || t.sumber?.id).match(/20\d\d/) || [''])[0]}`.trim();
 const RINGKAS_BA = t => ({ id: t.id, nama: t.nama, status: t.status, butir: t.sumber.butir, halaman: t.sumber.halaman, catatan: t.catatan,
+  tanpa_putusan:t.tanpa_putusan === true,
   sumber: { id: t.sumber.id, judul: t.sumber.judul, nomor: t.sumber.nomor, jenis: t.sumber.jenis, versi: t.sumber.versi }, label_sumber: labelBa(t),
   bukti: t.bukti, menilai_putusan: t.menilai_putusan === true, kontradiksi_angka: t.kontradiksi_angka === true, gabung_ke: t.gabung_ke || [],
   ...(t.ringkas_telaah ? { ringkas_telaah: t.ringkas_telaah } : {}) });
@@ -876,4 +887,5 @@ function gabungkanTumpang(temuan) {
   return hasilGabung.filter(t => !keluar.has(t));
 }
 
+Object.assign(DETEKTOR, require('./pnpkDokumentasiDetektor'));
 module.exports = { DETEKTOR, KHUSUS, periksa, nilaiButir, konteks, gabungkanTumpang, cari, BUTIR_BA, labelBa };

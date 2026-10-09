@@ -12,6 +12,12 @@ const kandidat = {
 };
 
 describe('putusanPendingAiService', () => {
+  test.each(['tinggi','sedang'])('AI bersih tidak menggugurkan temuan otomatis %s yang belum selesai',keparahan=>{
+    const p={...kandidat,alasan:[{kode:'PNPK-UJI',ringkas:'Bukti belum terkonfirmasi',keparahan,pertahankan_otomatis:true}]};
+    const hasil=bentukPutusan(p,{status:'tidak_ditemukan_alasan',alasan_ids:[]});
+    expect(hasil.putusan.alasan).toEqual(p.alasan);
+    expect(hasil.putusan.status).toBe(keparahan==='tinggi'?'berisiko_pending':'perlu_dicek');
+  });
   test('status dan alasan final hanya dipilih AI dari kandidat yang telah tersedia', () => {
     const hasil = bentukPutusan(kandidat, {
       status: 'perlu_dicek',

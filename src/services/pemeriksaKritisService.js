@@ -181,12 +181,30 @@ Selisih tarif INA-CBG dan tagihan RS tidak membuktikan upcoding. Upcoding memerl
 yang tidak didukung. PA normal, radang atau tidak ganas tidak membatalkan diagnosis dokter, tindakan
 operasi, atau indikasi rawat inap. Jangan menyimpulkan lokasi/kedalaman jaringan dari histologi saja.
 Bila tidak ada keberatan yang kuat, kembalikan daftar kosong -- jangan mencari-cari.
+Bila diberikan KARTU PERSYARATAN atau PEDOMAN PNPK, periksa juga seperti verifikator: kriteria diagnosis, penunjang wajib, indikasi rawat inap/intensif
+dan indikasi tindakan menurut PNPK itu. Keberatan berbasis PNPK tetap WAJIB berkutipan berkas, dan pesannya menyebut PNPK
+(katalog_id) serta halamannya persis dari konteks. Jangan mengulang temuan yang sudah ada di HASIL PEMERIKSAAN OTOMATIS.
 ${KONVENSI_KODING_RS}
 Kode bertanda [aturan RS] berasal dari konvensi di atas. Kode bertanda [pola casemix] sama dengan pilihan casemix RS pada
 berkas serupa yang sudah diterima.
 Jawab JSON: {"keberatan":[{"jenis":"potensi_rugi_rs|potensi_upcoding|kode_tidak_didukung|urutan_diagnosis|kode_terlewat|inkonsistensi",
 "keparahan":"tinggi|sedang|rendah","pesan":"satu kalimat","halaman":3,"kutipan":"persis","saran":"apa yang harus dilakukan koder"}],
 "kesimpulan":"satu-dua kalimat"}  (paling banyak 5 keberatan)`;
+
+/** Kriteria PNPK yang berlaku + hasil aturan BA/PNPK, dibatasi agar bukti berkas tetap dominan. */
+function konteksPnpk(record, dx, px, ai) {
+  if (process.env.KRITIK_PAKAI_PNPK === 'false') return '';
+  try {
+    const pnpk = require('./pnpkPengetahuanService');
+    const konteks = pnpk.konteksAgen(record, { dx, px, referensiKlaim: ai.referensi_klaim, ai,
+      topik: ['kriteria_diagnosis', 'rawat_inap', 'intensif', 'indikasi_tindakan', 'tata_laksana', 'penunjang'], total: 5000 }).teks;
+    // Kartu diagnosis dapat menutup dokumen yang sama. Tata laksana tetap
+    // perlu dibaca untuk membandingkan tindakan yang tercatat.
+    const terapi = pnpk.untukPrompt(pnpk.dokumenUntukKlaim(record, { dx, px }),
+      { topik: ['tata_laksana'], total: 1400, perDokumen: 1100, perBagian: 900 });
+    return [konteks, terapi].filter(Boolean).join('\n');
+  } catch (_) { return ''; }
+}
 
 /** Lapis 2: Luna sebagai verifikator skeptis. */
 async function kritikAi({ record, ai, pages, db, dikenal, gateway, hitungInacbgDanTarif, pola = [] }) {
@@ -199,7 +217,9 @@ async function kritikAi({ record, ai, pages, db, dikenal, gateway, hitungInacbgD
   ].filter(Boolean).join(' ');
   if (!dx.length) return { keberatan: [], kesimpulan: null, tokens: 0, idr: 0 };
   const halamanHasil = new Set((ai.temuan_penunjang || []).map(t => Number(t.page_number)));
-  const penting = (pages || []).filter(p => halamanHasil.has(Number(p.page_number))
+  const cairan = require('./buktiResusitasiService').cariBuktiResusitasi(require('./referensiKlaimService').halamanKlinis(pages));
+  const halamanCairan = new Set(cairan.bukti.map(b => Number(b.page_number)));
+  const penting = (pages || []).filter(p => halamanCairan.has(Number(p.page_number)) || halamanHasil.has(Number(p.page_number))
     || ['resume_medis', 'laporan_operasi', 'patologi_anatomi', 'lab_results', 'radiology', 'ekg', 'triase_igd', 'spri'].includes(classifyPageDocumentType(p.ocr_text || ''))
     || /discharge\s+planning|perencanaan\s+pemulangan/i.test(p.ocr_text || ''));
   const ket = k => `${k} ${deskripsiDiagnosis(k) || ''} ${tanda(k)}`.trim();
@@ -212,9 +232,15 @@ TEMUAN PENUNJANG (anotasi; verifikasi kutipan/halaman): ${JSON.stringify(ai.temu
 SYARAT DIAGNOSIS: ${JSON.stringify(ai.syarat_penunjang || [])}
 ${require('./laporanOperasiService').konteksOperasiUntukAi(pages)}
 ${konteksPneumoniaAnak(record, dx, pages)}
-BUKTI:\n${penting.map(p => `=== Halaman ${p.page_number} ===\n${String(p.ocr_text)}`).join('\n\n').slice(0, 60000)}`;
-  const muatan = { system: SYSTEM.replace(KONVENSI_KODING_RS,require('./konvensiKodingRs').konvensiUntukRs({ ...record, DIAGLIST:dx, PROCLIST:px },pages)), prompt, json: true, maxTokens: 1500, dikenal, jenisKlaim: record.jenis_klaim || record.JENIS_KLAIM, versi: 'kritik-v2-referensi' };
+${konteksPnpk(record, dx, px, ai)}
+BUKTI TINDAKAN CAIRAN (tidak membuktikan kecukupan/diagnosis): ${JSON.stringify(cairan)}
+BUKTI:\n${penting.map(p => `=== Halaman ${p.page_number} ===\n${String(p.ocr_text)}`).join('\n\n')}`;
+  const muatan = { system: require('./humanizerPromptService').denganGayaRingkas(SYSTEM.replace(KONVENSI_KODING_RS,require('./konvensiKodingRs').konvensiUntukRs({ ...record, DIAGLIST:dx, PROCLIST:px },pages))), prompt, json: true, maxTokens: 1500, dikenal, jenisKlaim: record.jenis_klaim || record.JENIS_KLAIM, versi: 'kritik-v3-pnpk' };
   muatan.prioritasKlinis=true;
+  muatan.pemeriksaKritis=true;
+  // Reasoning tinggi memakai kuota keluaran yang sama dengan JSON. Berkas
+  // panjang memerlukan ruang lebih besar agar keputusan tidak terpotong.
+  muatan.batasKeluaran = (pages || []).length > 30 ? 16000 : dx.length > 4 ? 12000 : 8000;
   let r = await gateway.panggilModel('agen_tinjau', muatan, { db });
   // Gangguan koneksi/jawaban rusak: ulang sekali sebelum menyerah.
   if ((!r || !r.ok) && !require('./konteksPenggunaanAiService').saatIni().anggaran_ai)
@@ -252,7 +278,8 @@ function konteksPneumoniaAnak(record, dx, pages) {
   } catch (_) { return ''; }
 }
 
-async function periksaKritis({ record, ai, pages, hitungInacbgDanTarif, db = null, dikenal = {}, gateway = gatewayModelService }) {
+async function periksaKritis({ record, ai, pages, hitungInacbgDanTarif, db = null, dikenal = {}, gateway = gatewayModelService, hasilKritis = null }) {
+  const hashBukti = require('./laporanOperasiService').hashBukti(pages);
   const aturan = periksaAturan({ record, ai, pages, hitungInacbgDanTarif }).map(t => ({ ...t, sumber: 'aturan' }));
   // Pembanding dari berkas lain yang sudah diklaim (pola istilah -> kode casemix).
   let pola = [];
@@ -285,8 +312,12 @@ async function periksaKritis({ record, ai, pages, hitungInacbgDanTarif, db = nul
     }
   } catch (_) { /* tanpa pelajaran: lanjut */ }
   let ai2 = { keberatan: [], kesimpulan: null, tokens: 0, idr: 0 };
-  if (process.env.PEMERIKSA_KRITIS_AI !== 'false') {
-    try { ai2 = await kritikAi({ record, ai, pages, db, dikenal, gateway, hitungInacbgDanTarif, pola }); } catch (e) { ai2 = { keberatan: [], kesimpulan: null, tokens: 0, idr: 0, gagal: true }; }
+  if (hasilKritis && hasilKritis.hash_bukti === hashBukti && JSON.stringify(hasilKritis.dinilai?.dx) === JSON.stringify(kodeFinal(record, ai).dx)
+      && JSON.stringify(hasilKritis.dinilai?.px) === JSON.stringify(kodeFinal(record, ai).px)) {
+    ai2 = { keberatan: (hasilKritis.temuan || []).filter(t => t.sumber === 'ai').map(t => ({ ...t })), kesimpulan: hasilKritis.catatan_ai,
+      gagal: hasilKritis.ai_gagal, pesan: hasilKritis.pesan_gangguan, tokens: hasilKritis.tokens_used || 0, idr: hasilKritis.biaya_idr || 0, model: hasilKritis.model, reutilise: true };
+  } else if (process.env.PEMERIKSA_KRITIS_AI !== 'false') {
+    try { ai2 = await kritikAi({ record, ai, pages, db, dikenal, gateway, hitungInacbgDanTarif, pola }); } catch (e) { ai2 = { keberatan: [], kesimpulan: null, tokens: 0, idr: 0, gagal: true, pesan: e.message }; }
   }
   // Keberatan yang menentang praktik casemix RS yang sudah terbukti diterima
   // (kode sama dengan pola berkas lain) diturunkan menjadi catatan rendah.
@@ -339,10 +370,10 @@ async function periksaKritis({ record, ai, pages, hitungInacbgDanTarif, db = nul
   const upcoding = temuan.filter(t => t.jenis === 'potensi_upcoding').length;
   const grup = inacbgFinal(record, ai, hitungInacbgDanTarif);
   return {
-    versi: 'kritis-v1', skor_keyakinan: skor, tingkat, temuan,
+    versi: 'kritis-v2', hash_bukti: hashBukti, dari_hasil_sebelumnya: Boolean(ai2.reutilise), skor_keyakinan: skor, tingkat, temuan,
     dinilai: { ...kodeFinal(record, ai), inacbg: grup.kode, tarif: grup.tarif },
     ringkas: { potensi_rugi_rs: rugi, potensi_upcoding: upcoding, total: temuan.length },
-    kesimpulan: (aiGagal ? 'Pemeriksaan kritis AI belum berjalan (gangguan layanan AI); baru pemeriksaan aturan yang diterapkan. ' : '')
+    kesimpulan: (aiGagal ? `Pemeriksaan kritis AI belum selesai: ${ai2.pesan || 'gangguan layanan AI'}. Pemeriksaan aturan tetap diterapkan. ` : '')
       + (temuan.length === 0
         ? 'Pemeriksaan yang dijalankan belum menemukan keberatan pada kode dan bukti yang terbaca.'
         : `${temuan.length} hal perlu ditinjau koder sebelum unggah${rugi ? `, ${rugi} berpotensi merugikan RS` : ''}${upcoding ? `, ${upcoding} berisiko ditolak/diaudit` : ''}.`),

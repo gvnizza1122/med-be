@@ -32,11 +32,17 @@ Jangan memilih atau menambah diagnosis karena tarif. Tanda [aturan RS] berarti k
 nilai "terkonfirmasi" bila fakta sesuai konvensi, dan sebutkan konvensinya di alasan.
 ${KONVENSI_KODING_RS}
 Kutipan WAJIB disalin persis dari baris fakta (teks setelah "- " sebelum "[hal"), beserta nomor halamannya.
+Bila diberikan KARTU PERSYARATAN dan/atau PEDOMAN PNPK: pakai kriteria diagnosis, penunjang, dan indikasi rawat inap/tindakan di dalamnya sebagai tolok ukur
+dukungan dokumentasi. Untuk setiap syarat PNPK yang relevan isi "pedoman" dengan status terpenuhi/belum_ada/bertentangan, menyebut
+katalog_id dan halaman PNPK persis dari konteks. Syarat PNPK yang belum ada di berkas juga masuk "belum_ada" dengan menyebut PNPK
+dan halamannya. Jangan mengutip PNPK, halaman, atau ambang yang tidak ada di konteks. HASIL PEMERIKSAAN OTOMATIS adalah hasil
+aturan aplikasi: jangan dibantah tanpa kutipan berkas yang jelas. PNPK adalah rujukan klinis, bukan keputusan BPJS.
 Jawab JSON:
 {"diagnosis":[{"kode":"I51.7","status":"terkonfirmasi","alasan":"1-2 kalimat",
   "mendukung":[{"jenis":"anamnesis|fisik|tanda_vital|penunjang|terapi|tindakan","kutipan":"...","halaman":3}],
   "melemahkan":[{"kutipan":"...","halaman":3,"catatan":"..."}],
-  "belum_ada":["bukti yang lazim dibutuhkan tetapi tidak ditemukan"]}],
+  "belum_ada":["bukti yang lazim dibutuhkan tetapi tidak ditemukan"],
+  "pedoman":[{"katalog_id":"KMK-2025-1168","halaman":12,"syarat":"infiltrat + >=2 gejala","status":"terpenuhi|belum_ada|bertentangan","dasar":"kutipan berkas singkat atau -"}]}],
  "kondisi_tersirat":[{"kondisi":"...","kutipan":"...","halaman":5}],
  "pertanyaan_klarifikasi":[{"untuk":"dokter|koder","pertanyaan":"...","dasar":"kutipan singkat","halaman":5}],
  "ringkasan":"2-3 kalimat penalaran keseluruhan"}`;
@@ -58,7 +64,7 @@ function buktiSah(kutipan, halaman, fakta, pages) {
  * @param {string[]} p.kodeDiagnosis kode final (urutan: utama dulu)
  * @param {Set<string>} [p.kodeAturan] kode yang berasal dari aturan koding RS
  */
-async function nilaiDiagnosis({ faktaKlinis, kodeDiagnosis, kodeAturan = new Set(), pages, record = {}, db = null, dikenal = {}, gateway = gatewayModelService }) {
+async function nilaiDiagnosis({ faktaKlinis, kodeDiagnosis, kodeAturan = new Set(), pages, record = {}, db = null, dikenal = {}, gateway = gatewayModelService, referensiKlaim = null, prosedur = null }) {
   const kode = [...new Set((kodeDiagnosis || []).map(k => String(k).toUpperCase()))];
   if (!kode.length || !faktaKlinis || !faktaKlinis.fakta.length) return { status: 'tidak_dinilai', diagnosis: [], kondisi_tersirat: [], pertanyaan_klarifikasi: [] };
   if (process.env.PENALARAN_DIAGNOSIS_AI === 'false') return { status: 'dimatikan', diagnosis: [], kondisi_tersirat: [], pertanyaan_klarifikasi: [] };
@@ -68,6 +74,13 @@ async function nilaiDiagnosis({ faktaKlinis, kodeDiagnosis, kodeAturan = new Set
   if (db) {
     try { pelajaran = await require('./keputusanCasemixService').pelajaranRelevan(db, { dx: kode, recordId: record.id, jenisKlaim: record.jenis_klaim || record.JENIS_KLAIM }); } catch (_) { pelajaran = []; }
   }
+  // Kriteria PNPK yang berlaku (diagnosis, penunjang, indikasi rawat/tindakan) + hasil aturan BA/PNPK.
+  let pedoman = { teks: '', dokumen: [] };
+  if (process.env.PENALARAN_PAKAI_PNPK !== 'false') {
+    try { pedoman = require('./pnpkPengetahuanService').konteksAgen(record, { dx: kode, px: prosedur, referensiKlaim, total: 6500,
+      topik: ['kriteria_diagnosis', 'penunjang', 'rawat_inap', 'intensif', 'indikasi_tindakan', 'definisi'] }); } catch (_) { pedoman = { teks: '', dokumen: [] }; }
+  }
+  const pedomanSah = require('./pnpkPengetahuanService').rujukanSah(pedoman.dokumen);
   const daftar = kode.map((k, i) => `${i === 0 ? 'UTAMA' : 'SEKUNDER'}: ${k} ${deskripsiDiagnosis(k) || '(belum ada di kamus WHO)'}${kodeAturan.has(k) ? ' [aturan RS]' : ''}`).join('\n');
   const prompt = `JENIS_KLAIM: ${record.jenis_klaim || record.JENIS_KLAIM || '-'}
 DIAGNOSIS YANG DINILAI:\n${daftar}
@@ -76,8 +89,8 @@ FAKTA KLINIS (per kategori, dengan halaman):\n${faktaUntukPrompt(faktaKlinis)}${
 
 POLA KEPUTUSAN CASEMIX RS PADA KASUS LAIN (pola, BUKAN bukti pasien ini; status tetap ditentukan fakta berkas ini,
 tetapi bila fakta lemah dan casemix RS biasa tidak mengode, pertimbangkan perlu_klarifikasi):
-${pelajaran.map(p => `- ${p.pesan}`).join('\n')}` : ''}`;
-  const muatan = { system: SYSTEM.replace(KONVENSI_KODING_RS,require('./konvensiKodingRs').konvensiUntukRs(record,pages)), prompt, json: true, maxTokens: 2500, dikenal, jenisKlaim: record.jenis_klaim || record.JENIS_KLAIM, versi: 'penalaran-v2-referensi' };
+${pelajaran.map(p => `- ${p.pesan}`).join('\n')}` : ''}${pedoman.teks ? `\n\n${pedoman.teks}` : ''}`;
+  const muatan = { system: require('./humanizerPromptService').denganGayaRingkas(SYSTEM.replace(KONVENSI_KODING_RS,require('./konvensiKodingRs').konvensiUntukRs(record,pages))), prompt, json: true, maxTokens: 2500, dikenal, jenisKlaim: record.jenis_klaim || record.JENIS_KLAIM, versi: pedoman.teks ? 'penalaran-v3-pnpk' : 'penalaran-v2-referensi' };
   muatan.prioritasKlinis=true;
   // Setiap diagnosis menambah penalaran + bukti mendukung/melemahkan; jatah
   // keluaran ikut jumlah diagnosis agar jawaban tidak terpotong.
@@ -106,10 +119,16 @@ ${pelajaran.map(p => `- ${p.pesan}`).join('\n')}` : ''}`;
       kode: k, deskripsi: deskripsiDiagnosis(k) || null, peran: k === kode[0] ? 'utama' : 'sekunder', status,
       alasan: String(d.alasan || '').slice(0, 400), mendukung, melemahkan: saring(d.melemahkan),
       belum_ada: (Array.isArray(d.belum_ada) ? d.belum_ada : []).map(x => String(x).slice(0, 160)).slice(0, 5),
+      // Rujukan PNPK hanya yang ada di konteks (katalog_id + halaman); selebihnya dibuang.
+      pedoman: (Array.isArray(d.pedoman) ? d.pedoman : [])
+        .filter(x => x && pedomanSah.get(x.katalog_id)?.has(Number(x.halaman)) && ['terpenuhi', 'belum_ada', 'bertentangan'].includes(x.status))
+        .slice(0, 6).map(x => ({ katalog_id: x.katalog_id, halaman: Number(x.halaman), syarat: String(x.syarat || '').slice(0, 200),
+          status: x.status, dasar: String(x.dasar || '').slice(0, 200) })),
     });
   }
   return {
     status: 'selesai', versi: 'penalaran-v1', diagnosis,
+    pedoman_dipakai: pedoman.dokumen.map(d => ({ katalog_id: d.katalog_id, judul: d.judul, nomor: d.nomor, kode_pemicu: d.kode_pemicu })),
     kondisi_tersirat: saring(r.hasil.kondisi_tersirat).map(x => ({ kondisi: String(x.kondisi || '').slice(0, 160), kutipan: x.kutipan, halaman: x.halaman })),
     pertanyaan_klarifikasi: (Array.isArray(r.hasil.pertanyaan_klarifikasi) ? r.hasil.pertanyaan_klarifikasi : []).slice(0, 6)
       .map(q => ({ untuk: q.untuk === 'koder' ? 'koder' : 'dokter', pertanyaan: String(q.pertanyaan || '').slice(0, 300), dasar: String(q.dasar || '').slice(0, 200), halaman: Number(q.halaman) || null }))

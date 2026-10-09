@@ -103,3 +103,17 @@ test('tanggal sah, tanggal mustahil dan format Indonesia dinilai tanpa menebak t
 test('tifoid 2026: Widal tunggal dicatat dengan keterbatasan dan tidak menetapkan diagnosis',()=>{
   const r=t('A01.0',[p('HASIL LABORATORIUM\nSalmonella Typhi O 1/320')])[0];expect(r.id).toBe('RK-18');expect(r.catatan).toMatch(/Widal tunggal/);expect(r.blokir_submit).toBe(false);
 });
+
+test.each([
+ 'Melakukan tindakan pemasangan Inf Asering loading\n500cc lanjut 20tpm',
+ 'Bolus RL 500 ml diberikan',
+ 'Dilakukan resusitasi cairan',
+ 'Pemberian loading cairan NaCl 500cc',
+])('bukti resusitasi cukup dengan tindakan singkat: %s',text=>{
+ const r=require('../../services/referensiKlaimService').cariBukti(halamanKlinis([p(text)]),'resusitasi');
+ expect(r.status).toBe('bukti_ditemukan');expect(r.bukti[0].kutipan).toBe(text);
+ expect(r.bukti[0].cakupan).toBe('tindakan_tercatat');
+});
+test.each(['Infus RL 20tpm','Rencana diberikan loading cairan NaCl 500 ml','Belum dilakukan resusitasi cairan','Jika hipotensi diberikan bolus RL 500 ml','Diberikan bolus midazolam 5mg','RINCIAN BIAYA\nPemberian bolus RL 500ml'])('infus biasa, rencana, negasi dan tagihan tidak membuktikan resusitasi: %s',text=>{
+ expect(require('../../services/referensiKlaimService').cariBukti(halamanKlinis([p(text)]),'resusitasi').status).toBe('bukti_belum_cukup');
+});
