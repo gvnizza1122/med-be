@@ -1,7 +1,7 @@
 {
-  "versi": "KRITERIA-PNPK-2026-10-08.3",
-  "diperiksa_pada": "2026-10-08",
-  "keterangan": "Kriteria PNPK yang sudah dibaca dari PDF Katalog Pedoman (src/data/katalogPedoman.json) dan dapat dinilai dari berkas klaim. Setiap aturan menunjuk katalog_id; versi dipilih menurut tanggal awal episode. Kriteria klinis PNPK menjadi telaah valid/pending (sedang; tinggi hanya bila angka terbaca bertentangan dengan definisi), tidak pernah pending wajib, tidak mengganti kode. Butir bertopik sama dengan aturan lain memakai gabung_ke.",
+  "versi": "KRITERIA-PNPK-2026-10-09.1",
+  "diperiksa_pada": "2026-10-09",
+  "keterangan": "Kriteria PNPK yang sudah dibaca dari PDF Katalog Pedoman (src/data/katalogPedoman.json) dan dapat dinilai dari berkas klaim. Setiap aturan menunjuk katalog_id; versi dipilih menurut tanggal awal episode. Kriteria klinis PNPK menjadi telaah valid/pending (sedang; tinggi hanya bila angka terbaca bertentangan dengan definisi), tidak pernah pending wajib, tidak mengganti kode. Butir bertopik sama dengan aturan lain memakai gabung_ke. Tambahan 9 Oktober: seluruh 28 entri ditelaah; 16 pemeriksaan dukungan dokumentasi baru dan 12 pemetaan aturan/versi. Bukti ditemukan bukan kelulusan klinis otomatis; sumber dengan keputusan spesialis tetap meminta evaluasi.",
   "aturan": [
     {
       "id": "PNPK-SEPSIS-ANAK-01",
@@ -1510,120 +1510,534 @@
       "syarat": "salah_satu",
       "catatan": "Derajat ketulian ditentukan dari ambang dengar (ringan 26-40 dB, sedang, berat 61-80 dB, sangat berat >81 dB) melalui pemeriksaan audiologi.",
       "usia_max": 17
+    },
+    {
+      "id": "PNPK-HIPERTENSI-ANAK-DOK",
+      "nama": "Dokumentasi hipertensi anak",
+      "katalog_id": "KMK-2021-4613",
+      "dx": [
+        "I10",
+        "I11",
+        "I12",
+        "I13",
+        "I15"
+      ],
+      "halaman": [
+        9,
+        10,
+        17,
+        18
+      ],
+      "butir": "Pemeriksaan dan dukungan dokumentasi klinis",
+      "kriteria": [
+        [
+          "td_persentil_anak"
+        ]
+      ],
+      "syarat": "semua",
+      "mode_penilaian": "dukungan_dokumentasi",
+      "usia_max": 17,
+      "catatan": "Interpretasi TD anak memerlukan persentil usia/jenis kelamin/tinggi atau ABPM. Tabel skrining bukan diagnosis. Bila belum tertulis, konfirmasi penilaian dokter; jangan memakai ambang dewasa. Dukungan dokumentasi belum memastikan seluruh kriteria klinis dan kelayakan klaim.",
+      "alasan_telaah_manual": "Hipertensi anak: ambang memakai tabel persentil TD menurut usia/jenis kelamin/tinggi (AAP) yang tidak dapat dihitung andal dari dokumen klaim."
+    },
+    {
+      "id": "PNPK-KATARAK-ANAK-DOK",
+      "nama": "Dokumentasi katarak anak",
+      "katalog_id": "KMK-2020-2849",
+      "dx": [
+        "H25",
+        "H26",
+        "H28",
+        "Q12.0"
+      ],
+      "halaman": [
+        11,
+        12
+      ],
+      "butir": "Pemeriksaan dan dukungan dokumentasi klinis",
+      "kriteria": [
+        [
+          "pemeriksaan_lensa_anak"
+        ]
+      ],
+      "syarat": "semua",
+      "mode_penilaian": "dukungan_dokumentasi",
+      "usia_max": 17,
+      "catatan": "Periksa dokumentasi pemeriksaan lensa/red reflex. Temuan belum membuktikan indikasi atau waktu operasi; keputusan mata anak diklarifikasi kepada spesialis. Dukungan dokumentasi belum memastikan seluruh kriteria klinis dan kelayakan klaim.",
+      "alasan_telaah_manual": "Katarak anak: keputusan operasi oleh subspesialis mata anak; tidak ada ambang angka yang dapat diperiksa dari dokumen."
+    },
+    {
+      "id": "PNPK-ULKUS-KORNEA-DOK",
+      "nama": "Dokumentasi ulkus kornea",
+      "katalog_id": "KMK-2025-723",
+      "dx": [
+        "H16.0"
+      ],
+      "halaman": [
+        18,
+        19
+      ],
+      "butir": "Pemeriksaan dan dukungan dokumentasi klinis",
+      "kriteria": [
+        [
+          "defek_kornea"
+        ]
+      ],
+      "syarat": "semua",
+      "mode_penilaian": "dukungan_dokumentasi",
+      "catatan": "Diagnosis klinis berdasarkan pemeriksaan kornea/slit lamp. Kultur untuk etiologi tidak menjadi kewajiban universal; jangan menyimpulkan organisme tanpa hasil. Dukungan dokumentasi belum memastikan seluruh kriteria klinis dan kelayakan klaim.",
+      "alasan_telaah_manual": "Ulkus kornea bakteri: diagnosis klinis slit lamp; pemeriksaan mikrobiologi untuk etiologi, bukan syarat diagnosis."
+    },
+    {
+      "id": "PNPK-SKIZOFRENIA-DOK",
+      "nama": "Dokumentasi skizofrenia",
+      "katalog_id": "KMK-2025-970",
+      "dx": [
+        "F20"
+      ],
+      "halaman": [
+        13,
+        14,
+        18,
+        19
+      ],
+      "butir": "Pemeriksaan dan dukungan dokumentasi klinis",
+      "kriteria": [
+        [
+          "pemeriksaan_psikiatri"
+        ],
+        [
+          "durasi_psikosis"
+        ]
+      ],
+      "syarat": "semua",
+      "mode_penilaian": "dukungan_dokumentasi",
+      "catatan": "Tinjau status mental, durasi, diagnosis akhir psikiater dan diagnosis banding. Mesin memeriksa bukti dokumentasi, tidak menetapkan PPDGJ/DSM.",
+      "alasan_telaah_manual": "Skizofrenia: kriteria PPDGJ/DSM (durasi, gejala) merupakan penilaian psikiatri, tidak dapat diverifikasi otomatis dari resume."
+    },
+    {
+      "id": "PNPK-JIWA-DOK",
+      "nama": "Dokumentasi jiwa",
+      "katalog_id": "KMK-2015-73",
+      "dx": [
+        "^F"
+      ],
+      "halaman": [
+        7,
+        8,
+        11,
+        23,
+        24
+      ],
+      "butir": "Pemeriksaan dan dukungan dokumentasi klinis",
+      "kriteria": [
+        [
+          "status_mental_umum"
+        ]
+      ],
+      "syarat": "semua",
+      "mode_penilaian": "dukungan_dokumentasi",
+      "konfirmasi_spesialis": true,
+      "catatan": "Pemeriksaan status mental dan dukungan diagnosis perlu ditulis. Diagnosis psikiatri selain psikosis perlu evaluasi casemix/psikiater; temuan mesin bukan keputusan diagnosis.",
+      "alasan_telaah_manual": "PNPK jiwa 2015: kriteria diagnosis klinis psikiatri; sebagai rujukan."
+    },
+    {
+      "id": "PNPK-SARKOPENIA-DOK",
+      "nama": "Dokumentasi sarkopenia",
+      "katalog_id": "KMK-2024-2005",
+      "dx": [
+        "M62.8",
+        "M62.9"
+      ],
+      "halaman": [
+        12,
+        15,
+        16,
+        17
+      ],
+      "butir": "Pemeriksaan dan dukungan dokumentasi klinis",
+      "kriteria": [
+        [
+          "ukuran_kekuatan_otot"
+        ],
+        [
+          "ukuran_massa_otot"
+        ]
+      ],
+      "syarat": "semua",
+      "mode_penilaian": "dukungan_dokumentasi",
+      "usia_min": 18,
+      "konteks_klinis": "sarkopenia",
+      "catatan": "Konfirmasi sarkopenia memerlukan kekuatan dan massa otot; skrining SARC-F/LILA saja tidak memastikan diagnosis. Nilai ditafsirkan menurut metode, jenis kelamin dan dokter. Dukungan dokumentasi belum memastikan seluruh kriteria klinis dan kelayakan klaim.",
+      "alasan_telaah_manual": "Sarkopenia: jarang menjadi diagnosis klaim; kriteria (kekuatan genggam, massa otot) sebagai rujukan."
+    },
+    {
+      "id": "PNPK-AKUPUNKTUR-DOK",
+      "nama": "Dokumentasi akupunktur",
+      "katalog_id": "KMK-2024-1933",
+      "dx": [],
+      "halaman": [
+        14,
+        15
+      ],
+      "butir": "Pemeriksaan dan dukungan dokumentasi klinis",
+      "kriteria": [
+        [
+          "akupunktur_terlaksana"
+        ],
+        [
+          "consent_tindakan"
+        ]
+      ],
+      "syarat": "semua",
+      "mode_penilaian": "dukungan_dokumentasi",
+      "px": [
+        "99.91",
+        "99.92"
+      ],
+      "catatan": "Periksa catatan titik/lokasi dan persetujuan tindakan; indikasi dan kontraindikasi ditelaah sesuai metode. Tidak membuat diagnosis dari tindakan.",
+      "alasan_telaah_manual": "Akupunktur medik: pedoman tindakan, bukan kriteria diagnosis."
+    },
+    {
+      "id": "PNPK-ANESTESI-DOK",
+      "nama": "Dokumentasi anestesi",
+      "katalog_id": "KMK-2022-1541",
+      "dx": [],
+      "halaman": [
+        25,
+        26,
+        27
+      ],
+      "butir": "Pemeriksaan dan dukungan dokumentasi klinis",
+      "kriteria": [
+        [
+          "asesmen_anestesi"
+        ],
+        [
+          "jalan_napas_anestesi"
+        ],
+        [
+          "consent_tindakan"
+        ]
+      ],
+      "syarat": "semua",
+      "mode_penilaian": "dukungan_dokumentasi",
+      "px": [
+        "03.91",
+        "03.92",
+        "03.93",
+        "93.90",
+        "96.04"
+      ],
+      "konteks_klinis": "anestesi|anaesthesia|anesthesia",
+      "catatan": "Evaluasi praanestesi dan izin untuk tindakan elektif. Resusitasi darurat bukan anestesi elektif dan mempunyai pengecualian; pemicu memerlukan catatan tindakan anestesi.",
+      "alasan_telaah_manual": "Anestesiologi dan terapi intensif: pedoman tindakan; kriteria ICU dinilai aturan RK/TKMKB."
+    },
+    {
+      "id": "PNPK-NYERI-DOK",
+      "nama": "Dokumentasi nyeri",
+      "katalog_id": "KMK-2019-481",
+      "dx": [
+        "R52"
+      ],
+      "halaman": [
+        22,
+        26,
+        27
+      ],
+      "butir": "Pemeriksaan dan dukungan dokumentasi klinis",
+      "kriteria": [
+        [
+          "skala_nyeri"
+        ]
+      ],
+      "syarat": "semua",
+      "mode_penilaian": "dukungan_dokumentasi",
+      "catatan": "Asesmen nyeri sesuai usia/kondisi; skor saja tidak membuktikan diagnosis etiologis.",
+      "alasan_telaah_manual": "Tata laksana nyeri: pedoman terapi, bukan kriteria diagnosis klaim."
+    },
+    {
+      "id": "PNPK-TRAUMA-DOK",
+      "nama": "Dokumentasi trauma",
+      "katalog_id": "KMK-2017-132",
+      "dx": [
+        "^S"
+      ],
+      "halaman": [
+        24,
+        25,
+        26,
+        27
+      ],
+      "butir": "Pemeriksaan dan dukungan dokumentasi klinis",
+      "kriteria": [
+        [
+          "survei_trauma"
+        ]
+      ],
+      "syarat": "semua",
+      "mode_penilaian": "dukungan_dokumentasi",
+      "catatan": "Telaah temuan cedera/primary dan secondary survey; diagnosis spesifik memerlukan bukti yang sesuai jenis cedera.",
+      "alasan_telaah_manual": "Trauma (ATLS): pedoman tata laksana; diagnosis per cedera dinilai aturan fraktur/COT."
+    },
+    {
+      "id": "PNPK-INFEKSI-ABD-DOK",
+      "nama": "Dokumentasi infeksi intraabdomen",
+      "katalog_id": "KMK-2017-359",
+      "dx": [
+        "K35",
+        "K36",
+        "K37",
+        "K65"
+      ],
+      "halaman": [
+        15,
+        16
+      ],
+      "butir": "Pemeriksaan dan dukungan dokumentasi klinis",
+      "kriteria": [
+        [
+          "infeksi_abdomen_klinis"
+        ]
+      ],
+      "syarat": "semua",
+      "mode_penilaian": "dukungan_dokumentasi",
+      "catatan": "Anamnesis dan pemeriksaan abdomen adalah dasar evaluasi. Imaging dipilih sesuai kondisi, bukan wajib CT pada setiap kasus.",
+      "alasan_telaah_manual": "Infeksi intraabdominal: diagnosis klinis-pencitraan beragam; sebagai rujukan."
+    },
+    {
+      "id": "PNPK-PERIODONTAL-DOK",
+      "nama": "Dokumentasi periodontal",
+      "katalog_id": "KMK-2025-978",
+      "dx": [
+        "K05"
+      ],
+      "halaman": [
+        11,
+        16,
+        20,
+        25,
+        26
+      ],
+      "butir": "Pemeriksaan dan dukungan dokumentasi klinis",
+      "kriteria": [
+        [
+          "periodontal_klinis"
+        ]
+      ],
+      "syarat": "semua",
+      "mode_penilaian": "dukungan_dokumentasi",
+      "catatan": "Tinjau pemeriksaan gingiva/poket/perlekatan dan radiologi sesuai indikasi. Mesin tidak menetapkan stadium hanya dari kode. Dukungan dokumentasi belum memastikan seluruh kriteria klinis dan kelayakan klaim.",
+      "alasan_telaah_manual": "Penyakit periodontal: diagnosis klinis gigi; sebagai rujukan."
+    },
+    {
+      "id": "PNPK-KARIES-DOK",
+      "nama": "Dokumentasi karies",
+      "katalog_id": "KMK-2025-15",
+      "dx": [
+        "K02"
+      ],
+      "halaman": [
+        15,
+        16,
+        17
+      ],
+      "butir": "Pemeriksaan dan dukungan dokumentasi klinis",
+      "kriteria": [
+        [
+          "karies_klinis"
+        ]
+      ],
+      "syarat": "semua",
+      "mode_penilaian": "dukungan_dokumentasi",
+      "catatan": "Dukungan lokasi gigi serta lesi/kedalaman pada pemeriksaan. Tidak mewajibkan radiologi untuk semua karies. Dukungan dokumentasi belum memastikan seluruh kriteria klinis dan kelayakan klaim.",
+      "alasan_telaah_manual": "Karies gigi: diagnosis klinis gigi; sebagai rujukan."
+    },
+    {
+      "id": "PNPK-PULPA-DOK",
+      "nama": "Dokumentasi penyakit pulpa dan periapikal",
+      "katalog_id": "KMK-2023-1492",
+      "dx": [
+        "K04"
+      ],
+      "halaman": [
+        12,
+        13,
+        17,
+        24
+      ],
+      "butir": "Pemeriksaan dan dukungan dokumentasi klinis",
+      "kriteria": [
+        [
+          "pulpa_klinis"
+        ]
+      ],
+      "syarat": "semua",
+      "mode_penilaian": "dukungan_dokumentasi",
+      "catatan": "Bukti vitalitas, perkusi atau radiografis sesuai diagnosis. Diagnosis klinis dan etiologi ditetapkan dokter gigi. Dukungan dokumentasi belum memastikan seluruh kriteria klinis dan kelayakan klaim.",
+      "alasan_telaah_manual": "Penyakit pulpa/periapikal: diagnosis klinis gigi; sebagai rujukan."
+    },
+    {
+      "id": "PNPK-SEBOROIK-DOK",
+      "nama": "Dokumentasi seboroik",
+      "katalog_id": "KMK-2019-213",
+      "dx": [
+        "L21"
+      ],
+      "halaman": [
+        15,
+        19,
+        29
+      ],
+      "butir": "Pemeriksaan dan dukungan dokumentasi klinis",
+      "kriteria": [
+        [
+          "lesi_seboroik"
+        ]
+      ],
+      "syarat": "semua",
+      "mode_penilaian": "dukungan_dokumentasi",
+      "catatan": "Diagnosis dari anamnesis dan lesi eritroskuamosa di daerah predileksi. KOH/biopsi tidak diwajibkan untuk semua kasus. Dukungan dokumentasi belum memastikan seluruh kriteria klinis dan kelayakan klaim.",
+      "alasan_telaah_manual": "Dermatitis seboroik: diagnosis klinis kulit; sebagai rujukan."
+    },
+    {
+      "id": "PNPK-SUMBING-DOK",
+      "nama": "Dokumentasi sumbing",
+      "katalog_id": "KMK-2019-321",
+      "dx": [
+        "Q35",
+        "Q36",
+        "Q37"
+      ],
+      "halaman": [
+        23
+      ],
+      "butir": "Pemeriksaan dan dukungan dokumentasi klinis",
+      "kriteria": [
+        [
+          "anatomi_sumbing"
+        ]
+      ],
+      "syarat": "semua",
+      "mode_penilaian": "dukungan_dokumentasi",
+      "catatan": "Tinjau jenis, sisi dan kelengkapan celah sesuai kode; indikasi operasi menurut kondisi dan tahap pertumbuhan. Dukungan dokumentasi belum memastikan seluruh kriteria klinis dan kelayakan klaim.",
+      "alasan_telaah_manual": "Bibir sumbing dan lelangit: diagnosis klinis yang tampak; sebagai rujukan tindakan."
     }
   ],
-  "tanpa_aturan": [
+  "tanpa_aturan": [],
+  "pemetaan_aturan": [
     {
       "katalog_id": "KMK-2026-304",
-      "alasan": "Stroke: sudah dinilai aturan RK/TKMKB (CT kepala, defisit neurologis); PNPK sebagai rujukan."
+      "alasan": "Stroke: sudah dinilai aturan RK/TKMKB (CT kepala, defisit neurologis); PNPK sebagai rujukan.",
+      "aturan_ids": [
+        "RK-10",
+        "TK-25-01"
+      ],
+      "status": "dinilai_aturan_terkait",
+      "batas_cakupan": "Pemetaan pemeriksaan terkait yang sudah berjalan; bukan implementasi seluruh isi PNPK. Kelayakan klaim memerlukan bukti klinis dan telaah episode."
     },
     {
       "katalog_id": "KMK-2026-876",
-      "alasan": "SKA: sudah dinilai aturan RK/BA (EKG, troponin); PNPK sebagai rujukan."
+      "alasan": "SKA: sudah dinilai aturan RK/BA (EKG, troponin); PNPK sebagai rujukan.",
+      "aturan_ids": [
+        "RK-11"
+      ],
+      "status": "dinilai_aturan_terkait",
+      "batas_cakupan": "Pemetaan pemeriksaan terkait yang sudah berjalan; bukan implementasi seluruh isi PNPK. Kelayakan klaim memerlukan bukti klinis dan telaah episode."
     },
     {
       "katalog_id": "KMK-2026-875",
-      "alasan": "Demam tifoid dewasa: sudah dinilai aturan RK (serologi/kultur)."
+      "alasan": "Demam tifoid dewasa: sudah dinilai aturan RK (serologi/kultur).",
+      "aturan_ids": [
+        "RK-18"
+      ],
+      "status": "dinilai_aturan_terkait",
+      "batas_cakupan": "Pemetaan pemeriksaan terkait yang sudah berjalan; bukan implementasi seluruh isi PNPK. Kelayakan klaim memerlukan bukti klinis dan telaah episode."
     },
     {
       "katalog_id": "KMK-2025-1168",
-      "alasan": "Pneumonia dewasa: sudah dinilai BA-18 (infiltrat + gejala) dan RK."
+      "alasan": "Pneumonia dewasa: sudah dinilai BA-18 (infiltrat + gejala) dan RK.",
+      "aturan_ids": [
+        "BA-18-M03",
+        "RK-03"
+      ],
+      "status": "dinilai_aturan_terkait",
+      "batas_cakupan": "Pemetaan pemeriksaan terkait yang sudah berjalan; bukan implementasi seluruh isi PNPK. Kelayakan klaim memerlukan bukti klinis dan telaah episode."
     },
     {
       "katalog_id": "KMK-2021-4636",
-      "alasan": "Dengue anak/remaja: sudah dinilai aturan RK (trombosit, hematokrit, NS1/serologi)."
+      "alasan": "Dengue anak/remaja: sudah dinilai aturan RK (trombosit, hematokrit, NS1/serologi).",
+      "aturan_ids": [
+        "RK-02"
+      ],
+      "status": "dinilai_aturan_terkait",
+      "batas_cakupan": "Pemetaan pemeriksaan terkait yang sudah berjalan; bukan implementasi seluruh isi PNPK. Kelayakan klaim memerlukan bukti klinis dan telaah episode."
     },
     {
       "katalog_id": "KMK-2020-9845",
-      "alasan": "Dengue dewasa: sudah dinilai aturan RK."
+      "alasan": "Dengue dewasa: sudah dinilai aturan RK.",
+      "aturan_ids": [
+        "RK-01"
+      ],
+      "status": "dinilai_aturan_terkait",
+      "batas_cakupan": "Pemetaan pemeriksaan terkait yang sudah berjalan; bukan implementasi seluruh isi PNPK. Kelayakan klaim memerlukan bukti klinis dan telaah episode."
     },
     {
       "katalog_id": "KMK-2017-342",
-      "alasan": "Sepsis dewasa: sudah dinilai BA-18 (SIRS/kultur) dan RK."
+      "alasan": "Sepsis dewasa: pemeriksaan terkait RK-13 dan skor SOFA pada TK-25-09. Ketentuan BA historis berbasis SIRS tidak menggantikan penilaian disfungsi organ.",
+      "aturan_ids": [
+        "RK-13",
+        "TK-25-09"
+      ],
+      "status": "dinilai_aturan_terkait",
+      "batas_cakupan": "Pemetaan pemeriksaan terkait yang sudah berjalan; bukan implementasi seluruh isi PNPK. Kelayakan klaim memerlukan bukti klinis dan telaah episode."
     },
     {
       "katalog_id": "KMK-2017-91",
-      "alasan": "Komplikasi kehamilan: sudah dinilai aturan RK/BA obstetri; PNPK sebagai rujukan."
+      "alasan": "PNPK komplikasi kehamilan: pemeriksaan preeklampsia memakai RK-12. Komplikasi lain perlu aturan spesifik sesuai topik; pemetaan ini tidak meluluskan seluruh komplikasi kehamilan.",
+      "aturan_ids": [
+        "RK-12"
+      ],
+      "status": "cakupan_sebagian",
+      "batas_cakupan": "Pemetaan pemeriksaan terkait yang sudah berjalan; bukan implementasi seluruh isi PNPK. Kelayakan klaim memerlukan bukti klinis dan telaah episode."
     },
     {
       "katalog_id": "PNPK-PNEUMONIA-ANAK-IDAI",
-      "alasan": "Dinilai oleh pemeriksa pneumonia anak (baPnpkAnak)."
+      "alasan": "Dinilai oleh pemeriksa pneumonia anak (baPnpkAnak).",
+      "aturan_ids": [
+        "RK-19"
+      ],
+      "status": "dinilai_aturan_terkait",
+      "batas_cakupan": "Pemetaan pemeriksaan terkait yang sudah berjalan; bukan implementasi seluruh isi PNPK. Kelayakan klaim memerlukan bukti klinis dan telaah episode."
     },
     {
       "katalog_id": "KMK-2014-305",
-      "alasan": "TB 2014 digantikan PNPK TB terbaru; kriteria TB anak/dewasa dinilai PNPK-TB-ANAK-01 dan BA-18."
-    },
-    {
-      "katalog_id": "KMK-2021-4613",
-      "alasan": "Hipertensi anak: ambang memakai tabel persentil TD menurut usia/jenis kelamin/tinggi (AAP) yang tidak dapat dihitung andal dari dokumen klaim."
-    },
-    {
-      "katalog_id": "KMK-2020-2849",
-      "alasan": "Katarak anak: keputusan operasi oleh subspesialis mata anak; tidak ada ambang angka yang dapat diperiksa dari dokumen."
-    },
-    {
-      "katalog_id": "KMK-2025-723",
-      "alasan": "Ulkus kornea bakteri: diagnosis klinis slit lamp; pemeriksaan mikrobiologi untuk etiologi, bukan syarat diagnosis."
-    },
-    {
-      "katalog_id": "KMK-2025-970",
-      "alasan": "Skizofrenia: kriteria PPDGJ/DSM (durasi, gejala) merupakan penilaian psikiatri, tidak dapat diverifikasi otomatis dari resume."
-    },
-    {
-      "katalog_id": "KMK-2015-73",
-      "alasan": "PNPK jiwa 2015: kriteria diagnosis klinis psikiatri; sebagai rujukan."
-    },
-    {
-      "katalog_id": "KMK-2024-2005",
-      "alasan": "Sarkopenia: jarang menjadi diagnosis klaim; kriteria (kekuatan genggam, massa otot) sebagai rujukan."
-    },
-    {
-      "katalog_id": "KMK-2024-1933",
-      "alasan": "Akupunktur medik: pedoman tindakan, bukan kriteria diagnosis."
-    },
-    {
-      "katalog_id": "KMK-2022-1541",
-      "alasan": "Anestesiologi dan terapi intensif: pedoman tindakan; kriteria ICU dinilai aturan RK/TKMKB."
-    },
-    {
-      "katalog_id": "KMK-2019-481",
-      "alasan": "Tata laksana nyeri: pedoman terapi, bukan kriteria diagnosis klaim."
-    },
-    {
-      "katalog_id": "KMK-2017-132",
-      "alasan": "Trauma (ATLS): pedoman tata laksana; diagnosis per cedera dinilai aturan fraktur/COT."
+      "alasan": "TB 2014 digantikan PNPK TB terbaru; kriteria TB anak/dewasa dinilai PNPK-TB-ANAK-01 dan BA-18.",
+      "aturan_ids": [
+        "PNPK-TB-ANAK-01",
+        "BA-18-M04"
+      ],
+      "status": "versi_digantikan",
+      "batas_cakupan": "Pemetaan pemeriksaan terkait yang sudah berjalan; bukan implementasi seluruh isi PNPK. Kelayakan klaim memerlukan bukti klinis dan telaah episode."
     },
     {
       "katalog_id": "KMK-2021-4622",
-      "alasan": "Fraktur kraniomaksilofasial: dinilai bersama PNPK-FRAKTUR-01 (konfirmasi radiologi/CT)."
-    },
-    {
-      "katalog_id": "KMK-2017-359",
-      "alasan": "Infeksi intraabdominal: diagnosis klinis-pencitraan beragam; sebagai rujukan."
-    },
-    {
-      "katalog_id": "KMK-2025-978",
-      "alasan": "Penyakit periodontal: diagnosis klinis gigi; sebagai rujukan."
-    },
-    {
-      "katalog_id": "KMK-2025-15",
-      "alasan": "Karies gigi: diagnosis klinis gigi; sebagai rujukan."
-    },
-    {
-      "katalog_id": "KMK-2023-1492",
-      "alasan": "Penyakit pulpa/periapikal: diagnosis klinis gigi; sebagai rujukan."
+      "alasan": "Fraktur kraniomaksilofasial: dinilai bersama PNPK-FRAKTUR-01 (konfirmasi radiologi/CT).",
+      "aturan_ids": [
+        "PNPK-FRAKTUR-01"
+      ],
+      "status": "dinilai_aturan_terkait",
+      "batas_cakupan": "Pemetaan pemeriksaan terkait yang sudah berjalan; bukan implementasi seluruh isi PNPK. Kelayakan klaim memerlukan bukti klinis dan telaah episode."
     },
     {
       "katalog_id": "KMK-2022-777",
-      "alasan": "Impaksi gigi: dinilai BA-19-M69/RK-17 (odontektomi rawat inap)."
-    },
-    {
-      "katalog_id": "KMK-2019-213",
-      "alasan": "Dermatitis seboroik: diagnosis klinis kulit; sebagai rujukan."
-    },
-    {
-      "katalog_id": "KMK-2019-321",
-      "alasan": "Bibir sumbing dan lelangit: diagnosis klinis yang tampak; sebagai rujukan tindakan."
+      "alasan": "Impaksi gigi: dinilai BA-19-M69/RK-17 (odontektomi rawat inap).",
+      "aturan_ids": [
+        "BA-19-M69",
+        "RK-17"
+      ],
+      "status": "dinilai_aturan_terkait",
+      "batas_cakupan": "Pemetaan pemeriksaan terkait yang sudah berjalan; bukan implementasi seluruh isi PNPK. Kelayakan klaim memerlukan bukti klinis dan telaah episode."
     }
   ]
 }

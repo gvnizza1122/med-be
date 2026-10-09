@@ -1,3 +1,8 @@
+// Layanan jaringan tiruan tetap memakai fetch yang disiapkan setiap skenario.
+jest.mock('../../services/httpTanpaTenggatService', () => ({
+  kirim: (...args) => global.fetch(...args),
+}));
+
 /**
  * Integrasi kamusPenunjangService + bacaLabService ke generateAiReview
  * (HANDOFF.md item 4). Fetch AI dan DB dimock, sama seperti

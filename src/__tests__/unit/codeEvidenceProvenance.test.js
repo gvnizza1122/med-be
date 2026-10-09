@@ -1,3 +1,8 @@
+// Layanan jaringan tiruan tetap memakai fetch yang disiapkan setiap skenario.
+jest.mock('../../services/httpTanpaTenggatService', () => ({
+  kirim: (...args) => global.fetch(...args),
+}));
+
 /**
  * Test regresi generateAiReview end-to-end untuk fix item 7 (provenance dari
  * metadata halaman), item 8 (procedure_rules -- lab rutin perlu review), dan

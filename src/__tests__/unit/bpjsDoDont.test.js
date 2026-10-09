@@ -86,7 +86,11 @@ test('hasil lama 100/100 diperbarui dan tidak berganda saat dibuka berulang; dat
   expect(lagi.putusan_pending.alasan).toHaveLength(1);expect(JSON.stringify(record)).toBe(before);
   const diperbaiki=perbaruiRisikoTampilan({...record,ai_review:lagi},[],{pages:[lab('Lekosit 25 Leu/uL'),p('RESUME MEDIS RAWAT INAP\nKeluhan: disuria, nyeri suprapubik\nDiagnosis Utama : ISK',4)]});
   expect(diperbaiki.analisis_kritis.temuan).toEqual([]);expect(diperbaiki.analisis_kritis.skor_keyakinan).toBe(100);
-  expect(diperbaiki.putusan_pending.alasan).toEqual([]);
+  expect(diperbaiki.putusan_pending.alasan).toHaveLength(1);
+  expect(diperbaiki.putusan_pending.alasan[0]).toMatchObject({kode:'PNPK-ISK-01',keparahan:'sedang',pertahankan_otomatis:true});
+  expect(diperbaiki.putusan_pending.alasan[0].penjelasan).toMatch(/Tanggal awal episode/);
+  const bertanggal=perbaruiRisikoTampilan({...record,admission_date:'2026-10-01',ai_review:lagi},[],{pages:[lab('Lekosit 25 Leu/uL'),p('RESUME MEDIS RAWAT INAP\nKeluhan: disuria, nyeri suprapubik\nDiagnosis Utama : ISK',4)]});
+  expect(bertanggal.putusan_pending.alasan).toEqual([]);
 });
 test('alasan dan keberatan lain tetap terpelihara, kegagalan AI tidak naik di atas 70',()=>{
   const lama={skor_keyakinan:70,ai_gagal:true,temuan:[{jenis:'kode_terlewat',keparahan:'sedang',pesan:'lain'}],ringkas:{total:1}};

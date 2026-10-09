@@ -76,3 +76,13 @@ test('LLA anak dan dewasa memakai tanggal penetapan masing-masing',()=>{
  expect(s.getDokumen('KMK-2026-160').berlaku_mulai).toBe('2026-03-03');expect(s.getDokumen('KMK-2025-986').berlaku_mulai).toBe('2025-10-17');
  expect(select(5,'C91.0').topik[0].terpilih.id).toBe('KMK-2025-986');expect(select(40,'C91.0').topik[0].terpilih.id).toBe('KMK-2026-160');
 });
+
+test('PNPK perdarahan menyediakan PDF, ringkasan berhalaman dan cakupan aturan yang sebenarnya',()=>{
+ const svc=require('../../services/katalogPedomanService');
+ const d=svc.getDokumen('KMK-2023-2162');
+ expect(d.status_unduh).toBe('terunduh');expect(d.berkas[0].jumlah_halaman).toBe(82);
+ expect(d.status_telaah).toBe('memiliki_aturan_ditelaah');
+ expect(d.pengetahuan_agen.tersedia).toBe(true);
+ expect(d.pengetahuan_agen.bagian).toContainEqual(expect.objectContaining({topik:'tata_laksana',halaman:20,kutipan:expect.stringContaining('Resusitasi')}));
+ expect(svc.berkasDokumen(d.id)).not.toBeNull();
+});

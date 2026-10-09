@@ -6,18 +6,6 @@
  */
 
 const { enhancedOcrExtraction } = require('./ocrEnhancement');
-const { OCR_ANGGARAN_MAKS_MS } = require('./ocrService');
-
-// OCR Phase 1 (19 Sep 2026, client approved): batas keras total budget OCR
-// enhancement turun jadi 3 menit/180000ms (sebelumnya hardcode 120000ms) —
-// dibuat configurable lewat OCR_ENHANCEMENT_TIMEOUT, dan SENGAJA nilai yang
-// SAMA persis dipakai sebagai budget internal ocrPdfPages() (lihat
-// ENHANCEMENT_TIMEOUT_MS di ocrService.js) supaya loop halaman di dalamnya
-// sempat berhenti sendiri (skip halaman non-critical) SEBELUM Promise.race
-// di bawah ini memutus paksa dan membuang seluruh hasil yang sudah selesai.
-const OCR_ENHANCEMENT_TIMEOUT_MS = parseInt(process.env.OCR_ENHANCEMENT_TIMEOUT || '180000', 10);
-// Batas panjang teks berkas yang dikirim ke AI ekstraksi (±30 halaman OCR).
-const BATAS_TEKS_KLAIM = parseInt(process.env.BATAS_TEKS_KLAIM || '90000', 10);
 
 /**
  * Apply OCR enhancements ke hasil standard extraction
@@ -61,21 +49,8 @@ async function applyOcrEnhancements(standardResult, filePath, options = {}) {
   try {
     console.log('[OcrIntegration] Applying OCR enhancements...');
 
-    // Timeout untuk OCR enhancement (Tesseract + clinical extraction), lihat
-    // OCR_ENHANCEMENT_TIMEOUT_MS di atas. Kalau timeout, skip enhancement dan
-    // lanjut dengan basic extraction saja.
-    // Batas keras hanya jaring pengaman: budget internal ocrPdfPages (menurut
-    // jumlah halaman & berkas yang di-OCR bersamaan) berhenti sendiri dan
-    // tidak pernah melebihi OCR_ANGGARAN_MAKS_MS, jadi halaman yang sudah
-    // selesai tidak pernah dibuang oleh batas ini.
-    const batasMs = Math.max(OCR_ENHANCEMENT_TIMEOUT_MS, OCR_ANGGARAN_MAKS_MS + 180000 + 15000);
-    let timerBatas;
-    const enhancementResult = await Promise.race([
-      enhancedOcrExtraction(filePath, pageNumbers),
-      new Promise((_, reject) => {
-        timerBatas = setTimeout(() => reject(new Error(`OCR enhancement timeout (${batasMs / 1000}s)`)), batasMs);
-      })
-    ]).finally(() => clearTimeout(timerBatas));
+    // Seluruh halaman diselesaikan sebelum analisis; durasi bukan alasan membuang bukti.
+    const enhancementResult = await enhancedOcrExtraction(filePath, pageNumbers, { classification: standardResult });
 
     enhanced.ocr_enhancement = enhancementResult;
     // Lembar grouper yang terbaca lewat OCR (PDF scan) -- untuk pembanding.
@@ -112,8 +87,7 @@ async function applyOcrEnhancements(standardResult, filePath, options = {}) {
         ].sort((a, b) => a.page_num - b.page_num);
         enhanced.claimDataText = enhanced.claimDataPages
           .map(p => (p.dari_ocr ? `[Halaman ${p.page_num} - hasil OCR scan]\n${p.text}` : p.text))
-          .join('\n\n---\n\n')
-          .slice(0, BATAS_TEKS_KLAIM);
+          .join('\n\n---\n\n');
       }
     }
 

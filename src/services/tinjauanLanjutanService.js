@@ -1,6 +1,6 @@
 const { createHash } = require('crypto');
 const gatewayModelService = require('./gatewayModelService');
-const { denganHumanizer } = require('./humanizerPromptService');
+const { denganGayaRingkas } = require('./humanizerPromptService');
 const { buatKandidat, periksaTinjauan, SYSTEM: SYSTEM_DIAGNOSIS } = require('./tinjauanDiagnosisService');
 const { bentukPutusan, buatPrompt, SYSTEM: SYSTEM_PENDING } = require('./putusanPendingAiService');
 
@@ -193,7 +193,7 @@ Skema gabungan ini menggantikan dua bentuk keluaran sebelumnya. Tidak perlu mena
 Tulis ringkas: setiap "alasan" paling banyak 2 kalimat, setiap kandidat 1-2 kutipan terpendek yang sudah cukup
 membuktikan, "klarifikasi" paling banyak 3 butir. Ketelitian penilaian tidak boleh dikurangi karena ringkas.`;
   const muatan = {
-    system: denganHumanizer(system), dikenal, json: true, maxTokens: 16000, versi: VERSI,
+    system: denganGayaRingkas(system), dikenal, json: true, maxTokens: 16000, versi: VERSI,
     jenisKlaim: record.jenis_klaim || record.JENIS_KLAIM,
     pemicuPendalaman: pemicu,
     prompt: `JENIS_KLAIM: ${record.jenis_klaim || record.JENIS_KLAIM}\nPEMICU: ${JSON.stringify(pemicu)}

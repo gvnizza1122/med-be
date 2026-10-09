@@ -5,29 +5,9 @@
  *       [ENHANCEMENT] multi-pass OCR (vital signs, clinical findings) →
  *       ekstraksi AI → record vClaim sesuai skema resmi.
  *
- * Env: AI_PROVIDER_API_KEY (wajib), AI_PROVIDER_BASE_URL, AI_MODEL, AI_MAX_ATTEMPTS, AI_TIMEOUT_MS.
- * Env: OCR_ENHANCEMENT_ENABLED (default true) — enable multi-pass OCR enhancement
- * Env: OCR_ENHANCEMENT_TIMEOUT (default 180000/3 menit) — batas keras budget
- *   OCR enhancement (Phase 1, 19 Sep 2026, client approved, turun dari
- *   sebelumnya). Lihat applyOcrEnhancements() di ocrIntegration.js untuk
- *   Promise.race pembungkusnya.
- *
- * STRATEGI PRIORITAS HALAMAN CRITICAL (OCR Phase 1): dalam budget 3 menit,
- * dokumen scan tebal (SPRI+SEP+Rincian Biaya+Resume Medis+Triage dst) bisa
- * kehabisan waktu sebelum sampai ke halaman yang paling berharga secara
- * klinis. Halaman TRIAGE IGD & RESUME MEDIS ditandai "CRITICAL" (lihat
- * isCriticalPage() di pdfPageClassifier.js) karena keduanya SATU-SATUNYA
- * sumber vital signs/diagnosis/prosedur (lihat extractClinicalFields() di
- * ocrEnhancement.js) — tanpa keduanya field klinis inti klaim gawat darurat
- * kosong total. ocrService.js#ocrPdfPages() mengurutkan antrean OCR supaya
- * halaman CRITICAL diproses LEBIH DULU, lalu men-skip halaman non-critical
- * begitu sisa waktu sudah mepet (lihat CRITICAL_PAGE_TIMEOUT_MARGIN_MS &
- * prioritizePagesForOcr()) — jadi kalaupun timeout keras tercapai, hasil
- * OCR halaman critical yang SUDAH selesai tetap terpakai (bukan dibuang
- * semua oleh Promise.race di ocrIntegration.js). Halaman yang ke-skip
- * dicatat di result.skipped_pages — daftar ini disiapkan sebagai input buat
- * Phase 2 (Luna fallback untuk field yang hilang), BELUM diimplementasi di
- * sini.
+ * Pembacaan seluruh halaman ditunggu tanpa batas durasi. Hasil lengkap
+ * disimpan lokal sebelum ekstraksi AI, agar gangguan jaringan tidak memicu
+ * OCR berulang. Bukti yang tidak terbaca tetap meminta telaah.
  */
 
 const { isLembarGrouper, cariLembarGrouper } = require('./lembarGrouperService');
@@ -296,7 +276,7 @@ function pakaiSemuaHalaman(classification, result) {
   const teks = halaman.map(p => p.text).join('\n\n---\n\n');
   if (teks.trim().length < 200) return false;
   classification.claimDataPages = halaman;
-  classification.claimDataText = teks.slice(0, 60000);
+  classification.claimDataText = teks;
   result.metadata.claimDataPagesFound = halaman.length;
   result.metadata.sumberDataSemuaHalaman = true;
   console.log(`[Pipeline] Halaman data klaim tidak dikenali kata kuncinya; ${halaman.length} halaman berteks dipakai sebagai sumber data.`);
@@ -356,7 +336,10 @@ async function extractFromPDF(filePath, options = {}) {
   };
 
   try {
-    let classification = await classifyPdfPages(filePath);
+    const cacheBaca = require('./cachePembacaanPdfService');
+    const tersimpan = await cacheBaca.ambil(filePath);
+    let classification = tersimpan || await classifyPdfPages(filePath);
+    result.metadata.pembacaan_digunakan_ulang = Boolean(tersimpan);
     result.classification = classification;
     result.metadata.pagesProcessed = classification.totalPages;
     result.metadata.claimDataPagesFound = classification.claimDataPages.length;
@@ -449,7 +432,7 @@ async function extractFromPDF(filePath, options = {}) {
     } else {
       // ENHANCEMENT: Kalau pdf-parse SUDAH dapat teks, apply enhancement untuk extract vital signs
       const ocrEnhancementEnabled = process.env.OCR_ENHANCEMENT_ENABLED !== 'false';
-      if (ocrEnhancementEnabled && filePath) {
+      if (ocrEnhancementEnabled && filePath && !tersimpan) {
         try {
           console.log('[Pipeline] Applying OCR enhancement (already have text, enriching with vital signs)...');
           const enhanced = await applyOcrEnhancements(classification, filePath, {
@@ -466,6 +449,8 @@ async function extractFromPDF(filePath, options = {}) {
         }
       }
     }
+
+    await cacheBaca.simpan(filePath, classification);
 
     // SEP/resume/SPRI dari native dan OCR menentukan kategori. Halaman IGD tidak
     // mengganti bukti rawat inap; pilihan tunggal klien lama tidak mengunci hasil.

@@ -16,7 +16,7 @@ const { KONVENSI_KODING_RS } = require('./konvensiKodingRs');
 const rag = require('./ragReferenceService');
 
 const MAKS_LANGKAH = Number(process.env.AGEN_CASEMIX_MAKS_LANGKAH || 8);
-const ALAT = ['baca_halaman', 'cari_teks', 'lihat_fakta', 'lihat_laporan', 'cari_kode', 'cek_kode', 'kategori', 'hitung_inacbg', 'cari_regulasi', 'cari_referensi_pending', 'lihat_pelajaran', 'jawab'];
+const ALAT = ['baca_halaman', 'cari_teks', 'lihat_fakta', 'lihat_laporan', 'cari_kode', 'cek_kode', 'kategori', 'hitung_inacbg', 'cari_regulasi', 'cari_pnpk', 'cari_referensi_pending', 'lihat_pelajaran', 'jawab'];
 
 const SYSTEM = `Kamu Agen Casemix rumah sakit -- casemix RUJUKAN: memberi rekomendasi beralasan; keputusan akhir ada pada casemix RS.
 Kamu asisten koder untuk klaim BPJS/asuransi. Kamu menjawab pertanyaan atau mengerjakan
@@ -34,13 +34,27 @@ Setiap giliran jawab SATU JSON:
 {"langkah":"kategori","kode":"D21"}
 {"langkah":"hitung_inacbg","diagnosis":["O42.1"],"prosedur":["74.1"]}
 {"langkah":"cari_regulasi","teks":"kegawatdaruratan"}
+{"langkah":"cari_pnpk","teks":"indikasi rawat inap","kode":"A91"}   (isi PNPK resmi berhalaman; kode/katalog_id opsional untuk mempersempit)
 {"langkah":"lihat_pelajaran"}   (pola keputusan casemix RS pada kasus lain untuk kode berkas ini; pola, bukan bukti pasien ini)
 {"langkah":"cari_referensi_pending","teks":"alasan pending BPJS"}   (kasus pending terdahulu yang HASILNYA terverifikasi petugas)
 {"langkah":"jawab","jawaban":"jawaban ringkas & jelas dalam bahasa Indonesia","rujukan":[{"halaman":3,"kutipan":"persis dari halaman"}]}
 Untuk draf jawaban pending: argumen dari berkas pasien INI (fakta & halaman); referensi kasus terdahulu hanya pola, bukan bukti
 pasien ini, dan hasil "ditolak" adalah peringatan. Bagian yang datanya tidak ada tulis "[isi: ...]", jangan ditebak.
+PNPK: pakai PNPK YANG BERLAKU di konteks atau hasil cari_pnpk sebagai tolok ukur kriteria diagnosis, penunjang, dan indikasi
+rawat inap/tindakan; sebut nomor KMK dan halamannya di jawaban. PNPK rujukan klinis, bukan keputusan BPJS; jangan mengutip PNPK
+atau halaman yang tidak muncul di konteks/hasil alat.
 Hemat langkah: pertanyaan tarif/selisih -> panggil hitung_inacbg segera (kode dasar ada di ringkasan laporan); jangan membaca
 halaman yang isinya sudah terlihat di hasil cari_teks. Jawab langsung bila sudah cukup data. Kutipan rujukan WAJIB persis dari halaman.`;
+
+/** Daftar PNPK yang berlaku + kriteria pokoknya (singkat; isi lengkap lewat cari_pnpk). */
+function pnpkKonteks(record, laporan) {
+  try {
+    const svc = require('./pnpkPengetahuanService');
+    const kode = laporan?.keputusan_casemix || null;
+    const k = svc.konteksAgen(record, { ...(kode ? { dx: kode.diagnosis, px: kode.prosedur } : {}), topik: ['kriteria_diagnosis', 'rawat_inap', 'indikasi_tindakan'], total: 3000 });
+    return k.teks ? `\n${k.teks}\n(detail PNPK lain lewat cari_pnpk)` : '';
+  } catch (_) { return ''; }
+}
 
 function norm(x) { return String(x || '').replace(/\s+/g, ' ').trim().toLowerCase(); }
 
@@ -53,9 +67,14 @@ function ringkasLaporan(laporan) {
     risiko: (laporan.risiko_pending || []).map(r => `[${r.keparahan}] ${r.ringkas}`),
     pertanyaan_klarifikasi: (laporan.pertanyaan_klarifikasi || []).map(q => q.pertanyaan),
     inacbg: laporan.alternatif_koding && laporan.alternatif_koding.dasar,
-    alternatif: ((laporan.alternatif_koding && laporan.alternatif_koding.alternatif) || []).map(a => `${a.judul}: ${a.inacbg} ${a.tarif} (selisih ${a.selisih_tarif})`),
+    alternatif: ((laporan.alternatif_koding && laporan.alternatif_koding.alternatif) || []).map(a => `${a.judul}: ${a.inacbg} ${a.tarif} (selisih ${a.selisih_tarif})${a.penilaian ? ` [${a.penilaian}; syarat belum: ${(a.syarat_belum || []).map(x => x.syarat).join(' | ') || '-'}]` : ''}`),
     keputusan_casemix_rs: laporan.keputusan_casemix ? `${laporan.keputusan_casemix.diagnosis.join(';')} | ${laporan.keputusan_casemix.prosedur.join(';')} | ${laporan.keputusan_casemix.inacbg || '-'} (KEPUTUSAN AKHIR casemix RS)` : null,
     pelajaran: (laporan.pelajaran_casemix || []).map(p => p.pesan),
+    evaluasi_petugas_casemix: laporan.evaluasi_casemix?.terakhir ? {
+      status:laporan.evaluasi_casemix.terakhir.status, alasan:laporan.evaluasi_casemix.terakhir.alasan,
+      bukti:laporan.evaluasi_casemix.terakhir.bukti, perlu_evaluasi_ulang:laporan.evaluasi_casemix.terakhir.perlu_evaluasi_ulang,
+      catatan:'Pendapat petugas RS, bukan hasil BPJS. Telaah alasan perbedaan; jangan abaikan temuan otomatis yang belum diselesaikan.',
+    } : null,
     kronologi: (laporan.kronologi || []).map(k => `${k.tanggal}${k.jam ? ` ${k.jam}` : ''} ${k.peristiwa} (hal. ${k.halaman})`),
   };
 }
@@ -83,6 +102,10 @@ async function alatInteraktif(langkah, konteks) {
     return p.length ? { pelajaran: p.map(x => x.pesan) } : { pelajaran: [], catatan: 'belum ada pola keputusan casemix RS yang berulang untuk kode ini' };
   }
   if (langkah.langkah === 'cari_regulasi') return { hasil: cariRegulasi(langkah.teks) };
+  if (langkah.langkah === 'cari_pnpk') {
+    const hasil = require('./pnpkPengetahuanService').cariPnpk(langkah.teks, { katalog_id: langkah.katalog_id || null, kode: langkah.kode || null, maks: 4 });
+    return hasil.length ? { hasil } : { hasil: [], catatan: 'tidak ditemukan di PNPK; jangan menebak isi pedoman' };
+  }
   if (langkah.langkah === 'cari_referensi_pending') {
     // Hanya referensi berhasil-terverifikasi; skema lama / belum ada data -> kosong (tidak pernah contoh acak).
     if (!konteks.db || typeof konteks.db.prepare !== 'function') return { hasil: [], catatan: 'referensi tidak tersedia' };
@@ -106,7 +129,7 @@ async function tanyaAgenCasemix({ pertanyaan, riwayat = [], record, pages, fakta
   const kelas = require('./kelasPerawatanService').informasiKelas(record);
   const konteks = `JENIS_KLAIM: ${record.jenis_klaim || record.JENIS_KLAIM || '-'}; KELAS TARIF: ${kelas.kelas_tarif || '-'}; KELAS HAK: ${kelas.kelas_hak || '-'}; KELAS KAMAR: ${kelas.kelas_ditempati || '-'}
 HALAMAN TERSEDIA: ${daftarHalaman}
-RINGKASAN LAPORAN CASEMIX: ${JSON.stringify(ringkas).slice(0, 3000)}
+RINGKASAN LAPORAN CASEMIX: ${JSON.stringify(ringkas).slice(0, 3000)}${pnpkKonteks(record, laporan)}
 ${percakapan ? `PERCAKAPAN SEBELUMNYA:\n${percakapan}\n` : ''}PERTANYAAN/TUGAS KODER: ${tanya}`;
 
   const jejak = [];
@@ -114,7 +137,7 @@ ${percakapan ? `PERCAKAPAN SEBELUMNYA:\n${percakapan}\n` : ''}PERTANYAAN/TUGAS K
   for (let i = 0; i < MAKS_LANGKAH; i++) {
     const terakhir = i === MAKS_LANGKAH - 1;
     const prompt = `${konteks}\n\nLANGKAH SEBELUMNYA:\n${jejak.map((j, n) => `${n + 1}. ${JSON.stringify(j.langkah)} -> ${JSON.stringify(j.hasil).slice(0, 1800)}`).join('\n') || '(belum ada)'}${terakhir ? '\n\nIni langkah TERAKHIR: wajib {"langkah":"jawab",...}.' : ''}`;
-    const r = await gateway.panggilModel('agen_casemix', { system: SYSTEM.replace(KONVENSI_KODING_RS,require('./konvensiKodingRs').konvensiUntukRs(record,pages)), prompt, json: true, maxTokens: 1800, dikenal, jenisKlaim: record.jenis_klaim || record.JENIS_KLAIM, versi: 'agen-casemix-v2-referensi' }, { db });
+    const r = await gateway.panggilModel('agen_casemix', { system: SYSTEM.replace(KONVENSI_KODING_RS,require('./konvensiKodingRs').konvensiUntukRs(record,pages)), prompt, json: true, maxTokens: 1800, dikenal, jenisKlaim: record.jenis_klaim || record.JENIS_KLAIM, versi: 'agen-casemix-v3-pnpk' }, { db });
     tokens += (r && r.penggunaan && r.penggunaan.total_tokens) || 0;
     idr += (r && r.biaya && r.biaya.idr) || 0;
     model = (r && r.model) || model;

@@ -1,5 +1,5 @@
 const gatewayModelService = require('./gatewayModelService');
-const { denganHumanizer } = require('./humanizerPromptService');
+const { denganGayaRingkas } = require('./humanizerPromptService');
 const { pecahDaftarKode, normalisasiKode } = require('./ketentuanKlaimService');
 const { deskripsiDiagnosis } = require('./kamusKodeService');
 
@@ -130,7 +130,7 @@ async function tinjauDiagnosis(record, ai, pages, resumePages, { gateway = gatew
   const promptDasar = `JENIS_KLAIM: ${record.jenis_klaim || record.JENIS_KLAIM || 'belum diketahui'}\nKANDIDAT: ${JSON.stringify(candidates)}\nHALAMAN_RESUME: ${JSON.stringify(resumePages)}\nBUKTI SELURUH BERKAS:\n${pages.map(p => `=== Halaman ${p.page_number} ===\n${p.ocr_text}`).join('\n\n')}`;
   const panggil = (tambahan = '') => gateway.panggilModel('baca_berkas', {
     jenisKlaim: record.jenis_klaim || record.JENIS_KLAIM,
-    system: denganHumanizer(SYSTEM), json: true, maxTokens: 3000, dikenal,
+    system: denganGayaRingkas(SYSTEM), json: true, maxTokens: 3000, dikenal,
     prompt: promptDasar + tambahan,
   }, { db });
   let response = await panggil();

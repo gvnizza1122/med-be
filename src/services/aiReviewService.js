@@ -58,7 +58,7 @@ const { susunFaktaKlinis } = require('./faktaKlinisService');
 const { nilaiDiagnosis } = require('./penalaranDiagnosisService');
 const { groupCodesToInaCBG } = require('./inacbgGroupingService');
 const gatewayModelService = require('./gatewayModelService');
-const { denganHumanizer } = require('./humanizerPromptService');
+const { denganHumanizer, denganGayaRingkas } = require('./humanizerPromptService');
 const { tinjauDiagnosis } = require('./tinjauanDiagnosisService');
 const { getTarifResmi, lookupTarifInacbg, cocokJenisKlaim } = require('./tarifInacbgLookup');
 const { jalankanPagarAman, catatDitolakAwal, ALASAN_PAGAR } = require('./pagarPascaAiService');
@@ -834,7 +834,7 @@ async function suggestDiagnosisCodesFallback(evidencePool, ditolakOut = null, re
 
   try {
     const gateway = await gatewayModelService.panggilModel('baca_berkas', {
-      system: denganHumanizer(DIAGNOSIS_SUGGESTION_SYSTEM_PROMPT),
+      system: denganGayaRingkas(DIAGNOSIS_SUGGESTION_SYSTEM_PROMPT),
       jenisKlaim: record.jenis_klaim || record.JENIS_KLAIM,
       prompt: userPrompt,
       json: true,
@@ -1237,7 +1237,7 @@ async function assessKegawatdaruratan(evidencePool, triagePageNumbers, umurTahun
 
   try {
     const hasilGateway = await gatewayModelService.panggilModel('baca_berkas', {
-      system: denganHumanizer(KEGAWATDARURATAN_SYSTEM_PROMPT),
+      system: denganGayaRingkas(KEGAWATDARURATAN_SYSTEM_PROMPT),
       prompt: userPrompt,
       json: true,
       maxTokens: 4200,
@@ -2117,7 +2117,7 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
     try {
       const db = getDb();
       const hasilGateway = await gatewayModelService.panggilModel('baca_berkas', {
-        system: denganHumanizer(AI_REVIEW_SYSTEM_PROMPT),
+        system: denganGayaRingkas(AI_REVIEW_SYSTEM_PROMPT),
         jenisKlaim: record.jenis_klaim || record.JENIS_KLAIM,
         prompt: promptLuna,
         json: true,
@@ -2610,10 +2610,7 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
       const resumeMedisOnlyPool = evidencePool.filter(p => resumeMedisOnlyPageNumbers.includes(p.page_number));
       if (codes.diagnosis.length === 0 && result.suggested_codes.length === 0 && resumeMedisOnlyPool.length > 0) {
         try {
-          const fallbackSuggestions = await Promise.race([
-            suggestDiagnosisCodesFallback(resumeMedisOnlyPool, ditolakAwal, record, sesiAgen ? sesiAgen.catatanUntukLuna() : ''),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('fallback hard-timeout 70s')), 70000)),
-          ]);
+          const fallbackSuggestions = await suggestDiagnosisCodesFallback(resumeMedisOnlyPool, ditolakAwal, record, sesiAgen ? sesiAgen.catatanUntukLuna() : '');
           if (fallbackSuggestions.length > 0) {
             console.warn(`[AI-REVIEW] Fallback saran diagnosis menghasilkan ${fallbackSuggestions.length} kandidat tambahan.`);
             result.suggested_codes.push(...fallbackSuggestions);
@@ -2837,6 +2834,16 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
       result.tariff_result = tarifResult;
       if (result.tariff_result) result.tariff_result.kelas_perawatan = require('./kelasPerawatanService').informasiKelas(record);
 
+      // Pemeriksa kritis mendapat giliran sebelum tinjauan tambahan. Setelah
+      // penalaran selesai, aturan diperbarui memakai jawaban AI yang sama.
+      try {
+        result.analisis_kritis = await periksaKritis({ record, ai: result, pages: evidencePool, hitungInacbgDanTarif,
+          db: getDb(), dikenal: identitasUntukGateway(record) });
+        result.tokens_used += result.analisis_kritis.tokens_used || 0;
+      } catch (e) {
+        result.analisis_kritis = { ai_gagal: true, pesan_gangguan: e.message, temuan: [] };
+      }
+
       // Penalaran dan tinjauan diagnosis saling independen; antrean bersama
       // membatasi beban, tanpa memperpendek bukti atau melangkahi pemeriksa kritis.
       const prosesPenalaran=(async()=>{
@@ -2849,6 +2856,7 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
         const { dx } = kodeFinal(record, result);
         const kodeAturan = new Set((result.suggested_codes || []).filter(s => s && s.sumber_aturan && s.sumber_aturan !== 'agen_tinjau').map(s => String(s.code).toUpperCase()));
         result.penalaran_diagnosis = await nilaiDiagnosis({ faktaKlinis: fakta, kodeDiagnosis: dx, kodeAturan, pages: evidencePool, record,
+          referensiKlaim: result.referensi_klaim, prosedur: kodeFinal(record, result).px,
           db: getDb(), dikenal: identitasUntukGateway(record) });
         result.tokens_used += result.penalaran_diagnosis.tokens_used || 0;
         if (sesiAgen) sesiAgen.catat('Penalaran diagnosis (anamnesis -> fisik -> penunjang -> kesimpulan)', result.penalaran_diagnosis.status,
@@ -2894,6 +2902,9 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
           db: getDb(), dikenal: identitasUntukGateway(record),
           tinjauanDiagnosis: result.tinjauan_diagnosis,
           jenisKlaim: record.jenis_klaim || record.JENIS_KLAIM,
+          // Indikasi rawat inap/penunjang PNPK membantu menilai relevansi kandidat (mis. syarat dewasa pada anak).
+          pedomanPnpk: (() => { try { const k = kodeFinal(record, result); return require('./pnpkPengetahuanService').konteksAgen(record,
+            { dx: k.dx, px: k.px, ai: result, topik: ['rawat_inap', 'kriteria_diagnosis', 'penunjang', 'indikasi_tindakan'], total: 3500 }).teks; } catch (_) { return ''; } })(),
         });
         if (keputusan.ok) {
           result.putusan_pending = keputusan.putusan;
@@ -2922,8 +2933,8 @@ async function generateAiReview(record, validationErrors = [], evidencePool = []
       // berat memicu pemeriksaan lanjutan Sol di bawah.
       try {
         result.analisis_kritis = await periksaKritis({ record, ai: result, pages: evidencePool, hitungInacbgDanTarif,
-          db: getDb(), dikenal: identitasUntukGateway(record) });
-        result.tokens_used += result.analisis_kritis.tokens_used || 0;
+          hasilKritis: result.analisis_kritis, db: getDb(), dikenal: identitasUntukGateway(record) });
+        if (!result.analisis_kritis.dari_hasil_sebelumnya) result.tokens_used += result.analisis_kritis.tokens_used || 0;
         if (sesiAgen) sesiAgen.catat('Pemeriksa kritis (rugi RS, upcoding, kode tanpa bukti)', result.analisis_kritis.ai_gagal ? 'sebagian' : 'selesai',
           { biaya_idr: result.analisis_kritis.biaya_idr, keterangan: `keyakinan ${result.analisis_kritis.skor_keyakinan}/100, ${(result.analisis_kritis.temuan || []).length} temuan` });
       } catch (kritisErr) {

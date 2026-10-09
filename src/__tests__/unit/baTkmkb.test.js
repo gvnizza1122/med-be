@@ -21,10 +21,12 @@ test('ISK tidak mendapat aturan TKMKB/ESWL dari dugaan batu atau kolik saja',()=
   const r=evalDoc({},[p('RESUME MEDIS\nDiagnosis Utama: Infeksi Saluran Kemih\nDiagnosis awal: obs colic renal susp BSK')]);
   expect(r.some(t=>t.jenis_ketentuan==='rekomendasi_tkmkb')).toBe(false);
 });
-test('BA berlaku pada tanggal layanan RJ atau pulang RI; episode lama/unknown tidak menjadi alasan',()=>{
+test('BA 2024 tidak diterapkan sebelum berlaku; BA klinis tetap ditelaah bila bukti tidak terbaca',()=>{
   for(const extra of [{discharge_date:'2024-11-30'},{discharge_date:null}]){
     const refs=evalDoc({...extra,kunjungan_igd:true,hospital_code:'RS-B'});
-    expect(susunPutusan({referensi_klaim:{temuan:refs}}).alasan).toEqual([]);
+    const a=susunPutusan({referensi_klaim:{temuan:refs}}).alasan;
+    expect(a.some(x=>x.kode==='RK-16')).toBe(false);
+    expect(a).toEqual([expect.objectContaining({kode:'BA-18-M37',pertahankan_otomatis:true})]);
   }
   const r=evalDoc({jenis_klaim:'RAWAT_JALAN',discharge_date:null,admission_date:'2024-12-01',kunjungan_igd:true,hospital_code:'RS-B'}).find(t=>t.id==='RK-16');
   expect(r.berlaku_pada_episode).toBe(true);

@@ -27,7 +27,7 @@ function grup(hitung, record, dx, px) {
 }
 
 /** Alternatif koding yang SAH: hanya variasi yang punya dasar dokumentasi. */
-function alternatifKoding({ record, dx, px, penalaran, kritis, hitung }) {
+function alternatifKoding({ record, dx, px, penalaran, kritis, hitung, pages = null }) {
   const dasar = grup(hitung, record, dx, px);
   const hasil = [];
   const tambah = (judul, dx2, px2, syarat, jenis) => {
@@ -48,10 +48,25 @@ function alternatifKoding({ record, dx, px, penalaran, kritis, hitung }) {
       tambah(`Dengan prosedur ${kode} ${deskripsiProsedur(kode)}`, dx, [...px, kode], 'Berlaku bila tindakan tersebut benar dilakukan dan terdokumentasi.', 'optimasi');
     }
   }
+  // Diagnosis yang tersirat dari temuan penunjang (mis. kesan bronkopneumonia): skenario beserta syarat dan
+  // tarifnya. Hanya berlaku bila DPJP menuliskan diagnosisnya; tarif naik tanpa syarat = berisiko upcoding.
+  if (Array.isArray(pages) && pages.length) {
+    const sk = require('./skenarioDiagnosisService');
+    for (const s of sk.skenarioAlternatif({ record, dx, px, pages })) {
+      const g = grup(hitung, record, s.diagnosis, px);
+      hasil.push(sk.nilaiSkenario({ ...s, prosedur: px, ...g, selisih_tarif: dasar.tarif != null && g.tarif != null ? g.tarif - dasar.tarif : null }));
+    }
+  }
   return { dasar: { diagnosis: dx, prosedur: px, ...dasar }, alternatif: hasil };
 }
 
 /** Persyaratan klaim: terpenuhi / belum ditemukan / perlu konfirmasi. */
+/** "PNPK <nomor KMK>" untuk katalog_id yang dipakai penalaran. */
+function labelPnpk(id, penalaran) {
+  const d = ((penalaran && penalaran.pedoman_dipakai) || []).find(x => x.katalog_id === id);
+  return d ? `PNPK ${d.nomor}` : `PNPK ${id}`;
+}
+
 function persyaratan(ai) {
   const daftar = [];
   for (const s of ai.syarat_penunjang || []) {
@@ -71,6 +86,16 @@ function persyaratan(ai) {
   }
   for (const k of ai.kombinasi_kode || []) {
     daftar.push({ syarat: `Ketentuan kombinasi kode ${k.kode}: ${k.nama}`, status: 'perlu_konfirmasi', sumber: k.sumber || 'Berita Acara Kesepakatan', regulasi: labelSumber(k.sumber === 'casemix_rs' ? 'KONVENSI-KODING-RS' : 'BA-KESEPAKATAN-2018'), bukti: k.pesan || null });
+  }
+  // Kriteria BA/PNPK yang dinilai aturan aplikasi (deterministik) -- termasuk rujukan yang menempel ke kartu lain.
+  const temuanRef = ai.referensi_klaim?.temuan || [];
+  for (const b of [...temuanRef.filter(t => /^(?:BA-\d{2}|PNPK)-/.test(String(t.id))), ...temuanRef.flatMap(t => t.rujukan_ba_2018 || [])]) {
+    if (!b || !['bukti_ditemukan', 'bukti_belum_cukup'].includes(b.status)) continue;
+    const label = require('./baKesepakatan2018Service').labelBa(b);
+    daftar.push({ syarat: `${label} ${b.nama}`, status: b.status === 'bukti_ditemukan' ? 'terpenuhi' : 'belum_ditemukan',
+      jenis_ketentuan: /^PNPK/.test(label) ? 'pedoman_klinis' : 'verifikasi_klaim_bpjs',
+      sumber: `${b.sumber?.judul || label} (${b.sumber?.nomor || '-'}), hal. ${b.halaman || b.sumber?.halaman || '-'}`,
+      regulasi: label, bukti: b.catatan || null });
   }
   const op = (ai.konsistensi_data || []).find(k => k.id === 'KD-OP');
   if (op) daftar.push({ syarat: 'Operasi terdokumentasi harus dikode tindakannya', status: 'belum_ditemukan', sumber: 'Konsistensi berkas', bukti: op.yang_ditemukan ? op.yang_ditemukan.kutipan : null });
@@ -101,7 +126,7 @@ function jejakKerja(ai) {
 /**
  * @returns {object} laporan_casemix
  */
-function susunLaporanCasemix({ record, ai, faktaKlinis, saran, hitungInacbgDanTarif, kronologi = null, pelajaran = [], keputusan = null }) {
+function susunLaporanCasemix({ record, ai, faktaKlinis, saran, hitungInacbgDanTarif, kronologi = null, pelajaran = [], keputusan = null, pages = null }) {
   const a = ai || {};
   const { dx, px } = kodeFinal(record, a);
   const penalaran = a.penalaran_diagnosis && a.penalaran_diagnosis.status === 'selesai' ? a.penalaran_diagnosis : null;
@@ -118,7 +143,9 @@ function susunLaporanCasemix({ record, ai, faktaKlinis, saran, hitungInacbgDanTa
         status: p ? LABEL_STATUS[p.status] || 'perlu_klarifikasi' : (s && s.bukti && s.bukti.length ? 'didukung_bukti' : 'belum_dinilai'),
         alasan: p ? p.alasan : (s && s.catatan) || null,
         bukti: p ? p.mendukung.map(b => ({ kutipan: b.kutipan, halaman: b.halaman, jenis: b.jenis })) : ((s && s.bukti) || []).map(b => ({ kutipan: b.kutipan, halaman: b.halaman })),
-        ketidakpastian: p ? [...p.belum_ada, ...p.melemahkan.map(m => m.catatan || m.kutipan)].filter(Boolean).slice(0, 4) : [] };
+        ketidakpastian: p ? [...p.belum_ada, ...p.melemahkan.map(m => m.catatan || m.kutipan)].filter(Boolean).slice(0, 4) : [],
+        // Penalaran agen terhadap kriteria PNPK yang berlaku (katalog_id + halaman tervalidasi).
+        pedoman: p && Array.isArray(p.pedoman) ? p.pedoman.map(x => ({ ...x, label: labelPnpk(x.katalog_id, penalaran) })) : [] };
     }),
     ...px.map(k => {
       const s = buktiSaran.get(k);
@@ -137,11 +164,15 @@ function susunLaporanCasemix({ record, ai, faktaKlinis, saran, hitungInacbgDanTa
 
   const risiko = [
     ...(((a.putusan_pending && a.putusan_pending.alasan) || []).map(r => ({ sumber: r.sumber_pemeriksaan, ringkas: r.ringkas, keparahan: r.keparahan, dasar: r.bukti || r.penjelasan || null }))),
+    // Syarat PNPK yang menurut penalaran agen bertentangan dengan isi berkas (AI, bukan aturan; sedang).
+    ...(((penalaran && penalaran.diagnosis) || []).flatMap(d => (d.pedoman || []).filter(x => x.status === 'bertentangan')
+      .map(x => ({ sumber: 'Penalaran PNPK (AI)', ringkas: `${d.kode}: ${x.syarat} -- bertentangan dengan berkas (${labelPnpk(x.katalog_id, penalaran)} hal. ${x.halaman})`,
+        keparahan: 'sedang', dasar: x.dasar || null })))),
     ...(((kritis && kritis.temuan) || []).filter(t => t.keparahan !== 'rendah').map(t => ({ sumber: 'Pemeriksa kritis', ringkas: t.pesan, keparahan: t.keparahan, dasar: t.bukti ? `"${t.bukti.kutipan}" (hal. ${t.bukti.page_number})` : null }))),
   ];
 
   const syarat = persyaratan(a);
-  const alt = alternatifKoding({ record, dx, px, penalaran, kritis, hitung: hitungInacbgDanTarif });
+  const alt = alternatifKoding({ record, dx, px, penalaran, kritis, hitung: hitungInacbgDanTarif, pages });
   const perluKlarifikasi = rekomendasi.some(r => r.status !== 'didukung_bukti') || pertanyaan.length > 0 || syarat.some(s => s.status !== 'terpenuhi');
   const berisiko = risiko.some(r => r.keparahan === 'tinggi');
   return {
@@ -164,6 +195,7 @@ function susunLaporanCasemix({ record, ai, faktaKlinis, saran, hitungInacbgDanTa
     kondisi_tersirat: (penalaran && penalaran.kondisi_tersirat) || [],
     risiko_pending: risiko,
     alternatif_koding: alt,
+    pedoman_klinis: (penalaran && penalaran.pedoman_dipakai) || [],
     keyakinan: kritis ? { skor: kritis.skor_keyakinan, tingkat: kritis.tingkat } : null,
     jejak_kerja: jejakKerja(a),
     catatan: 'Agen casemix adalah casemix rujukan: rekomendasi untuk ditinjau. Keputusan akhir koding ada pada casemix RS, keputusan diagnosis milik dokter; perubahan data dan pengajuan klaim memerlukan persetujuan petugas.',

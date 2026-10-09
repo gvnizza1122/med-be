@@ -98,11 +98,11 @@ function perbaruiRisikoTampilan(record = {}, errors = [], options = {}) {
       // Kalimat alasan kegawatdaruratan disusun ulang dari penilaian tersimpan (bukan AI ulang).
       && !(Array.isArray(options.pages) && a.sumber_pemeriksaan === 'Kriteria kegawatdaruratan')
       && !(Array.isArray(options.pages) && ['BA kesepakatan 2018', 'BA kesepakatan Kemenkes-BPJS', 'PNPK Kemenkes'].includes(a.sumber_pemeriksaan))
-      // Alasan konsistensi yang tidak lagi terpicu dibuang; yang baru tidak ditambah di sini.
-      && !(Array.isArray(options.pages) && a.sumber_pemeriksaan === 'Konsistensi antar data' && !konsistensi.some(k => k.id === a.kode))
+      // Seluruh alasan konsistensi disusun ulang; jangan menggandakan yang masih terpicu.
+      && !(Array.isArray(options.pages) && a.sumber_pemeriksaan === 'Konsistensi antar data')
       && !(Array.isArray(options.pages) && a.sumber_pemeriksaan === 'Syarat penunjang diagnosis'));
     const alasan = [...sisa, ...susunPutusan({ kombinasi_kode: kombinasi,
-      ...(Array.isArray(options.pages) ? {kegawatdaruratan_assessment:ai.kegawatdaruratan_assessment,syarat_penunjang:ai.syarat_penunjang,referensi_klaim:ai.referensi_klaim,laporan_operasi:ai.laporan_operasi,kesesuaian_stt:ai.kesesuaian_stt,pneumonia_anak:ai.pneumonia_anak} : {}) }).alasan];
+      ...(Array.isArray(options.pages) ? {konsistensi_data:konsistensi,kegawatdaruratan_assessment:ai.kegawatdaruratan_assessment,syarat_penunjang:ai.syarat_penunjang,referensi_klaim:ai.referensi_klaim,laporan_operasi:ai.laporan_operasi,kesesuaian_stt:ai.kesesuaian_stt,pneumonia_anak:ai.pneumonia_anak} : {}) }).alasan];
     const berubah = JSON.stringify(alasan) !== JSON.stringify(putusan.alasan);
     if (berubah) {
       const berat = alasan.filter(a => a.wajib_pending || ['tinggi', 'critical'].includes(a.keparahan));

@@ -1,0 +1,3040 @@
+{
+ "dokumen": {
+  "KMK-2017-132": {
+   "katalog_id": "KMK-2017-132",
+   "judul": "Pedoman Nasional Pelayanan Kedokteran Tata Laksana Trauma",
+   "nomor": "HK.01.07/MENKES/132/2017",
+   "berlaku_mulai": "2017-03-21",
+   "cakupan_usia": "perlu_telaah",
+   "disusun": {
+    "tanggal": "2026-10-09T02:18:28.872Z",
+    "model": "gpt-6-luna",
+    "penyedia": "openai_compat",
+    "versi": "draf-kartu-pnpk-v1",
+    "halaman_dibaca": [
+     7,
+     10,
+     34,
+     41,
+     49,
+     50,
+     66,
+     101,
+     129
+    ],
+    "usulan_ai": 10,
+    "lolos_validasi_kutipan": 10,
+    "tokens": 8459,
+    "biaya_idr": 41,
+    "error": null
+   },
+   "butir": [
+    {
+     "kategori": "tindakan",
+     "syarat": "Pada EDH dengan penurunan kesadaran pascaresusitasi, trepanasi dan evakuasi hematom bila CT menunjukkan tebal ≥ 15 mm dan pergeseran midline ≥5 mm.",
+     "halaman": 50,
+     "kutipan": "ditemukan Hematom Epidural pada CT Scan dengan tebal ≥ 15 mm dan pergeseran struktur midline ≥5 mm",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "tindakan",
+     "syarat": "Trepanasi dan evakuasi hematom bila volume hematom > 25 cc, MLS > 5mm, dan terjadi perburukan GCS, tanpa melihat GCS.",
+     "halaman": 50,
+     "kutipan": "Tanpa melihat GCS tetapi ditemukan Volume hematom > 25 cc, MLS > 5mm, dan perburukan GCS",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "tindakan",
+     "syarat": "Pada EDH dengan penurunan kesadaran pascaresusitasi, indikasi objektif mencakup lateralisasi sesuai lesi atau tanda Cushing.",
+     "halaman": 50,
+     "kutipan": "b. ditemukan \"Lateralisasi\" yang sesuai lesi (pupil anisokor atau hemiparesa) c. ditemukan tanda-tanda\"Cushing Response\" (hipertensi, bradikardi, nafas irreguler)",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "tindakan",
+     "syarat": "Bila belum sempat CT Scan, lakukan eksplorasi burr hole jika terdapat lucid interval dan lateralisasi sesuai lesi.",
+     "halaman": 50,
+     "kutipan": "a. \"Lucid Interval\" atau \"free interval\"( artinya pernah sadar segera sesudah kejadian) dan ditemukan \"Lateralisasi\" yang sesuai lesi (pupil anisokor atau hemiparesa)",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "tindakan",
+     "syarat": "Bila belum sempat CT Scan, lakukan eksplorasi burr hole jika penurunan kesadaran progresif disertai lateralisasi sesuai lesi.",
+     "halaman": 50,
+     "kutipan": "b. Penurunan Kesadaran yang progressif dan ditemukan\"Lateralisasi\" yang sesuai lesi (pupil anisokor atau hemiparesa)",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "tindakan",
+     "syarat": "Laparotomi eksplorasi diindikasikan pada pasien trauma tumpul abdomen dengan DPL positif.",
+     "halaman": 101,
+     "kutipan": "Laparotomi eksplorasi diindikasikan untuk pasien dengan DPL yang positif.",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "rawat_inap",
+     "syarat": "Pasien trauma tumpul abdomen dengan CT Scan negatif harus masuk rumah sakit untuk observasi.",
+     "halaman": 101,
+     "kutipan": "Pada situasi ini, pasien dengan hasil CT Scan yang negatif harus masuk rumah sakit untuk observasi.",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "penunjang",
+     "syarat": "Untuk menegakkan diagnosis fraktur mandibula, pemeriksaan foto panoramik lebih baik dilakukan.",
+     "halaman": 66,
+     "kutipan": "Untuk menegakkan diagnosis fraktur mandibula lebih baik dilakukan pemeriksaan foto panoramik.",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "pulang_rujuk",
+     "syarat": "Pasien trauma mayor di RS kelas C ditransfer ke pusat trauma lebih tinggi bila RS tidak mampu memberikan terapi definitif.",
+     "halaman": 34,
+     "kutipan": "Untuk pasien trauma mayor, peran utama rumah sakit kelas C berupa menstabilisasi pasien dan mentransfer pasien secara aman ke pusat trauma yang lebih tinggi bila kemampuan untuk terapi definitif di rumah sakit tipe C tidak bisa dilakukan.",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "tindakan",
+     "syarat": "Pada fraktur maksilofasial yang menyebabkan obstruksi jalan napas, lakukan trakeostomi bila cara sederhana tidak mengatasi obstruksi.",
+     "halaman": 66,
+     "kutipan": "Bila dengan cara sederhana tidak dapat mengatasi obstruksi jalan napas maka perlu dilakukan trakeostomi.",
+     "usia": "semua",
+     "sama_dengan": null
+    }
+   ],
+   "ditolak_validasi": []
+  },
+  "KMK-2017-342": {
+   "katalog_id": "KMK-2017-342",
+   "judul": "Pedoman Nasional Pelayanan Kedokteran Tata Laksana Sepsis",
+   "nomor": "HK.01.07/MENKES/342/2017",
+   "berlaku_mulai": "2017-07-18",
+   "cakupan_usia": "perlu_telaah",
+   "disusun": {
+    "tanggal": "2026-10-09T02:18:40.858Z",
+    "model": "gpt-6-luna",
+    "penyedia": "openai_compat",
+    "versi": "draf-kartu-pnpk-v1",
+    "halaman_dibaca": [
+     5,
+     6,
+     12,
+     13,
+     14,
+     15,
+     30,
+     45,
+     64
+    ],
+    "usulan_ai": 2,
+    "lolos_validasi_kutipan": 2,
+    "tokens": 6586,
+    "biaya_idr": 26,
+    "error": null
+   },
+   "butir": [
+    {
+     "kategori": "kriteria_diagnosis",
+     "syarat": "Penambahan akut dua atau lebih nilai SOFA akibat infeksi menjadi dasar diagnosis sepsis.",
+     "halaman": 12,
+     "kutipan": "Penambahan akut dua atau lebih nilai SOFA sebagai akibat infeksi digunakan sebagai dasar diagnosis sepsis.",
+     "usia": "semua",
+     "sama_dengan": "TK-25-09"
+    },
+    {
+     "kategori": "tindakan",
+     "syarat": "Abses intra-abdomen, perforasi organ gastrointestinal, iskemia usus, atau kolangitis memerlukan pengendalian sumber infeksi.",
+     "halaman": 30,
+     "kutipan": "Fokus infeksi yang memerlukan tindakan pengendalian sumber infeksi, antara lain: • Abses intra-abdomen • Perforasi organ gastrointestinal • Iskemia usus • Kolangitis",
+     "usia": "semua",
+     "sama_dengan": null
+    }
+   ],
+   "ditolak_validasi": []
+  },
+  "KMK-2017-359": {
+   "katalog_id": "KMK-2017-359",
+   "judul": "Pedoman Nasional Pelayanan Kedokteran Tata Laksana Infeksi Intraabdominal",
+   "nomor": "HK.01.07/MENKES/359/2017",
+   "berlaku_mulai": "2017-07-26",
+   "cakupan_usia": "perlu_telaah",
+   "disusun": {
+    "tanggal": "2026-10-09T02:19:12.085Z",
+    "model": "gpt-6-luna",
+    "penyedia": "openai_compat",
+    "versi": "draf-kartu-pnpk-v1",
+    "halaman_dibaca": [
+     5,
+     6,
+     12,
+     19,
+     23,
+     26,
+     28,
+     43,
+     45
+    ],
+    "usulan_ai": 6,
+    "lolos_validasi_kutipan": 6,
+    "tokens": 5486,
+    "biaya_idr": 24,
+    "error": null
+   },
+   "butir": [
+    {
+     "kategori": "kriteria_diagnosis",
+     "syarat": "Infeksi intraabdominal nonkomplikata terbatas pada satu organ, tidak meluas ke rongga peritoneum, dan tanpa disrupsi struktur anatomi.",
+     "halaman": 6,
+     "kutipan": "Infeksi intraabdominal nonkomplikata hanya terjadi pada satu organ intraabdominal, tetapi tidak meluas ke rongga peritoneum karena tidak terdapat disrupsi struktur anatomi organ tersebut.",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "kriteria_diagnosis",
+     "syarat": "Infeksi intraabdominal dengan disrupsi anatomi organ yang meluas ke peritoneum memenuhi kriteria komplikata.",
+     "halaman": 6,
+     "kutipan": "telah terjadi infeksi dan disrupsi anatomi pada organ intraabdominal tersebut yang meluas ke peritoneum",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "tindakan",
+     "syarat": "Pada infeksi intraabdominal nonkomplikata, dilakukan pembedahan.",
+     "halaman": 6,
+     "kutipan": "Manajemen penyakit ini adalah pembedahan disertai pemberian antibiotika profilaksis.",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "tindakan",
+     "syarat": "Pada infeksi intraabdominal komplikata, terapi bedah menjadi terapi utama.",
+     "halaman": 6,
+     "kutipan": "terapi bedah, pemberian antibiotika terapeutik dan terapi suportif disfungsi organ menjadi terapi utama karena telah terjadi infeksi dan disrupsi anatomi pada organ intraabdominal tersebut yang meluas ke peritoneum",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "penunjang",
+     "syarat": "Foto polos dada tegak atau abdomen tegak dapat menunjukkan udara bebas intraperitoneal pada 75% pasien.",
+     "halaman": 45,
+     "kutipan": "Pemeriksaan foto polos dada dalam posisi tegak atau foto polos tegak abdomen memberikan gambaran udara bebas di dalam rongga peritoneal pada 75% pasien.",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "kriteria_diagnosis",
+     "syarat": "Peritonitis beronset tiba-tiba dengan gambaran udara bebas merupakan kriteria perforasi organ berongga.",
+     "halaman": 45,
+     "kutipan": "peritonitis dengan onset yang tiba-tiba dengan gambaran udara bebas.",
+     "usia": "semua",
+     "sama_dengan": null
+    }
+   ],
+   "ditolak_validasi": []
+  },
+  "KMK-2017-367": {
+   "katalog_id": "KMK-2017-367",
+   "judul": "Pedoman Nasional Pelayanan Kedokteran Tata Laksana Epilepsi Pada Anak",
+   "nomor": "HK.01.07/MENKES/367/2017",
+   "berlaku_mulai": "2017-08-02",
+   "cakupan_usia": "anak",
+   "disusun": {
+    "tanggal": "2026-10-09T02:19:26.988Z",
+    "model": "gpt-6-luna",
+    "penyedia": "openai_compat",
+    "versi": "draf-kartu-pnpk-v1",
+    "halaman_dibaca": [
+     5,
+     10,
+     13,
+     22,
+     23,
+     27,
+     38,
+     48,
+     50
+    ],
+    "usulan_ai": 6,
+    "lolos_validasi_kutipan": 6,
+    "tokens": 7605,
+    "biaya_idr": 32,
+    "error": null
+   },
+   "butir": [
+    {
+     "kategori": "kriteria_diagnosis",
+     "syarat": "Dokumentasikan anamnesis dan pemeriksaan fisis-neurologis sebagai dasar diagnosis klinis epilepsi.",
+     "halaman": 22,
+     "kutipan": "Diagnosis epilepsi merupakan diagnosis klinis yang terutama ditegakkan atas dasar anamnesis dan pemeriksaan fisis-neurologis.",
+     "usia": "anak",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "penunjang",
+     "syarat": "Gambaran EEG saja tidak dapat menegakkan maupun menyingkirkan diagnosis epilepsi tanpa informasi klinis.",
+     "halaman": 27,
+     "kutipan": "Gambaran EEG saja tanpa memandang informasi klinis tidak dapat menyingkirkan maupun menegakkan diagnosis epilepsi.",
+     "usia": "anak",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "kriteria_diagnosis",
+     "syarat": "Pertimbangkan SENK pada anak dengan perubahan kepribadian, psikosis akut, atau regresi kemampuan komunikasi, motorik, maupun perilaku.",
+     "halaman": 50,
+     "kutipan": "Status epileptikus non-konvulsif harus dipikirkan jika ada seorang anak dengan atau tanpa diagnosis epilepsi menunjukkan perubahan kepribadian, psikosis akut, regresi dalam kemampuan komunikasi, motorik, atau perilaku.",
+     "usia": "anak",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "penunjang",
+     "syarat": "Diagnosis SENK sangat bergantung pada pemeriksaan EEG.",
+     "halaman": 50,
+     "kutipan": "Diagnosis SENK cukup sulit dan sangat bergantung pada pemeriksaan EEG.",
+     "usia": "anak",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "pulang_rujuk",
+     "syarat": "Rujuk pasien epilepsi intraktabel yang tidak merespons dua macam OAE dengan dosis adekuat setelah enam bulan terapi.",
+     "halaman": 48,
+     "kutipan": "Pasien dengan epilepsi intraktabel (tidak memperlihatkan respons dengan dua macam OAE dengan dosis yang adekuat setelah enam bulan terapi) harus dirujuk.",
+     "usia": "anak",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "intensif",
+     "syarat": "Jika status epileptikus konvulsif berlangsung 30 menit atau lebih, anak harus dirawat di ICU dan menjalani monitoring EEG.",
+     "halaman": 50,
+     "kutipan": "Jika SEK menetap selama 30 menit atau lebih, maka anak harus masuk perawatan ICU dan harus dilakukan monitoring EEG.",
+     "usia": "anak",
+     "sama_dengan": null
+    }
+   ],
+   "ditolak_validasi": []
+  },
+  "KMK-2017-91": {
+   "katalog_id": "KMK-2017-91",
+   "judul": "Pedoman Nasional Pelayanan Kedokteran Tata Laksana Komplikasi Kehamilan",
+   "nomor": "HK.01.07/MENKES/91/2017",
+   "berlaku_mulai": "2017-02-17",
+   "cakupan_usia": "perlu_telaah",
+   "disusun": {
+    "tanggal": "2026-10-09T02:18:59.735Z",
+    "model": "gpt-6-luna",
+    "penyedia": "openai_compat",
+    "versi": "draf-kartu-pnpk-v1",
+    "halaman_dibaca": [
+     10,
+     13,
+     17,
+     30,
+     51,
+     52,
+     69,
+     133,
+     134
+    ],
+    "usulan_ai": 10,
+    "lolos_validasi_kutipan": 10,
+    "tokens": 9257,
+    "biaya_idr": 41,
+    "error": null
+   },
+   "butir": [
+    {
+     "kategori": "kriteria_diagnosis",
+     "syarat": "KPD preterm: bukti pecah ketuban berupa vaginal pooling, tes nitrazin, tes fern, atau IGFBP-1 (+), pada usia <37 minggu sebelum persalinan.",
+     "halaman": 10,
+     "kutipan": "KPD preterm adalah pecah ketuban yang terbukti dengan vaginal pooling, tes nitrazin, dan tes fern atau IGFBP-1 (+) pada usia <37 minggu sebelum onset persalinan.",
+     "usia": "dewasa",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "kriteria_diagnosis",
+     "syarat": "KPD aterm: bukti pecah ketuban berupa vaginal pooling, tes nitrazin, tes fern (+), atau IGFBP-1 (+) pada usia kehamilan ≥37 sampai 44 minggu.",
+     "halaman": 10,
+     "kutipan": "Ketuban pecah dini/ Premature Rupture Of Membranes (PROM) adalah pecahnya ketuban sebelum waktunya yang terbukti dengan vaginal pooling, tes nitrazin dan tes fern (+), IGFBP-1 (+) pada usia kehamilan ≥ 37 minggu sampai dengan 44 minggu.",
+     "usia": "dewasa",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "kriteria_diagnosis",
+     "syarat": "KPD aterm didiagnosis secara klinis berdasarkan anamnesis dan visualisasi cairan amnion pada pemeriksaan fisik.",
+     "halaman": 10,
+     "kutipan": "KPD aterm didiagnosis secara klinis pada anamnesis pasien dan visualisasi adanya cairan amnion pada pemeriksaan fisik.",
+     "usia": "dewasa",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "penunjang",
+     "syarat": "Diagnosis KPD spontan didukung anamnesis dan pemeriksaan spekulum steril.",
+     "halaman": 17,
+     "kutipan": "Diagnosis KPD spontan paling baik didapatkan dari anamnesis dan pemeriksaan spekulum steril (Rekomendasi B)",
+     "usia": "dewasa",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "rawat_inap",
+     "syarat": "Pasien dengan KPD >24 jam tetap dirawat sampai berada dalam fase aktif.",
+     "halaman": 17,
+     "kutipan": "Jika pasien datang dengan KPD >24 jam, pasien sebaiknya tetap dalam perawatan sampai berada dalam fase aktif.",
+     "usia": "dewasa",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "kriteria_diagnosis",
+     "syarat": "Preeklampsia: hipertensi spesifik akibat kehamilan disertai gangguan sistem organ pada usia kehamilan di atas 20 minggu.",
+     "halaman": 30,
+     "kutipan": "Diagnosis preeklampsia ditegakkan berdasarkan adanya hipertensi spesifik yang disebabkan kehamilan disertai dengan gangguan sistem organ lainnya pada usia kehamilan diatas 20 minggu.",
+     "usia": "dewasa",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "kriteria_diagnosis",
+     "syarat": "Hipertensi berat adalah tekanan darah sekurang-kurangnya 160 mmHg sistolik atau 110 mmHg diastolik.",
+     "halaman": 30,
+     "kutipan": "Definisi hipertensi berat adalah peningkatan tekanan darah sekurang-kurangnya 160 mmHg sistolik atau 110 mmHg diastolik.",
+     "usia": "dewasa",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "kriteria_diagnosis",
+     "syarat": "Edema tidak digunakan sebagai kriteria diagnostik preeklampsia.",
+     "halaman": 30,
+     "kutipan": "Sedangkan, untuk edema tidak lagi dipakai sebagai kriteria diagnostik karena sangat banyak ditemukan pada wanita dengan kehamilan normal.",
+     "usia": "dewasa",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "tindakan",
+     "syarat": "Jika perdarahan tetap masif setelah pemasangan tube, pasien harus menjalani tindakan bedah.",
+     "halaman": 133,
+     "kutipan": "Akan tetapi, bila setelah pemasangan tube, perdarahan masih tetap masif, maka pasien harus menjalani tindakan bedah.",
+     "usia": "dewasa",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "tindakan",
+     "syarat": "Tindakan B-Lynch harus didahului tes tamponade dengan kompresi bimanual uterus langsung di meja operasi.",
+     "halaman": 134,
+     "kutipan": "Akan tetapi, perlu diingat bahwa tindakan B-Lynch ini harus didahului tes tamponade yaitu upaya menilai efektifitas tindakan B- Lynch dengan cara kompresi bimanual uterus secara langsung di meja operasi.",
+     "usia": "dewasa",
+     "sama_dengan": null
+    }
+   ],
+   "ditolak_validasi": []
+  },
+  "KMK-2018-1": {
+   "katalog_id": "KMK-2018-1",
+   "judul": "Pedoman Nasional Pelayanan Kedokteran Tata Laksana Thalasemia",
+   "nomor": "HK.01.07/MENKES/1/2018",
+   "berlaku_mulai": "2018-01-02",
+   "cakupan_usia": "perlu_telaah",
+   "disusun": {
+    "tanggal": "2026-10-09T02:18:09.001Z",
+    "model": "gpt-6-luna",
+    "penyedia": "openai_compat",
+    "versi": "draf-kartu-pnpk-v1",
+    "halaman_dibaca": [
+     7,
+     8,
+     12,
+     13,
+     45,
+     67,
+     72,
+     75,
+     78
+    ],
+    "usulan_ai": 6,
+    "lolos_validasi_kutipan": 6,
+    "tokens": 7842,
+    "biaya_idr": 32,
+    "error": null
+   },
+   "butir": [
+    {
+     "kategori": "tindakan",
+     "syarat": "Splenektomi dapat dipertimbangkan bila kebutuhan transfusi lebih dari 200-250 mL PRC/kg/tahun atau 1,5 kali kebutuhan biasanya.",
+     "halaman": 45,
+     "kutipan": "Kebutuhan transfusi meningkat hingga lebih dari 200-250 mL PRC /kg/tahun atau 1,5 kali lipat dibanding kebutuhan biasanya (kebutuhan transfusi pasien thalassemia umumnya 180 mL/kg/tahun).",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "tindakan",
+     "syarat": "Pertimbangkan splenektomi pada splenomegali dengan leukopenia atau trombositopenia persisten yang bukan disebabkan kondisi lain.",
+     "halaman": 45,
+     "kutipan": "Kondisi hipersplenisme ditandai oleh splenomegali dan leukopenia atau trombositopenia persisten, yang bukan disebabkan oleh penyakit atau kondisi lain.",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "kriteria_diagnosis",
+     "syarat": "Diagnosis karier thalassemia ditegakkan bila kadar HbA2 >3,5%.",
+     "halaman": 78,
+     "kutipan": "Diagnosis ditegakkan bila kadar HbA2 >3,5%.",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "penunjang",
+     "syarat": "MCH <26 pg dan MCV <75 fL digunakan sebagai pemeriksaan awal karier thalassemia.",
+     "halaman": 78,
+     "kutipan": "Pasien thalassemia selalu mengalami anemia hipokrom (MCH <26 pg) dan mikrositik (MCV <75 fL), karenanya kedua kelainan ini tepat digunakan untuk pemeriksaan awal karier thalassemia.",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "penunjang",
+     "syarat": "Pada anemia mikrositik, singkirkan defisiensi besi dengan pemeriksaan porfirin eritrosit bebas, feritin, atau besi serum dengan TIBC.",
+     "halaman": 78,
+     "kutipan": "Kemungkinan anemia mikrositik akibat defisiensi besi harus disingkirkan melalui pemeriksaan porfirin eritrosit bebas, feritin serum, atau kadar besi serum, dengan total iron-binding capacity.",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "penunjang",
+     "syarat": "Timbunan besi ditunjukkan nilai MRI T2* jantung <20 ms atau MRI T2* hati <6,3 ms.",
+     "halaman": 8,
+     "kutipan": "nilai MRI T2* < 20 millisecond (ms), atau nilai MRI T2* hati < 6,3 ms.",
+     "usia": "semua",
+     "sama_dengan": null
+    }
+   ],
+   "ditolak_validasi": []
+  },
+  "KMK-2019-214": {
+   "katalog_id": "KMK-2019-214",
+   "judul": "Pedoman Nasional Pelayanan Kedokteran Tata Laksana Asfiksia",
+   "nomor": "HK.01.07/MENKES/214/2019",
+   "berlaku_mulai": "2019-04-16",
+   "cakupan_usia": "perlu_telaah",
+   "disusun": {
+    "tanggal": "2026-10-09T02:17:40.476Z",
+    "model": "gpt-6-luna",
+    "penyedia": "openai_compat",
+    "versi": "draf-kartu-pnpk-v1",
+    "halaman_dibaca": [
+     5,
+     9,
+     17,
+     18,
+     46,
+     49,
+     56,
+     87,
+     103
+    ],
+    "usulan_ai": 4,
+    "lolos_validasi_kutipan": 4,
+    "tokens": 7374,
+    "biaya_idr": 32,
+    "error": null
+   },
+   "butir": [
+    {
+     "kategori": "tindakan",
+     "syarat": "Terapi hipotermia diindikasikan bila usia gestasi >35 minggu, dimulai sebelum usia 6 jam, dan terdapat EHI derajat sedang atau berat.",
+     "halaman": 87,
+     "kutipan": "Terapi hipotermia dilakukan pada bayi dengan indikasi sebagai berikut: 1) Usia gestasi >35 minggu. 2) Dimulai sebelum bayi berusia 6 jam. 3) EHI derajat sedang atau berat*",
+     "usia": "anak",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "tindakan",
+     "syarat": "Untuk bukti asfiksia peripartum dalam indikasi terapi hipotermia, salah satu kriteria ialah Apgar <5 pada menit ke-10.",
+     "halaman": 87,
+     "kutipan": "Bukti asfiksia peripartum (minimal 1)*, yaitu : a) Nilai Apgar <5 pada menit ke-10, ATAU",
+     "usia": "anak",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "tindakan",
+     "syarat": "Untuk bukti asfiksia peripartum dalam indikasi terapi hipotermia, salah satu kriteria ialah masih membutuhkan ventilasi mekanik atau resusitasi pada menit ke-10.",
+     "halaman": 87,
+     "kutipan": "Bayi masih membutuhkan ventilasi mekanik (balon / T-piece resuscitator dengan sungkup atau intubasi endotrakeal) atau resusitasi pada menit ke-10",
+     "usia": "anak",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "tindakan",
+     "syarat": "Untuk bukti asfiksia peripartum dalam indikasi terapi hipotermia, salah satu kriteria ialah pH <7,0 atau defisit basa >16 dalam 60 menit pertama setelah lahir.",
+     "halaman": 87,
+     "kutipan": "pH darah tali pusat <7,0 atau pH arteri <7,0 atau defisit basa >16 dalam 60 menit pertama setelah lahir",
+     "usia": "anak",
+     "sama_dengan": null
+    }
+   ],
+   "ditolak_validasi": []
+  },
+  "KMK-2019-240": {
+   "katalog_id": "KMK-2019-240",
+   "judul": "Pedoman Nasional Pelayanan Kedokteran Tata Laksana Hiperbilirubinemia",
+   "nomor": "HK.01.07/MENKES/240/2019",
+   "berlaku_mulai": "2019-04-26",
+   "cakupan_usia": "perlu_telaah",
+   "disusun": {
+    "tanggal": "2026-10-09T02:17:25.755Z",
+    "model": "gpt-6-luna",
+    "penyedia": "openai_compat",
+    "versi": "draf-kartu-pnpk-v1",
+    "halaman_dibaca": [
+     9,
+     21,
+     23,
+     25,
+     26,
+     27,
+     29,
+     59,
+     75
+    ],
+    "usulan_ai": 10,
+    "lolos_validasi_kutipan": 10,
+    "tokens": 7209,
+    "biaya_idr": 35,
+    "error": null
+   },
+   "butir": [
+    {
+     "kategori": "kriteria_diagnosis",
+     "syarat": "Diagnosis hiperbilirubinemia bila bilirubin serum total ≥5 mg/dL (86 μmol/L).",
+     "halaman": 9,
+     "kutipan": "Hiperbilirubinemia didefinisikan sebagai kadar bilirubin serum total ≥5 mg/dL (86 μmol/L).",
+     "usia": "anak",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "penunjang",
+     "syarat": "Periksa laboratorium penyebab ikterus bila bayi menerima fototerapi atau TSB meningkat cepat tanpa penjelasan anamnesis dan pemeriksaan fisik.",
+     "halaman": 23,
+     "kutipan": "Melakukan pemeriksaan laboratorium untuk mencari kemungkinan penyebab ikterus pada bayi yang menerima fototerapi atau TSB meningkat cepat dan tidak dapat dijelaskan berdasarkan anamnesis dan pemeriksaan fisik.",
+     "usia": "anak",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "penunjang",
+     "syarat": "Bila bilirubin direk atau konjugasi meningkat, lakukan analisis dan kultur urin.",
+     "halaman": 23,
+     "kutipan": "Bayi yang mengalami peningkatan bilirubin direk atau konjugasi harus dilakukan analisis dan kultur urin.",
+     "usia": "anak",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "pulang_rujuk",
+     "syarat": "Sebelum pulang, periksa TcB atau TSB setiap bayi dan plot pada kurva yang sesuai.",
+     "halaman": 26,
+     "kutipan": "dari rumah sakit, setiap bayi harus diperiksa TcB atau TSB dan diplot di kurva yang sesuai.",
+     "usia": "anak",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "pulang_rujuk",
+     "syarat": "Bayi yang belum memenuhi kriteria fototerapi disarankan kontrol ke petugas kesehatan maksimal 2x24 jam.",
+     "halaman": 26,
+     "kutipan": "Untuk yang belum masuk dalam kriteria fototerapi, disarankan untuk kontrol menemui petugas kesehatan maksimal 2x24 jam.",
+     "usia": "anak",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "intensif",
+     "syarat": "Bayi harus segera masuk dan mendapat fototerapi intensif bila bilirubin total mencapai ambang transfusi tukar atau ≥25mg/dL kapan pun.",
+     "halaman": 29,
+     "kutipan": "jika kadar bilirubin total sebesar 25mg/dL atau lebih tinggi pada setiap waktu, hal ini merupakan keadaan emergensi dan bayi harus segera masuk dan mendapatkan perawatan fototerapi intensif.",
+     "usia": "anak",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "tindakan",
+     "syarat": "Pertimbangkan transfusi tukar bila bilirubin tak terkonjugasi meningkat signifikan dan fototerapi intensif gagal atau terdapat risiko kernikterus.",
+     "halaman": 59,
+     "kutipan": "Adanya peningkatan kadar bilirubin tak terkonjugasi yang signifikan pada bayi baru lahir karena sebab apapun, ketika fototerapi intensif gagal, atau ada risiko terjadinya kernikterus.",
+     "usia": "anak",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "tindakan",
+     "syarat": "Lakukan transfusi tukar sesegera mungkin bila terdapat tanda awal bilirubin ensefalopati akut.",
+     "halaman": 59,
+     "kutipan": "Transfusi tukar sesegera mungkin direkomendasikan jika terdapat tanda awal gejala bilirubin ensefalopati akut.",
+     "usia": "anak",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "tindakan",
+     "syarat": "Transfusi tukar dilakukan personel terlatih di NICU dengan observasi ketat dan kemampuan resusitasi.",
+     "halaman": 29,
+     "kutipan": "Transfusi tukar harus dilakukan hanya oleh personel yang terlatih di ruangan NICU dengan observasi ketat dan mampu melakukan resusitasi.",
+     "usia": "anak",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "penunjang",
+     "syarat": "Albumin <3 mg/dL menurunkan ambang batas fototerapi.",
+     "halaman": 29,
+     "kutipan": "Kadar albumin yang kurang dari 3 mg/dL meningkatkan risiko terjadinya bilirubin ensefalopati akut sehingga ambang batas fototerapi untuk bayi tersebut harus diturunkan (kelompok risiko tinggi).",
+     "usia": "anak",
+     "sama_dengan": null
+    }
+   ],
+   "ditolak_validasi": []
+  },
+  "KMK-2019-270": {
+   "katalog_id": "KMK-2019-270",
+   "judul": "Pedoman Nasional Pelayanan Kedokteran Penatalaksanaan Fraktur",
+   "nomor": "HK.01.07/MENKES/270/2019",
+   "berlaku_mulai": "2019-05-10",
+   "cakupan_usia": "perlu_telaah",
+   "disusun": {
+    "tanggal": "2026-10-09T02:17:55.582Z",
+    "model": "gpt-6-luna",
+    "penyedia": "openai_compat",
+    "versi": "draf-kartu-pnpk-v1",
+    "halaman_dibaca": [
+     5,
+     6,
+     10,
+     11,
+     14,
+     22,
+     54,
+     102,
+     127
+    ],
+    "usulan_ai": 8,
+    "lolos_validasi_kutipan": 8,
+    "tokens": 7950,
+    "biaya_idr": 34,
+    "error": null
+   },
+   "butir": [
+    {
+     "kategori": "kriteria_diagnosis",
+     "syarat": "Fraktur terbuka berhubungan dengan lingkungan luar melalui defek jaringan lunak.",
+     "halaman": 11,
+     "kutipan": "Definisi fraktur terbuka adalah fraktur yang berhubungan dengan lingkungan luar melalui defek jaringan lunak.",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "tindakan",
+     "syarat": "Fraktur terbuka ekstremitas bawah memerlukan irigasi dan debridemen dalam 8 jam setelah kejadian.",
+     "halaman": 22,
+     "kutipan": "Semua fraktur terbuka ektremitas bawah harus dilakukan irigasi dan debridemen dalam waktu 8 jam setelah kejadian.",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "tindakan",
+     "syarat": "Fraktur terbuka ekstremitas atas Gustilo >1 memerlukan irigasi dan debridemen dalam 8 jam setelah kejadian.",
+     "halaman": 22,
+     "kutipan": "Semua fraktur terbuka ektremitas atas grade Gustilo >1 harus dilakukan irigasi dan debridemen dalam waktu 8 jam setelah kejadian",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "tindakan",
+     "syarat": "Fraktur terbuka ekstremitas atas Gustilo 1 memerlukan irigasi dan debridemen dalam 12 jam setelah kejadian.",
+     "halaman": 22,
+     "kutipan": "Fraktur ekstremitas atas grade Gustilo 1 harus dilakukan irigasi dan debridemen dalam waktu 12 jam setelah kejadian",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "tindakan",
+     "syarat": "Irigasi dan debridemen definitif dilakukan di ruang operasi dengan fasilitas anestesi lengkap.",
+     "halaman": 22,
+     "kutipan": "Irigasi dan debridemen definitif harus dilakukan di ruang operasi dengan fasilitas anestesi lengkap.",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "tindakan",
+     "syarat": "Operasi fraktur klavikula akut diindikasikan pada fraktur terbuka, cedera neurovaskular terkait, atau tarikan kulit berpotensi menyebabkan fraktur terbuka.",
+     "halaman": 54,
+     "kutipan": "Indikasi yang diterima untuk tata laksana operatif fraktur klavikula akut adalah fraktur terbuka, cedera neurovaskular terkait, dan tarikan kulit dengan potensi dapat terjadi fraktur terbuka.",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "kriteria_diagnosis",
+     "syarat": "Fraktur nonunion tulang panjang tipe atrofi belum menunjukkan jembatan kalus setelah sembilan bulan atau selama tiga bulan berturut-turut.",
+     "halaman": 127,
+     "kutipan": "Fraktur nonunion adalah fraktur tulang panjang yang mengalami gangguan gagal sambung tipe atrofi, yaitu setelah sembilan bulan atau selama tiga bulan berturut-turut belum memperlihatkan tumbuhnya jembatan kalus",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "kriteria_diagnosis",
+     "syarat": "Defek tulang kritis adalah kehilangan jaringan tulang > 5 cm.",
+     "halaman": 127,
+     "kutipan": "Defek tulang kritis adalah defek tulang dengan kehilangan jaringan tulang > 5 cm.",
+     "usia": "semua",
+     "sama_dengan": null
+    }
+   ],
+   "ditolak_validasi": []
+  },
+  "KMK-2019-394": {
+   "katalog_id": "KMK-2019-394",
+   "judul": "Pedoman Nasional Pelayanan Kedokteran Tata Laksana Stroke",
+   "nomor": "HK.01.07/MENKES/394/2019",
+   "berlaku_mulai": "2019-07-18",
+   "cakupan_usia": "perlu_telaah",
+   "disusun": {
+    "tanggal": "2026-10-09T02:16:43.593Z",
+    "model": "gpt-6-luna",
+    "penyedia": "openai_compat",
+    "versi": "draf-kartu-pnpk-v1",
+    "halaman_dibaca": [
+     6,
+     8,
+     10,
+     14,
+     27,
+     33,
+     42,
+     45,
+     47
+    ],
+    "usulan_ai": 10,
+    "lolos_validasi_kutipan": 10,
+    "tokens": 8910,
+    "biaya_idr": 45,
+    "error": null
+   },
+   "butir": [
+    {
+     "kategori": "kriteria_diagnosis",
+     "syarat": "Diagnosis stroke memerlukan disfungsi neurologis akut yang menetap ≥24 jam atau menyebabkan kematian akibat gangguan pembuluh darah.",
+     "halaman": 14,
+     "kutipan": "Stroke adalah manifestasi klinis akut akibat disfungsi neurologis pada otak, medulla spinalis, dan retina baik sebagian atau menyeluruh yang menetap selama ≥24 jam atau menimbulkan kematian akibat gangguan pembuluh darah.",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "kriteria_diagnosis",
+     "syarat": "Stroke iskemik ditegakkan bila infark dibuktikan melalui radiologi, patologi, atau bukti lain yang menunjukkan iskemi.",
+     "halaman": 14,
+     "kutipan": "Stroke yang disebabkan oleh infark (dibuktikan melalui pemeriksaan radiologi, patologi, atau bukti lain yang menunjukkan iskemi otak, medulla spinalis, atau retina) disebut stroke iskemik.",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "penunjang",
+     "syarat": "Pada suspek stroke akut, berkas mencantumkan pencitraan otak dengan CT-scan non-kontras atau MRI dengan perfusi dan difusi.",
+     "halaman": 45,
+     "kutipan": "Pencitraan otak: CT-scan (kelas I, peringkat bukti A) non-kontras atau MRI (kelas I, peringkat bukti A) dengan perfusi dan difusi.",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "penunjang",
+     "syarat": "Pada suspek stroke akut, EKG dilakukan saat masuk ke unit gawat darurat.",
+     "halaman": 45,
+     "kutipan": "Semua pasien dengan suspek stroke akut harus dilakukan beberapa pemeriksaan saat masuk ke unit gawat darurat, meliputi : 1) Elektrokardiografi (EKG).",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "penunjang",
+     "syarat": "Pemeriksaan darah mencakup hematologi rutin, gula darah sewaktu, fungsi ginjal, APTT, PT, INR, dan fibrinogen.",
+     "halaman": 45,
+     "kutipan": "Darah : hematologi rutin, gula darah sewaktu, fungsi ginjal (ureum, kreatinin), activated partial thrombin time (APTT), prothrombin time (PT), INR, fibrinogen.",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "penunjang",
+     "syarat": "CT kranial mendukung infark bila tampak area hipodens fokal yang mengikuti teritori vaskular.",
+     "halaman": 47,
+     "kutipan": "Infark : area hipodens fokal, pada kortikal, subkortikal, sustantia alba, grisea yang dalam, diikuti oleh teritoral vascular",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "penunjang",
+     "syarat": "CT kranial mendukung perdarahan bila tampak hiperdens pada substansia alba atau grisea, dengan atau tanpa keterlibatan permukaan kortikal.",
+     "halaman": 47,
+     "kutipan": "Perdarahan : adanya gambaran hiperdens pada sustansia alba atau grisea, dengan atau tanpa terkenanya permukaan kortikal (40-90 Hounsfield units).",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "pulang_rujuk",
+     "syarat": "Pasien dari puskesmas atau RS tipe D/C dirujuk ke RS tipe C/B/A yang memiliki CT brain.",
+     "halaman": 10,
+     "kutipan": "Pasien dirujuk dari puskesmas / RS tipe D /C ke RS tipe C / B / A yang memiliki CT brain.",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "intensif",
+     "syarat": "Pasien stroke dengan kejang yang belum teratasi perlu dirawat di ICU.",
+     "halaman": 33,
+     "kutipan": "Bila kejang belum teratasi maka perlu dirawat di ICU.",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "tindakan",
+     "syarat": "Pada trombektomi di atas 6 jam, CT perfusi harus menunjukkan CBV masih baik agar trombektomi dapat dilakukan hingga 6–16 jam.",
+     "halaman": 42,
+     "kutipan": "dipastikan terlebih dahulu sirkulasi serebral dengan menggunakan CT perfusi : apabila cerebral blood volume (CBV) masih baik, dapat dilakukan trombektomi walaupun sudah mencapai waktu 6-16 jam.",
+     "usia": "semua",
+     "sama_dengan": null
+    }
+   ],
+   "ditolak_validasi": []
+  },
+  "KMK-2019-555": {
+   "katalog_id": "KMK-2019-555",
+   "judul": "Pedoman Nasional Pelayanan Kedokteran Tata Laksana Luka Bakar",
+   "nomor": "HK.01.07/MENKES/555/2019",
+   "berlaku_mulai": "2019-09-20",
+   "cakupan_usia": "perlu_telaah",
+   "disusun": {
+    "tanggal": "2026-10-09T02:22:26.952Z",
+    "model": "gpt-6-luna",
+    "penyedia": "openai_compat",
+    "versi": "draf-kartu-pnpk-v1",
+    "halaman_dibaca": [
+     6,
+     22,
+     28,
+     30,
+     32,
+     63,
+     68,
+     77,
+     111
+    ],
+    "usulan_ai": 10,
+    "lolos_validasi_kutipan": 6,
+    "tokens": 7016,
+    "biaya_idr": 19,
+    "error": null
+   },
+   "butir": [
+    {
+     "kategori": "pulang_rujuk",
+     "syarat": "Rujuk pasien dengan luka bakar lebih dari 10% TBSA.",
+     "halaman": 22,
+     "kutipan": "Luka bakar lebih dari 10% Total Body Surface Area (TBSA)",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "pulang_rujuk",
+     "syarat": "Rujuk anak dengan luka bakar lebih dari 5% TBSA.",
+     "halaman": 22,
+     "kutipan": "Luka bakar lebih dari 5% TBSA pada anak",
+     "usia": "anak",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "pulang_rujuk",
+     "syarat": "Rujuk pasien dengan luka bakar full thickness lebih dari 5% TBSA.",
+     "halaman": 22,
+     "kutipan": "Luka bakar full thickness lebih dari 5% TBSA",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "tindakan",
+     "syarat": "Lakukan eskarotomi pada luka bakar seluruh ketebalan dermis dengan edema yang dapat menjepit pembuluh darah.",
+     "halaman": 30,
+     "kutipan": "Indikasi: pada luka bakar yang mengenai seluruh ketebalan dermis sehingga timbul edema yang dapat menjepit pembuluh darah, misalnya luka bakar melingkar di ekstremitas dan dada.",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "tindakan",
+     "syarat": "Fasciotomi diindikasikan bila kompartemen terasa keras, sensasi perifer progresif menghilang, dan nadi tidak teraba.",
+     "halaman": 32,
+     "kutipan": "Dilakukan bila ada indikasi tanda-tanda sindroma kompartemen: terasa keras pada palpasi, sensasi perifer menghilang secara progresif, dan nadi tidak teraba.",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "pulang_rujuk",
+     "syarat": "Sebelum transfer, lakukan assessment segera dan stabilisasi di rumah sakit terdekat.",
+     "halaman": 22,
+     "kutipan": "Sebelum dilakukan transfer pasien, harus dilakukan assessment segera dan stabilisasi di rumah sakit yang terdekat.",
+     "usia": "semua",
+     "sama_dengan": null
+    }
+   ],
+   "ditolak_validasi": [
+    {
+     "kategori": "pulang_rujuk",
+     "syarat": "Rujuk luka bakar pada wajah, tangan, kaki, genitalia, perineum, sendi utama, ekstremitas melingkar, atau dada.",
+     "halaman": 22,
+     "kutipan": "Luka bakar pada area khusus (Wajah, tangan, kaki, genitalia, perineum, sendi utama, dan luka bakar yang mengelilingi ekstremitas serta luka bakar pada dada)",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "rawat_inap",
+     "syarat": "Trauma listrik voltase rendah dapat dirawat jalan bila EKG normal, tanpa penurunan kesadaran, dan tanpa indikasi rawat inap lain.",
+     "halaman": 111,
+     "kutipan": "trauma listrik voltase rendah, tidak memiliki abnormalitas pada EKG, tidak ada riwayat penurunan kesadaran dan tidak memilki indikasi lain untuk dirawat di rumah sakit dapat ditangani dengan rawat jalan",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "rawat_inap",
+     "syarat": "Rawat inap dengan telemetry monitor bila ada riwayat penurunan kesadaran atau disaritma terdokumentasi sebelum atau sesudah dirawat di IGD.",
+     "halaman": 111,
+     "kutipan": "Pasien dengan riwayat penurunan kesadaran, dukumentasi disaritma sebelum atau sesudah dirawat di IGD sebaiknya dirawat dirumah sakit dengan telemetry monitor terpasang.",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "pulang_rujuk",
+     "syarat": "Rujuk trauma listrik voltase tinggi pada ekstremitas atas ke rumah sakit dengan unit luka bakar.",
+     "halaman": 111,
+     "kutipan": "Pasien dengan riwayat trauma listrik voltase tinggi pada ekstremitas atas harus dirujuk ke rumah sakit yang memiliki unit luka bakar",
+     "usia": "semua",
+     "sama_dengan": null
+    }
+   ]
+  },
+  "KMK-2019-687": {
+   "katalog_id": "KMK-2019-687",
+   "judul": "Pedoman Nasional Pelayanan Kedokteran Tata Laksana Penyakit Paru Obstruktif Kronik",
+   "nomor": "HK.01.07/MENKES/687/2019",
+   "berlaku_mulai": "2019-10-18",
+   "cakupan_usia": "perlu_telaah",
+   "disusun": {
+    "tanggal": "2026-10-09T02:16:54.394Z",
+    "model": "gpt-6-luna",
+    "penyedia": "openai_compat",
+    "versi": "draf-kartu-pnpk-v1",
+    "halaman_dibaca": [
+     5,
+     6,
+     8,
+     26,
+     52,
+     58,
+     59,
+     60,
+     81
+    ],
+    "usulan_ai": 7,
+    "lolos_validasi_kutipan": 7,
+    "tokens": 7056,
+    "biaya_idr": 28,
+    "error": null
+   },
+   "butir": [
+    {
+     "kategori": "rawat_inap",
+     "syarat": "Rawat inap diindikasikan pada eksaserbasi sedang atau berat, atau bila terdapat komplikasi.",
+     "halaman": 58,
+     "kutipan": "Indikasi rawat : 1) Eksaserbasi sedang dan berat 2) Terdapat komplikasi",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "rawat_inap",
+     "syarat": "Rawat inap diindikasikan pada infeksi saluran napas berat, gagal napas akut pada gagal napas kronik, atau gagal jantung kanan.",
+     "halaman": 59,
+     "kutipan": "3) Infeksi saluran nafas berat 4) Gagal nafas akut pada gagal nafas kronik 5) Gagal jantung kanan",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "rawat_inap",
+     "syarat": "Rawat jalan diindikasikan untuk eksaserbasi ringan sampai sedang, gagal napas kronik tanpa gagal napas akut pada gagal napas kronik, atau evaluasi rutin.",
+     "halaman": 58,
+     "kutipan": "Indikasi : 1) Eksaserbasi ringan sampai sedang 2) Gagal nafas kronik 3) Tidak ada gagal nafas akut pada gagal nafas kronik",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "intensif",
+     "syarat": "Perawatan ICU diindikasikan untuk sesak berat setelah penanganan adekuat, penurunan kesadaran, lethargi, atau kelemahan otot respirasi.",
+     "halaman": 59,
+     "kutipan": "Indikasi perawatan ICU : 1) Sesak berat setelah penanganan adekuat di ruang gawat darurat atau ruang rawat 2) Kesadaran menurun, lethargi, atau kelemahan otot-otot respirasi",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "intensif",
+     "syarat": "Perawatan ICU diindikasikan bila hipoksemia menetap atau memburuk (PaO2 <5,3 kPa, 40 mmHg) dan/atau asidosis respiratorik (pH <7,25) meski diberi oksigen dan ventilasi noninvasif.",
+     "halaman": 59,
+     "kutipan": "3) Menetap atau perburukan hipoksemia (PaO2 <5,3 kPa, 40 mmHg) dan / atau asidosis respiratorik (pH <7,25) meskipun dengan suplementasi oksigen dan ventilasi non invasif.",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "intensif",
+     "syarat": "Perawatan ICU diindikasikan bila pasien memerlukan ventilasi mekanis atau mengalami hemodinamik tidak stabil yang memerlukan vasopresor.",
+     "halaman": 60,
+     "kutipan": "4) Memerlukan ventilasi mekanis (invasif atau non invasif) 5) Hemodinamik tidak stabil yang memerlukan vasopresor.",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "tindakan",
+     "syarat": "Sebelum reseksi paru pada pasien PPOK, lakukan spirometri disertai uji bronkodilator, volume statis paru, kapasitas difusi, dan analisis gas darah arteri saat istirahat.",
+     "halaman": 81,
+     "kutipan": "semua pasien PPOK yang akan menjalani reseksi paru harus dilakukan pemeriksaan spirometri disertai uji bronkodilator, volume statis paru, kapasitas difusi dan analisis gas darah arteri pada saat istirahat.",
+     "usia": "semua",
+     "sama_dengan": null
+    }
+   ],
+   "ditolak_validasi": []
+  },
+  "KMK-2019-755": {
+   "katalog_id": "KMK-2019-755",
+   "judul": "Pedoman Nasional Pelayanan Kedokteran Tata Laksana Tuberkulosis",
+   "nomor": "HK.01.07/MENKES/755/2019",
+   "berlaku_mulai": "2019-12-02",
+   "cakupan_usia": "perlu_telaah",
+   "disusun": {
+    "tanggal": "2026-10-09T02:16:21.220Z",
+    "model": "gpt-6-luna",
+    "penyedia": "openai_compat",
+    "versi": "draf-kartu-pnpk-v1",
+    "halaman_dibaca": [
+     9,
+     19,
+     22,
+     67,
+     73,
+     76,
+     96,
+     101,
+     102
+    ],
+    "usulan_ai": 8,
+    "lolos_validasi_kutipan": 8,
+    "tokens": 7484,
+    "biaya_idr": 31,
+    "error": null
+   },
+   "butir": [
+    {
+     "kategori": "kriteria_diagnosis",
+     "syarat": "Di laboratorium yang terpantau mutunya, TB Paru BTA positif ditegakkan dengan BTA positif minimal dari satu spesimen.",
+     "halaman": 19,
+     "kutipan": "Pada wilayah dengan laboratorium yang terpantau mutunya melalui sistem pemantauan mutu eksternal, kasus TB Paru BTA positif ditegakkan berdasarkan hasil pemeriksaan BTA positif, minimal dari satu spesimen.",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "kriteria_diagnosis",
+     "syarat": "Di laboratorium yang tidak terpantau mutunya, TB BTA positif memerlukan BTA positif pada paling sedikit dua spesimen.",
+     "halaman": 19,
+     "kutipan": "Pada daerah dengan laboratorium yang tidak terpantau mutunya, maka definisi kasus TB BTA positif bila paling sedikit terdapat dua spesimen dengan BTA positif.",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "kriteria_diagnosis",
+     "syarat": "Diagnosis TB Paru dewasa ditegakkan terlebih dahulu dengan pemeriksaan bakteriologis: mikroskopis, TCM TB, atau biakan.",
+     "halaman": 22,
+     "kutipan": "Diagnosis TB Paru pada orang dewasa harus ditegakkan terlebih dahulu dengan pemeriksaan bakteriologis. Pemeriksaan bakteriologis yang dimaksud adalah pemeriksaan mikroskopis, tes cepat molekuler TB dan biakan.",
+     "usia": "dewasa",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "kriteria_diagnosis",
+     "syarat": "Diagnosis TB pleura berdasarkan basil tuberkulosis pada cairan atau biopsi pleura, atau granuloma pleura pada histopatologi.",
+     "halaman": 67,
+     "kutipan": "Diagnosis TB pleura berdasarkan pada terdapatnya basil tuberkulosis pada cairan pleura, biopsi pleura maupun granuloma di pleura pada pemeriksaan histopatologis.",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "tindakan",
+     "syarat": "Torakosentesis dilakukan bila cairan pleura cukup untuk diaspirasi, dengan ketebalan minimal 10 mm pada USG toraks atau foto toraks.",
+     "halaman": 67,
+     "kutipan": "Tindakan tersebut dilakukan bila cairan yang terkumpul cukup untuk diaspirasi seperti dengan ketebalan minimal 10 mm pada pemeriksaan ultrasonografi toraks atau foto toraks",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "penunjang",
+     "syarat": "Setiap pasien TB meningen menjalani CT-scan kepala dengan kontras sebelum terapi atau dalam 48 jam pertama terapi.",
+     "halaman": 73,
+     "kutipan": "Setiap pasien TB meningen harus dilakukan CT-scan kepala dengan kontras sebelum diterapi atau dalam 48 jam pertama terapi",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "tindakan",
+     "syarat": "Indikasi bedah pada TB meningen meliputi hidrosefalus atau abses serebral tuberkulosis.",
+     "halaman": 73,
+     "kutipan": "Indikasi bedah: hidrosefalus, abses serebral tuberkulosis",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "pulang_rujuk",
+     "syarat": "Rujuk pasien anak bila foto toraks menunjukkan efusi pleura, milier, atau kavitas.",
+     "halaman": 101,
+     "kutipan": "Jika ditemukan salah satu keadaan di bawah ini, pasien dirujuk ke fasilitas pelayanan kesehatan rujukan: 1) Foto toraks menunjukkan gambaran efusi pleura atau milier atau kavitas",
+     "usia": "anak",
+     "sama_dengan": null
+    }
+   ],
+   "ditolak_validasi": []
+  },
+  "KMK-2020-2849": {
+   "katalog_id": "KMK-2020-2849",
+   "judul": "Pedoman Nasional Pelayanan Kedokteran Tata Laksana Katarak Pada Anak",
+   "nomor": "HK.01.07/MENKES/2849/2020",
+   "berlaku_mulai": "2020-10-15",
+   "cakupan_usia": "anak",
+   "disusun": {
+    "tanggal": "2026-10-09T02:15:44.689Z",
+    "model": "gpt-6-luna",
+    "penyedia": "openai_compat",
+    "versi": "draf-kartu-pnpk-v1",
+    "halaman_dibaca": [
+     5,
+     8,
+     11,
+     13,
+     14,
+     15,
+     22,
+     26,
+     27
+    ],
+    "usulan_ai": 8,
+    "lolos_validasi_kutipan": 7,
+    "tokens": 7972,
+    "biaya_idr": 35,
+    "error": null
+   },
+   "butir": [
+    {
+     "kategori": "kriteria_diagnosis",
+     "syarat": "Dokter mata subspesialis anak mengonfirmasi katarak mengganggu tajam penglihatan secara signifikan.",
+     "halaman": 13,
+     "kutipan": "Dokter Mata Subspesialis Mata Anak (Oftalmologi Pediatri) melakukan konfirmasi bahwa katarak pada anak yang ditemukan memang mengganggu tajam penglihatan secara signifikan.",
+     "usia": "anak",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "kriteria_diagnosis",
+     "syarat": "Pastikan leukokoria benar berasal dari katarak, bukan penyakit mata lainnya.",
+     "halaman": 13,
+     "kutipan": "Dokter Mata Subspesialis Mata Anak (Oftalmologi Pediatri) memastikan bahwa manifestasi klinis yang timbul pada pasien (misalnya leukokoria) adalah benar berasal dari katarak pada anak, bukan penyakit mata lainnya.",
+     "usia": "anak",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "tindakan",
+     "syarat": "Operasi dilakukan di rumah sakit dengan dokter anestesi anak, ruang rawat inap, dan ruang rawat intensif.",
+     "halaman": 13,
+     "kutipan": "Tindakan pembedahan harus dilakukan di rumah sakit yang memiliki fasilitas lengkap untuk mendukung dilakukannya tindakan pembedahan pada bayi (dokter anestesi anak, ruang rawat inap, ruang rawat intensif).",
+     "usia": "anak",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "penunjang",
+     "syarat": "Evaluasi pra-anestesi dilakukan sebelum tindakan anestesi.",
+     "halaman": 15,
+     "kutipan": "Evaluasi pra anestesi dilakukan sebelum tindakan anestesi.",
+     "usia": "anak",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "koding",
+     "syarat": "Persetujuan tindakan anestesi harus memiliki izin tertulis dari pasien atau keluarga pasien.",
+     "halaman": 15,
+     "kutipan": "Memperoleh izin tertulis dari pasien atau keluarga pasien.",
+     "usia": "anak",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "tindakan",
+     "syarat": "Pada anak lebih dari 5 tahun berkebutuhan khusus, operasi wajib dilakukan dengan PPC dan vitrektomi anterior.",
+     "halaman": 27,
+     "kutipan": "Tetapi bila operasi dilakukan pada anak lebih dari 5 tahun berkebutuhan khusus wajib dilakukan PPC dengan vitrektomi anterior.",
+     "usia": "anak",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "tindakan",
+     "syarat": "Pada anak kooperatif yang dapat menjalani kapsulotomi Nd:YAG pascabedah, lensektomi dengan IOL tanpa PPC/vitrektomi anterior dapat dilakukan; biasanya di atas usia 5 tahun.",
+     "halaman": 27,
+     "kutipan": "pada anak-anak yang kooperatif untuk dilakukan kapsulotomi posterior dengan laser Neodymium-doped yttrium aluminum garnet (Nd:YAG) pascabedah (biasanya di atas usia 5 tahun).",
+     "usia": "anak",
+     "sama_dengan": null
+    }
+   ],
+   "ditolak_validasi": [
+    {
+     "syarat": "Pemeriksaan laboratorium dilakukan atas indikasi; minimal meliputi darah lengkap, PT, aPTT, dan fungsi hati.",
+     "halaman": 13,
+     "kutipan": "Pemeriksaan laboratorium dilakukan atas indikasi dengan minimal pemeriksaan meliputi: darah lengkap, protrombin time (PT), activated partial thromboplastin time (aPTT), fungsi hati (SGOT, SGPT)"
+    }
+   ]
+  },
+  "KMK-2020-9845": {
+   "katalog_id": "KMK-2020-9845",
+   "judul": "Pedoman Nasional Pelayanan Kedokteran Tata Laksana Infeksi Dengue Pada Dewasa",
+   "nomor": "HK.01.07/MENKES/9845/2020",
+   "berlaku_mulai": "2020-11-30",
+   "cakupan_usia": "dewasa",
+   "disusun": {
+    "tanggal": "2026-10-09T02:16:07.760Z",
+    "model": "gpt-6-luna",
+    "penyedia": "openai_compat",
+    "versi": "draf-kartu-pnpk-v1",
+    "halaman_dibaca": [
+     5,
+     9,
+     23,
+     25,
+     35,
+     38,
+     39,
+     41,
+     51
+    ],
+    "usulan_ai": 10,
+    "lolos_validasi_kutipan": 10,
+    "tokens": 9151,
+    "biaya_idr": 47,
+    "error": null
+   },
+   "butir": [
+    {
+     "kategori": "kriteria_diagnosis",
+     "syarat": "Salah satu kriteria DBD adalah demam mendadak tinggi selama 2–7 hari.",
+     "halaman": 23,
+     "kutipan": "Demam mendadak tinggi dengan selama 2-7 hari;",
+     "usia": "dewasa",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "kriteria_diagnosis",
+     "syarat": "Manifestasi perdarahan sebagai salah satu kriteria DBD dapat berupa tes torniket positif, petekie, ekimosis, purpura, atau perdarahan.",
+     "halaman": 23,
+     "kutipan": "Manifestasi perdarahan dapat berupa salah satu dari gejala berikut: tes torniket positif, petekie, ekimosis atau purpura, atau perdarahan dari mukosa, saluran pencernaan, tempat injeksi, atau perdarahan dari tempat lain;",
+     "usia": "dewasa",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "penunjang",
+     "syarat": "Salah satu kriteria DBD adalah trombosit ≤100.000 sel/mm3.",
+     "halaman": 23,
+     "kutipan": "3) Trombosit ≤100.000 sel/mm3; dan 4)",
+     "usia": "dewasa",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "penunjang",
+     "syarat": "Kebocoran plasma sebagai kriteria DBD dapat dibuktikan dengan peningkatan hematokrit/hemokonsentrasi ≥20% dibanding standar sesuai umur dan jenis kelamin.",
+     "halaman": 23,
+     "kutipan": "Peningkatan hematokrit / hemokonsentrasi ≥20% dibandingkan standar sesuai dengan umur dan jenis kelamin;",
+     "usia": "dewasa",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "kriteria_diagnosis",
+     "syarat": "Pada kriteria sindroma syok dengue, tekanan nadi ≤20 mmHg disertai peningkatan tekanan diastolik.",
+     "halaman": 23,
+     "kutipan": "Tekanan nadi ≤20 mmHg dengan peningkatan tekanan diastolik, contoh: 100/80 mmHg; dan",
+     "usia": "dewasa",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "rawat_inap",
+     "syarat": "Oliguria selama 4–6 jam, komorbid, atau tinggal sendiri/jauh dari fasilitas kesehatan termasuk tanda untuk rawat inap.",
+     "halaman": 38,
+     "kutipan": "oliguria (urin yang keluar kurang / tidak ada selama 4-6 jam), memiliki komorbid, dan tinggal sendiri atau jauh dari fasilitas kesehatan penderita harus dirawat inap.",
+     "usia": "dewasa",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "rawat_inap",
+     "syarat": "Tanpa tanda kedaruratan, demam ≥3 hari memerlukan pemeriksaan darah; trombosit ≤100.000 dianjurkan rawat inap.",
+     "halaman": 38,
+     "kutipan": "Bila tidak ada tanda kedaruratan dan lama demam ≥ 3 hari maka perlu dilakukan pemeriksaan hemoglobin (Hb), hematokrit (Ht), leukosit, dan trombosit. Apabila didapatkan nilai trombosit ≤100.000 maka penderita dianjurkan rawat inap",
+     "usia": "dewasa",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "rawat_inap",
+     "syarat": "Tanpa tanda kedaruratan, trombosit ≤100.000 dianjurkan rawat inap; trombosit >100.000 dapat berobat jalan.",
+     "halaman": 38,
+     "kutipan": "Apabila didapatkan nilai trombosit ≤100.000 maka penderita dianjurkan rawat inap; tetapi bila nilai trombosit >100.000 maka penderita dapat berobat jalan",
+     "usia": "dewasa",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "rawat_inap",
+     "syarat": "Demam <3 hari tanpa tanda kedaruratan dapat ditangani dengan berobat jalan.",
+     "halaman": 38,
+     "kutipan": "Bila penderita mengeluh demam <3 hari dan tidak terdapat tanda-tanda kedaruratan maka penderita dapat berobat jalan.",
+     "usia": "dewasa",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "rawat_inap",
+     "syarat": "Pasien rawat jalan harus mampu mentoleransi cairan oral memadai dan buang air kecil setidaknya sekali setiap 6 jam.",
+     "halaman": 38,
+     "kutipan": "Penderita yang dapat berobat jalan adalah penderita yang mampu mentoleransi volume cairan oral yang memadai dan buang air kecil setidaknya sekali setiap 6 jam",
+     "usia": "dewasa",
+     "sama_dengan": null
+    }
+   ],
+   "ditolak_validasi": []
+  },
+  "KMK-2021-4636": {
+   "katalog_id": "KMK-2021-4636",
+   "judul": "Pedoman Nasional Pelayanan Kedokteran Tata Laksana Infeksi Dengue Anak Dan Remaja",
+   "nomor": "HK.01.07/MENKES/4636/2021",
+   "berlaku_mulai": "2021-05-03",
+   "cakupan_usia": "anak_remaja",
+   "disusun": {
+    "tanggal": "2026-10-09T02:15:16.866Z",
+    "model": "gpt-6-luna",
+    "penyedia": "openai_compat",
+    "versi": "draf-kartu-pnpk-v1",
+    "halaman_dibaca": [
+     5,
+     12,
+     17,
+     26,
+     29,
+     31,
+     43,
+     51,
+     56
+    ],
+    "usulan_ai": 10,
+    "lolos_validasi_kutipan": 8,
+    "tokens": 8490,
+    "biaya_idr": 40,
+    "error": null
+   },
+   "butir": [
+    {
+     "kategori": "kriteria_diagnosis",
+     "syarat": "Tanda awal perembesan plasma: trombosit turun cepat dan progresif <100.000 sel/mm3 serta hematokrit di atas nilai normal.",
+     "halaman": 17,
+     "kutipan": "Penurunan jumlah trombosit yang cepat dan progresif kurang dari 100.000 sel/mm3 serta kenaikan hematokrit di atas nilai normal merupakan tanda awal perembesan plasma.",
+     "usia": "anak",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "penunjang",
+     "syarat": "Pada dengue dengan gejala neurologi, CT-scan kepala tanpa kontras digunakan untuk mendeteksi perdarahan intrakranial atau ensefalopati.",
+     "halaman": 29,
+     "kutipan": "CT-scan kepala tanpa kontras mendeteksi perdarahan intrakranial atau ensefalopati apabila dengue disertai gejala neurologi, seperti kejang dan penurunan kesadaran",
+     "usia": "anak",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "rawat_inap",
+     "syarat": "Rawat inap bila ditemukan setiap warning sign yang tercantum pada Tabel 3.",
+     "halaman": 31,
+     "kutipan": "Warning signs Setiap warning signs (lihat Tabel 3)",
+     "usia": "anak",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "tindakan",
+     "syarat": "Transfusi darah segera bila hematokrit turun disertai hemodinamik tidak stabil dan tanda perdarahan hebat.",
+     "halaman": 51,
+     "kutipan": "Penurunan hematokrit diikuti dengan status hemodinamik yang tidak stabil (tekanan nadi sempit, takikardia, asidosis metabolik, dan urin sedikit) menandakan perdarahan yang hebat dan memerlukan transfusi darah segera.",
+     "usia": "anak",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "pulang_rujuk",
+     "syarat": "Pulang setelah menunjukkan tanda penyembuhan dan memenuhi seluruh kriteria pulang rawat.",
+     "halaman": 56,
+     "kutipan": "Pasien dengue dapat dipulangkan apabila menunjukkan tanda penyembuhan dan memenuhi seluruh kriteria pulang rawat.",
+     "usia": "anak",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "pulang_rujuk",
+     "syarat": "Salah satu kriteria pulang: tidak demam minimal 24 jam tanpa antipiretik.",
+     "halaman": 56,
+     "kutipan": "Tidak demam minimal 24 jam tanpa antipiretik.",
+     "usia": "anak",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "pulang_rujuk",
+     "syarat": "Setelah syok teratasi, penuhi minimal 48 jam sebelum pulang rawat.",
+     "halaman": 56,
+     "kutipan": "Minimal 48 jam setelah syok teratasi.",
+     "usia": "anak",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "pulang_rujuk",
+     "syarat": "Jumlah trombosit ≥50.000/mm3 dan cenderung meningkat sebagai kriteria pulang rawat.",
+     "halaman": 56,
+     "kutipan": "Jumlah trombosit ≥50.000/mm3 dan cenderung meningkat.",
+     "usia": "anak",
+     "sama_dengan": null
+    }
+   ],
+   "ditolak_validasi": [
+    {
+     "syarat": "Rawat inap bila pasien dehidrasi dan tidak mampu menerima cairan oral.",
+     "halaman": 31,
+     "kutipan": "Pasien dehidrasi, tidak mampu menerima cairan oral"
+    },
+    {
+     "syarat": "Kriteria rawat inap mencakup hematokrit meningkat atau efusi pleura, asites, maupun penebalan kandung empedu tanpa gejala.",
+     "halaman": 31,
+     "kutipan": "Temuan melalui pemeriksaan lebih lanjut Hematokrit meningkat Efusi pleura, asites, penebalan kandung empedu tanpa gejala"
+    }
+   ]
+  },
+  "KMK-2021-4722": {
+   "katalog_id": "KMK-2021-4722",
+   "judul": "Pedoman Nasional Pelayanan Kedokteran Tata Laksana Sepsis Pada Anak",
+   "nomor": "HK.01.07/MENKES/4722/2021",
+   "berlaku_mulai": "2021-05-21",
+   "cakupan_usia": "anak",
+   "disusun": {
+    "tanggal": "2026-10-09T02:14:58.202Z",
+    "model": "gpt-6-luna",
+    "penyedia": "openai_compat",
+    "versi": "draf-kartu-pnpk-v1",
+    "halaman_dibaca": [
+     5,
+     10,
+     11,
+     13,
+     14,
+     29,
+     31,
+     33,
+     40
+    ],
+    "usulan_ai": 3,
+    "lolos_validasi_kutipan": 3,
+    "tokens": 6896,
+    "biaya_idr": 23,
+    "error": null
+   },
+   "butir": [
+    {
+     "kategori": "penunjang",
+     "syarat": "Pembuktian mikroorganisme dilakukan melalui pulasan gram, kultur, atau PCR.",
+     "halaman": 14,
+     "kutipan": "Sepsis memerlukan pembuktian adanya mikroorganisme yang dapat dilakukan melalui pemeriksaan pulasan gram, hasil kultur (biakan), atau PCR.",
+     "usia": "anak",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "tindakan",
+     "syarat": "Intubasi segera bila dalam pemantauan paling lambat 30 menit terjadi perburukan saturasi oksigen atau peningkatan usaha napas.",
+     "halaman": 31,
+     "kutipan": "Intubasi harus segera dilakukan bila dalam pemantauan selambatnya 30 menit terjadi perburukan (saturasi oksigen atau peningkatan usaha napas).",
+     "usia": "anak",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "tindakan",
+     "syarat": "Transfusi PRC diberikan bila ScvO2 <70% atau Hb <7 g/dL.",
+     "halaman": 40,
+     "kutipan": "Transfusi Packed Red Cell (PRC) diberikan berdasarkan saturasi vena cava superior (ScvO2) <70% atau Hb <7 g/dL.",
+     "usia": "anak",
+     "sama_dengan": null
+    }
+   ],
+   "ditolak_validasi": []
+  },
+  "KMK-2021-4801": {
+   "katalog_id": "KMK-2021-4801",
+   "judul": "Pedoman Nasional Pelayanan Kedokteran Tata Laksana Gagal Jantung",
+   "nomor": "HK.01.07/MENKES/4801/2021",
+   "berlaku_mulai": "2021-06-28",
+   "cakupan_usia": "perlu_telaah",
+   "disusun": {
+    "tanggal": "2026-10-09T02:15:28.187Z",
+    "model": "gpt-6-luna",
+    "penyedia": "openai_compat",
+    "versi": "draf-kartu-pnpk-v1",
+    "halaman_dibaca": [
+     11,
+     26,
+     31,
+     41,
+     49,
+     57,
+     71,
+     73,
+     79
+    ],
+    "usulan_ai": 8,
+    "lolos_validasi_kutipan": 8,
+    "tokens": 7575,
+    "biaya_idr": 29,
+    "error": null
+   },
+   "butir": [
+    {
+     "kategori": "kriteria_diagnosis",
+     "syarat": "Diagnosis klinis gagal jantung mencakup gejala khas, tanda khas, dan bukti objektif gangguan struktur atau fungsi jantung saat istirahat.",
+     "halaman": 11,
+     "kutipan": "Secara klinis, gagal jantung merupakan kumpulan gejala yang kompleks dimana seseorang memiliki tampilan berupa: gejala gagal jantung, tanda khas gagal jantung, dan adanya bukti obyektif dari gangguan struktur atau fungsi jantung saat istirahat",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "penunjang",
+     "syarat": "Pada pasien dengan sesak akut di IGD maupun CCU/ICU, ukur konsentrasi BNP atau NT-proBNP untuk mendiagnosis atau menyingkirkan GJA.",
+     "halaman": 79,
+     "kutipan": "Untuk mendiagnosis dan menyingkirkan GJA, direkomendasikan untuk mengukur konsentrasi peptida natriuretik plasma (BNP, NT-proBNP) pada setiap pasien dengan sesak akut di IGD maupun CCU/ICU.",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "penunjang",
+     "syarat": "BNP > 100 pg/mL memiliki sensitivitas 90% dan spesifisitas 76% untuk membedakan gagal jantung dari penyebab sesak lain.",
+     "halaman": 79,
+     "kutipan": "Studi Breathing Not Properly menunjukkan konsentrasi BNP > 100 pg/mL memiliki 90% sensitivitas dan 76% spesifisitas untuk membedakan gagal jantung dari penyebab sesak lain.",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "penunjang",
+     "syarat": "Saat masuk rumah sakit, lakukan EKG 12 sadapan dan pemeriksaan kreatinin, urea, elektrolit, tes fungsi liver, serta glukosa darah.",
+     "halaman": 79,
+     "kutipan": "Pada saat masuk rumah sakit, direkomendasikan untuk melakukan pemeriksaan EKG 12 sadapan, pemeriksaan laboratorium (kreatinin, urea, elektrolit, tes fungsi liver, glukosa darah).",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "penunjang",
+     "syarat": "Lakukan analisis gas darah dan laktat bila ditemukan ketidakstabilan hemodinamik atau distres pernapasan yang tidak responsif terhadap terapi awal.",
+     "halaman": 79,
+     "kutipan": "Jika ditemukan ketidakstabilan hemodinamik atau distres pernapasan yang tidak responsif terhadap terapi awal, lakukan analisis gas darah dan laktat.",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "penunjang",
+     "syarat": "Pada ketidakstabilan hemodinamik, ekokardiografi untuk menilai etiologi gagal jantung dan parameter hemodinamik harus dilakukan sesegera mungkin.",
+     "halaman": 79,
+     "kutipan": "Ekokardiografi untuk menilai etiologi gagal jantung dan parameter hemodinamik harus dilakukan sesegera mungkin pada ketidakstabilan hemodinamik.",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "tindakan",
+     "syarat": "BPAK direkomendasikan pada pasien dengan angina dan stenosis signifikan cabang utama a. koronaria kiri yang memenuhi syarat bedah dan diperkirakan berstatus fungsional baik selama ≥ 1 tahun.",
+     "halaman": 49,
+     "kutipan": "Bedah Pintas Arteri Koroner (BPAK) direkomendasikan pada pasien dengan angina dan stenosis cabang utama a. koronaria kiri yang signifikan, yang memang memenuhi syarat untuk menjalani pembedahan dan diharapkan untuk tetap dalam keadaan status fungsional yang ba",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "tindakan",
+     "syarat": "BPAK direkomendasikan pada pasien dengan angina dan penyakit koroner 2 atau 3 pembuluh darah, termasuk cabang desenden a. koronaria kiri, yang memenuhi syarat bedah dan diperkirakan berstatus fungsional baik selama ≥ 1 t",
+     "halaman": 49,
+     "kutipan": "BPAK direkomendasikan pada pasien dengan angina dan dengan penyakit koroner pada 2 atau 3 pembuluh darah, termasuk cabang desenden a. koronaria kiri, yang memang memenuhi syarat untuk menjalani pembedahan dan diharapkan untuk tetap dalam keadaan status fungsio",
+     "usia": "semua",
+     "sama_dengan": null
+    }
+   ],
+   "ditolak_validasi": []
+  },
+  "KMK-2022-1600": {
+   "katalog_id": "KMK-2022-1600",
+   "judul": "Pedoman Nasional Pelayanan Kedokteran Tata Laksana Cedera Otak Traumatik",
+   "nomor": "HK.01.07/MENKES/1600/2022",
+   "berlaku_mulai": "2022-10-21",
+   "cakupan_usia": "perlu_telaah",
+   "disusun": {
+    "tanggal": "2026-10-09T02:14:50.240Z",
+    "model": "gpt-6-luna",
+    "penyedia": "openai_compat",
+    "versi": "draf-kartu-pnpk-v1",
+    "halaman_dibaca": [
+     9,
+     12,
+     15,
+     16,
+     23,
+     24,
+     27,
+     33,
+     34
+    ],
+    "usulan_ai": 10,
+    "lolos_validasi_kutipan": 10,
+    "tokens": 7298,
+    "biaya_idr": 29,
+    "error": null
+   },
+   "butir": [
+    {
+     "kategori": "penunjang",
+     "syarat": "Pemeriksaan CT scan kepala merupakan pemeriksaan penunjang pertama yang penting dan dilakukan atas indikasi.",
+     "halaman": 15,
+     "kutipan": "Pemeriksaan penunjang pertama yang penting (atas indikasi) dan cepat adalah pemeriksaan CT scan kepala, yang dapat ditemukan gambaran yang khas untuk setiap diagnosis, yaitu:",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "penunjang",
+     "syarat": "CT scan EDH menunjukkan lesi hiperdens epidural berbentuk lensa cembung.",
+     "halaman": 15,
+     "kutipan": "terdapat gambaran lesi hiperdens pada epidural (dibawah tulang tengkorak dan diatas duramater) yang berbentuk seperti lensa cembung berwarna.",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "penunjang",
+     "syarat": "CT scan SDH menunjukkan lesi perdarahan hiperdens berbentuk bulan sabit.",
+     "halaman": 15,
+     "kutipan": "Perdarahan subdural/Hematoma subdural (SDH): terdapat gambaran lesi perdarahan hiperdens berbentuk bulan sabit (konkaf yang",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "penunjang",
+     "syarat": "Pada DAI, MRI diperlukan untuk menentukan grading sebagai dasar menentukan prognosis.",
+     "halaman": 16,
+     "kutipan": "Pada kasus DAI diperlukan diagnosis lanjutan menggunakan MRI untuk menentukan grading DAI sebagai dasar menentukan prognosis.",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "tindakan",
+     "syarat": "Pertimbangan tindakan bedah jika SKG < 8 dengan pupil anisokor.",
+     "halaman": 23,
+     "kutipan": "Pertimbangan dilakukannya Tindakan bedah jika (IIA): a. SKG < 8 dengan pupil anisokor",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "tindakan",
+     "syarat": "Pertimbangan tindakan bedah jika volume EDH > 30 cc, tanpa mempertimbangkan SKG.",
+     "halaman": 23,
+     "kutipan": "Volume EDH > 30 cc tanpa mempertimbangkan SKG",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "tindakan",
+     "syarat": "Pertimbangan tindakan bedah pada SDH akut jika midline shift > 5 mm atau ketebalan >10 mm.",
+     "halaman": 23,
+     "kutipan": "SDH akut, midline shift > 5 mm atau ketebalan (thickness) >10 mm",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "tindakan",
+     "syarat": "Pertimbangan tindakan bedah jika ICH dengan volume perdarahan > 50 cc.",
+     "halaman": 23,
+     "kutipan": "ICH dengan volume perdarahan > 50 cc. Perburukan klinis progresif akibat lesi, peningkatan TIK dan adanya efek desak ruang akibat massa.",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "tindakan",
+     "syarat": "Bila TIK > 20 mmHg, pasang EVD.",
+     "halaman": 27,
+     "kutipan": "e) Normotermia f) Bila TIK > 20 mmHg pasang EVD",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "rawat_inap",
+     "syarat": "Kriteria rawat jalan pasien COT mencakup SKG 15.",
+     "halaman": 33,
+     "kutipan": "Pasien dengan COT dapat dirawat jalan dengan kriteria dan ketersediaan sarana kesehatan. Kriteria rawat jalan a. SKG 15",
+     "usia": "semua",
+     "sama_dengan": null
+    }
+   ],
+   "ditolak_validasi": []
+  },
+  "KMK-2023-1419": {
+   "katalog_id": "KMK-2023-1419",
+   "judul": "Pedoman Nasional Pelayanan Kedokteran Tata Laksana Angina Pektoris Stabil",
+   "nomor": "HK.01.07/MENKES/1419/2023",
+   "berlaku_mulai": "2023-06-08",
+   "cakupan_usia": "perlu_telaah",
+   "disusun": {
+    "tanggal": "2026-10-09T02:14:38.667Z",
+    "model": "gpt-6-luna",
+    "penyedia": "openai_compat",
+    "versi": "draf-kartu-pnpk-v1",
+    "halaman_dibaca": [
+     9,
+     14,
+     23,
+     33,
+     34,
+     44,
+     47,
+     62,
+     73
+    ],
+    "usulan_ai": 5,
+    "lolos_validasi_kutipan": 5,
+    "tokens": 6840,
+    "biaya_idr": 27,
+    "error": null
+   },
+   "butir": [
+    {
+     "kategori": "tindakan",
+     "syarat": "LVEF kurang dari 50% dengan angina tipikal menjadi dasar pertimbangan angiografi koroner invasif tanpa pemeriksaan non-invasif terlebih dahulu.",
+     "halaman": 14,
+     "kutipan": "kurang dari 50% dan angina tipikal memiliki risiko tinggi kejadian komplikasi kardiovaskular dan sebaiknya dipertimbangkan untuk dilakukan angiografi koroner invasif tanpa melalui tahapan pemeriksaan non-invasif terlebih dahulu.",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "penunjang",
+     "syarat": "Uji latih menunjukkan respons iskemia positif bila depresi ST ≥ 1 mm pada 60 milidetik setelah J point, horizontal atau downsloping.",
+     "halaman": 23,
+     "kutipan": "Depresi segmen ST ≥ 1 mm dibawah garis isoelektrik pada 60 milidetik setelah J point (bila segmen ST depresi horizontal atau downsloping).",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "penunjang",
+     "syarat": "Uji latih menunjukkan respons iskemia positif bila depresi ST ≥ 1.5 mm pada 60 milidetik setelah J point, upsloping.",
+     "halaman": 23,
+     "kutipan": "Depresi segmen ST ≥ 1.5 mm dibawah garis isoelektrik pada 60 milidetik setelah J point (bila depresi segmen ST upsloping).",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "penunjang",
+     "syarat": "Uji latih menunjukkan respons iskemia positif bila elevasi ST dan J point ≥ 1 mm pada 80 milidetik setelah J point.",
+     "halaman": 23,
+     "kutipan": "Elevasi segmen ST (dan elevasi J point) ≥ 1 mm pada 80 milidetik setelah J point.",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "tindakan",
+     "syarat": "Pasien berisiko tinggi dianjurkan menjalani angiografi koroner invasif langsung, disertai TMO.",
+     "halaman": 33,
+     "kutipan": "Pasien berisiko tinggi dianjurkan untuk langsung menjalani prosedur angiografi koroner invasif (disertai TMO), sedangkan pasien dengan risiko sedang dapat diberikan pilihan",
+     "usia": "semua",
+     "sama_dengan": null
+    }
+   ],
+   "ditolak_validasi": []
+  },
+  "KMK-2023-1634": {
+   "katalog_id": "KMK-2023-1634",
+   "judul": "Pedoman Nasional Pelayanan Kedokteran Tata Laksana Penyakit Ginjal Kronik",
+   "nomor": "HK.01.07/MENKES/1634/2023",
+   "berlaku_mulai": "2023-08-16",
+   "cakupan_usia": "perlu_telaah",
+   "disusun": {
+    "tanggal": "2026-10-09T02:14:11.625Z",
+    "model": "gpt-6-luna",
+    "penyedia": "openai_compat",
+    "versi": "draf-kartu-pnpk-v1",
+    "halaman_dibaca": [
+     12,
+     13,
+     70,
+     71,
+     78,
+     129,
+     133,
+     139,
+     163
+    ],
+    "usulan_ai": 6,
+    "lolos_validasi_kutipan": 6,
+    "tokens": 8163,
+    "biaya_idr": 36,
+    "error": null
+   },
+   "butir": [
+    {
+     "kategori": "kriteria_diagnosis",
+     "syarat": "Pada anak, eGFR dihitung menggunakan rumus Schwartz: (k × TB) / kreatinin serum.",
+     "halaman": 13,
+     "kutipan": "Pada anak, perhitungan eGFR ditentukan dengan rumus Schwartz, yaitu: eGFR = (k x TB) / Serum kreatinin",
+     "usia": "anak",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "kriteria_diagnosis",
+     "syarat": "Penurunan kategori GFR disertai penurunan eGFR 25% atau lebih dari baseline merupakan progresivitas PGK.",
+     "halaman": 13,
+     "kutipan": "Penurunan eGFR tertentu didefinisikan sebagai penurunan kategori GFR yang disertai dengan penurunan eGFR 25% atau lebih dari baseline.",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "kriteria_diagnosis",
+     "syarat": "Penurunan berkelanjutan eGFR lebih dari 5 ml/menit/1,73 m2/tahun didefinisikan sebagai progresivitas cepat.",
+     "halaman": 13,
+     "kutipan": "Progresivitas yang cepat didefinisikan sebagai penurunan berkelanjutan dalam eGFR lebih dari 5 ml/menit/1,73 m2/tahun.",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "pulang_rujuk",
+     "syarat": "Rujuk ke nefrologi terutama bila eGFR <30 ml/menit/1,73m2, penurunan fungsi ginjal cepat, rasio albumin-kreatinin >300 mg/g, atau eritrosit cast di urin.",
+     "halaman": 12,
+     "kutipan": "Rujukan ke ahli nefrologi terutama diindikasikan pada eGFR <30ml/menit/1,73m2, penurunan fungsi ginjal yang cepat, peningkatan rasio albumin-kreatinin (>300 mg/g), atau didapatkan eritrosit cast di urin.",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "pulang_rujuk",
+     "syarat": "Pada hipertensi dengan PGK tahap 3, rujuk ke faskes lanjutan bila eGFR ≤60 ml/menit/1.73m2 dan/atau disertai albuminuria.",
+     "halaman": 78,
+     "kutipan": "Pasien hipertensi dengan penyakit ginjal kronik tahap 3 (eGFR ≤60 ml/menit/1.73m2) dan atau disertai albuminuria",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "tindakan",
+     "syarat": "Pertimbangkan pembedahan untuk infeksi jaringan lunak sekitar akses dialisis, seperti abses, atau pembuatan akses hemodialisis baru bila diperlukan.",
+     "halaman": 139,
+     "kutipan": "Pertimbangkan tatalaksana pembedahan untuk menangani infeksi jaringan lunak sekitar akses dialisis, seperti abses, atau jika diperlukan dibuat akses hemodialisis dengan AV fistula atau AV graft yang baru.",
+     "usia": "semua",
+     "sama_dengan": null
+    }
+   ],
+   "ditolak_validasi": []
+  },
+  "KMK-2023-2162": {
+   "katalog_id": "KMK-2023-2162",
+   "judul": "Pedoman Nasional Pelayanan Kedokteran Tata Laksana Perdarahan Saluran Cerna",
+   "nomor": "HK.01.07/MENKES/2162/2023",
+   "berlaku_mulai": "2023-12-04",
+   "cakupan_usia": "perlu_telaah",
+   "disusun": {
+    "tanggal": "2026-10-09T02:13:54.414Z",
+    "model": "gpt-6-luna",
+    "penyedia": "openai_compat",
+    "versi": "draf-kartu-pnpk-v1",
+    "halaman_dibaca": [
+     7,
+     11,
+     16,
+     20,
+     27,
+     28,
+     30,
+     31,
+     47
+    ],
+    "usulan_ai": 7,
+    "lolos_validasi_kutipan": 7,
+    "tokens": 7450,
+    "biaya_idr": 34,
+    "error": null
+   },
+   "butir": [
+    {
+     "kategori": "penunjang",
+     "syarat": "Penegakan PSCA didasarkan pada anamnesis, pemeriksaan fisik, NGT jika ada indikasi, dan pemeriksaan penunjang.",
+     "halaman": 16,
+     "kutipan": "Diagnosis PSCA dibuat berdasarkan dari anamnesis, pemeriksaan fisik, inspeksi dengan pemasangan nasogastric tube (NGT) jika ada indikasi, serta pemeriksaan penunjang",
+     "usia": "dewasa",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "kriteria_diagnosis",
+     "syarat": "Manifestasi klinis perdarahan saluran cerna bawah dapat berupa melena atau hematokezia.",
+     "halaman": 31,
+     "kutipan": "Manifestasi klinis yang sering terjadi berupa melena atau hematokezia.",
+     "usia": "dewasa",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "intensif",
+     "syarat": "Pasien dengan ketidakstabilan hemodinamik atau perdarahan aktif harus dirawat di unit perawatan intensif.",
+     "halaman": 20,
+     "kutipan": "Semua pasien dengan ketidakstabilan hemodinamik atau perdarahan aktif (dimanifestasikan oleh hematemesis, darah merah terang per tabung nasogastrik, atau hematokezia) harus dirawat di unit perawatan intensif",
+     "usia": "dewasa",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "tindakan",
+     "syarat": "Laparotomi emergensi hanya menjadi opsi terakhir bila terapi medikamentosa atau endoskopi gagal menghentikan perdarahan, atau terjadi perforasi.",
+     "halaman": 27,
+     "kutipan": "Tindakan pembedahan berupa laparotomi emergensi hanya dilakukan sebagai opsi terakhir bila terapi medikamentosa ataupun endoskopi gagal menghentikan perdarahan yang terjadi, atau bila terjadi komplikasi perforasi.",
+     "usia": "dewasa",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "tindakan",
+     "syarat": "Hemoglobin minimal untuk endoskopi 8 g/dL; untuk terapi endoskopi minimal 10 g/dL dan hemodinamik stabil.",
+     "halaman": 20,
+     "kutipan": "Hemoglobin minimal untuk endoskopi adalah 8 g/dL, namun jika akan dilakukan terapi endoskopi, hemoglobin minimal 10 g/dL dan hemodinamik stabil.",
+     "usia": "dewasa",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "pulang_rujuk",
+     "syarat": "Rujuk bila perdarahan tidak berhenti dengan penanganan awal di layanan primer.",
+     "halaman": 30,
+     "kutipan": "Perdarahan yang tidak berhenti dengan penanganan awal di layanan primer.",
+     "usia": "dewasa",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "pulang_rujuk",
+     "syarat": "Rujuk pasien yang dicurigai mengalami perdarahan saluran cerna bawah untuk modalitas diagnostik lebih lanjut, seperti endoskopi.",
+     "halaman": 47,
+     "kutipan": "Semua pasien yang dicurigai mengalami perdarahan saluran cerna bawah, memerlukan modalitas diagnostik lebih lanjut seperti endoskopi saluran cerna untuk mengevaluasi sumber perdarahan",
+     "usia": "dewasa",
+     "sama_dengan": null
+    }
+   ],
+   "ditolak_validasi": []
+  },
+  "KMK-2023-85": {
+   "katalog_id": "KMK-2023-85",
+   "judul": "Pedoman Nasional Pelayanan Kedokteran Tata Laksana Gagal Jantung Pada Anak",
+   "nomor": "HK.01.07/MENKES/85/2023",
+   "berlaku_mulai": "2023-02-03",
+   "cakupan_usia": "anak",
+   "disusun": {
+    "tanggal": "2026-10-09T02:22:13.816Z",
+    "model": "gpt-6-luna",
+    "penyedia": "openai_compat",
+    "versi": "draf-kartu-pnpk-v1",
+    "halaman_dibaca": [
+     5,
+     8,
+     13,
+     14,
+     43,
+     44,
+     57,
+     63,
+     64
+    ],
+    "usulan_ai": 8,
+    "lolos_validasi_kutipan": 5,
+    "tokens": 7541,
+    "biaya_idr": 14,
+    "error": null
+   },
+   "butir": [
+    {
+     "kategori": "intensif",
+     "syarat": "Perawatan ICU diindikasikan pada gagal jantung modifikasi Ross skor 10-12.",
+     "halaman": 64,
+     "kutipan": "gagal jantung modifikasi Ross skor 10-12",
+     "usia": "anak",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "intensif",
+     "syarat": "Perawatan ICU diindikasikan pada Ross > 7 disertai hipotensi refrakter dengan skor inotropik vasoaktif ≥ 15.",
+     "halaman": 64,
+     "kutipan": "hipotensi refrakter dengan skor inotropik vasoaktif ≥ 15",
+     "usia": "anak",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "intensif",
+     "syarat": "Perawatan ICU diindikasikan pada gagal napas dan/atau syok kardiogenik pada semua kasus gagal jantung.",
+     "halaman": 64,
+     "kutipan": "gagal napas dan/atau syok kardiogenik pada semua kasus gagal jantung",
+     "usia": "anak",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "intensif",
+     "syarat": "Semua kasus pasca operasi jantung anak dirawat di ICU.",
+     "halaman": 64,
+     "kutipan": "semua kasus pasca operasi jantung anak",
+     "usia": "anak",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "intensif",
+     "syarat": "Perawatan ICU diindikasikan pasca kateterisasi bila pasien tidak dapat diekstubasi di laboratorium kateterisasi.",
+     "halaman": 64,
+     "kutipan": "semua kasus pasca kateterisasi yang tidak dapat diekstubasi di laboratorium kateterisasi.",
+     "usia": "anak",
+     "sama_dengan": null
+    }
+   ],
+   "ditolak_validasi": [
+    {
+     "kategori": "rawat_inap",
+     "syarat": "Gagal jantung NYHA/Ross derajat III atau IV sebaiknya dirawat inap.",
+     "halaman": 63,
+     "kutipan": "Pada gagal jantung berat (kriteria NYHA/Ross derajat III dan IV), aktivitas sedang atau berat harus dihindari, dan sebaiknya dirawat",
+     "usia": "anak",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "intensif",
+     "syarat": "Perawatan ICU diindikasikan pada Ross > 7 disertai komorbiditas pneumonia atau gangguan ginjal akut.",
+     "halaman": 64,
+     "kutipan": "komorbiditas: pneumonia, gangguan ginjal akut (acute kidney injury, AKI)",
+     "usia": "anak",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "pulang_rujuk",
+     "syarat": "Bila klinis membaik menjadi NYHA/Ross derajat I atau II, anak dapat ditata laksana rawat jalan.",
+     "halaman": 64,
+     "kutipan": "Jika klinis membaik (kriteria NYHA/Ross derajat I atau II), anak dapat ditata laksana rawat jalan dengan tetap menghindari aktivitas",
+     "usia": "anak",
+     "sama_dengan": null
+    }
+   ]
+  },
+  "KMK-2024-2009": {
+   "katalog_id": "KMK-2024-2009",
+   "judul": "Pedoman Nasional Pelayanan Klinis Tata Laksana Diabetes Melitus Pada Anak",
+   "nomor": "HK.01.07/MENKES/2009/2024",
+   "berlaku_mulai": "2024-12-31",
+   "cakupan_usia": "anak",
+   "disusun": {
+    "tanggal": "2026-10-09T02:13:37.812Z",
+    "model": "gpt-6-luna",
+    "penyedia": "openai_compat",
+    "versi": "draf-kartu-pnpk-v1",
+    "halaman_dibaca": [
+     13,
+     16,
+     17,
+     56,
+     57,
+     59,
+     74,
+     86,
+     100
+    ],
+    "usulan_ai": 7,
+    "lolos_validasi_kutipan": 7,
+    "tokens": 8990,
+    "biaya_idr": 41,
+    "error": null
+   },
+   "butir": [
+    {
+     "kategori": "kriteria_diagnosis",
+     "syarat": "Tanpa gejala klinis DM, pemeriksaan harus diulang pada hari yang berbeda.",
+     "halaman": 16,
+     "kutipan": "Tanpa adanya gejala klinis DM, pemeriksaan harus diulang pada hari yang berbeda.",
+     "usia": "anak",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "kriteria_diagnosis",
+     "syarat": "KAD berat: pH < 7,1 atau HCO3 < 5 mEq/L.",
+     "halaman": 74,
+     "kutipan": "KAD berat : pH < 7,1 atau HCO3 < 5 mEq/L",
+     "usia": "anak",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "rawat_inap",
+     "syarat": "Anak dengan KAD dirawat di tempat dengan kompetensi kesehatan anak, panduan tata laksana KAD, dan laboratorium untuk evaluasi ketat.",
+     "halaman": 74,
+     "kutipan": "Anak dengan KAD harus dirawat di tempat yang memiliki dokter dengan kompetensi di bidang kesehatan anak, panduan tata laksana KAD, dan memiliki laboratorium yang memungkinkan evaluasi pasien secara ketat.",
+     "usia": "anak",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "rawat_inap",
+     "syarat": "Rawat di rumah sakit bila anak akan menjalani anestesi umum.",
+     "halaman": 57,
+     "kutipan": "Perlu dirawat di rumah sakit bila akan menjalani anestesi umum.",
+     "usia": "anak",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "tindakan",
+     "syarat": "Operasi elektif hanya dilakukan pada penderita diabetes yang terkontrol.",
+     "halaman": 56,
+     "kutipan": "Operasi elektif hanya dilakukan pada penderita diabetes yang terkontrol.",
+     "usia": "anak",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "tindakan",
+     "syarat": "Operasi kegawatan pada penderita ketoasidosis ditunda sampai keadaan membaik dan stabil, kecuali ada indikasi klinis absolut.",
+     "halaman": 56,
+     "kutipan": "Tindakan operasi kegawatan sebaiknya ditunda pada penderita ketoasidosis sampai keadaannya membaik dan stabil, kecuali ada indikasi klinis absolut.",
+     "usia": "anak",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "tindakan",
+     "syarat": "Jika kadar glukosa darah tidak stabil, tindakan operasi sebaiknya ditunda.",
+     "halaman": 57,
+     "kutipan": "Jika kadar glukosa darahnya tidak stabil, tindakan operasi sebaiknya ditunda.",
+     "usia": "anak",
+     "sama_dengan": null
+    }
+   ],
+   "ditolak_validasi": []
+  },
+  "KMK-2025-1168": {
+   "katalog_id": "KMK-2025-1168",
+   "judul": "Pedoman Nasional Pelayanan Klinis Tata Laksana Pneumonia Pada Dewasa",
+   "nomor": "HK.01.07/MENKES/1168/2025",
+   "berlaku_mulai": "2025-12-15",
+   "cakupan_usia": "dewasa",
+   "disusun": {
+    "tanggal": "2026-10-09T02:11:06.876Z",
+    "model": "gpt-6-luna",
+    "penyedia": "openai_compat",
+    "versi": "draf-kartu-pnpk-v1",
+    "halaman_dibaca": [
+     4,
+     10,
+     11,
+     12,
+     13,
+     15,
+     18,
+     26,
+     27
+    ],
+    "usulan_ai": 6,
+    "lolos_validasi_kutipan": 5,
+    "tokens": 8779,
+    "biaya_idr": 29,
+    "error": null
+   },
+   "butir": [
+    {
+     "kategori": "kriteria_diagnosis",
+     "syarat": "Diagnosis ditegakkan bila radiologi menunjukkan infiltrat/opasitas/konsolidasi/air bronchogram dan terdapat awitan akut dengan minimal 2 gejala atau tanda.",
+     "halaman": 12,
+     "kutipan": "diagnosis pneumonia ditegakkan jika pada pemeriksaan radiologi ditemukan infiltrat/opasitas/konsolidasi/air bronchogram ditambah dengan awitan akut lebih dari satu (minimal 2) gejala dan tanda di bawah ini:",
+     "usia": "dewasa",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "intensif",
+     "syarat": "Indikasi ICU: hipotensi yang membutuhkan vasopressor atau gagal napas yang membutuhkan ventilasi mekanik.",
+     "halaman": 27,
+     "kutipan": "Indikasi perawatan ICU adalah pasien dengan hipotensi yang membutuhkan terapi vasopressor atau gagal napas yang membutuhkan ventilasi mekanik.",
+     "usia": "dewasa",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "intensif",
+     "syarat": "Pada pasien tanpa vasopressor atau ventilasi mekanik, kriteria minor IDSA/ATS dapat dipakai dengan penilaian klinis DPJP untuk menentukan indikasi ICU.",
+     "halaman": 27,
+     "kutipan": "Kriteria minor IDSA/ATS 2007 dapat digunakan pada pasien yang tidak membutuhkan vasopressor atau ventilasi mekanik, dengan penilaian klinis dokter penanggung jawab pelayanan untuk menentukan indikasi pasien dirawat di ICU.",
+     "usia": "dewasa",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "penunjang",
+     "syarat": "Pada kasus gawat napas, lakukan analisis gas darah bila frekuensi napas > dari 30 atau SPO2 92% dengan udara ruangan.",
+     "halaman": 18,
+     "kutipan": "analisis gas darah dilakukan pada pasien dengan kasus gawat nafas (frekuensi nafas > dari 30 atau SPO2 92% dengan udara ruangan)",
+     "usia": "dewasa",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "penunjang",
+     "syarat": "Jika klinis membaik dalam 5-7 hari, rontgen toraks ulang tidak perlu dilakukan.",
+     "halaman": 13,
+     "kutipan": "Apabila klinis membaik dalam 5-7 hari, tidak perlu dilakukan rontgen toraks ulang (rekomendasi kuat, kualitas bukti sedang).",
+     "usia": "dewasa",
+     "sama_dengan": null
+    }
+   ],
+   "ditolak_validasi": [
+    {
+     "syarat": "PSI 91–130 (kelas IV) dicantumkan sebagai rawat inap.",
+     "halaman": 26,
+     "kutipan": "91 – 130                           IV\n                                                        8.2 %       Rawat inap"
+    }
+   ]
+  },
+  "KMK-2025-762": {
+   "katalog_id": "KMK-2025-762",
+   "judul": "Pedoman Nasional Pelayanan Klinis Tata Laksana Infeksi Saluran Kemih",
+   "nomor": "HK.01.07/MENKES/762/2025",
+   "berlaku_mulai": "2025-07-29",
+   "cakupan_usia": "perlu_telaah",
+   "disusun": {
+    "tanggal": "2026-10-09T02:22:03.321Z",
+    "model": "gpt-6-luna",
+    "penyedia": "openai_compat",
+    "versi": "draf-kartu-pnpk-v1",
+    "halaman_dibaca": [
+     4,
+     5,
+     9,
+     11,
+     25,
+     27,
+     33,
+     60,
+     61
+    ],
+    "usulan_ai": 6,
+    "lolos_validasi_kutipan": 5,
+    "tokens": 9223,
+    "biaya_idr": 29,
+    "error": null
+   },
+   "butir": [
+    {
+     "kategori": "penunjang",
+     "syarat": "Evaluasi sistitis nonkomplikata mencakup urinalisis atau uji urin carik celup sebagai alternatif.",
+     "halaman": 33,
+     "kutipan": "Pemeriksaan urinalisis atau uji urin carik celup sebagai alternatif.",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "penunjang",
+     "syarat": "Kultur urine diindikasikan pada gejala atau tanda ISK, evaluasi setelah terapi, atau setelah pelepasan kateter urin.",
+     "halaman": 27,
+     "kutipan": "Indikasi utama untuk dilakukan kultur urine adalah: 1) pasien dengan gejala atau tanda adanya ISK; 2) evaluasi setelah terapi ISK; 3) setelah pelepasan kateter urin;",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "rawat_inap",
+     "syarat": "Hospitalisasi diindikasikan pada wanita hamil, hemodinamik tidak stabil, gangguan absorbsi gastrointestinal, atau kepatuhan terapi oral tidak jelas.",
+     "halaman": 61,
+     "kutipan": "Indikasi hospitalisasi adalah wanita hamil, hemodinamik tidak stabil, gangguan absorbsi gastrointestinal atau kepatuhan terhadap terapi oral tidak jelas",
+     "usia": "dewasa",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "kriteria_diagnosis",
+     "syarat": "Pada wanita tanpa faktor risiko ISK komplikata, diagnosis sistitis nonkomplikata berdasarkan riwayat gejala saluran kemih bawah.",
+     "halaman": 33,
+     "kutipan": "Diagnosis sistitis nonkomplikata pada wanita yang tidak memiliki faktor risiko lain untuk ISK komplikata dilakukan berdasarkan: ● riwayat gejala saluran kemih bagian bawah (disuria, frekuensi dan urgensi)",
+     "usia": "dewasa",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "penunjang",
+     "syarat": "Gejala ISK bawah nonkomplikata dan dipstik urin positif dapat ditangani tanpa kultur; kultur pascaterapi tidak perlu bila gejala hilang.",
+     "halaman": 27,
+     "kutipan": "bila didapatkan gejala ISK bawah nonkomplikata disertai hasil dipstik urin positif dapat diberikan terapi tanpa kultur urin, dan bila gejala hilang setelah mendapat pengobatan, tidak perlu dilakukan kultur pasca terapi.",
+     "usia": "semua",
+     "sama_dengan": null
+    }
+   ],
+   "ditolak_validasi": [
+    {
+     "kategori": "rawat_inap",
+     "syarat": "Rawat inap pasien pielonefritis akut bila gagal mempertahankan hidrasi atau toleransi antibiotika oral, atau pasien sakit berat atau debilitasi.",
+     "halaman": 60,
+     "kutipan": "Indikasi rawat inap pasien dengan pielonefritis akut adalah: 1) Kegagalan mempertahankan hidrasi normal atau toleransi terhadap antibiotika oral 2) Pasien sakit berat atau debilitasi",
+     "usia": "semua",
+     "sama_dengan": null
+    }
+   ]
+  },
+  "KMK-2026-274": {
+   "katalog_id": "KMK-2026-274",
+   "judul": "Pedoman Nasional Pelayanan Klinis Tata Laksana Epilepsi Pada Dewasa",
+   "nomor": "HK.01.07/MENKES/274/2026",
+   "berlaku_mulai": "2026-03-30",
+   "cakupan_usia": "dewasa",
+   "disusun": {
+    "tanggal": "2026-10-09T02:21:27.163Z",
+    "model": "gpt-6-luna",
+    "penyedia": "openai_compat",
+    "versi": "draf-kartu-pnpk-v1",
+    "halaman_dibaca": [
+     4,
+     6,
+     7,
+     11,
+     23,
+     25,
+     32,
+     59,
+     60
+    ],
+    "usulan_ai": 7,
+    "lolos_validasi_kutipan": 7,
+    "tokens": 7244,
+    "biaya_idr": 20,
+    "error": null
+   },
+   "butir": [
+    {
+     "kategori": "pulang_rujuk",
+     "syarat": "Rujuk ke FPKTL bila terdapat defisit neurologis fokal pasca-iktal.",
+     "halaman": 23,
+     "kutipan": "Terdapat defisit neurologis fokal pasca-iktal",
+     "usia": "dewasa",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "pulang_rujuk",
+     "syarat": "Rujuk ke FPKTL bila penurunan kesadaran menetap pasca-iktal.",
+     "halaman": 23,
+     "kutipan": "Penurunan kesadaran yang menetap pasca-iktal",
+     "usia": "dewasa",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "pulang_rujuk",
+     "syarat": "Rujuk ke FPKTL bila bangkitan awitan fokal terjadi tanpa riwayat bangkitan sebelumnya.",
+     "halaman": 23,
+     "kutipan": "Bangkitan awitan fokal pada pasien yang tidak memiliki riwayat bangkitan sebelumnya",
+     "usia": "dewasa",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "pulang_rujuk",
+     "syarat": "Rujuk ke FPKTL bila bangkitan pertama kali terjadi pada usia lebih dari 25 tahun tanpa riwayat bangkitan sebelumnya.",
+     "halaman": 23,
+     "kutipan": "Bangkitan terjadi pertama kali pada usia lebih dari 25 tahun tanpa riwayat bangkitan sebelumnya.",
+     "usia": "dewasa",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "tindakan",
+     "syarat": "Bedah paliatif untuk sindrom epilepsi atau epilepsi refrakter dengan zona epileptogenik meliputi seluruh atau salah satu hemisfer.",
+     "halaman": 60,
+     "kutipan": "Prosedur bedah paliatif dilakukan pada kasus sindrom epilepsi atau epilepsi refrakter dengan zona epileptogenik meliputi seluruh hemisfer otak atau salah satu hemisfer",
+     "usia": "dewasa",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "kriteria_diagnosis",
+     "syarat": "Diagnosis epilepsi bila minimal dua bangkitan tanpa provokasi berjarak lebih dari 24 jam, satu bangkitan dengan risiko berulang ≥60% dalam 10 tahun, atau sindrom epilepsi.",
+     "halaman": 4,
+     "kutipan": "minimal dua bangkitan epileptik tanpa provokasi dengan jarak lebih dari 24 jam, atau satu bangkitan tanpa provokasi dengan risiko bangkitan berikutnya mencapai setidaknya 60% dalam 10 tahun",
+     "usia": "dewasa",
+     "sama_dengan": "PNPK-EPILEPSI-DEWASA-01"
+    },
+    {
+     "kategori": "tindakan",
+     "syarat": "Bedah resektif dilakukan bila semiologi, video EEG, dan MRI sesuai serta terlokalisir pada area otak.",
+     "halaman": 59,
+     "kutipan": "Tindakan bedah resektif dilakukan jika terdapat kesesuaian antara semiologi, video EEG dan imaging (MRI) yang terlokalisir pada area otak.",
+     "usia": "dewasa",
+     "sama_dengan": null
+    }
+   ],
+   "ditolak_validasi": []
+  },
+  "KMK-2026-302": {
+   "katalog_id": "KMK-2026-302",
+   "judul": "Pedoman Nasional Pelayanan Klinis Tatalaksana Diabetes Melitus Tipe 2 Dewasa",
+   "nomor": "HK.01.07/MENKES/302/2026",
+   "berlaku_mulai": "2026-04-17",
+   "cakupan_usia": "dewasa",
+   "disusun": {
+    "tanggal": "2026-10-09T02:20:17.908Z",
+    "model": "gpt-6-luna",
+    "penyedia": "openai_compat",
+    "versi": "draf-kartu-pnpk-v1",
+    "halaman_dibaca": [
+     4,
+     9,
+     10,
+     13,
+     58,
+     66,
+     76,
+     111,
+     112
+    ],
+    "usulan_ai": 0,
+    "lolos_validasi_kutipan": 0,
+    "tokens": 6550,
+    "biaya_idr": 6,
+    "error": null
+   },
+   "butir": [],
+   "ditolak_validasi": []
+  },
+  "KMK-2026-303": {
+   "katalog_id": "KMK-2026-303",
+   "judul": "Pedoman Nasional Pelayanan Klinis Tata Laksana Hipertensi Dewasa",
+   "nomor": "HK.01.07/MENKES/303/2026",
+   "berlaku_mulai": "2026-04-17",
+   "cakupan_usia": "dewasa",
+   "disusun": {
+    "tanggal": "2026-10-09T02:20:52.692Z",
+    "model": "gpt-6-luna",
+    "penyedia": "openai_compat",
+    "versi": "draf-kartu-pnpk-v1",
+    "halaman_dibaca": [
+     5,
+     9,
+     29,
+     38,
+     39,
+     53,
+     65,
+     71,
+     81
+    ],
+    "usulan_ai": 5,
+    "lolos_validasi_kutipan": 4,
+    "tokens": 7864,
+    "biaya_idr": 19,
+    "error": null
+   },
+   "butir": [
+    {
+     "kategori": "pulang_rujuk",
+     "syarat": "Rujuk segera ibu hamil dengan TDS >170 mmHg atau TDD >110 mmHg ke FKRTL.",
+     "halaman": 53,
+     "kutipan": "tekanan darah sistolik >170 mmHg atau tekanan darah diastolik >110 mmHg adalah keadaan gawat darurat pada ibu hamil sehingga harus segera dirujuk ke fasilitas kesehatan rujukan tingkat lanjut (FKRTL).",
+     "usia": "dewasa",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "pulang_rujuk",
+     "syarat": "Rujuk pasien dengan pre-eklampsia berat atau eklampsia ke FKRTL.",
+     "halaman": 53,
+     "kutipan": "Pasien dengan pre-eklampsia berat atau eklampsia harus dirujuk ke Fasilitas Kesehatan Rujukan Tingkat Lanjut (FKRTL).",
+     "usia": "dewasa",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "pulang_rujuk",
+     "syarat": "Rujuk pasien hipertensi grade 3 ke dokter kompeten layanan mata untuk evaluasi dan pengobatan komplikasi vaskular retina.",
+     "halaman": 81,
+     "kutipan": "Untuk semua pasien hipertensi grade 3 merupakan indikasi kuat rujukan ke dokter dengan kompetensi melakukan layanan mata untuk evaluasi dan pengobatan komplikasi vaskular retina.",
+     "usia": "dewasa",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "pulang_rujuk",
+     "syarat": "Rujuk pasien hipertensi grade 2 tanpa kerusakan target organ yang jelas ke dokter kompeten layanan mata.",
+     "halaman": 81,
+     "kutipan": "Untuk pasien hipertensi grade 2 tanpa kerusakan target organ yang jelas, diperlukan rujukan ke dokter dengan kompetensi melakukan layanan mata.",
+     "usia": "dewasa",
+     "sama_dengan": null
+    }
+   ],
+   "ditolak_validasi": [
+    {
+     "kategori": "tindakan",
+     "syarat": "Tunda intervensi operasi non-jantung bila TDS ≥180 mmHg dan/atau TDD ≥110 mmHg sampai TD turun atau terkendali, kecuali keadaan darurat.",
+     "halaman": 38,
+     "kutipan": "pada mereka yang memiliki TDS ≥180 mmHg dan/atau TDD ≥110 mmHg, disarankan menunda intervensi sampai TD turun atau terkendali, kecuali pada keadaan darurat.",
+     "usia": "dewasa",
+     "sama_dengan": null
+    }
+   ]
+  },
+  "KMK-2026-67": {
+   "katalog_id": "KMK-2026-67",
+   "judul": "Pedoman Nasional Pelayanan Klinis Tatalaksana Katarak Pada Dewasa",
+   "nomor": "HK.01.07/MENKES/67/2026",
+   "berlaku_mulai": "2026-02-02",
+   "cakupan_usia": "dewasa",
+   "disusun": {
+    "tanggal": "2026-10-09T02:20:12.391Z",
+    "model": "gpt-6-luna",
+    "penyedia": "openai_compat",
+    "versi": "draf-kartu-pnpk-v1",
+    "halaman_dibaca": [
+     4,
+     11,
+     14,
+     15,
+     24,
+     30,
+     31,
+     32,
+     34
+    ],
+    "usulan_ai": 10,
+    "lolos_validasi_kutipan": 10,
+    "tokens": 7370,
+    "biaya_idr": 20,
+    "error": null
+   },
+   "butir": [
+    {
+     "kategori": "penunjang",
+     "syarat": "Pasien yang akan menjalani operasi katarak menjalani pemeriksaan darah rutin: hemoglobin, leukosit, trombosit, dan gula darah sewaktu.",
+     "halaman": 14,
+     "kutipan": "Pemeriksaan darah rutin yang terdiri dari hemoglobin, leukosit, trombosit dan gula darah sewaktu dilakukan pada pasien yang akan dilakukan operasi katarak.",
+     "usia": "dewasa",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "penunjang",
+     "syarat": "Keratometri dan biometri merupakan pemeriksaan rutin untuk menentukan kekuatan IOL yang akan diimplantasi.",
+     "halaman": 15,
+     "kutipan": "Pemeriksaan keratometri dan biometri merupakan pemeriksaan rutin untuk menentukan besarnya power IOL yang akan di- implantasi.",
+     "usia": "dewasa",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "rawat_inap",
+     "syarat": "Rawat inap bila kondisi atau penyulit pasien membutuhkan anestesi umum (GA).",
+     "halaman": 32,
+     "kutipan": "Terdapat setidaknya salah satu kondisi/penyulit pada pasien, sehingga membutuhkan anestesi umum (GA)",
+     "usia": "dewasa",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "tindakan",
+     "syarat": "Sebelum operasi, tekanan darah harus < 160 mmHg sistolik dan < 100 mmHg diastolik.",
+     "halaman": 30,
+     "kutipan": "Oleh karena itu, sebelum tindakan operasi, tekanan darah harus dipastikan < 160 mmHg untuk sistolik dan < 100 mmHg untuk diastolik",
+     "usia": "dewasa",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "pulang_rujuk",
+     "syarat": "Rujuk ke fasilitas pelayanan kesehatan tingkat lanjut bila visus 6/12 atau lebih baik tetapi dikhawatirkan mengganggu atau membahayakan keselamatan.",
+     "halaman": 32,
+     "kutipan": "Jika ditemukan pasien katarak dengan tajam penglihatan 6/12 atau lebih baik, namun dikhawatirkan akan mengganggu bahkan membahayakan keselamatan pasien dan orang di sekitarnya.",
+     "usia": "dewasa",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "kriteria_diagnosis",
+     "syarat": "Diagnosis katarak ditegakkan dengan slit lamp; senter dan/atau oftalmoskop juga dapat digunakan.",
+     "halaman": 14,
+     "kutipan": "Diagnosis katarak dapat ditegakkan melalui pemeriksaan dengan menggunakan senter dan/atau oftalmoskop, akan tetapi pemeriksaan melalui slit lamp tanpa dilatasi dan dengan dilatasi merupakan standar pelayanan untuk mendiagnosis katarak.",
+     "usia": "dewasa",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "rawat_inap",
+     "syarat": "Rawat inap bila penyakit sistemik atau kondisi pasien membutuhkan observasi ketat berdasarkan konsultasi dokter sesuai kompetensinya.",
+     "halaman": 32,
+     "kutipan": "Terdapat penyakit sistemik atau kondisi yang telah diderita pasien sebelumnya, yang berdasarkan hasil konsultasi dengan dokter sesuai kompetensinya membutuhkan observasi ketat sebelum operasi, saat operasi, dan pasca operasi",
+     "usia": "dewasa",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "rawat_inap",
+     "syarat": "Rawat inap bila komplikasi operasi membutuhkan tindakan atau operasi tambahan dan/atau observasi ketat pascaoperasi.",
+     "halaman": 32,
+     "kutipan": "Terdapat komplikasi operasi yang membutuhkan tindakan/operasi tambahan dan/atau observasi ketat pasca operasi",
+     "usia": "dewasa",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "tindakan",
+     "syarat": "Pada pasien diabetes, kadar gula darah sewaktu harus di bawah 180 mg/dl sebelum operasi.",
+     "halaman": 30,
+     "kutipan": "Kadar gula darah harus dikendalikan sebelum tindakan operasi. Kadar gula darah sewaktu dibawah 180 mg/dl guna mengurangi risiko infeksi dan gangguan penyembuhan.",
+     "usia": "dewasa",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "tindakan",
+     "syarat": "Operasi pada pasien dengan riwayat uveitis hanya dilakukan tanpa inflamasi aktif selama minimal tiga bulan berturut-turut.",
+     "halaman": 31,
+     "kutipan": "Operasi hanya boleh dilakukan jika tidak terdapat tanda-tanda inflamasi aktif selama minimal tiga bulan berturut-turut.",
+     "usia": "dewasa",
+     "sama_dengan": null
+    }
+   ],
+   "ditolak_validasi": []
+  },
+  "KMK-2026-701": {
+   "katalog_id": "KMK-2026-701",
+   "judul": "Pedoman Nasional Pelayanan Klinis Tata Laksana Hipertensi Dalam Kehamilan",
+   "nomor": "HK.01.07/MENKES/701/2026",
+   "berlaku_mulai": "2026-07-06",
+   "cakupan_usia": "perlu_telaah",
+   "disusun": {
+    "tanggal": "2026-10-09T02:21:12.994Z",
+    "model": "gpt-6-luna",
+    "penyedia": "openai_compat",
+    "versi": "draf-kartu-pnpk-v1",
+    "halaman_dibaca": [
+     8,
+     9,
+     15,
+     22,
+     23,
+     30,
+     34,
+     58,
+     60
+    ],
+    "usulan_ai": 9,
+    "lolos_validasi_kutipan": 6,
+    "tokens": 8839,
+    "biaya_idr": 28,
+    "error": null
+   },
+   "butir": [
+    {
+     "kategori": "kriteria_diagnosis",
+     "syarat": "Pada hipertensi baru setelah 20 minggu tanpa proteinuria, trombosit <100.000/µL menjadi salah satu tanda untuk menegakkan preeklamsia.",
+     "halaman": 9,
+     "kutipan": "Trombositopenia, yaitu jumlah trombosit kurang dari 100.000/µL.",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "kriteria_diagnosis",
+     "syarat": "Preeklamsia dengan gambaran berat mencakup sistolik ≥160 mmHg atau diastolik ≥110 mmHg pada dua pemeriksaan berjarak minimal 4 jam, kecuali pasien sudah mendapat terapi antihipertensi.",
+     "halaman": 9,
+     "kutipan": "Hipertensi berat (sistolik ≥160 mmHg atau diastolik ≥110 mmHg) pada dua kali pemeriksaan dengan jarak minimal 4 jam, kecuali pasien sudah dalam terapi antihipertensi.",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "pulang_rujuk",
+     "syarat": "Semua kasus hipertensi dalam kehamilan dirujuk ke FPKTL.",
+     "halaman": 23,
+     "kutipan": "semua kasus harus dilakukan rujukan ke FPKTL",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "kriteria_diagnosis",
+     "syarat": "Pada hipertensi baru setelah 20 minggu tanpa proteinuria, kreatinin serum >1,1 mg/dl atau dua kali nilai sebelumnya tanpa penyebab lain menjadi tanda preeklamsia.",
+     "halaman": 9,
+     "kutipan": "Gangguan fungsi ginjal, yaitu kreatinin serum >1,1 mg/dl atau terjadi peningkatan dua kali lipat dari nilai sebelumnya tanpa penyebab lain.",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "kriteria_diagnosis",
+     "syarat": "Pada hipertensi baru setelah 20 minggu tanpa proteinuria, peningkatan transaminase hati hingga dua kali nilai normal atau ALT/AST >40 IU/L menjadi tanda preeklamsia.",
+     "halaman": 9,
+     "kutipan": "Gangguan fungsi hati, yaitu peningkatan kadar transaminase hati hingga dua kali lipat nilai normal seperti ALT atau AST > 40 IU/L",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "tindakan",
+     "syarat": "Pada HELLP usia kehamilan ≥34 minggu dengan kondisi maternal memburuk atau fetal distress, terminasi segera diindikasikan.",
+     "halaman": 60,
+     "kutipan": "Pada usia kehamilan ≥34 minggu dengan kondisi maternal yang memburuk atau fetal distress, terminasi segera diindikasikan.",
+     "usia": "semua",
+     "sama_dengan": null
+    }
+   ],
+   "ditolak_validasi": [
+    {
+     "kategori": "kriteria_diagnosis",
+     "syarat": "Catat hipertensi kronik bila terdeteksi sebelum kehamilan atau sebelum 20 minggu gestasi, memakai obat sebelum hamil, atau menetap 12 minggu setelah lahir.",
+     "halaman": 8,
+     "kutipan": "Hipertensi yang terdeteksi sebelum kehamilan atau sebelum 20 minggu gestasi, menggunakan obat antihipertensi sebelum hamil, atau hipertensi menetap 12 minggu setelah lahir",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "kriteria_diagnosis",
+     "syarat": "Hipertensi gestasional muncul de novo pada usia kehamilan ≥20 minggu tanpa proteinuria atau temuan lain yang menunjukkan preeklamsia.",
+     "halaman": 9,
+     "kutipan": "Hipertensi yang muncul de novo pada ≥20 minggu kehamilan tanpa proteinuria dan tanpa temuan lain yang menunjukkan tanda-tanda preeklamsia.",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "penunjang",
+     "syarat": "Pada evaluasi HELLP, catat SGOT/SGPT >2x batas normal, LDH ≥600 IU/L, atau bilirubin total >1,2 mg/dL.",
+     "halaman": 58,
+     "kutipan": "SGOT/SGPT (peningkatan >2x batas normal), LDH (≥600 IU/L sebagai kriteria diagnostik), bilirubin total (peningkatan >1,2 mg/dL)",
+     "usia": "semua",
+     "sama_dengan": null
+    }
+   ]
+  },
+  "KMK-2026-875": {
+   "katalog_id": "KMK-2026-875",
+   "judul": "Pedoman Nasional Pelayanan Klinis Tata Laksana Demam Tifoid Pada Dewasa",
+   "nomor": "HK.01.07/MENKES/875/2026",
+   "berlaku_mulai": "2026-08-10",
+   "cakupan_usia": "dewasa",
+   "disusun": {
+    "tanggal": "2026-10-09T02:21:42.338Z",
+    "model": "gpt-6-luna",
+    "penyedia": "openai_compat",
+    "versi": "draf-kartu-pnpk-v1",
+    "halaman_dibaca": [
+     4,
+     7,
+     10,
+     12,
+     19,
+     22,
+     40,
+     44,
+     45
+    ],
+    "usulan_ai": 6,
+    "lolos_validasi_kutipan": 6,
+    "tokens": 8025,
+    "biaya_idr": 21,
+    "error": null
+   },
+   "butir": [
+    {
+     "kategori": "kriteria_diagnosis",
+     "syarat": "Penegakan diagnosis klinis dapat menggunakan Skor Nelwan dengan total skor lebih dari atau sama dengan 10.",
+     "halaman": 45,
+     "kutipan": "Penegakan diagnosis klinis demam tifoid dapat dilakukan menggunakan sistem skoring “Skor Nelwan” dengan total skor lebih dari atau sama dengan 10.",
+     "usia": "dewasa",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "intensif",
+     "syarat": "Komplikasi berbahaya menjadi indikasi perawatan intensif dan perawatan bersama multidisiplin.",
+     "halaman": 40,
+     "kutipan": "Bila komplikasi berbahaya, harus dilaksanakan perawatan intensif serta dirawat secara bersama dari bermacam-macam disiplin spesialis yang terkait untuk pelayanan kesehatan lanjutan.",
+     "usia": "dewasa",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "tindakan",
+     "syarat": "Segera transfusi bila perdarahan akut mencapai 5 ml/KgBB/jam dan pemeriksaan hemostasis normal.",
+     "halaman": 40,
+     "kutipan": "Segera transfusi bila telah terjadi perdarahan akut, dimana perdarahan terjadi sebanyak 5 ml/KgBB/jam dan pemeriksaan hemostasis normal.",
+     "usia": "dewasa",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "pulang_rujuk",
+     "syarat": "Usia lanjut 60 tahun ke atas merupakan kriteria rujukan.",
+     "halaman": 44,
+     "kutipan": "Umur/ Age (A) Usia lanjut (60 tahun keatas )",
+     "usia": "dewasa",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "rawat_inap",
+     "syarat": "Pertimbangkan rawat inap bila terdapat komorbid, komplikasi, ibu hamil, lansia, muntah persisten yang menghambat asupan, tidak ada perawat, atau akses berobat sangat jauh.",
+     "halaman": 45,
+     "kutipan": "apabila terdapat salah satu dari kondisi berikut ini komorbid, komplikasi, ibu hamil, lansia, mual muntah persisten sehingga asupan nutrisi dan obat per oral tidak adekuat",
+     "usia": "dewasa",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "pulang_rujuk",
+     "syarat": "Rujuk bila setelah terapi selama 5 hari tidak ada perbaikan, terjadi perburukan, atau terdapat komplikasi.",
+     "halaman": 44,
+     "kutipan": "Telah mendapatkan terapi selama 5 hari dan tidak ada perbaikan atau perburukan atau terdapat komplikasi",
+     "usia": "dewasa",
+     "sama_dengan": null
+    }
+   ],
+   "ditolak_validasi": []
+  },
+  "KMK-2026-876": {
+   "katalog_id": "KMK-2026-876",
+   "judul": "Pedoman Nasional Pelayanan Klinis Tata Laksana Sindrom Koroner Akut",
+   "nomor": "HK.01.07/MENKES/876/2026",
+   "berlaku_mulai": "2026-08-10",
+   "cakupan_usia": "perlu_telaah",
+   "disusun": {
+    "tanggal": "2026-10-09T02:20:38.516Z",
+    "model": "gpt-6-luna",
+    "penyedia": "openai_compat",
+    "versi": "draf-kartu-pnpk-v1",
+    "halaman_dibaca": [
+     8,
+     9,
+     12,
+     21,
+     24,
+     32,
+     60,
+     61,
+     65
+    ],
+    "usulan_ai": 8,
+    "lolos_validasi_kutipan": 7,
+    "tokens": 8591,
+    "biaya_idr": 27,
+    "error": null
+   },
+   "butir": [
+    {
+     "kategori": "kriteria_diagnosis",
+     "syarat": "Diagnosis IMA-EST memerlukan angina akut dan elevasi segmen ST persisten pada dua sadapan bersebelahan.",
+     "halaman": 9,
+     "kutipan": "Diagnosis IMA-EST ditegakkan jika terdapat keluhan angina pektoris akut disertai elevasi segmen ST yang persisten di dua sandapan yang bersebelahan.",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "kriteria_diagnosis",
+     "syarat": "Elevasi ST baru di titik J pada dua sadapan berdekatan memenuhi ambang sesuai sadapan, jenis kelamin, dan usia yang dicantumkan.",
+     "halaman": 12,
+     "kutipan": "Elevasi segmen ST baru pada titik J pada 2 sadapan yang berdekatan dengan cut-point ≥1 mm di semua sadapan selain V2–V3, dengan cut-point sebagai berikut: ≥2 mm pada pria usia ≥40 tahun",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "penunjang",
+     "syarat": "EKG 12 sadapan dibuat sedapat mungkin dalam 10 menit sejak pasien tiba di ruang gawat darurat.",
+     "halaman": 12,
+     "kutipan": "Sedapat mungkin, rekaman EKG dibuat dalam 10 menit sejak kedatangan pasien di ruang gawat darurat dan diulang setiap keluhan angina timbul kembali.",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "tindakan",
+     "syarat": "Stenosis >50% pada pembuluh darah utama koroner kiri merupakan indikasi bedah pintas arteri koroner.",
+     "halaman": 60,
+     "kutipan": "Stenosis >50% pada pembuluh darah utama koroner kiri",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "kriteria_diagnosis",
+     "syarat": "IMA-NEST dibedakan dari APTS berdasarkan peningkatan bermakna biomarka jantung; tanpa peningkatan bermakna, diagnosisnya APTS.",
+     "halaman": 9,
+     "kutipan": "Bila hasil pemeriksaan biokimia biomarka jantung terjadi peningkatan bermakna, maka diagnosisnya infark miokard akut tanpa elevasi segmen ST (IMA-NEST), jika biomarka jantung tidak meningkat secara bermakna maka diagnosisnya APTS.",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "tindakan",
+     "syarat": "Reperfusi direkomendasikan pada semua pasien dengan diagnosis kerja IMA-EST dan gejala iskemik ≤12 jam.",
+     "halaman": 32,
+     "kutipan": "Terapi reperfusi direkomendasikan pada semua pasien dengan diagnosis kerja IMA-EST (elevasi segmen ST persisten atau ekivalensinya) dan gejala iskemik ≤12 jam",
+     "usia": "semua",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "tindakan",
+     "syarat": "Stenosis >70% pada proksimal LAD dengan fraksi ejeksi <50% atau tanda iskemik jelas pada evaluasi non-invasif merupakan indikasi BPAK.",
+     "halaman": 60,
+     "kutipan": "Stenosis >70% pada daerah proksimal LAD dengan fraksi ejeksi <50% atau tanda-tanda iskemik yang jelas pada evaluasi non-invasif.",
+     "usia": "semua",
+     "sama_dengan": null
+    }
+   ],
+   "ditolak_validasi": [
+    {
+     "kategori": "tindakan",
+     "syarat": "Strategi invasif selama perawatan RS direkomendasikan untuk SKA-NEST dengan risiko tinggi atau indeks kecurigaan APTS tinggi.",
+     "halaman": 65,
+     "kutipan": "Strategi invasif selama perawatan RS direkomendasikan untuk pasien SKA-NEST dengan kriteria risiko tinggi atau indeks kecurigaan APTS tinggi",
+     "usia": "semua",
+     "sama_dengan": null
+    }
+   ]
+  },
+  "PNPK-PNEUMONIA-ANAK-IDAI": {
+   "katalog_id": "PNPK-PNEUMONIA-ANAK-IDAI",
+   "judul": "PNPK Tata Laksana Pneumonia pada Anak, PP IDAI / UKK Respirologi",
+   "nomor": null,
+   "berlaku_mulai": null,
+   "cakupan_usia": "anak",
+   "disusun": {
+    "tanggal": "2026-10-09T02:19:45.308Z",
+    "model": "gpt-6-luna",
+    "penyedia": "openai_compat",
+    "versi": "draf-kartu-pnpk-v1",
+    "halaman_dibaca": [
+     2,
+     4,
+     5,
+     7,
+     8,
+     9,
+     10
+    ],
+    "usulan_ai": 8,
+    "lolos_validasi_kutipan": 8,
+    "tokens": 7239,
+    "biaya_idr": 36,
+    "error": null
+   },
+   "butir": [
+    {
+     "kategori": "kriteria_diagnosis",
+     "syarat": "Bayi <2 bulan: pneumonia berat bila batuk disertai napas cepat >60 X/menit atau retraksi berat.",
+     "halaman": 4,
+     "kutipan": "Pneumonia berat: batuk disertai napas cepat (>60 X/menit) atau retraksi yang berat",
+     "usia": "anak",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "kriteria_diagnosis",
+     "syarat": "Anak umur 2 bulan–5 tahun: pneumonia berat bila batuk disertai napas cepat dan retraksi dinding dada.",
+     "halaman": 4,
+     "kutipan": "Pneumonia berat: batuk disertai napas cepat dan retraksi dinding dada",
+     "usia": "anak",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "penunjang",
+     "syarat": "Foto Rontgen dada AP direkomendasikan pada pasien pneumonia berat yang dirawat di rumah sakit.",
+     "halaman": 5,
+     "kutipan": "Pemeriksaan foto Rontgen dada anteroposterior (AP) direkomendasikan pada pasien pneumonia berat yang dirawat di rumah sakit.",
+     "usia": "anak",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "rawat_inap",
+     "syarat": "Bayi: rawat inap bila saturasi ≤92% atau sianosis, napas >60 x/menit, distres, apnea intermiten, grunting, tidak mau minum, atau keluarga tidak bisa merawat di rumah.",
+     "halaman": 7,
+     "kutipan": "Bayi : 1. Saturasi oksigen ≤92%, sianosis (A). 2. Frekuensi napas >60 x/menit 3. Distres pernapasan, apnea intermiten, atau grunting (A). 4. Tidak mau minum/menetek 5. Keluarga tidak bisa merawat di rumah",
+     "usia": "anak",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "rawat_inap",
+     "syarat": "Anak: rawat inap bila saturasi ≤92% atau sianosis, napas >40 x/menit, distres, grunting, dehidrasi, atau keluarga tidak bisa merawat di rumah.",
+     "halaman": 7,
+     "kutipan": "Anak : 1. Saturasi oksigen ≤92%, sianosis (A) 2. Frekuensi napas >40 x/menit (A) 3. Distres pernapasan, grunting (A) 4. Terdapat tanda dehidrasi 5. Keluarga tidak bisa merawat di rumah",
+     "usia": "anak",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "intensif",
+     "syarat": "Rawat PICU bila distres respirasi berat membutuhkan ventilasi invasif maupun noninvasif.",
+     "halaman": 7,
+     "kutipan": "pasien dengan distress respirasi berat sehingga membutuhkan ventilasi invasif (A), maupun non invasif (D).",
+     "usia": "anak",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "intensif",
+     "syarat": "Rawat PICU bila SpO2 <92% meskipun FiO2 >50%, atau kesadaran menurun akibat hiperkarbia atau hipoksemia.",
+     "halaman": 8,
+     "kutipan": "atau SpO2 <92% meskipun dengan FiO2 >50% (C), atau kesadaran menurun akibat hiperkarbia atau hipoksemia (C).",
+     "usia": "anak",
+     "sama_dengan": null
+    },
+    {
+     "kategori": "pulang_rujuk",
+     "syarat": "Pulang bila gejala dan tanda pneumonia menghilang, frekuensi napas normal tanpa retraksi, asupan oral adekuat, dan antibiotika dapat diteruskan per oral di rumah.",
+     "halaman": 10,
+     "kutipan": "Gejala dan tanda pneumonia menghilang: frekuensi napas normal, tidak ada retraksi dinding dada  Asupan per oral adekuat  Pemberian antibiotika dapat diteruskan di rumah (per oral)",
+     "usia": "anak",
+     "sama_dengan": null
+    }
+   ],
+   "ditolak_validasi": []
+  }
+ },
+ "versi": "DRAF-KARTU-PNPK-2026-10-09",
+ "keterangan": "Hasil AI per PNPK (scripts/drafKartuPnpk.js): hanya butir yang kutipannya ditemukan persis pada teks PDF. DRAF, belum ditelaah."
+}

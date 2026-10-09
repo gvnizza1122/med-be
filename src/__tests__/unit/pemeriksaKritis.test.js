@@ -65,7 +65,7 @@ test('AI pemeriksa gagal (koneksi) -> diulang sekali, dan TIDAK dilaporkan aman'
   expect(gateway.panggilModel).toHaveBeenCalledTimes(2);
   expect(r).toMatchObject({ ai_gagal: true, tingkat: 'sedang', pesan_gangguan: 'fetch failed' });
   expect(r.skor_keyakinan).toBeLessThanOrEqual(70);
-  expect(r.kesimpulan).toMatch(/belum berjalan/);
+  expect(r.kesimpulan).toMatch(/belum selesai/);
 });
 
 test('keberatan AI "kode tidak didukung" dibantah bila ada halaman hasil (EKG)', async () => {
@@ -78,4 +78,31 @@ test('keberatan AI "kode tidak didukung" dibantah bila ada halaman hasil (EKG)',
   const r = await periksaKritis({ record, ai, pages: [resume, ekg, tagihan], hitungInacbgDanTarif, gateway });
   expect(r.temuan.some(t => /89\.52/.test(t.pesan))).toBe(false);
   expect(r.keberatan_dibantah_bukti).toEqual([expect.objectContaining({ kode: '89.52', halaman: 8 })]);
+});
+
+test('loading cairan pada catatan keperawatan di halaman akhir selalu ikut pemeriksaan kritis',async()=>{
+ const gateway={panggilModel:jest.fn(async()=>({ok:true,hasil:{keberatan:[],kesimpulan:'Diperiksa'},model:'gpt-6-luna'}))};
+ const pages=[{...resume,ocr_text:resume.ocr_text+'\n'+('Catatan klinis panjang '.repeat(3000))},
+ {page_number:16,ocr_text:'CATATAN KEPERAWATAN\nMelakukan tindakan pemasangan Inf Asering loading\n500cc lanjut 20tpm'}];
+ await periksaKritis({record,ai:{suggested_codes:[s('D21.3','diagnosis')]},pages,hitungInacbgDanTarif,gateway});
+ const muatan=gateway.panggilModel.mock.calls[0][1];
+ expect(muatan).toMatchObject({pemeriksaKritis:true,prioritasKlinis:true});
+ expect(muatan.prompt).toContain('=== Halaman 16 ===');expect(muatan.prompt).toContain('500cc lanjut 20tpm');
+});
+test('aturan diperbarui setelah penalaran tanpa membayar ulang kritik AI',async()=>{
+ const gateway={panggilModel:jest.fn(async()=>({ok:true,hasil:{keberatan:[],kesimpulan:'Diperiksa'},model:'gpt-6-luna',penggunaan:{total_tokens:700}}))};
+ const ai={suggested_codes:[s('D21.3','diagnosis')]};
+ const hasilKritis=await periksaKritis({record,ai,pages:[resume],hitungInacbgDanTarif,gateway});
+ ai.penalaran_diagnosis={status:'selesai',diagnosis:[{kode:'D21.3',status:'perlu_klarifikasi',alasan:'Lokasi belum jelas'}]};
+ const hasil=await periksaKritis({record,ai,pages:[resume],hitungInacbgDanTarif,gateway,hasilKritis});
+ expect(gateway.panggilModel).toHaveBeenCalledTimes(1);expect(hasil.tokens_used).toBe(700);expect(hasil.dari_hasil_sebelumnya).toBe(true);
+ expect(hasil.temuan.some(t=>t.sumber==='aturan' && /Lokasi belum jelas/.test(t.pesan))).toBe(true);
+ expect(hasil.ai_gagal).toBe(false);
+});
+
+test('kritik berkas panjang mendapat ruang penalaran tanpa mengurangi ketelitian',async()=>{
+ const gateway={panggilModel:jest.fn(async()=>({ok:true,hasil:{keberatan:[],kesimpulan:'Diperiksa'},model:'gpt-6-luna'}))};
+ const pages=Array.from({length:48},(_,i)=>({...resume,page_number:i+1}));
+ await periksaKritis({record,ai:{suggested_codes:[s('D21.3','diagnosis')]},pages,hitungInacbgDanTarif,gateway});
+ expect(gateway.panggilModel.mock.calls[0][1]).toMatchObject({pemeriksaKritis:true,batasKeluaran:16000,prioritasKlinis:true});
 });

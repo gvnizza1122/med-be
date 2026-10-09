@@ -8,11 +8,24 @@ const root = path.resolve(__dirname, '../..');
 const docs = new Map(katalog.dokumen.map(d => [d.id, d]));
 const cache = new Map();
 const norm = v => String(v || '').normalize('NFKD').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+/** Bagian pokok PNPK yang dipakai agen AI (penalaran diagnosis, pemeriksa kritis, putusan pending, agen casemix). */
+function pengetahuanAgen(id, isi = false) {
+  let d = null; try { d = require('../data/pnpkPokok.json').dokumen.find(x => x.katalog_id === id) || null; } catch (_) { d = null; }
+  if (!d) return { tersedia: false };
+  return { tersedia: d.bagian.length > 0, kode_pemicu: [...d.dx, ...d.px],
+    bagian: d.bagian.map(b => ({ topik: b.topik, halaman: b.halaman, ...(isi ? { kutipan: b.kutipan } : {}) })) };
+}
 function ringkas(d) {
   const { berkas, ...rest } = d;
-  return { ...rest, berkas: berkas.map(({ arsip, arsip_teks, ...f }) => f) };
+  const kriteria=require('../data/kriteriaPnpk.json');
+  const aktif=kriteria.aturan.filter(a=>a.katalog_id===d.id);
+  const pemetaan=kriteria.pemetaan_aturan?.find(a=>a.katalog_id===d.id) || null;
+  return { ...rest, ...(aktif.length ? {status_telaah:'memiliki_aturan_ditelaah'} : {}), berkas: berkas.map(({ arsip, arsip_teks, ...f }) => f), pemeriksaan_otomatis:{
+    versi:kriteria.versi,aturan:aktif.map(a=>({id:a.id,nama:a.nama,halaman:a.halaman,mode:a.mode_penilaian || 'kriteria_bukti'})),
+    pemetaan,catatan:'Pemeriksaan otomatis mencakup kriteria yang dapat diperiksa dari berkas. Seluruh bagian pokok PNPK (berhalaman) dipakai agen AI.'},
+    ...(['pnpk','pnpk_profesi'].includes(d.jenis) ? { pengetahuan_agen: pengetahuanAgen(d.id) } : {}) };
 }
-function getDokumen(id) { const d = docs.get(id); return d ? ringkas(d) : null; }
+function getDokumen(id) { const d = docs.get(id); return d ? { ...ringkas(d), ...(['pnpk','pnpk_profesi'].includes(d.jenis) ? {pengetahuan_agen:pengetahuanAgen(d.id,true)} : {}) } : null; }
 function berkasDokumen(id, variant = 0, teks = false) {
   const f = docs.get(id)?.berkas[variant];
   const relative = f?.[teks ? 'arsip_teks' : 'arsip'];
@@ -139,4 +152,4 @@ function berlakuPadaEpisode(id, episode) {
   if (d.berlaku_mulai > episode) return false;
   return !d.digantikan_oleh.some(r => { const b = docs.get(r); return b?.berlaku_mulai && b.berlaku_mulai <= episode; });
 }
-module.exports = { katalog, daftar, getDokumen, berkasDokumen, cuplikan, pedomanKasus, usiaSesuai, pilihVersi, berlakuPadaEpisode };
+module.exports = { katalog, daftar, getDokumen, berkasDokumen, cuplikan, pedomanKasus, usiaSesuai, pilihVersi, berlakuPadaEpisode, mapDx, halaman };

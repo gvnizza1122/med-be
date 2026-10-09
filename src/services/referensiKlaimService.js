@@ -49,6 +49,7 @@ function halamanKlinis(pages) {
 function cariBukti(pages, key) {
   const d = DETEKTOR[key];
   if (!d) return { id: key, nama: key, status: 'bukti_belum_cukup', bukti: [] };
+  if (key === 'resusitasi') return require('./buktiResusitasiService').cariBuktiResusitasi(pages);
   if(key==='indikasi_ranap_stt')return require('./laporanOperasiService').buktiStt(pages);
   if (key === 'resume_dpjp') {
     const bukti = require('./dasarDiagnosisService').bacaDiagnosisAkhir(pages.filter(p=>p.jenis==='resume_medis'))

@@ -165,7 +165,7 @@ HALAMAN KLINIS UTAMA:\n${utama.map(p => `=== Halaman ${p.page_number} ===\n${Str
   for (let i = 0; i < MAKS_LANGKAH; i++) {
     const terakhir = i === MAKS_LANGKAH - 1;
     const prompt = `${konteksLengkap}\n\nRIWAYAT LANGKAH:\n${riwayat.map((r, n) => `${n + 1}. ${JSON.stringify(r.langkah)} -> ${JSON.stringify(r.hasil).slice(0, 1500)}`).join('\n') || '(belum ada)'}${terakhir ? '\n\nIni langkah TERAKHIR: wajib jawab {"langkah":"selesai",...}.' : ''}`;
-    const r = await gateway.panggilModel('agen_tinjau', { system: SYSTEM, prompt, json: true, maxTokens: 1500, dikenal, jenisKlaim: record.jenis_klaim || record.JENIS_KLAIM }, { db });
+    const r = await gateway.panggilModel('agen_tinjau', { system: require('./humanizerPromptService').denganGayaRingkas(SYSTEM), prompt, json: true, maxTokens: 1500, dikenal, jenisKlaim: record.jenis_klaim || record.JENIS_KLAIM }, { db });
     tokens += (r && r.penggunaan && r.penggunaan.total_tokens) || 0;
     idr += (r && r.biaya && r.biaya.idr) || 0;
     model = (r && r.model) || model;

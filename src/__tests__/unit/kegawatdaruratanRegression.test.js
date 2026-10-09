@@ -1,3 +1,8 @@
+// Layanan jaringan tiruan tetap memakai fetch yang disiapkan setiap skenario.
+jest.mock('../../services/httpTanpaTenggatService', () => ({
+  kirim: (...args) => global.fetch(...args),
+}));
+
 /**
  * Test regresi end-to-end untuk kasus hyperemesis gravidarum rawat inap (fix
  * item 4, 5, 6 -- 18-19 Sep 2026) memakai fixture REDAKSI di

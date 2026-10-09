@@ -1,3 +1,8 @@
+// Layanan jaringan tiruan tetap memakai fetch yang disiapkan setiap skenario.
+jest.mock('../../services/httpTanpaTenggatService', () => ({
+  kirim: (...args) => global.fetch(...args),
+}));
+
 const { generateAiReview } = require('../../services/aiReviewService');
 const router = require('../../services/routerModelService');
 const env = { ...process.env };

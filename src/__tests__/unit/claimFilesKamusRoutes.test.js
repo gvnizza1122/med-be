@@ -19,7 +19,7 @@ beforeEach(() => {
     prepare: sql => ({
       get: async () => /claim_files/.test(sql) ? { status: 'completed' }
         : { id: 'rec', file_id: 'file', raw_data: '{}', diagnosa_list: 'R10.84', prosedur_list: '93.94' },
-      all: async () => /validation_rules/.test(sql) ? [] : [{ id: 'rec', diagnosa_list: 'R10.84', prosedur_list: '93.94', validation_status: 'valid' }],
+      all: async () => /validation_rules|evaluasi_casemix|ocr_results/.test(sql) ? [] : [{ id: 'rec', diagnosa_list: 'R10.84', prosedur_list: '93.94', validation_status: 'valid' }],
       run: async (...values) => { writes.push({ sql, values }); },
     }),
     transaction: async callback => callback(mockDb),

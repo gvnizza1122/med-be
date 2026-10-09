@@ -22,6 +22,7 @@ const dbHelper = {
       // Katalog tetap disiapkan bila migrasi lama atas tabel milik role DB lain
       // belum dapat dijalankan. Kegagalan katalog sendiri tidak disembunyikan.
       await require('../services/profilKlaimRsService').ensureSchema(dbHelper);
+      await require('../services/evaluasiCasemixService').ensureSchema(dbHelper);
       isInitialized = true;
       initPromise = null;
     })().catch(err => { initPromise = null; throw err; });

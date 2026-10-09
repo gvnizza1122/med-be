@@ -9,10 +9,7 @@
  * dan clinical notation. Trade-off: ~1.8x memory per page (scale^2), tapi CPU
  * masih manageable dengan worker pool.
  *
- * Buka dokumen dari AWAL tiap panggilan (bukan reuse across pages) — sengaja
- * sederhana: worker task terisolasi per-halaman, tidak perlu koordinasi
- * "dokumen mana yang sedang terbuka di worker mana". Overhead re-open per
- * halaman jauh lebih murah dibanding cost render pixmap-nya sendiri.
+ * Satu dokumen disimpan per worker; pergantian file melepaskan dokumen lama.
  */
 const { parentPort } = require('worker_threads');
 
@@ -23,28 +20,36 @@ const { parentPort } = require('worker_threads');
 const DEFAULT_SCALE = 4.0;
 const HIGH_DETAIL_SCALE = 5.0;
 
-async function renderPage(bufferData, pageNum, scaleOverride = null) {
+const fs = require('fs');
+let cachedDocument = null, cachedKey = null;
+async function renderPage(bufferData, pageNum, scaleOverride = null, filePath = null) {
   const mupdf = await import('mupdf');
-  const doc = mupdf.Document.openDocument(bufferData, 'application/pdf');
+  let doc;
+  if (filePath) {
+    const stat = await fs.promises.stat(filePath);
+    const key = `${filePath}:${stat.size}:${stat.mtimeMs}`;
+    if (cachedKey !== key) {
+      cachedDocument?.destroy?.(); cachedDocument = null; cachedKey = null;
+      cachedDocument = mupdf.Document.openDocument(await fs.promises.readFile(filePath), 'application/pdf');
+      cachedKey = key;
+    }
+    doc = cachedDocument;
+  } else doc = mupdf.Document.openDocument(bufferData, 'application/pdf');
+  let page, pixmap;
   try {
-    const page = doc.loadPage(pageNum - 1); // mupdf 0-indexed
-
-    // Use scale override jika ada (untuk pass khusus), otherwise default
+    page = doc.loadPage(pageNum - 1);
     const scale = scaleOverride || DEFAULT_SCALE;
-    const matrix = mupdf.Matrix.scale(scale, scale);
-    const pixmap = page.toPixmap(matrix, mupdf.ColorSpace.DeviceRGB, false, true);
+    pixmap = page.toPixmap(mupdf.Matrix.scale(scale, scale), mupdf.ColorSpace.DeviceRGB, false, true);
     return Buffer.from(pixmap.asPNG());
   } finally {
-    doc.destroy?.();
+    pixmap?.destroy?.(); page?.destroy?.();
+    if (!filePath) doc.destroy?.();
   }
 }
-
 parentPort.on('message', async ({ taskId, payload }) => {
   try {
-    // Support scale override untuk high-detail OCR pass (lihat ocrEnhancement.js)
-    const scaleOverride = payload.scaleOverride || null;
-    const pngBuffer = await renderPage(payload.bufferData, payload.pageNum, scaleOverride);
-    parentPort.postMessage({ taskId, result: pngBuffer });
+    const png = await renderPage(payload.bufferData, payload.pageNum, payload.scaleOverride, payload.filePath);
+    parentPort.postMessage({ taskId, result: png });
   } catch (error) {
     parentPort.postMessage({ taskId, error: error.message || String(error) });
   }
