@@ -70,3 +70,9 @@ test('analisis yang gagal tidak menurunkan status error data',async()=>{
   const r=await finalisasiAnalisisPdf(db,{recordId:'r',fileId:'f',review:null,evidencePool:[]});
   expect(r.validation_status).toBe('error'); expect(db.state.error_count).toBe(1);
 });
+
+test('tahap yang berhasil dipulihkan tidak mewarisi kegagalan lama',()=>{
+ const ai={...lengkap(),tinjauan_diagnosis:{status:'ada_saran'},kelengkapan_analisis:{status:'sebagian',alasan:[{kode:'analisis_belum_lengkap',pesan:'Status lama belum lengkap'},{kode:'penalaran_diagnosis',pesan:'Penalaran belum selesai'},{kode:'pemeriksaan_lanjutan',pesan:'Lanjutan gagal'}]}};
+ expect(nilaiKelengkapanAnalisis(ai,{wajibTahap:true}).status).toBe('lengkap');
+ expect(nilaiKelengkapanAnalisis({...ai,penalaran_diagnosis:{status:'gagal'}},{wajibTahap:true}).status).toBe('sebagian');
+});

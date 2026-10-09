@@ -183,7 +183,7 @@ describe('gatewayModelService.panggilModel', () => {
     const body = JSON.parse(init.body);
     expect(body.model).toBe('gpt-6-luna');
     expect(body.response_format).toEqual({ type: 'json_object' });
-    expect(body.max_completion_tokens).toBe(8000);
+    expect(body).not.toHaveProperty('max_completion_tokens');
     expect(body.reasoning_effort).toBe('medium');
     expect(body.messages.map((m) => m.role)).toEqual(['system', 'user']);
   });
@@ -249,7 +249,7 @@ describe('gatewayModelService.panggilModel', () => {
     const f = fetchTiruan('{"diagnosis":null}');
     const hasil = await gateway.panggilModel('tinjau_kasus_lanjutan', { prompt: 'bukti kasus', json: true, maxTokens: 3000, fetchImpl: f });
     expect(hasil).toMatchObject({ ok: true, model: 'gpt-6.1-sol', effort: 'high' });
-    expect(JSON.parse(f.mock.calls[0][1].body)).toMatchObject({ model: 'gpt-6.1-sol', reasoning_effort: 'high', max_completion_tokens: 16000 });
+    expect(JSON.parse(f.mock.calls[0][1].body)).toMatchObject({ model: 'gpt-6.1-sol', reasoning_effort: 'high' });
   });
   test('ekstraksi memakai Luna low; model selain yang didukung tidak dikirimi effort', async () => {
     const f = fetchTiruan('{}');

@@ -28,7 +28,7 @@
 const routerModel = require('./routerModelService');
 const catatan = require('./catatanPanggilanModelService');
 const { buatPenyamar } = require('./penyamaranService');
-const { normalisasiPenggunaan, estimasiBiaya, batasBiaya } = require('./biayaModelService');
+const { normalisasiPenggunaan, estimasiBiaya } = require('./biayaModelService');
 const konteksAi = require('./konteksPenggunaanAiService');
 const anggaranAi = require('./anggaranAiService');
 const batasPanggilan = require('./batasPanggilanAiService');
@@ -74,10 +74,8 @@ async function panggilChatCompletions({ apiKey, baseUrl, timeoutMs, label, model
     const messages = [];
     if (system) messages.push({ role: 'system', content: system });
     messages.push({ role: 'user', content: prompt });
-    // Batas completion mencakup penalaran DAN jawaban JSON. Sediakan ruang
-    // penalaran agar jawaban tidak terpotong, tanpa meminta penalaran mentah.
-    const minimum = reasoningEffort === 'high' ? 16000 : reasoningEffort === 'medium' ? 8000 : 3000;
-    const body = { model, messages, max_completion_tokens: completionLimit || (reasoningEffort ? Math.max(maxTokens || 3000, minimum) : (maxTokens || 3000)) };
+    // Penyelesaian analisis mengikuti penyedia, tanpa pemotongan token aplikasi.
+    const body = { model, messages };
     if (reasoningEffort) body.reasoning_effort = reasoningEffort;
     if (json) body.response_format = { type: 'json_object' };
     const response = await doFetch(`${baseUrl}/chat/completions`, {
@@ -136,16 +134,7 @@ async function panggilModel(tugas, payload, opsi = {}) {
   let reasoningEffort = effortUntuk(rute.model, tugas);
   const klinis=payload?.prioritasKlinis===true || ['baca_berkas','tinjau_kasus_lanjutan','putuskan_pending'].includes(tugas);
   if(scope && klinis && rute.model==='gpt-6-luna') reasoningEffort='high';
-  let completionLimit = scope ? (tugas==='ekstrak_pdf' ? 4000 : tugas==='baca_berkas' ? 12000 : klinis ? 8000 : 6000) : undefined;
-  // Tahap yang keluarannya tumbuh bersama isi kasus (mis. penalaran per
-  // diagnosis) boleh meminta jatah lebih besar -- hanya menaikkan, maks 16000.
-  // KASUS ACUAN SLE (SLE, 5 diagnosis): 8000 token habis untuk penalaran sebelum
-  // JSON selesai -> output_terpotong, lalu tahap berikutnya tertahan anggaran.
-  if(scope && Number.isFinite(payload?.batasKeluaran) && payload.batasKeluaran>completionLimit)
-    completionLimit=Math.min(16000,Math.round(payload.batasKeluaran));
-  const alasanMendalam=new Set(['tinjauan_awal_belum_terverifikasi','diagnosis_atau_urutan_belum_jelas','dukungan_diagnosis_perlu_klarifikasi','diagnosis_bertentangan_dengan_bukti','prosedur_dan_bukti_perlu_ditinjau','risiko_klinis_perlu_penafsiran','kriteria_igd_borderline','alasan_pending_belum_tegas','inacbg_atau_tarif_belum_pasti','agen_belum_yakin','keberatan_kritis_berat','permintaan_koder']);
-  const pendalaman=tugas==='tinjau_kasus_lanjutan' && Array.isArray(payload?.pemicuPendalaman) && payload.pemicuPendalaman.some(p=>alasanMendalam.has(p));
-  if(scope && rute.model==='gpt-6.1-sol' && pendalaman) completionLimit=16000;
+  const completionLimit = undefined;
   let dasar = {
     penyedia: rute.penyedia, model: rute.model, sumber: rute.sumber, peringatan: rute.peringatan,
     effort: reasoningEffort || null,
@@ -171,11 +160,12 @@ async function panggilModel(tugas, payload, opsi = {}) {
     const invoke=async()=>{
       if(scope) {
         const pilihan=[{rute,effort:reasoningEffort,limit:completionLimit}];
-        if(rute.model==='gpt-6.1-sol') {
-          // Kebijakan baru tidak membatalkan hasil Sol/Luna lama yang telah selesai.
-          if(completionLimit!==8000) pilihan.push({rute,effort:reasoningEffort,limit:8000});
-          pilihan.push({rute:{...rute,model:'gpt-6-luna',penyedia:'openai_compat',sumber:'anggaran_berkas'},effort:'high',limit:8000});
-        }
+        // Pakai kembali hasil lengkap kebijakan lama; kegagalannya tidak
+        // menahan permintaan baru yang kini tidak memiliki batas keluaran.
+        const limitLama = tugas==='ekstrak_pdf' ? 4000 : tugas==='baca_berkas' ? 12000 : klinis ? 8000 : 6000;
+        for (const limit of new Set([limitLama, payload.batasKeluaran, 16000].filter(Number.isFinite)))
+          pilihan.push({rute,effort:reasoningEffort,limit});
+        if(rute.model==='gpt-6.1-sol') pilihan.push({rute:{...rute,model:'gpt-6-luna',penyedia:'openai_compat',sumber:'anggaran_berkas'},effort:'high',limit:8000});
         for(const p of pilihan) {
           const key=buatKey(p.rute,p.effort,p.limit);
           const cached=await anggaranAi.ambilCache(db,key,scope);
@@ -190,26 +180,15 @@ async function panggilModel(tugas, payload, opsi = {}) {
           // dikirim ulang tepat satu kali; bila terputus/gagal lagi, diblokir.
           // Jangan lepaskan penanda saat pemeriksaan anggaran. Hak percobaan
           // ulang baru diklaim atomik setelah reservasi berhasil, sebelum request.
+          if(failed && p.limit !== undefined && ['output_terpotong','jawaban_belum_valid'].includes(failed.kode)) continue;
           if(failed && ['terputus_restart', 'ulang_disetujui_pengguna'].includes(failed.kode)) {
+            cacheKey=kunciP;
             kodeUlang=failed.kode==='terputus_restart' ? 'permintaan_ulang_setelah_restart' : 'permintaan_ulang_disetujui';
             continue;
           }
           if(failed) {
             const e=new Error('Tahap ini sebelumnya gagal dan mungkin sudah berbiaya. Permintaan yang sama ditahan agar biaya tidak berulang; hasil tahap lain tetap tersedia.');
             e.kode='pengulangan_berbiaya_dicegah';throw e;
-          }
-        }
-        if(rute.model==='gpt-6.1-sol') {
-          const available=await anggaranAi.ringkasan(db,scope);
-          const total=(available?.terpakai_idr||0)+(available?.dicadangkan_idr||0)+(available?.belum_pasti_idr||0);
-          const cap=pendalaman ? (!available?.gagal_idr && (available?.belum_pasti_idr||0)<=(available?.belum_pasti_restart_idr||0) ? 5000 : available?.batas_idr||600)
-            : Math.min(600,available?.batas_idr||600);
-          // Reservasi aktif diselesaikan sebelum menentukan apakah perlu fallback.
-          if((batasBiaya(rute.model,system,prompt,completionLimit,rute.penyedia)?.idr || Infinity)>cap-total+(available?.dicadangkan_idr||0)) {
-            rute={...rute,model:'gpt-6-luna',penyedia:'openai_compat',sumber:'anggaran_berkas'};
-            reasoningEffort='high';completionLimit=8000;
-            penyesuaian='Pendalaman memakai Luna high karena estimasi maksimum Sol melebihi batas pengaman berkas.';
-            cacheKey=buatKey(rute,reasoningEffort,completionLimit);
           }
         }
       }
@@ -221,14 +200,10 @@ async function panggilModel(tugas, payload, opsi = {}) {
       // Percobaan ulang hanya permintaan ini, bukan ekstraksi/analisis penuh.
       const attempts=scope ? 2 : 1;
       for(let i=0;i<attempts;i++) {
-        const reserve=scope ? batasBiaya(rute.model,system,prompt,completionLimit,rute.penyedia) : null;
-        const termine=scope && reserve ? await anggaranAi.cadangkanSaatSiap(db,scope,reserve.idr,
-          !klinis && ['agen_tinjau','agen_casemix'].includes(tugas),{klinis:klinis||tugas==='ekstrak_pdf',pendalaman,kritis:tugas==='agen_tinjau' && payload?.pemeriksaKritis===true}) : null;
-        if(scope && !termine) {
-          const e=new Error('Anggaran AI berkas tidak cukup untuk tahap ini. Hasil dan bukti yang sudah tersimpan tetap tersedia.');
-          e.kode='anggaran_ai_terbatas';throw e;
-        }
-        const selesaiReservasi=termine||(()=>{});
+        // Biaya aktual tetap dicatat. Plafon perkiraan tidak menghentikan
+        // tahap klinis atau mengganti model yang dipilih untuk kasus ini.
+        const reserve = { idr: 0 };
+        const selesaiReservasi = scope ? anggaranAi.tandaiAktif(scope) : (()=>{});
         let cost=null,known=false,noCharge=false,callOk=false,requestMade=false;
         let requestUsage=normalisasiPenggunaan();
         try {
@@ -239,7 +214,7 @@ async function panggilModel(tugas, payload, opsi = {}) {
             e.kode='pengulangan_berbiaya_dicegah';throw e;
           }
           answer=await batasPanggilan.jalankan(()=>{requestMade=true;return fn({model:rute.model,system,prompt,json:!!payload.json,
-            maxTokens:payload.maxTokens,fetchImpl:payload.fetchImpl,reasoningEffort,completionLimit,
+            fetchImpl:payload.fetchImpl,reasoningEffort,completionLimit,
             timeoutMs: 0});});
           const usage=normalisasiPenggunaan(typeof answer==='string' ? {} : answer?.usage||{});
           requestUsage=usage;

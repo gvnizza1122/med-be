@@ -94,7 +94,8 @@ function periksaTinjauan(raw, candidates, pages) {
     const buktiSalah = k.bukti.find(b => !b || !Number.isInteger(Number(b.halaman)) || !cocokKutipan(b.kutipan, b.halaman, pages));
     if (buktiSalah) return tolak(`kutipan ${kode} tidak ditemukan di halaman ${buktiSalah && buktiSalah.halaman}: "${String(buktiSalah && buktiSalah.kutipan).slice(0, 80)}"`);
     // Dukungan kode wajib punya diagnosis di resume dan kutipan nyata yang dinilai AI.
-    if (k.status === 'didukung' && (!known.get(kode).diagnosis_resume.length || !k.bukti.length)) return tolak(`${kode} "didukung" tanpa diagnosis di resume`);
+    if (k.status === 'didukung' && (!k.bukti.length || (!known.get(kode).diagnosis_resume.length
+      && !k.bukti.some(e => require('./dasarDiagnosisService').buktiDiagnosisAkhir({quotation:e.kutipan,page_number:e.halaman},pages))))) return tolak(`${kode} "didukung" tanpa diagnosis di resume`);
     kandidat.push({ kode, deskripsi: known.get(kode).deskripsi, status: k.status, alasan: k.alasan,
       bukti: k.bukti.map(b => ({ halaman: Number(b.halaman), kutipan: b.kutipan })) });
   }
@@ -127,7 +128,7 @@ async function tinjauDiagnosis(record, ai, pages, resumePages, { gateway = gatew
   const candidates = buatKandidat(record, ai, pages, resumePages);
   const belum = pesan => ({ versi: 1, status: 'belum_dinilai', ringkasan: pesan, kode_rekomendasi: [], kandidat: [], klarifikasi: [] });
   if (!candidates.length || !resumePages.length || !pages.length) return belum('Diagnosis dan bukti resume belum cukup untuk menilai pilihan kode.');
-  const promptDasar = `JENIS_KLAIM: ${record.jenis_klaim || record.JENIS_KLAIM || 'belum diketahui'}\nKANDIDAT: ${JSON.stringify(candidates)}\nHALAMAN_RESUME: ${JSON.stringify(resumePages)}\nBUKTI SELURUH BERKAS:\n${pages.map(p => `=== Halaman ${p.page_number} ===\n${p.ocr_text}`).join('\n\n')}`;
+  const promptDasar = `JENIS_KLAIM: ${record.jenis_klaim || record.JENIS_KLAIM || 'belum diketahui'}\nKANDIDAT: ${JSON.stringify(candidates)}\nHALAMAN_RESUME: ${JSON.stringify(resumePages)}\nBUKTI SELURUH BERKAS:\n${pages.map(p => `=== Halaman ${p.page_number} ===\n${require('./konteksIcuService').teksUntukAnalisis(p)}`).join('\n\n')}`;
   const panggil = (tambahan = '') => gateway.panggilModel('baca_berkas', {
     jenisKlaim: record.jenis_klaim || record.JENIS_KLAIM,
     system: denganGayaRingkas(SYSTEM), json: true, maxTokens: 3000, dikenal,

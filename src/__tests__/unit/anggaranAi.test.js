@@ -69,10 +69,10 @@ test('timeout tetap diperhitungkan secara konservatif dan tidak dianggap gratis'
   const db=database();await ai.cadangkan(db,scope,150);await ai.lunasi(db,scope,150,{usageKnown:false});
   expect((await ai.ringkasan(db,scope))).toMatchObject({terpakai_idr:0,belum_pasti_idr:150,sisa_idr:450});
 });
-test('tahap klinis menggunakan reasoning tinggi dan batas completion yang terkendali',async()=>{
+test('tahap klinis menggunakan reasoning tinggi dan tanpa batas completion aplikasi',async()=>{
   const db=database(),fn=jest.fn(async()=>answer());restore=gateway.pasangAdapter('openai_compat',fn);
   const result=await call(db);expect(result.ok).toBe(true);expect(result.effort).toBe('high');
-  expect(fn.mock.calls[0][0]).toMatchObject({reasoningEffort:'high',completionLimit:12000});
+  expect(fn.mock.calls[0][0]).toMatchObject({reasoningEffort:'high',completionLimit:undefined});
   expect(db.row.terpakai_idr).toBeGreaterThan(0);expect(db.row.dicadangkan_idr).toBe(0);
 });
 test('20 permintaan identik hanya memanggil penyedia sekali; hasil berikutnya tidak menambah token/biaya',async()=>{
@@ -88,17 +88,17 @@ test('perubahan bukti atau instruksi tidak memakai hasil cache lama',async()=>{
   await call(db);await call(db,'baca_berkas',{...payload,prompt:payload.prompt+' Bukti baru.'});
   await call(db,'baca_berkas',{...payload,system:'Aturan diperbarui.'});expect(fn).toHaveBeenCalledTimes(3);
 });
-test('anggaran yang habis menolak panggilan sebelum keluar ke penyedia',async()=>{
+test('plafon lama yang habis tidak menahan penyelesaian analisis',async()=>{
   const db=database(1499),fn=jest.fn(async()=>answer());restore=gateway.pasangAdapter('openai_compat',fn);
-  expect(await call(db)).toMatchObject({ok:false,kode:'anggaran_ai_terbatas'});expect(fn).not.toHaveBeenCalled();expect(db.logs).toHaveLength(0);
+  expect(await call(db)).toMatchObject({ok:true});expect(fn).toHaveBeenCalledTimes(1);expect(db.logs).toHaveLength(1);
 });
-test('Sol yang tidak muat anggaran tetap mendapat tinjauan mendalam Luna high',async()=>{
+test('plafon lama tidak mengganti model tinjauan mendalam',async()=>{
   const db=database(),fn=jest.fn(async()=>answer());restore=gateway.pasangAdapter('openai_compat',fn);
-  const r=await call(db,'tinjau_kasus_lanjutan');expect(r).toMatchObject({ok:true,model:'gpt-6-luna',effort:'high',sumber:'anggaran_berkas'});
+  const r=await call(db,'tinjau_kasus_lanjutan');expect(r).toMatchObject({ok:true,model:'gpt-6.1-sol',effort:'high'});
 });
-test('model dengan tarif tak diketahui tidak dipanggil dalam anggaran berkas',async()=>{
-  process.env.AI_MODEL='unknown-model';router.hapusCache();const db=database(),fn=jest.fn();restore=gateway.pasangAdapter('openai_compat',fn);
-  expect(await call(db)).toMatchObject({ok:false,kode:'anggaran_ai_terbatas'});expect(fn).not.toHaveBeenCalled();
+test('tarif yang belum tersedia tidak menahan analisis, penggunaan tetap dicatat',async()=>{
+  process.env.AI_MODEL='unknown-model';router.hapusCache();const db=database(),fn=jest.fn(async()=>answer());restore=gateway.pasangAdapter('openai_compat',fn);
+  expect(await call(db)).toMatchObject({ok:true});expect(fn).toHaveBeenCalledTimes(1);
 });
 test.each(['length','empty','bad_json','{}','[]','null'])('jawaban %s tidak masuk cache dan biayanya tetap tercatat',async kind=>{
   const db=database(),fn=jest.fn(async()=>({...answer(),finish_reason:kind==='length'?'length':'stop',content:kind==='empty'?'':kind==='bad_json'?'tidak JSON':['{}','[]','null'].includes(kind)?kind:answer().content}));
@@ -108,7 +108,7 @@ test.each(['length','empty','bad_json','{}','[]','null'])('jawaban %s tidak masu
 test('timeout tidak mengulang permintaan otomatis dan cadangannya tetap terlihat',async()=>{
   const db=database(),fn=jest.fn(async()=>{throw Error('timeout');});restore=gateway.pasangAdapter('openai_compat',fn);
   expect((await call(db)).ok).toBe(false);expect(fn).toHaveBeenCalledTimes(1);
-  expect(db.row.belum_pasti_idr).toBeGreaterThan(0);expect(db.row.dicadangkan_idr).toBe(0);
+  expect([...db.failed.values()][0].kode).toBe('biaya_belum_pasti');expect(db.row.dicadangkan_idr).toBe(0);
 });
 test('429 dicoba ulang hanya pada tahap yang sama, tanpa biaya fiktif pada penolakan',async()=>{
   const db=database(),fn=jest.fn().mockRejectedValueOnce(Object.assign(Error('429'),{status:429,definiteNoCharge:true})).mockResolvedValueOnce(answer());
@@ -144,20 +144,19 @@ test('jawaban tidak digunakan lintas kategori walau anggaran PDF sama',async()=>
 test('tahap klinis wajib dapat menambah secukupnya tanpa memakai plafon mendalam',async()=>{
   const db=database(599),fn=jest.fn(async()=>answer());restore=gateway.pasangAdapter('openai_compat',fn);
   expect(await call(db)).toMatchObject({ok:true,model:'gpt-6-luna'});
-  expect(db.row.batas_idr).toBeGreaterThan(600);expect(db.row.batas_idr).toBeLessThan(1500);
-  expect(db.row.tambahan_alasan).toHaveLength(1);
+  expect(db.row.batas_idr).toBe(600);expect(db.row.terpakai_idr).toBeGreaterThan(599);
 });
 test('klarifikasi bukti memungkinkan Sol high dengan ruang penalaran lebih besar',async()=>{
   const db=database(),fn=jest.fn(async()=>answer());restore=gateway.pasangAdapter('openai_compat',fn);
   const r=await call(db,'tinjau_kasus_lanjutan',{...payload,pemicuPendalaman:['diagnosis_atau_urutan_belum_jelas']});
   expect(r).toMatchObject({ok:true,model:'gpt-6.1-sol',effort:'high'});
-  expect(fn.mock.calls[0][0].completionLimit).toBe(16000);
+  expect(fn.mock.calls[0][0].completionLimit).toBeUndefined();
   expect(fn.mock.calls[0][0].timeoutMs).toBe(0);
-  expect(db.row.batas_idr).toBeGreaterThan(600);expect(db.row.batas_idr).toBeLessThanOrEqual(5000);
+  expect(db.row.batas_idr).toBe(600);
 });
-test('sampel kualitas rutin tidak membuka tambahan biaya Sol',async()=>{
+test('sampel kualitas mengikuti model yang dipilih',async()=>{
   const db=database(),fn=jest.fn(async()=>answer());restore=gateway.pasangAdapter('openai_compat',fn);
-  expect(await call(db,'tinjau_kasus_lanjutan',{...payload,pemicuPendalaman:['sampel_kualitas']})).toMatchObject({ok:true,model:'gpt-6-luna'});
+  expect(await call(db,'tinjau_kasus_lanjutan',{...payload,pemicuPendalaman:['sampel_kualitas']})).toMatchObject({ok:true,model:'gpt-6.1-sol'});
   expect(db.row.batas_idr).toBe(600);
 });
 test('hasil Sol tersimpan tetap gratis ketika anggaran habis',async()=>{
@@ -167,10 +166,10 @@ test('hasil Sol tersimpan tetap gratis ketika anggaran habis',async()=>{
   expect(await call(db,'tinjau_kasus_lanjutan',p)).toMatchObject({ok:true,model:'gpt-6.1-sol',dari_cache:true,penggunaan:{total_tokens:0}});
   expect(fn).toHaveBeenCalledTimes(1);expect(db.row.terpakai_idr).toBe(5000);
 });
-test('Luna yang telah menyelesaikan pendalaman sebelum kebijakan baru tetap dipakai gratis',async()=>{
+test('hasil pendalaman lengkap tetap dipakai gratis',async()=>{
   const db=database(),fn=jest.fn(async()=>answer());restore=gateway.pasangAdapter('openai_compat',fn);
   await call(db,'tinjau_kasus_lanjutan');
-  expect(await call(db,'tinjau_kasus_lanjutan',{...payload,pemicuPendalaman:['permintaan_koder']})).toMatchObject({ok:true,model:'gpt-6-luna',dari_cache:true});
+  expect(await call(db,'tinjau_kasus_lanjutan',{...payload,pemicuPendalaman:['permintaan_koder']})).toMatchObject({ok:true,model:'gpt-6.1-sol',dari_cache:true});
   expect(fn).toHaveBeenCalledTimes(1);
 });
 test.each(['timeout','invalid'])('kegagalan %s persisten mencegah panggilan identik berikutnya',async kind=>{
@@ -222,16 +221,16 @@ test('20 pendalaman serentak memakai satu Sol dan metadata model yang sama',asyn
   expect(results.filter(r=>r.dari_cache)).toHaveLength(19);
 });
 
-test('sampel rutin tidak memakai Sol meskipun plafon pernah bertambah untuk kasus yang lain',async()=>{
+test('model yang dipilih tidak diganti berdasarkan plafon lama',async()=>{
   const db=database();db.row.batas_idr=4500;const fn=jest.fn(async()=>answer());restore=gateway.pasangAdapter('openai_compat',fn);
-  expect(await call(db,'tinjau_kasus_lanjutan',{...payload,pemicuPendalaman:['sampel_kualitas']})).toMatchObject({ok:true,model:'gpt-6-luna'});
+  expect(await call(db,'tinjau_kasus_lanjutan',{...payload,pemicuPendalaman:['sampel_kualitas']})).toMatchObject({ok:true,model:'gpt-6.1-sol'});
 });
 
 test('pendalaman terpicu tetap dapat memakai Luna hemat setelah biaya tahap sebelumnya melampaui Rp1500',async()=>{
   process.env.AI_REVIEW_MODEL='gpt-6-luna';router.hapusCache();
   const db=database(1499),fn=jest.fn(async()=>answer());restore=gateway.pasangAdapter('openai_compat',fn);
   expect(await call(db,'tinjau_kasus_lanjutan',{...payload,pemicuPendalaman:['permintaan_koder']})).toMatchObject({ok:true,model:'gpt-6-luna',effort:'high'});
-  expect(db.row.batas_idr).toBeGreaterThan(1500);expect(db.row.batas_idr).toBeLessThan(5000);
+  expect(db.row.terpakai_idr).toBeGreaterThan(1499);
 });
 
 // KASUS ACUAN SLE (0000R0000126V000003): server dimulai ulang saat permintaan AI
@@ -254,13 +253,13 @@ test('percobaan ulang setelah restart yang terputus lagi tetap diblokir',async()
   expect(await call(db)).toMatchObject({ok:false,kode:'pengulangan_berbiaya_dicegah'});
   expect(fn).not.toHaveBeenCalled();
 });
-test('anggaran habis tidak menghapus penanda restart saat belum ada pengiriman',async()=>{
+test('restart dapat dipulihkan meskipun plafon lama habis',async()=>{
   const db=database(1500),fn=jest.fn(async()=>answer());restore=gateway.pasangAdapter('openai_compat',fn);
   const key=ai.kunciCache(scope,'baca_berkas',{penyedia:'openai_compat',model:'gpt-6-luna'},payload.system,payload.prompt,'high',12000);
   db.failed.set(key,{scope:'b',kode:'terputus_restart'});
-  expect(await call(db)).toMatchObject({ok:false,kode:'anggaran_ai_terbatas'});
-  expect(db.failed.get(key).kode).toBe('terputus_restart');
-  expect(fn).not.toHaveBeenCalled();
+  expect(await call(db)).toMatchObject({ok:true});
+  expect(db.failed.has(key)).toBe(false);
+  expect(fn).toHaveBeenCalledTimes(1);
 });
 test('100 pekerja hanya dapat mengklaim satu percobaan ulang setelah restart',async()=>{
   const db=database();db.failed.set('restart',{scope:'b',kode:'terputus_restart'});
@@ -274,10 +273,10 @@ test('penanda restart tidak dapat diklaim oleh RS lain atau sebagai panggilan ba
   expect(await ai.mulaiPanggilan(db,'restart',scope)).toBe(false);
   expect(db.failed.get('restart').kode).toBe('terputus_restart');
 });
-test.each([[13000,13000],[30000,16000],[3000,8000]])('jatah keluaran tahap klinis mengikuti permintaan %s (maks 16000, tidak pernah menurunkan)',async(minta,harap)=>{
+test.each([[13000,13000],[30000,16000],[3000,8000]])('batas keluaran lama %s tidak diteruskan ke penyedia',async(minta,harap)=>{
   const db=database(),fn=jest.fn(async()=>answer());restore=gateway.pasangAdapter('openai_compat',fn);
   expect((await call(db,'agen_tinjau',{...payload,prioritasKlinis:true,batasKeluaran:minta})).ok).toBe(true);
-  expect(fn.mock.calls[0][0].completionLimit).toBe(harap);
+  expect(fn.mock.calls[0][0].completionLimit).toBeUndefined();
 });
 
 test('pemulihan yang diminta pengguna hanya memberi satu kesempatan ulang',async()=>{
@@ -308,6 +307,6 @@ test('kritik berkas panjang mendapat 16000 token dengan batas biaya klinis',asyn
  const db=database(480);db.row.gagal_idr=124;db.row.belum_pasti_idr=145;
  const fn=jest.fn(async()=>answer());restore=gateway.pasangAdapter('openai_compat',fn);
  expect(await call(db,'agen_tinjau',{...payload,prioritasKlinis:true,pemeriksaKritis:true,batasKeluaran:16000})).toMatchObject({ok:true});
- expect(fn.mock.calls[0][0]).toMatchObject({completionLimit:16000,reasoningEffort:'high',timeoutMs:0});
+ expect(fn.mock.calls[0][0]).toMatchObject({completionLimit:undefined,reasoningEffort:'high',timeoutMs:0});
  expect(db.row.batas_idr).toBeLessThanOrEqual(1500);expect(db.row.belum_pasti_idr).toBe(145);expect(db.row.gagal_idr).toBe(124);
 });

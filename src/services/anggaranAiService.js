@@ -144,7 +144,7 @@ async function ringkasan(db,scope) {
   const r=await db.get('SELECT * FROM ai_anggaran_berkas WHERE id=? AND hospital_code=?',[scope.id,scope.hospital_code]);
   if(!r) return null;
   const n=k=>Number(r[k])||0;
-  return {versi:KEBIJAKAN,profil:'Analisis tinggi · biaya adaptif',target_idr:n('target_idr'),batas_normal_idr:BATAS_NORMAL,
+  return {versi:KEBIJAKAN,profil:'Analisis tuntas · biaya aktual',batas_aktif:false,target_idr:n('target_idr'),batas_normal_idr:BATAS_NORMAL,
     batas_maksimum_idr:BATAS_MENDALAM,tambahan_alasan:[...new Set(r.tambahan_alasan||[])],gagal_idr:n('gagal_idr'),batas_idr:n('batas_idr'),
     terpakai_idr:n('terpakai_idr'),dicadangkan_idr:n('dicadangkan_idr'),belum_pasti_idr:n('belum_pasti_idr'),
     belum_pasti_restart_idr:n('belum_pasti_restart_idr'),

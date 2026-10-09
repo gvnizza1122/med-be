@@ -135,6 +135,12 @@ function susunFaktaKlinis(pages, ai = {}) {
       halaman: gram.page_number, sumber: 'gram_sputum' });
   }
 
+  // Diagnosis akhir dan tindakan singkat cukup sebagai dokumentasi awal.
+  for (const d of require('./dasarDiagnosisService').bacaDiagnosisAkhir(halaman))
+    tambah({kategori:d.peran==='utama'?'diagnosis_utama':'diagnosis_sekunder',teks:d.kutipan,kutipan:d.kutipan,halaman:d.page_number});
+  for (const e of require('./buktiResusitasiService').cariBuktiResusitasi(require('./referensiKlaimService').halamanKlinis(halaman)).bukti)
+    tambah({kategori:'tindakan',teks:e.kutipan,kutipan:e.kutipan,halaman:e.page_number,sumber:'resusitasi_cairan'});
+
   // Tanda vital terukur.
   const vf = ai.kegawatdaruratan_assessment && ai.kegawatdaruratan_assessment.vital_findings;
   for (const [k, v] of Object.entries(vf || {})) {
@@ -173,12 +179,12 @@ function susunFaktaKlinis(pages, ai = {}) {
 }
 
 /** Teks ringkas untuk prompt AI (hemat token): satu baris per fakta. */
-function faktaUntukPrompt({ per_kategori }, batas = 9000) {
+function faktaUntukPrompt({ per_kategori }) {
   const URUT = [['keluhan', 'ANAMNESIS/KELUHAN'], ['riwayat', 'RIWAYAT'], ['tanda_vital', 'TANDA VITAL'], ['fisik', 'PEMERIKSAAN FISIK'],
     ['penunjang', 'PENUNJANG'], ['tindakan', 'TINDAKAN'], ['terapi', 'TERAPI'], ['diagnosis_awal', 'DIAGNOSIS AWAL (SEP/SPRI, bukan final)'],
     ['diagnosis_utama', 'DIAGNOSIS UTAMA DOKTER'], ['diagnosis_sekunder', 'DIAGNOSIS SEKUNDER DOKTER'], ['diagnosis_dokter', 'DIAGNOSIS/ASSESSMENT DOKTER']];
   const teks = URUT.filter(([k]) => (per_kategori[k] || []).length).map(([k, judul]) => `${judul}:\n${per_kategori[k].map(f => `- ${f.teks}${f.kelas_obat ? ` [${f.kelas_obat} -> ${f.petunjuk}]` : ''} [hal ${f.halaman || '?'}]`).join('\n')}`).join('\n');
-  return teks.slice(0, batas);
+  return teks;
 }
 
 module.exports = { susunFaktaKlinis, faktaUntukPrompt, kelasObat, faktaDariHalaman };
