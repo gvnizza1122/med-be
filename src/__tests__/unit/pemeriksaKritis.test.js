@@ -6,6 +6,17 @@ const resume = { page_number: 3, ocr_text: 'RESUME MEDIS RAWAT INAP\nDiagnosis U
 const tagihan = { page_number: 14, ocr_text: 'Perincian Harga Jml Biaya\nTerbilang : Empat Juta\nTotal 4,584,840\nKurang/Kelebihan 4,584,840' };
 const record = { id: 'r1', jenis_klaim: 'RAWAT_INAP', kelas_rawat: '3', diagnosa_list: '', prosedur_list: '' };
 const s = (code, type, page_number = 3, extra = {}) => ({ code, type, kamus_valid: true, page_number, quotation: 'x', ...extra });
+test('kode rutin mengikuti konvensi RS; kode tindakan penting dan kode rutin yang dipersoalkan tetap ditelaah',async()=>{
+ const gateway={panggilModel:jest.fn(async()=>({ok:true,hasil:{kesimpulan:'Telaah',keberatan:[
+  {jenis:'kode_terlewat',keparahan:'sedang',pesan:'Kode oksigen 93.96 belum ada',saran:'Tambahkan 93.96',halaman:3,kutipan:'Eksisi dan PA'},
+  {jenis:'potensi_rugi_rs',keparahan:'sedang',pesan:'Infus 99.18 belum dikode',saran:'Tambahkan 99.18',halaman:3,kutipan:'Eksisi dan PA'},
+  {jenis:'kode_terlewat',keparahan:'sedang',pesan:'Eksisi 86.3 belum dikode',saran:'Cek 86.3',halaman:3,kutipan:'Eksisi dan PA'},
+  {jenis:'kode_tidak_didukung',keparahan:'sedang',pesan:'Kode rutin 99.21 yang diajukan belum didukung',saran:'Cek 99.21',halaman:3,kutipan:'Eksisi dan PA'}
+ ]}}))};
+ const out=await periksaKritis({record,ai:{suggested_codes:[s('D21.3','diagnosis'),s('86.3','procedure'),s('99.21','procedure')]},pages:[resume],hitungInacbgDanTarif,gateway});
+ expect(out.temuan.filter(t=>t.sumber==='ai').map(t=>t.pesan)).toEqual(['Eksisi 86.3 belum dikode','Kode rutin 99.21 yang diajukan belum didukung']);
+ expect(out.keberatan_dibantah_bukti.map(t=>t.kode)).toEqual(['93.96','99.18']);
+});
 
 test('total tagihan RS terbaca dari rincian biaya', () => {
   expect(totalTagihan([tagihan])).toMatchObject({ jumlah: 4584840, page_number: 14 });

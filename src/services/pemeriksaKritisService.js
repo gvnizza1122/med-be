@@ -22,7 +22,7 @@
 const gatewayModelService = require('./gatewayModelService');
 const { deskripsiDiagnosis, deskripsiProsedur, padananWho } = require('./kamusKodeService');
 const { classifyPageDocumentType } = require('./pdfPageClassifier');
-const { KONVENSI_KODING_RS } = require('./konvensiKodingRs');
+const { KONVENSI_KODING_RS, PROSEDUR_RUTIN_TIDAK_DIKODE } = require('./konvensiKodingRs');
 const { kodeIm } = require('./kamusIdrgService');
 
 const BOBOT = { tinggi: 25, sedang: 12, rendah: 5 };
@@ -98,7 +98,7 @@ function periksaAturan({ record, ai, pages, hitungInacbgDanTarif }) {
   // Tarif INA-CBG vs biaya riil RS. Bukan aturan BPJS -- penanda kemungkinan
   // kode terlewat (rugi RS) atau kode berlebih (risiko ditolak/diaudit).
   const tagihan = totalTagihan(pages);
-  if (tagihan && tarif) {
+  if (tagihan && tarif && ai.inacbg_result?.severity_estimasi !== true) {
     const rasio = tarif / tagihan.jumlah;
     if (rasio < 0.5) {
       temuan.push({ jenis: 'potensi_rugi_rs', keparahan: 'sedang', bukti: { kutipan: tagihan.kutipan, page_number: tagihan.page_number },
@@ -178,6 +178,8 @@ Diagnosis tertulis merupakan bukti dokumentasi; jangan menyebut tidak ada bukti 
 Lembar ICU dipakai untuk mencari bukti singkat yang jelas. Jangan memaksakan rekonstruksi seluruh tabel/jam/dosis dari OCR.
 Bila tindakan sudah tertulis dilakukan, cukup satu kutipan yang sah; kecukupan dan respons terapi dinilai terpisah.
 Rincian CPPT/lembar ICU yang belum terbaca menjadi catatan telaah casemix, bukan alasan menghapus diagnosis atau pending otomatis.
+Bandingkan catatan dalam urutan waktu: BAB normal saat datang tidak membatalkan melena pada diagnosis akhir. Tanda vital membaik setelah terapi tidak membatalkan syok saat masuk.
+Gunakan ICD-10 WHO, bukan ICD-10-CM: E87.2 mencakup asidosis respiratorik dalam indeks WHO; jangan menolak kode ini karena pengecualian ICD-10-CM Amerika.
 Tetap soroti pertentangan nyata, diagnosis banding/riwayat dan ketidaksesuaian kode dengan kutipan yang jelas.
 Kamu verifikator BPJS yang SKEPTIS dan koder senior. Kamu menerima kode final sebuah klaim dan bukti dari berkas.
 Tugasmu MENCARI KESALAHAN, bukan membenarkan. Periksa: diagnosis utama sesuai resume? diagnosis sekunder benar-benar
@@ -357,6 +359,13 @@ async function periksaKritis({ record, ai, pages, hitungInacbgDanTarif, db = nul
     if (kembaliKeSistemLain) {
       dibantah.push({ kode: kembaliKeSistemLain, padanan_who: padananWho(kembaliKeSistemLain),
         alasan: 'Saran INA-CBG sudah memakai padanan WHO; kode dari sistem lain tidak membuktikan kode WHO salah.', pesan: k.pesan });
+      return false;
+    }
+    const prosedurDisebut = [...new Set([...`${k.pesan} ${k.saran}`.matchAll(/\b(\d{2}\.\d{1,2})\b/g)].map(m => m[1]))];
+    if (['kode_terlewat', 'potensi_rugi_rs'].includes(k.jenis) && prosedurDisebut.length
+        && prosedurDisebut.every(kd => PROSEDUR_RUTIN_TIDAK_DIKODE.has(kd) && !kodeFinal(record, ai).px.includes(kd))) {
+      dibantah.push({ kode: prosedurDisebut.join(';'), pesan: k.pesan,
+        alasan: 'Tindakan rutin mengikuti konvensi koding RS; ketiadaan kode ini saja bukan kehilangan tarif atau kode wajib yang terlewat.' });
       return false;
     }
     if (k.jenis !== 'kode_tidak_didukung') return true;

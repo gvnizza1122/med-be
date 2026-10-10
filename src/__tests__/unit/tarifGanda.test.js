@@ -111,7 +111,7 @@ test('perkiraan klaim L02.1 tersedia mandiri tanpa hasil E-Klaim',()=>{
   const r=susunTarifGanda({jenis_klaim:'RAWAT_INAP',diagnosa_list:'L02.1',kelas_rawat:'3',raw_data:{KELAS_RAWAT:'3'}},{});
   expect(r.inacbg.resmi).toBeNull();
   expect(r.inacbg.perkiraan_klaim).toMatchObject({label:'Perkiraan klaim kasus ini',kode:'L-4-12-I',tarif:1433000,status:'tersedia'});
-  expect(r.inacbg.perkiraan_klaim.keterangan).toMatch(/acuan sementara/);
+  expect(r.inacbg.perkiraan_klaim.keterangan).toMatch(/Severity aplikasi belum ditetapkan/);
 });
 test('pembanding E-Klaim tidak mengganti perkiraan kasus',()=>{
   const r=susunTarifGanda({jenis_klaim:'RAWAT_INAP',diagnosa_list:'L02.1',raw_data:{KELAS_RAWAT:'3',INACBG:'L-4-12-II',TOTAL_TARIF:999}},{});

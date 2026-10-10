@@ -59,7 +59,9 @@ function perbaruiRisikoTampilan(record = {}, errors = [], options = {}) {
     // yang sudah diperbaiki (mis. KD-01 kini menerima terapi resume/tagihan
     // nebulisasi) tidak meninggalkan alasan pending lama.
     try {
+      const operasi=require('./kodingBedahService').periksaOperasiTanpaKode(ai.suggested_codes,options.pages,recordReferensi.PROCLIST);
       ai.konsistensi_data = [
+        ...(operasi?[operasi]:[]),
         ...require('./konsistensiAntarDataService').evaluasiKonsistensi(recordReferensi, options.pages, ai.temuan_tindakan || []),
         ...require('./konsistensiWaktuService').periksaWaktuTriase(options.pages),
       ];

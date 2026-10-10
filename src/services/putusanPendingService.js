@@ -237,6 +237,7 @@ function susunPutusan(aiReviewMasuk = {}, validationErrorsMasuk = []) {
 
   // 2. Konsistensi antar data — data yang diklaim tanpa pendukungnya.
   for (const k of aiReview.konsistensi_data || []) {
+    if (k.tanpa_putusan === true) continue;
     // Label UMUM pada resume tidak menggugurkan penjaminan oleh SEP BPJS.
     // Filter juga temuan tersimpan yang dibuat sebelum aturan ini diperbaiki.
     if (k.id === 'KD-02') continue;
@@ -305,7 +306,7 @@ function susunPutusan(aiReviewMasuk = {}, validationErrorsMasuk = []) {
 
   // Rekomendasi TKMKB menambah telaah dokumentasi; masa berlaku belum dikonfirmasi.
   for(const t of aiReview.referensi_klaim?.temuan||[]) {
-    if(t.jenis_ketentuan!=='rekomendasi_tkmkb'||!t.perlu_telaah_dokumen)continue;
+    if(t.tanpa_putusan===true||t.jenis_ketentuan!=='rekomendasi_tkmkb'||!t.perlu_telaah_dokumen)continue;
     tambah(alasan,{sumber_pemeriksaan:'Telaah rekomendasi TKMKB',kode:t.id,ringkas:ringkasKartu(t,'dokumentasi perlu ditelaah'),
       penjelasan:`${t.catatan}${rincianKartu(t)}`,keparahan:'sedang',bukti:`${t.sumber.judul}, halaman ${t.sumber.halaman}`,
       tindakan:'Cocokkan bukti, kelompok usia, pengecualian dan pedoman episode bersama DPJP/casemix.',
@@ -339,7 +340,7 @@ function susunPutusan(aiReviewMasuk = {}, validationErrorsMasuk = []) {
       const pnpk = sumberBa.jenis === 'pedoman_klinis';
       const label = `${pnpk ? 'PNPK' : 'BA'} ${(String(sumberBa.versi || sumberBa.id).match(/20\d\d/) || [''])[0]}`.trim();
       tambah(alasan, { sumber_pemeriksaan: pnpk ? 'PNPK Kemenkes' : 'BA kesepakatan Kemenkes-BPJS', kode: b.id,
-        ringkas: b.status === 'belum_dapat_dinilai' ? `${b.nama}: bukti klinis belum terbaca untuk menilai syarat ${label}` : ringkasButir(b, label),
+        ringkas: b.id === 'BA-18-M43' && b.kontradiksi_angka !== true ? 'Sepsis: konfirmasi lampiran kultur darah dan dasar diagnosis akhir bersama casemix' : b.status === 'belum_dapat_dinilai' ? `${b.nama}: bukti klinis belum terbaca untuk menilai syarat ${label}` : ringkasButir(b, label),
         penjelasan: `Syarat ${label} (${butir}, hal. ${halaman}): ${b.catatan}${tertulis.length ? ` Sudah tertulis: ${tertulis.join('; ')}.` : ''}${kurang.length ? ` Belum ada/tidak memenuhi: ${kurang.join('; ')}.` : ''}${pendukung.length ? ` Temuan pendukung yang tertulis: ${pendukung.join('; ')}.` : ''}${digantikan.length ? ` Juga ditelaah pada topik yang sama: ${digantikan.join('; ')}.` : ''}`,
         keparahan: b.kontradiksi_angka === true ? 'tinggi' : 'sedang',
         bukti: `${sumberBa.judul || label} (${sumberBa.nomor || '-'}), ${butir}, halaman ${halaman}`,
