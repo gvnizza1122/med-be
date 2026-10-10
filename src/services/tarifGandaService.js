@@ -104,6 +104,8 @@ function bagianInacbg(raw, ai) {
         : 'Perkiraan berdasarkan diagnosis dan prosedur kasus ini; perlu verifikasi dengan hasil E-Klaim.',
     } : null,
     cocok: resmi && hitungan ? resmi.kode === hitungan.kode : null,
+    cocok_base: resmi && hitungan
+      ? resmi.kode.replace(/-(?:III|II|I|0)$/,'') === hitungan.kode.replace(/-(?:III|II|I|0)$/,'') : null,
   };
 }
 

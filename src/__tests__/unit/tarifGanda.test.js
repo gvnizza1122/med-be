@@ -37,7 +37,7 @@ describe('susunTarifGanda', () => {
   });
   test('tanpa data INA-CBG sama sekali', () => {
     const r = susunTarifGanda({ jenis_klaim: 'RAWAT_JALAN', raw_data: '{}' }, {});
-    expect(r.inacbg).toEqual({ resmi: null, hitungan_medaudit: null, perkiraan_klaim: null, cocok: null });
+    expect(r.inacbg).toEqual({ resmi: null, hitungan_medaudit: null, perkiraan_klaim: null, cocok: null, cocok_base:null });
     expect(r.idrg.status).toBe('belum_dapat_dihitung');
     expect(r.idrg.alasan).toMatch(/grouper iDRG/);
   });
@@ -50,6 +50,19 @@ describe('susunTarifGanda', () => {
     expect(r.inacbg.hitungan_medaudit).toMatchObject({kode:'J-3-13-0',tarif:321700});
     expect(r.inacbg.cocok).toBe(false);
     expect(JSON.stringify({rec,ai})).toBe(before);
+  });
+  test('ventilator tanpa trakeostomi mempertahankan tiga skenario; beda severity bukan beda kelompok',()=>{
+    const rec={jenis_klaim:'RAWAT_INAP',kelas_rawat:3,diagnosa_list:'J96.0;J18.0;J46',prosedur_list:'96.72;96.04'};
+    const ai={lembar_grouper:{inacbg:{kode:'J-1-02-III',tarif:46590400}}};
+    const r=susunTarifGanda(rec,ai).inacbg;
+    expect(r).toMatchObject({cocok:false,cocok_base:true,resmi:{kode:'J-1-02-III',tarif:46590400}});
+    expect(r.perkiraan_klaim.skenario_severity).toEqual([
+      {code:'J-1-02-I',severity:'I',amount:20262700},
+      {code:'J-1-02-II',severity:'II',amount:28213700},
+      {code:'J-1-02-III',severity:'III',amount:46590400},
+    ]);
+    ai.lembar_grouper.inacbg.kode='J-1-01-III';
+    expect(susunTarifGanda(rec,ai).inacbg.cocok_base).toBe(false);
   });
   test('ekspor MIX membaca kode, tarif, CW dan NBR iDRG tanpa memakai NBR rancangan',()=>{
     const r=susunTarifGanda({jenis_klaim:'RAWAT_JALAN',raw_data:{IDRG_DRG_CODE:'1234567',IDRG_DRG_DESCRIPTION:'contoh',
