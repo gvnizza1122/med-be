@@ -3,7 +3,8 @@
 const {createHash}=require('crypto');
 const {classifyPageDocumentType}=require('./pdfPageClassifier');
 const {isLembarGrouper}=require('./lembarGrouperService');
-const VERSI='operasi-2026-10-08.1';
+const {cariBuktiOperasi}=require('./buktiOperasiService');
+const VERSI='operasi-2026-10-10.1';
 const isi=p=>String(p?.ocr_text??p?.text??'');
 const norm=s=>String(s).replace(/\s+/g,' ').trim();
 const NEGASI=/\b(?:belum|rencana|direncanakan|akan|tidak\s+(?:ada|didapat(?:kan)?|ditemukan|terdapat|menunjukkan|menembus|meluas|masuk|ganas|dilakukan)|tanpa\s+tanda\s+ganas)\b/i;
@@ -52,10 +53,12 @@ function nilaiLabel(p,label) {
   return same||lines.slice(i+1,i+3).find(l=>l.trim())?.trim()||null;
 }
 function susunLaporanOperasi(pages=[],ai={}) {
-  const semua=halaman(pages),op=semua.filter(p=>p.jenis==='laporan_operasi'),pa=semua.filter(p=>p.jenis==='patologi_anatomi');
+  const semua=halaman(pages),op=semua.filter(p=>p.jenis==='laporan_operasi'
+    && (/\blaporan\s+(?:operasi|tindakan\s+operatif)\b/i.test(isi(p))||cariBuktiOperasi([p]))),pa=semua.filter(p=>p.jenis==='patologi_anatomi');
+  const konteksTumor=[...op,...pa].some(p=>/\b(?:tumou?r|massa|benjolan|neoplasm\w*|karsinoma|sarkoma)\b/i.test(isi(p)));
   const reports=op.map(p=>({page_number:p.page_number,tanggal:(()=>{const lines=isi(p).split(/\r?\n/),i=lines.findIndex(l=>/\b(?:tanggal|tgl\.?)\s+operasi\b/i.test(l));return i<0?null:lines.slice(i,i+3).join(' ').match(/\b\d{1,2}[-/]\d{1,2}[-/]\d{4}\b/)?.[0]||null;})(),
     tindakan:nilaiLabel(p,/^\s*nama\s*\/\s*macam\s+tindakan\s+operasi\b/i),
-    ukuran:ukuranHalaman(p),teks:isi(p),status_ukuran:ukuranHalaman(p).length?'terbaca':'perlu_cek_manual'}));
+    ukuran:ukuranHalaman(p),teks:isi(p),status_ukuran:ukuranHalaman(p).length?'terbaca':konteksTumor?'perlu_cek_manual':'tidak_relevan'}));
   for(let i=1;i<reports.length;i++)if(!reports[i].ukuran.length&&reports[i].page_number===reports[i-1].page_number+1
     && !/\b(?:rincian temuan|diagnosis (?:pra|pasca)|jaringan yang|prosedur operasi)\b/i.test(reports[i].teks))reports[i].status_ukuran='halaman_pengesahan';
   const hasilPa=pa.map(p=>({page_number:p.page_number,ukuran_spesimen:ukuranHalaman(p),
@@ -75,11 +78,11 @@ function susunLaporanOperasi(pages=[],ai={}) {
     {id:'keganasan',nama:'Tumor ganas',status:ganas.length?'bukti_pendukung':'perlu_cek_manual',bukti:ganas,catatan:'Sifat tumor ditelaah dari kesimpulan PA. Ukuran sampel PA tidak menggantikan ukuran temuan operasi.'},
   ];
   const catatan=[];
-  if(op.length&&!reports.some(r=>r.ukuran.length))catatan.push('Ukuran tumor belum terbaca; periksa laporan operasi asli, termasuk tulisan tangan.');
+  if(konteksTumor&&op.length&&!reports.some(r=>r.ukuran.length))catatan.push('Ukuran tumor belum terbaca; periksa laporan operasi asli, termasuk tulisan tangan.');
   if(besar.length&&!vital.length)catatan.push('Ada ukuran operasi >4 cm; keterlibatan struktur vital belum terkonfirmasi. Telaah pula alternatif kedalaman/infiltrasi, bukan menolak dari ukuran saja.');
   if(reports.some(r=>r.ukuran.length>1))catatan.push('Ada beberapa ukuran pada laporan operasi; jangan menjumlahkan atau memetakan semuanya ke satu lokasi tanpa keterangan operator.');
   if(pa.length&&op.length)catatan.push('Ukuran temuan operasi dan ukuran spesimen PA ditampilkan terpisah; perbedaan keduanya tidak otomatis berarti konflik.');
-  return {versi:VERSI,hash_bukti:hash,laporan:reports,patologi:hasilPa,kriteria_stt:kriteria,catatan,
+  return {versi:VERSI,hash_bukti:hash,laporan:reports,patologi:hasilPa,kriteria_stt:konteksTumor?kriteria:[],catatan,
     cakupan:{halaman_dipindai:semua.map(p=>p.page_number),halaman_belum_terbaca:kurang,
       status:kurang.length?'sebagian':'tersedia',analisis_berkas_berubah:!!saved&&saved!==hash,
       analisis_ai_sesuai_bukti:savedAi?savedAi===hash:null,telaah_lokal_tersedia:!!lokal&&lokal===hash},

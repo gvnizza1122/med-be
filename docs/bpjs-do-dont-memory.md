@@ -256,3 +256,40 @@ Instruksi terbaru pengguna menggantikan kebijakan pembatas token/plafon biaya ya
 Diagnosis tertulis di resume adalah bukti dokumentasi meskipun daftar kutipan AI per kode kosong. Kekurangan kutipan saja tidak membuat alasan pending atau saran menghapus kode. Penilaian klinis tetap membandingkan kondisi, penunjang, tindakan dan pertentangan nyata; jangan menyimpulkan penyakit baru dari terapi. Untuk ICU, gunakan bukti tindakan singkat yang jelas; cuplikan narasi untuk analisis tidak mengganti OCR asli dan tidak merekonstruksi hubungan angka/jam tabel. Rincian CPPT ditelaah casemix. Referensi klaim ditampilkan sebagai poin ringkas, dengan sumber/halaman tetap tersedia dan kutipan mentah tetap disimpan.
 
 Efisiensi konteks: jangan mengirim ai_review lama sebagai data pasien. Saat OCR per halaman tersedia, arsip physical_exam_findings/structured_extraction dan notasi OCR duplikat tidak perlu disalin lagi ke prompt; data klaim, hasil/tanda vital langsung, dan OCR sumber tetap dipertahankan.
+
+## Telaah dua kasus ICU dan severity — 10 Oktober 2026
+
+Instruksi tampilan terbaru: bukti referensi ditampilkan sebagai poin kutipan singkat dari berkas pasien beserta halamannya. Panel sumber pedoman di kartu tersebut dihilangkan; data sumber tetap tersimpan untuk audit dan katalog pedoman. Diagnosis tertulis DPJP tidak dibantah hanya karena OCR atau daftar kutipan per kode kosong. Perubahan tanda/gejala dari IGD ke resume tidak otomatis menjadi konflik.
+
+Pada ICU yang terdokumentasi, rincian skor audit/CPPT yang belum ditemukan menjadi catatan verifikasi casemix, bukan alasan pending otomatis. Waktu keluar IGD yang kosong juga menjadi catatan manual bila kegawatan, indikasi rawat inap, terapi dan DPJP tercatat; jangan mengarang waktu. Tetap pertahankan persyaratan substantif yang perlu dikonfirmasi, misalnya lampiran kultur darah untuk telaah sepsis menurut sumber yang dipakai.
+
+Terapi asma membutuhkan dua kelompok bukti tindakan aktual: bronkodilator dan kortikosteroid sistemik. Lasalcom nebul dan injeksi methylprednisolon dikenali; budesonide inhalasi saja bukan steroid sistemik. Hasil Gram sputum menerima format hasil tanpa titik dua, tetapi order/hasil tertunda bukan hasil pemeriksaan. Lembar anestesi/intubasi atau judul post-op yang tidak berisi operasi tidak boleh menimbulkan temuan operasi tanpa kode maupun permintaan ukuran tumor. Ukuran tumor hanya ditelaah pada laporan berkonteks tumor.
+
+Ventilasi 96.72 pada dewasa tanpa trakeostomi memilih dasar J-1-02, bukan J-1-01 atau kelompok neonatus. Lama ventilasi tidak ditetapkan dari keberadaan ICU saja. Severity I pada kalkulasi lokal merupakan skenario tarif; jangan melabeli kasus ringan atau menyebut selisih terhadap skenario I sebagai kerugian RS otomatis. Severity grouper resmi dipertahankan sebagai pembanding tersendiri; kode E-Klaim tidak disalin untuk mengganti hasil analisis. Acidosis respiratorik memiliki indeks WHO E87.2; jangan menerapkan pengecualian ICD-10-CM Amerika ke ICD-10 WHO.
+
+Pemeriksa kritis membuang usulan kode rutin yang diwajibkan AI hanya karena tidak ada dalam daftar kode, sesuai PROSEDUR_RUTIN_TIDAK_DIKODE. Keberatan terhadap tindakan penting atau dukungan tindakan yang telah dikode tetap ditelaah. Pencatatan biaya mencakup panggilan ulang/gagal yang berbiaya, dengan nilai belum pasti dipisahkan; biaya historis berkas bukan harga sekali analisis.
+
+
+## Tampilan severity dan bukti; rancangan evaluasi mingguan — 10 Oktober 2026
+
+Kotidjah: perkiraan lama J-1-01 (dengan trakeostomi) berbeda dari bukti ventilasi tanpa trakeostomi dan lembar J-1-02-III. Tarif I/II/III untuk profil kasus ini Rp20.262.700/Rp28.213.700/Rp46.590.400. Tiga skenario harus tampil sejajar; jangan menonjolkan I seolah severity final. Ringkasan mengutamakan hasil E-Klaim berkas jika tersedia, dengan halaman; bukan bukti klaim telah diterima/dibayar. TarifGanda mempertahankan cocok (kode lengkap) dan menambah cocok_base agar perbedaan severity estimasi tidak ditampilkan sebagai perbedaan kelompok dasar. Tidak menyalin hasil grouper untuk mengganti diagnosis/prosedur.
+
+Kartu bukti menempatkan kutipan berhalaman di awal, judul singkat, rincian kriteria yang dapat dibuka, dan catatan casemix di bawah. Alternatif gagal napas harus mempertahankan OR dan kombinasi pCO2+pH; jangan memecah desimal. Paragraf sumber tidak ditampilkan pada kartu ini; metadata audit tetap tersedia.
+
+Pengguna menanyakan kemungkinan siklus pembelajaran dan evaluasi per minggu. Rancangan disampaikan pada outputs/SIKLUS_PEMBELAJARAN_DAN_REVISI_TARIF.md di chat unggah dua file, bukan jadwal yang sudah aktif. Saat ini evaluasi/koreksi casemix disimpan, RAG jawaban RS/BPJS memakai label dan versi konfirmasi, pola koding historis dibatasi sebagai pembanding. error_knowledge_base juga menyimpan generalisasi AI yang belum seluruhnya dikonfirmasi; jangan menyebut semua pengetahuan sudah terverifikasi BPJS. Rancangan mingguan memisahkan kandidat AI dari pelajaran terkonfirmasi, membandingkan snapshot yang sama, mengukur peringatan keliru dan pending terlewat, serta memakai pengujian episode terpisah. Klaim diterima setelah koreksi bukan bukti bahwa temuan sebelum koreksi salah. Belum ada jadwal mingguan otomatis atau pelatihan ulang bobot model.
+
+
+## Penunjang bukan diagnosis otomatis; sedasi ETT — 10 Oktober 2026
+
+Pengguna mengklarifikasi lembar anestesi Kotidjah hal. 34 sebagai sedasi untuk pemasangan endotracheal tube. Klarifikasi disimpan sebagai data pengguna berhalaman dan bersidik bukti, ditelaah bersama intubasi pada resume; tidak menjadi operasi bedah atau kode tindakan baru. Konteks yang tidak sesuai sidik bukti tidak ditampilkan sebagai klarifikasi terkini. Pada kasus lain, lembar anestesi/obat sedasi saja tidak membuktikan bedah atau memastikan hubungan dengan ETT tanpa pencocokan episode.
+
+Hasil lab rendah/tinggi (Na, K, Cl, Hb, fungsi ginjal, AGD, dan lain-lain) dinilai untuk diagnosis yang sudah tertulis, perjalanan penyakit, resusitasi cairan, pemilihan/respons terapi. Angka abnormal, infus, koreksi elektrolit atau transfusi saja bukan penetapan diagnosis sekunder. Jangan mengubahnya menjadi kode terlewat, kehilangan tarif, peningkatan severity atau alasan pending. Diagnosis tersendiri yang ditulis dokter dan relevan pelayanan tetap ditelaah; kritik dukungan kode yang sudah diajukan dan prosedur penting tetap dipertahankan.
+
+konteksPenunjangService dipakai pada pemeriksa kritis (aturan + hasil AI) dan penyegaran tampilan hasil lama; kebijakan dipakai review utama, usulan diagnosis, penalaran, tinjauan diagnosis/lanjutan dan agen tinjau. Temuan lab tersirat dipindah ke catatan_klinis yang tidak mendapat penalti skor. Nilai dan halaman asli tetap ada; bila kutipan penalaran memuat anotasi tambahan, baris sumber hanya diambil bila parameter DAN nilai cocok. Temuan asal tetap disimpan untuk audit. Na/Cl tinggi pada Kotidjah kini konteks, bukan dua potensi rugi RS. Kedua hasil tersimpan diperbarui tanpa panggilan AI baru, tanpa mengubah diagnosis/prosedur dan tanpa menghapus catatan substantif lain.
+
+
+## Keyakinan mengikuti keberatan yang berlaku — 10 Oktober 2026
+
+Pengguna menegaskan perbaikan pemeriksaan kritis DAN keyakinan untuk Sanusi, Kotidjah, serta klaim berikutnya. Gejala, tanda vital, kondisi tersirat, dan angka lab dapat menjadi manifestasi penyakit atau dasar resusitasi/pilihan terapi. Tidak otomatis membuktikan diagnosis tambahan/kode terlewat/kerugian tarif. Kondisi tersirat dipindah ke konteks klinis tanpa penalti; sumber dan kutipan asli dipertahankan. Diagnosis dokter, kode final, dan kritik nyata terhadap dukungan/ketepatan kode tetap diperiksa.
+
+Skor kesesuaian kode/dokumentasi dihitung dari keberatan yang masih berlaku (tinggi 25, sedang 12, rendah 5), bukan skor lama atau jumlah catatan klinis. Pembacaan berulang harus idempotent; gangguan pemeriksaan AI tetap membatasi keyakinan dan dinyatakan. Skor bukan probabilitas klaim disetujui/dibayar dan tidak menentukan severity grouper. Hasil tersimpan disegarkan tanpa menambah diagnosis/prosedur atau membayar analisis ulang.

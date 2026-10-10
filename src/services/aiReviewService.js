@@ -120,7 +120,8 @@ function identitasUntukGateway(record = {}) {
   };
 }
 
-const AI_REVIEW_SYSTEM_PROMPT = `Kamu asisten audit klaim BPJS E-Claim untuk perawat/verifikator rumah sakit.
+const AI_REVIEW_SYSTEM_PROMPT = `${require('./konteksPenunjangService').KEBIJAKAN}
+Kamu asisten audit klaim BPJS E-Claim untuk perawat/verifikator rumah sakit.
 Kamu diberi data lengkap satu rekam klaim (hasil ekstraksi), daftar field yang gagal validasi otomatis,
 dan (kalau ada) teks bukti dokumen pendukung (hasil OCR/teks asli PDF).
 
@@ -773,7 +774,8 @@ function getEkgPageNumbers(evidencePool) {
  * ribuan token teks dokumen. Panggilan terpisah dengan SATU tugas saja
  * terbukti jauh lebih andal untuk kepatuhan instruksi LLM secara umum.
  */
-const DIAGNOSIS_SUGGESTION_SYSTEM_PROMPT = `Kamu asisten koding medis ICD-10 WHO & ICD-9-CM untuk klaim BPJS rumah sakit.
+const DIAGNOSIS_SUGGESTION_SYSTEM_PROMPT = `${require('./konteksPenunjangService').KEBIJAKAN}
+Kamu asisten koding medis ICD-10 WHO & ICD-9-CM untuk klaim BPJS rumah sakit.
 Kamu diberi teks halaman Resume Medis SAJA dari satu berkas klaim (dokumen lain seperti SEP/SPRI/Triage IGD
 sengaja TIDAK disertakan di sini — permintaan eksplisit klien: kolom diagnosis HANYA boleh diambil dari
 Resume Medis, demi kecepatan & kejelasan sumber). Dokumen ini TIDAK PUNYA halaman resmi "Berkas Klaim
@@ -1511,7 +1513,8 @@ function buildRingkasan(kriteria, ageGroup, sumber = 'formulir Triase IGD') {
   return `Kelompok usia: ${ageLabel}. Berdasarkan parameter dan nilai vital yang terekstrak dari ${sumber}, ${parts.join('; ')}. Lihat Tabel 1-3 di bawah untuk rincian dan bukti kutipan per kriteria.`;
 }
 
-const PENDING_RISK_SYSTEM_PROMPT = `Kamu asisten audit klaim BPJS E-Claim untuk perawat/verifikator rumah sakit.
+const PENDING_RISK_SYSTEM_PROMPT = `${require('./konteksPenunjangService').KEBIJAKAN}
+Kamu asisten audit klaim BPJS E-Claim untuk perawat/verifikator rumah sakit.
 
 TUGAS TUNGGAL: kamu diberi data satu rekam klaim (DATA REKAM KLAIM) dan teks lengkap dokumen pendukungnya
 (BUKTI_DOKUMEN) — di luar validasi format (rule engine), periksa apakah rekam ini menunjukkan indikasi

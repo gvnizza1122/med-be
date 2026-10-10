@@ -88,7 +88,7 @@ test('grouper tampilan lama disegarkan tanpa OCR/AI ulang atau mengubah hasil pe
     ai_review:{inacbg_result:{code:'Q-5-44-0'},tariff_result:{amount:192400}} };
   const before=JSON.stringify(rec);
   const r=perbaruiRisikoTampilan(rec);
-  expect(r.inacbg_result).toMatchObject({code:'J-3-13-0',versi_perkiraan:'2026-10-07.1'});
+  expect(r.inacbg_result).toMatchObject({code:'J-3-13-0',versi_perkiraan:'2026-10-10.1'});
   expect(r.tariff_result).toMatchObject({amount:321700,perlu_verifikasi_grouper:true});
   expect(JSON.stringify(rec)).toBe(before);
 });

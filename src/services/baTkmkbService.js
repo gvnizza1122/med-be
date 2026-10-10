@@ -48,6 +48,7 @@ function halamanBukti(pages) {
     .filter(p=>!['rincian_biaya','resep','sep','spri'].includes(p.jenis));
 }
 function cari(pages,key,cariBukti) {
+  if (key === 'terapi_asma') return buktiTerapiAsma(pages);
   const d=DET[key];
   if(!d) return cariBukti ? cariBukti(pages,key) : {id:key,nama:key,status:'perlu_cek_manual',bukti:[]};
   const [nama,pola,jenis,negatifDiterima]=d;
@@ -57,6 +58,34 @@ function cari(pages,key,cariBukti) {
   return {id:key,nama,status:bukti.length?'bukti_ditemukan':'bukti_belum_cukup',bukti,
     catatan:bukti.length?'Kutipan menunjukkan dokumentasi terkait; isi, hasil, waktu dan kelengkapan seluruh kriteria tetap ditelaah.'
       :`${nama} tidak tertulis pada halaman klinis yang terbaca.`};
+}
+function buktiTerapiAsma(pages) {
+  const groups = { bronkodilator: [], steroid_sistemik: [] };
+  for (const p of pages) {
+    const lines = isi(p).split(/\r?\n/); let pelaksanaan = false;
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (/^(?:intervensi|rencana|terapi\s+pulang|instruksi\s+tindak\s+lanjut|pengkajian\s+fungsional)\b/i.test(line)) pelaksanaan = false;
+      if (/tindakan\s+keperawatan|catatan\s+pemberian\s+obat|terapi\/pengobatan\s+selama|^memberikan\s*:/i.test(line)) pelaksanaan = true;
+      if (!line || NEGASI.test(line) || ['resep','rincian_biaya'].includes(p.jenis)) continue;
+      const aksi = pelaksanaan || /\b(?:diberikan|pemberian|memberikan|dinebul\w*|telah|sudah)\b/i.test(line);
+      if (!aksi) continue;
+      const e = { page_number:p.page_number, kutipan:line, jenis_halaman:p.jenis };
+      if (/\b(?:salbutamol|ipratropium|lasalcom|ventasal|bronkodilator)\b/i.test(line)) groups.bronkodilator.push(e);
+      if (/\b(?:methylprednisolon\w*|metilprednisolon\w*|dexamethasone|deksametason|prednison\w*|hydrocortisone|hidrokortison)\b/i.test(line)
+          && /\b(?:inj\w*|iv|intravena|oral|tablet|po)\b/i.test(line)) groups.steroid_sistemik.push(e);
+    }
+  }
+  const lengkap = groups.bronkodilator.length > 0 && groups.steroid_sistemik.length > 0;
+  const kurang = [!groups.bronkodilator.length && 'bronkodilator', !groups.steroid_sistemik.length && 'kortikosteroid sistemik'].filter(Boolean);
+  return {id:'terapi_asma',nama:DET.terapi_asma[0],status:lengkap?'bukti_ditemukan':'bukti_belum_cukup',
+    bukti:[...groups.bronkodilator.slice(0,1),...groups.steroid_sistemik.slice(0,1)],
+    catatan:lengkap?'Pemberian bronkodilator dan kortikosteroid sistemik tertulis. Respons terapi dinilai bersama perjalanan kasus.'
+      :`Rincian ${kurang.join(' dan ')} ditelaah casemix; budesonide inhalasi tidak dianggap steroid sistemik.`};
+}
+function konteksIcuTerdokumentasi(pages) {
+  return pages.some(p=>p.jenis==='resume_medis' && /\bICU\b/i.test(isi(p)) && /Bangsal|ruang\s+rawat/i.test(isi(p)))
+    && pages.some(p=>p.jenis==='resume_medis' && /(?:Alasan\s+Masuk\s+Rawat\s+Inap|Diagnosis\s+Utama)\s*:\s*[^\s-]/i.test(isi(p)));
 }
 function pemicu(a,record,pages,dx,px) {
   const raw=objek(record.raw_data), jenis=record.jenis_klaim||record.JENIS_KLAIM||raw.JENIS_KLAIM;
@@ -130,13 +159,15 @@ function evaluasiDokumen(record={},pages=[],options={}) {
     // Rekomedasi yang belum memiliki masa berlaku tetap bisa menambah telaah,
     // tetapi tidak menjadi kewajiban nasional/putusan pending otomatis.
     const telaah=!!tanggal&&!sebelum&&!usiaBelum&&missing.length>0;
+    const manualIcu=tk && konteksIcuTerdokumentasi(klinis) && missing.length>0;
     temuan.push({id:a.id,nama,kode_diagnosis:dx.filter(k=>(a.dx||[]).some(p=>cocok(k,p))),
       kode_prosedur:px.filter(k=>(a.px||[]).some(p=>cocok(k,p))),jenis_ketentuan:sumber.jenis,
       sumber:{...sumber,halaman:a.halaman_pdf.join(', ')+(a.halaman_buku?` (buku ${a.halaman_buku})`:''),butir:a.bab,teks_asli:a.teks_asli},
       tanggal_acuan:tanggal,berlaku_pada_episode:berlaku,
       status:sebelum||!tanggal||usiaBelum?'perlu_konfirmasi_ketentuan':missing.length?'bukti_belum_cukup':tk?'telaah_rekomendasi':'perlu_cek_manual',
       bukti,catatan,keterbatasan:batas,perlu_telaah_dokumen:telaah,
-      blokir_submit:false,mengubah_kode:false,wajib_pending:false});
+      blokir_submit:false,mengubah_kode:false,wajib_pending:false,
+      ...(manualIcu ? {tanpa_putusan:true,telaah_casemix:true,catatan:catatan+' Rincian audit yang belum tertulis dicocokkan casemix dengan CPPT; tidak menjadi pending otomatis pada episode ICU yang terdokumentasi.'} : {})});
   }
   return temuan;
 }
@@ -216,20 +247,25 @@ function matriksIgd(record,pages,options={}) {
   // SEP/SPRI administratif dibaca untuk checklist administrasi saja, bukan diagnosis.
   const admin=(Array.isArray(pages)?pages:[]).filter(p=>!isLembarGrouper(isi(p))).map(p=>({...p,jenis:classifyPageDocumentType(isi(p))}));
   hasil.push(buktiPola(admin,'matriks_administrasi_ri','Administrasi rawat inap',/\b(?:No\.?\s*SEP|SURAT PERINTAH RAWAT INAP|SURAT ELEGIBILITAS PESERTA)\b/i,'Telaah kesesuaian SEP, tanggal, jenis rawat dan surat perintah; keberadaan judul belum membuktikan seluruh data administrasi sah.'));
+  const dukunganRi = [kgd,...hasil.filter(b=>['matriks_indikasi_ri','matriks_ruang_dpjp','matriks_tatalaksana_ri'].includes(b.id))];
+  if (dukunganRi.length===4 && dukunganRi.every(b=>b.status==='bukti_ditemukan') && konteksIcuTerdokumentasi(klinis)) {
+    const waktu=hasil.find(b=>b.id==='matriks_durasi_igd');
+    if(waktu.status==='bukti_belum_cukup') Object.assign(waktu,{status:'perlu_cek_manual',info:true,catatan:'Durasi IGD belum lengkap. Kegawatan, indikasi rawat, terapi dan perawatan ICU oleh DPJP tertulis; jam transfer dicocokkan casemix tanpa menjadi pending otomatis.'});
+  }
   return hasil;
 }
 function lengkapiReferensiBa(temuan,record,pages,options={}) {
   return temuan.map(t=>{
     const a=katalog.pelengkap_aturan.find(a=>a.id===t.id);if(!a)return t;
     const bukti=t.id==='RK-16'?[...t.bukti,...matriksIgd(record,pages,options)]:t.bukti;
-    const manual=bukti.some(b=>['perlu_cek_manual','bukti_belum_cukup'].includes(b.status));
+    const manual=bukti.some(b=>!b.info&&['perlu_cek_manual','bukti_belum_cukup'].includes(b.status));
     return {...t,sumber:{...katalog.sumber[0],halaman:a.halaman_pdf.join(', '),butir:a.bab,teks_asli:a.teks_asli},
       catatan:a.catatan,bukti,status:t.berlaku_pada_episode===true&&manual?'bukti_belum_cukup':t.status,
       perlu_telaah_dokumen:t.id==='RK-16'&&t.berlaku_pada_episode===true&&manual};
   });
 }
 function temuanKritis(temuan) {
-  return temuan.filter(t=>t.perlu_telaah_dokumen&&t.jenis_ketentuan==='rekomendasi_tkmkb')
+  return temuan.filter(t=>!t.tanpa_putusan&&t.perlu_telaah_dokumen&&t.jenis_ketentuan==='rekomendasi_tkmkb')
     .map(t=>({id:t.id,jenis:'inkonsistensi',keparahan:'sedang',sumber:'aturan',sumber_dokumen:t.sumber.id,
       ketentuan_terverifikasi:false,pesan:`${t.nama}: ${t.bukti.filter(b=>b.status==='bukti_belum_cukup').map(b=>b.nama).join('; ')} belum terkonfirmasi dari berkas.`,
       saran:`Telaah rekomendasi ${t.sumber.judul}, halaman ${t.sumber.halaman}, bersama DPJP/casemix dan pedoman episode. Bukti belum terbaca bukan bukti tindakan tidak dilakukan.`,

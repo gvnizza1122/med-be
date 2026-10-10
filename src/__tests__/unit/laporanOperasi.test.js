@@ -6,6 +6,15 @@ const p=(ocr_text,page_number)=>({ocr_text,page_number});
 const op=p('LAPORAN OPERASI\nNama/ macam tindakan operasi\nEksisi dan PA\nTanggal Operasi Waktu operasi dimulai Waktu operasi selesai\n01-10-2026 17:05 17:50\nProsedur operasi yang dilakukan dan rincian temuan\nSetelah subcutis, platysma split sampai massa tumor diameter 3x2 cm, mobile.\nMassa tumor berada di antara otot: massa tumor diameter 5x4 cmcm, mobile. Eksisi in toto.',14);
 const pa=p('JAWABAN PEMERIKSAAN HISTOPATOLOGI\nMakroskopik: Tiga buah jaringan, terkecil diameter 1.5 cm, terbesar berukuran 3x2.5x1.5 cm.\nSifat Keganasan: Tidak didapatkan tanda ganas\nKesimpulan: Frontal dan antebrachii dextra:\nBenign mesenchymal neoplasm jenis adipocytic',16);
 const record={diagnosa_list:'R22.0;R22.3',prosedur_list:'86.3;89.52;90.59',jenis_klaim:'RAWAT_INAP',hospital_code:'3371084',discharge_date:'2026-10-01'};
+test('lembar anestesi intubasi ICU tidak memunculkan laporan operasi atau peringatan tumor',()=>{
+ const r=svc.susunLaporanOperasi([p('LEMBAR ANESTHESI\nDiagnosa pre operasi :\nDiagnosa post operasi :\nTindakan operasi :\nKetamin 10 mg inj\nPost op\nintubasi ETT',34)]);
+ expect(r.laporan).toEqual([]);expect(r.kriteria_stt).toEqual([]);expect(r.catatan).toEqual([]);
+});
+test('operasi fraktur tetap dikenali tanpa meminta ukuran tumor',()=>{
+ const r=svc.susunLaporanOperasi([p('LAPORAN OPERASI\nTindakan operasi: ORIF femur\nInsisi dan pemasangan plate',14)]);
+ expect(r.laporan).toHaveLength(1);expect(r.laporan[0].status_ukuran).toBe('tidak_relevan');
+ expect(r.kriteria_stt).toEqual([]);expect(r.catatan).toEqual([]);
+});
 test('kasus beberapa massa: kedua ukuran operasi tersimpan dan ukuran PA dipisahkan, cmcm tidak menggandakan ukuran',()=>{
   const r=svc.susunLaporanOperasi([op,pa]);
   expect(r.laporan[0].ukuran.map(u=>u.ukuran)).toEqual([[3,2],[5,4]]);
