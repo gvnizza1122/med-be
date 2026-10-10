@@ -60,3 +60,46 @@ test('diagnosis dokter terverifikasi dari saran lain tidak hilang meskipun kriti
  const out=sesuaikanKritik({...dasar,dinilai:{dx:['R57.1']},temuan:[temuan]},{record,ai,pages:[resume,lab]});
  expect(out.temuan).toEqual([temuan]);
 });
+
+test('manifestasi klinis dan dasar resusitasi tidak otomatis menjadi diagnosis terlewat; kritik kode tetap memengaruhi keyakinan',async()=>{
+ const klinis=p('CATATAN PERJALANAN\nSpO2 85% room air\nTD 80/43 mmHg diberikan fluid challenge dan norepinefrin\nKejang seluruh tubuh\nGCS 1-1-1 terpasang ventilator',4);
+ const kondisi_tersirat=[
+  {kondisi:'Desaturasi',kutipan:'SpO2 85% room air',halaman:4},
+  {kondisi:'Kemungkinan syok',kutipan:'TD 80/43 mmHg diberikan fluid challenge dan norepinefrin',halaman:4},
+  {kondisi:'Kejang',kutipan:'Kejang seluruh tubuh',halaman:4},
+  {kondisi:'Penurunan kesadaran',kutipan:'GCS 1-1-1 terpasang ventilator',halaman:4},
+ ];
+ const ai={penalaran_diagnosis:{status:'selesai',kondisi_tersirat,diagnosis:[{kode:'N17.9',status:'perlu_klarifikasi',alasan:'Periksa baseline dan serial kreatinin'}]}};
+ const out=await periksaKritis({record,ai,pages:[resume,lab,klinis],gateway:{panggilModel:async()=>({ok:true,hasil:{keberatan:[]}})},hitungInacbgDanTarif:()=>({inacbgResult:{code:'A-4-10-I'},tarifResult:null})});
+ expect(out.temuan).toHaveLength(1);expect(out.temuan[0].pesan).toContain('N17.9 perlu klarifikasi');
+ expect(out.skor_keyakinan).toBe(95);expect(out.ringkas.potensi_rugi_rs).toBe(0);
+ expect(out.catatan_klinis).toHaveLength(4);expect(out.catatan_klinis.every(c=>c.jenis==='konteks_klinis')).toBe(true);
+ expect(out.dasar_keyakinan).toMatchObject({penalti_temuan:5,konteks_tanpa_penalti:4,jumlah_temuan:1});
+});
+test('hasil tersimpan tidak mempertahankan penalti lama atau menggandakan konteks saat dibaca berulang',()=>{
+ const tersirat={kondisi:'Desaturasi',kutipan:'SpO2 85% room air',halaman:4};
+ const pages=[resume,p('CATATAN PERJALANAN\nSpO2 85% room air',4),lab];
+ const old={jenis:'potensi_rugi_rs',keparahan:'rendah',sumber:'aturan',pesan:`Bukti mengarah ke "${tersirat.kondisi}" tetapi tidak ditulis dokter sebagai diagnosis.`,bukti:{kutipan:tersirat.kutipan,page_number:4}};
+ const nyata={jenis:'inkonsistensi',keparahan:'sedang',pesan:'N17.9 tertulis; periksa baseline kreatinin',sumber:'ai'};
+ const ai={penalaran_diagnosis:{status:'selesai',kondisi_tersirat:[tersirat]},analisis_kritis:{...dasar,skor_keyakinan:1,temuan:[old,hiponat,nyata],pembaruan_ba_tkmkb:{dasar:{skor_keyakinan:1}}}};
+ const once=perbaruiRisikoTampilan({...record,ai_review:ai},[],{pages}).analisis_kritis;
+ const twice=perbaruiRisikoTampilan({...record,ai_review:{...ai,analisis_kritis:once}},[],{pages}).analisis_kritis;
+ expect(once.skor_keyakinan).toBe(88);expect(twice).toEqual(once);
+ expect(once.temuan).toEqual([nyata]);expect(once.catatan_klinis).toHaveLength(2);
+ expect(ai.analisis_kritis.temuan).toHaveLength(3);
+});
+test('label temuan AI tidak boleh menjadikan Na/K rendah diagnosis baru, tetapi penetapan dokter tetap dipertahankan',()=>{
+ for(const jenis of ['kode_terlewat','potensi_rugi_rs','kode_tidak_didukung','inkonsistensi']){
+  const t={...hiponat,jenis};
+  expect(sesuaikanKritik({...dasar,temuan:[t]},{record,pages:[resume,lab]}).skor_keyakinan).toBe(100);
+  const tertulis={...resume,ocr_text:resume.ocr_text.replace('AKI','AKI\nHiponatremia')};
+  expect(sesuaikanKritik({...dasar,temuan:[t]},{record,pages:[tertulis,lab]}).temuan).toEqual([t]);
+ }
+});
+test('keberatan nyata dengan kutipan sama tidak dibuang hanya karena cocok dengan kondisi tersirat',()=>{
+ const tersirat={kondisi:'Desaturasi',kutipan:'SpO2 85% room air',halaman:4};
+ const pages=[resume,p('CATATAN PERJALANAN\nSpO2 85% room air',4)];
+ const nyata={jenis:'potensi_rugi_rs',keparahan:'sedang',sumber:'ai',pesan:'Tindakan tercatat tetapi kode belum sesuai',bukti:{kutipan:tersirat.kutipan,page_number:4}};
+ const out=sesuaikanKritik({...dasar,temuan:[nyata]},{record,pages,ai:{penalaran_diagnosis:{status:'selesai',kondisi_tersirat:[tersirat]}}});
+ expect(out.temuan).toEqual([nyata]);expect(out.skor_keyakinan).toBe(88);
+});

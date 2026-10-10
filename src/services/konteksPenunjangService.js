@@ -7,6 +7,8 @@ const KEBIJAKAN = `Hasil laboratorium rendah/tinggi tidak otomatis menjadi diagn
 Na/K/Cl, Hb, glukosa, fungsi ginjal, AGD dan hasil lain dibaca dalam konteks diagnosis akhir, perjalanan penyakit,
 resusitasi cairan, respons dan pemilihan terapi. Infus, koreksi elektrolit, transfusi atau pemantauan saja tidak menetapkan diagnosis baru.
 Jangan menilai potensi rugi RS, menaikkan severity, atau membuat alasan pending hanya karena angka abnormal belum memiliki kode diagnosis.
+Gejala, tanda vital dan kondisi tersirat juga dapat menjadi manifestasi diagnosis yang sudah ada atau dasar tindakan/terapi.
+Jangan menganggapnya diagnosis terlewat atau mengurangi keyakinan hanya karena belum mempunyai kode tersendiri.
 Diagnosis tersendiri memerlukan penetapan dokter dan relevansi pelayanan, bukan angka atau obat saja. Bila hanya penunjang,
 pertahankan sebagai konteks analisis; jangan mewajibkan dokter menambah diagnosis. Diagnosis yang sudah ditulis/dikode tetap dinilai dukungannya.
 Lembar anestesi dapat dipakai untuk sedasi pemasangan endotracheal tube (ETT), bukan hanya operasi bedah.
@@ -29,7 +31,7 @@ function hanyaKonteksPenunjang(t, pages, { dx = [], diagnosisTertulis = [], ters
   const halaman = t.halaman ?? t.bukti?.page_number;
   const p = (pages || []).find(p => Number(p.page_number) === Number(halaman));
   if (!/\d/.test(kutipan) || !(PARAMETER.test(kutipan) || p && classifyPageDocumentType(p.ocr_text || '') === 'lab_results')) return false;
-  if (!tersirat && !['kode_terlewat', 'potensi_rugi_rs'].includes(t.jenis)) return false;
+  if (!tersirat && !['kode_terlewat', 'potensi_rugi_rs', 'kode_tidak_didukung', 'inkonsistensi'].includes(t.jenis)) return false;
   if (!tersirat && kodeDalam(teks, 'px').length) return false;
   const disebut = kodeDalam(teks, 'dx');
   if (!tersirat && disebut.some(k => dx.includes(k) || diagnosisTertulis.includes(k))) return false;
@@ -39,9 +41,16 @@ function hanyaKonteksPenunjang(t, pages, { dx = [], diagnosisTertulis = [], ters
   // Diagnosis tertulis berbeda dari temuan lab pada formulir. Rencana/DD/negasi belum menetapkan diagnosis.
   if (diagnosis.some(line => !/\b(?:dd|suspek|kemungkinan|rencana|tanpa|tidak|no)\b|\(-\)/i.test(line)
     && (keluarga.some(([re]) => re.test(line)) || disebut.some(k => new RegExp(`\\b${k.replace('.', '\\.')}(?!\\d)`).test(line))))) return false;
+  // Pertahankan juga diagnosis tertulis dengan nama/singkatan (mis. AKI),
+  // meski kode dan kutipan AI dari halaman lain belum tersedia.
+  if (!tersirat && diagnosis.some(line => {
+    if (/\b(?:dd|suspek|kemungkinan|rencana|tanpa|tidak|no)\b|\(-\)/i.test(line)) return false;
+    const nama = norm(line).replace(/^\d+[.)]\s*/, '');
+    return nama.length >= 3 && new RegExp(`\\b${nama.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(teks);
+  })) return false;
   return tersirat || keluarga.length > 0 || disebut.length > 0 || /diagnos|kode.*(?:tambah|terlewat)|(?:tambah|lengkapi).*kode/i.test(teks);
 }
-function catatanPenunjang(t, pages) {
+function catatanPenunjang(t, pages, jenis = 'konteks_penunjang') {
   let kutipan = t.kutipan || t.bukti?.kutipan;
   const halaman = Number(t.halaman ?? t.bukti?.page_number);
   const p = (pages || []).find(p => Number(p.page_number) === halaman);
@@ -61,8 +70,10 @@ function catatanPenunjang(t, pages) {
     }
   }
   const sah = p && norm(kutipan).length >= 3 && norm(p.ocr_text).includes(norm(kutipan));
-  return { jenis: 'konteks_penunjang', hash_bukti: require('./laporanOperasiService').hashBukti(pages),
-    pesan: 'Hasil penunjang dinilai bersama diagnosis yang tertulis, perjalanan penyakit dan pilihan terapi; tidak otomatis menjadi diagnosis tambahan.',
+  return { jenis, hash_bukti: require('./laporanOperasiService').hashBukti(pages),
+    pesan: jenis === 'konteks_penunjang'
+      ? 'Hasil penunjang dinilai bersama diagnosis yang tertulis, perjalanan penyakit dan pilihan terapi; tidak otomatis menjadi diagnosis tambahan.'
+      : 'Temuan klinis dinilai sebagai manifestasi penyakit atau dasar tindakan/terapi; dugaan diagnosis tersendiri tidak dianggap kode terlewat.',
     ...(sah ? { bukti: { kutipan, page_number: halaman } } : {}),
     temuan_asal: t };
 }
@@ -72,13 +83,23 @@ function sesuaikanKritik(analisis, { record = {}, ai = {}, pages = [] } = {}) {
   const hash = require('./laporanOperasiService').hashBukti(pages);
   const diagnosisTertulis = (ai.suggested_codes || []).filter(s => s.type === 'diagnosis' && !s.disangkal
     && buktiDiagnosisAkhir(s, pages)).map(s => String(s.code).toUpperCase());
-  const catatan = (analisis.catatan_klinis || []).filter(c => !['konteks_penunjang','konteks_anestesi'].includes(c.jenis) || c.hash_bukti === hash);
+  const tersirat = ai.penalaran_diagnosis?.status === 'selesai' ? ai.penalaran_diagnosis.kondisi_tersirat || [] : [];
+  const catatan = (analisis.catatan_klinis || []).filter(c => !['konteks_penunjang','konteks_klinis','konteks_anestesi'].includes(c.jenis) || c.hash_bukti === hash);
   const temuan = analisis.temuan.filter(t => {
+    // Hasil lama pernah mengubah seluruh kondisi tersirat menjadi rugi RS.
+    // Cocokkan sumber, pesan DAN kutipannya; keberatan lain tidak ikut dibuang.
+    const asal = ['aturan', 'penalaran'].includes(t.sumber) && t.jenis === 'potensi_rugi_rs'
+      && tersirat.find(x => norm(t.pesan) === norm(`Bukti mengarah ke "${x.kondisi}" tetapi tidak ditulis dokter sebagai diagnosis.`)
+        && norm(t.bukti?.kutipan) === norm(x.kutipan) && Number(t.bukti?.page_number) === Number(x.halaman));
+    if (asal) {
+      catatan.push(catatanPenunjang(asal, pages, hanyaKonteksPenunjang(asal, pages, { tersirat: true }) ? 'konteks_penunjang' : 'konteks_klinis'));
+      return false;
+    }
     if (!hanyaKonteksPenunjang(t, pages, { dx, diagnosisTertulis })) return true;
     catatan.push(catatanPenunjang(t, pages)); return false;
   });
-  for (const t of ai.penalaran_diagnosis?.kondisi_tersirat || []) {
-    if (hanyaKonteksPenunjang(t, pages, { tersirat: true })) catatan.push(catatanPenunjang(t, pages));
+  for (const t of tersirat) {
+    catatan.push(catatanPenunjang(t, pages, hanyaKonteksPenunjang(t, pages, { tersirat: true }) ? 'konteks_penunjang' : 'konteks_klinis'));
   }
   for (const k of ai.klarifikasi_berkas || []) {
     if (k.jenis === 'sedasi_ett' && k.sumber === 'klarifikasi_pengguna' && k.hash_bukti === hash
@@ -87,14 +108,16 @@ function sesuaikanKritik(analisis, { record = {}, ai = {}, pages = [] } = {}) {
     }
   }
   const unik = catatan.filter((c, i) => catatan.findIndex(x => x.jenis === c.jenis && norm(x.temuan_asal?.kutipan || x.temuan_asal?.bukti?.kutipan || x.pesan) === norm(c.temuan_asal?.kutipan || c.temuan_asal?.bukti?.kutipan || c.pesan)) === i);
-  if (temuan.length === analisis.temuan.length && !unik.length && !analisis.catatan_klinis?.length) return analisis;
   const bobot = { tinggi: 25, sedang: 12, rendah: 5 };
-  const skor = Math.max(0, 100 - temuan.reduce((n, t) => n + (bobot[t.keparahan] || 0), 0));
+  // Hitung dari keberatan yang masih berlaku, bukan skor/penalti hasil lama.
+  const penalti = temuan.reduce((n, t) => n + (bobot[t.keparahan] || 0), 0);
+  const skor = Math.max(0, 100 - penalti);
   const gagal = Boolean(analisis.ai_gagal);
   const nilai = gagal ? Math.min(skor, 70) : skor;
   const rugi = temuan.filter(t => t.jenis === 'potensi_rugi_rs').length;
   const upcoding = temuan.filter(t => t.jenis === 'potensi_upcoding').length;
-  return { ...analisis, versi_konteks_penunjang: 'penunjang-2026-10-10.1', temuan, catatan_klinis: unik,
+  return { ...analisis, versi_konteks_penunjang: 'penunjang-2026-10-10.2', temuan, catatan_klinis: unik,
+    dasar_keyakinan: { cakupan: 'kesesuaian_kode_dan_dokumentasi', penalti_temuan: penalti, jumlah_temuan: temuan.length, konteks_tanpa_penalti: unik.length, dibatasi_gangguan_ai: gagal },
     skor_keyakinan: nilai, tingkat: nilai >= 80 ? 'tinggi' : nilai >= 55 ? 'sedang' : 'rendah',
     ringkas: { potensi_rugi_rs: rugi, potensi_upcoding: upcoding, total: temuan.length },
     perlu_analisis_mendalam: temuan.some(t => t.keparahan === 'tinggi'),
