@@ -14,7 +14,7 @@ router.get('/', authenticate, authorize('superadmin'), async (req, res) => {
   try {
     const db = getDb();
     const users = await db.prepare(`
-      SELECT id, email, full_name, nik, role, hospital_code, is_active, last_login, created_at
+      SELECT id, email, username, full_name, nik, role, hospital_code, is_active, last_login, created_at
       FROM users ORDER BY created_at DESC
     `).all();
     res.json({ users });
@@ -29,10 +29,19 @@ router.get('/', authenticate, authorize('superadmin'), async (req, res) => {
  */
 router.post('/', authenticate, authorize('superadmin'), async (req, res) => {
   try {
-    const { email, password, full_name, nik, role } = req.body;
+    const { password, full_name, nik, role } = req.body;
+    // Username dipakai untuk login (auth.js mencocokkan username ATAU email).
+    // Petugas tanpa email cukup diberi username; kolom email (wajib & unik di
+    // tabel) diisi alamat internal yang tidak dipakai untuk mengirim surel.
+    const username = String(req.body.username || '').trim().toLowerCase() || null;
+    const email = String(req.body.email || '').trim() || (username ? `${username}@pengguna.medaudit.invalid` : '');
 
-    if (!email || !password || !full_name || !role) {
-      return res.status(400).json({ error: 'Email, password, nama lengkap, dan role wajib diisi.' });
+    if ((!email && !username) || !password || !full_name || !role) {
+      return res.status(400).json({ error: 'Username atau email, password, nama lengkap, dan role wajib diisi.' });
+    }
+
+    if (username && !/^[a-z0-9._-]{3,32}$/.test(username)) {
+      return res.status(400).json({ error: 'Username 3-32 karakter: huruf kecil, angka, titik, garis bawah, atau tanda minus.' });
     }
 
     if (!['superadmin', 'admin', 'supervisor', 'verifikator'].includes(role)) {
@@ -48,24 +57,30 @@ router.post('/', authenticate, authorize('superadmin'), async (req, res) => {
     if (existing) {
       return res.status(400).json({ error: 'Email sudah terdaftar.' });
     }
+    if (username) {
+      // Login mencari "username = ? OR email = ?", jadi username juga tidak boleh
+      // sama dengan email user lain.
+      const dipakai = await db.prepare('SELECT id FROM users WHERE username = ? OR email = ?').get(username, username);
+      if (dipakai) return res.status(400).json({ error: 'Username sudah dipakai.' });
+    }
 
     const id = uuidv4();
     const passwordHash = bcrypt.hashSync(password, 10);
 
     await db.prepare(`
-      INSERT INTO users (id, email, password_hash, full_name, nik, role, hospital_code)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(id, email, passwordHash, full_name, nik || null, role, req.user.hospital_code);
+      INSERT INTO users (id, email, username, password_hash, full_name, nik, role, hospital_code)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(id, email, username, passwordHash, full_name, nik || null, role, req.user.hospital_code);
 
     logAudit({
       userId: req.user.id, userEmail: req.user.email,
       action: 'create_user', resourceType: 'user', resourceId: id,
-      details: { email, role },
+      details: { email, username, role },
       ipAddress: req.ip
     });
 
     res.status(201).json({
-      id, email, full_name, nik, role,
+      id, email, username, full_name, nik, role,
       hospital_code: req.user.hospital_code,
       is_active: true
     });
@@ -105,7 +120,7 @@ router.put('/:id', authenticate, authorize('superadmin'), async (req, res) => {
     // Jalankan query update
     await db.prepare(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`).run(...params);
 
-    const updated = await db.prepare('SELECT id, email, full_name, nik, role, is_active, hospital_code FROM users WHERE id = ?').get(req.params.id);
+    const updated = await db.prepare('SELECT id, email, username, full_name, nik, role, is_active, hospital_code FROM users WHERE id = ?').get(req.params.id);
     res.json(updated);
   } catch (err) {
     console.error('[users] error:', err);

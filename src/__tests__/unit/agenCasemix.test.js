@@ -2,7 +2,7 @@ const { susunFaktaKlinis, faktaUntukPrompt } = require('../../services/faktaKlin
 const { nilaiDiagnosis } = require('../../services/penalaranDiagnosisService');
 const { susunKronologi, ambilTanggal, ambilJam } = require('../../services/kronologiService');
 const { susunLaporanCasemix } = require('../../services/agenCasemixService');
-const { tanyaAgenCasemix } = require('../../services/agenCasemixInteraktifService');
+const { tanyaAgenCasemix, PESAN_DI_LUAR_CAKUPAN } = require('../../services/agenCasemixInteraktifService');
 const { cariRegulasi, labelSumber, semuaButir } = require('../../services/registriRegulasiService');
 
 const pages = [
@@ -136,6 +136,36 @@ describe('agen casemix interaktif', () => {
     const r = await tanyaAgenCasemix({ pertanyaan: '  ', record, pages, faktaKlinis, gateway: g });
     expect(r.jawaban).toMatch(/kosong/);
     expect(g.panggilModel).not.toHaveBeenCalled();
+  });
+
+  test('instruksi agen membatasi cakupan ke berkas ini dan menyediakan langkah tolak', async () => {
+    const g = gw({ langkah: 'tolak' });
+    await tanyaAgenCasemix({ pertanyaan: 'kapan indonesia merdeka?', record, pages, faktaKlinis, laporan: null, gateway: g });
+    const { system } = g.panggilModel.mock.calls[0][1];
+    expect(system).toMatch(/CAKUPAN \(WAJIB\)/);
+    expect(system).toMatch(/"langkah":"tolak"/);
+  });
+
+  test('pertanyaan di luar berkas dijawab dengan kalimat baku, bukan teks model', async () => {
+    const g = gw({ langkah: 'tolak', jawaban: 'Indonesia merdeka 17 Agustus 1945.' });
+    const r = await tanyaAgenCasemix({ pertanyaan: 'kapan indonesia merdeka?', record, pages, faktaKlinis, laporan: null, gateway: g });
+    expect(g.panggilModel).toHaveBeenCalledTimes(1);
+    expect(r).toMatchObject({ jawaban: PESAN_DI_LUAR_CAKUPAN, rujukan: [], di_luar_cakupan: true, langkah: 1, biaya_idr: 2 });
+    expect(r.jawaban).not.toMatch(/1945/);
+  });
+
+  test('jawaban yang ditandai tidak terkait berkas juga diganti kalimat baku', async () => {
+    const g = gw({ langkah: 'jawab', terkait_berkas: false, jawaban: 'Indonesia merdeka 17 Agustus 1945.', rujukan: [] });
+    const r = await tanyaAgenCasemix({ pertanyaan: 'kapan indonesia merdeka?', record, pages, faktaKlinis, laporan: null, gateway: g });
+    expect(r.jawaban).toBe(PESAN_DI_LUAR_CAKUPAN);
+    expect(r.di_luar_cakupan).toBe(true);
+  });
+
+  test('jawaban tentang berkas tetap diteruskan', async () => {
+    const g = gw({ langkah: 'jawab', terkait_berkas: true, jawaban: 'Terapi furosemid tercatat.', rujukan: [{ halaman: 2, kutipan: 'Terapi : furosemid inj 2x20 mg' }] });
+    const r = await tanyaAgenCasemix({ pertanyaan: 'Terapinya apa?', record, pages, faktaKlinis, laporan: null, gateway: g });
+    expect(r.jawaban).toBe('Terapi furosemid tercatat.');
+    expect(r.di_luar_cakupan).toBeUndefined();
   });
 });
 
