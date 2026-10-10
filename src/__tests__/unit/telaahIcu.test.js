@@ -34,6 +34,11 @@ test('ICU dengan indikasi, terapi, DPJP dan kegawatan: waktu IGD yang hilang men
  const tanpa=ba.matriksIgd(r,[p('TRIAGE IGD\nICU')]).find(b=>b.id==='matriks_durasi_igd');
  expect(tanpa.status).toBe('bukti_belum_cukup');
 });
+test('perpindahan dari bangsal ke ICU tetap terlihat pada bukti ruang rawat',()=>{
+ const {ruangDanDpjp}=require('../../services/matriksIgdService');
+ const out=ruangDanDpjp([p('RESUME MEDIS RAWAT INAP\nBangsal Masuk Keluar\nGraha III 23-08-2026 14:37 24-08-2026 17:10\nICU III I01 24-08-2026 17:10 01-09-2026 11:09\nVital Sign\nTD 160/88')]);
+ expect(out.ruang[0].kutipan).toContain('ICU III I01');expect(out.ruang[0].kutipan).not.toContain('Vital Sign');
+});
 test('skor audit belum tertulis pada ICU tetap ada untuk casemix, tidak otomatis dihitung pending',()=>{
  const t=ba.evaluasiDokumen(r,[resume]).find(t=>t.id==='TK-25-03');
  expect(t).toMatchObject({tanpa_putusan:true,telaah_casemix:true,perlu_telaah_dokumen:true});

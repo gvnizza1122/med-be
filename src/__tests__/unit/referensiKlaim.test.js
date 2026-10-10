@@ -5,6 +5,13 @@ const { susunPutusan }=require('../../services/putusanPendingService');
 const p=(ocr_text,page_number=3)=>({ocr_text,page_number});
 const record=(diagnosa_list,extra={})=>({diagnosa_list,umur_tahun:35,jenis_klaim:'RAWAT_INAP',discharge_date:'2026-09-01',...extra});
 const t=(dx,pages=[],extra={})=>evaluasiReferensiKlaim(record(dx,extra),pages).temuan;
+test('sepsis: diagnosis sumber infeksi dan gagal nafas on VM terbaca tanpa mengarang kultur',()=>{
+ const out=t('A41.9',[p('RESUME MEDIS RAWAT INAP\nDiagnosis Utama:\nGAGAL NAFAS TIPE 2 ON VM\nDiagnosis Sekunder:\n1. BRONCHOPNEUMONIA\n2. SEPSIS')]).find(t=>t.id==='RK-13');
+ for(const id of ['infeksi','disfungsi_organ']) expect(out.bukti.find(b=>b.id===id).status).toBe('bukti_ditemukan');
+ expect(out.bukti.find(b=>b.id.endsWith('kultur_darah_hasil')).status).toBe('bukti_belum_cukup');
+ const negatif=t('A41.9',[p('RESUME MEDIS RAWAT INAP\nTidak ada bronkopneumonia\nRencana evaluasi gagal nafas tipe 2 on VM\nGagal nafas kronik')]).find(t=>t.id==='RK-13');
+ for(const id of ['infeksi','disfungsi_organ']) expect(negatif.bukti.find(b=>b.id===id).status).toBe('bukti_belum_cukup');
+});
 
 test('katalog 18 butir dengan sumber, versi, halaman dan URL yang dapat ditelusuri',()=>{
   expect(new Set(katalog.aturan.map(a=>a.id)).size).toBe(18);

@@ -136,7 +136,7 @@ function ruangDanDpjp(pages) {
   const ruang = [], dpjp = [];
   for (const p of pages || []) {
     const t = teks(p);
-    const r = /Tiba di ruangan\s*:?\s*[^\n]{1,40}|Bangsal\s+Masuk\s+Keluar[^\n]*\n[^\n]+/i.exec(t);
+    const r = /Tiba di ruangan\s*:?\s*[^\n]{1,40}|Bangsal\s+Masuk\s+Keluar[^\n]*\n[^\n]+(?:\n[^\n]*\b\d{2}[-/]\d{2}[-/]\d{4}\b[^\n]*){0,5}/i.exec(t);
     if (r) ruang.push({ page_number: p.page_number, kutipan: r[0].replace(/\s+/g, ' ').trim().slice(0, 200) });
     const d = /(?:Dokter yang merawat|DPJP|Dokter Penanggung Jawab(?: Pelayanan)?|visit\w*|visite)\s*:?[^\n]{0,80}?\bSp\.?\s?[A-Z]{1,4}\b[^\n]{0,20}/i.exec(t.replace(/\n(?=[^\n]{0,40}Sp\.)/g, ' '));
     if (d) dpjp.push({ page_number: p.page_number, kutipan: d[0].replace(/\s+/g, ' ').trim().slice(0, 200) });
