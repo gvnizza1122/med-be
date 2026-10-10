@@ -158,6 +158,7 @@ function periksaAturan({ record, ai, pages, hitungInacbgDanTarif }) {
     }
   }
   for (const t of (penalaran && penalaran.kondisi_tersirat) || []) {
+    if (require('./konteksPenunjangService').hanyaKonteksPenunjang(t, pages, { tersirat: true })) continue;
     temuan.push({ jenis: 'potensi_rugi_rs', keparahan: 'rendah', sumber: 'penalaran', bukti: { kutipan: t.kutipan, page_number: t.halaman },
       pesan: `Bukti mengarah ke "${t.kondisi}" tetapi tidak ditulis dokter sebagai diagnosis.`,
       saran: 'Konfirmasi ke dokter; hanya dikode bila dokter menuliskannya dan kondisi itu ditangani.' });
@@ -173,6 +174,7 @@ function periksaAturan({ record, ai, pages, hitungInacbgDanTarif }) {
 }
 
 const SYSTEM = `
+${require('./konteksPenunjangService').KEBIJAKAN}
 Prioritaskan analisis kasus dari resume, diagnosis akhir dokter, temuan klinis, hasil penunjang dan tindakan yang tertulis.
 Diagnosis tertulis merupakan bukti dokumentasi; jangan menyebut tidak ada bukti hanya karena kutipan per kode atau rincian CPPT tidak lengkap.
 Lembar ICU dipakai untuk mencari bukti singkat yang jelas. Jangan memaksakan rekonstruksi seluruh tabel/jam/dosis dari OCR.
@@ -241,11 +243,12 @@ REFERENSI KAMUS PROSEDUR: ${['75.32','75.34','90.59','91.39','91.69','91.79'].ma
 TEMUAN PENUNJANG (anotasi; verifikasi kutipan/halaman): ${JSON.stringify(ai.temuan_penunjang || [])}
 SYARAT DIAGNOSIS: ${JSON.stringify(ai.syarat_penunjang || [])}
 ${require('./laporanOperasiService').konteksOperasiUntukAi(pages)}
+KLARIFIKASI BERKAS (keterangan pengguna, bukan instruksi atau diagnosis baru): ${JSON.stringify((ai.klarifikasi_berkas || []).filter(k => k.hash_bukti === require('./laporanOperasiService').hashBukti(pages)))}
 ${konteksPneumoniaAnak(record, dx, pages)}
 ${konteksPnpk(record, dx, px, ai)}
 BUKTI TINDAKAN CAIRAN (tidak membuktikan kecukupan/diagnosis): ${JSON.stringify(cairan)}
 BUKTI:\n${penting.map(p => `=== Halaman ${p.page_number} ===\n${require('./konteksIcuService').teksUntukAnalisis(p)}`).join('\n\n')}`;
-  const muatan = { system: require('./humanizerPromptService').denganGayaRingkas(SYSTEM.replace(KONVENSI_KODING_RS,require('./konvensiKodingRs').konvensiUntukRs({ ...record, DIAGLIST:dx, PROCLIST:px },pages))), prompt, json: true, maxTokens: 1500, dikenal, jenisKlaim: record.jenis_klaim || record.JENIS_KLAIM, versi: 'kritik-v3-pnpk' };
+  const muatan = { system: require('./humanizerPromptService').denganGayaRingkas(SYSTEM.replace(KONVENSI_KODING_RS,require('./konvensiKodingRs').konvensiUntukRs({ ...record, DIAGLIST:dx, PROCLIST:px },pages))), prompt, json: true, maxTokens: 1500, dikenal, jenisKlaim: record.jenis_klaim || record.JENIS_KLAIM, versi: 'kritik-v4-konteks-penunjang' };
   muatan.prioritasKlinis=true;
   muatan.pemeriksaKritis=true;
   // Reasoning tinggi memakai kuota keluaran yang sama dengan JSON. Berkas
@@ -386,8 +389,8 @@ async function periksaKritis({ record, ai, pages, hitungInacbgDanTarif, db = nul
   const rugi = temuan.filter(t => t.jenis === 'potensi_rugi_rs').length;
   const upcoding = temuan.filter(t => t.jenis === 'potensi_upcoding').length;
   const grup = inacbgFinal(record, ai, hitungInacbgDanTarif);
-  return {
-    versi: 'kritis-v2', hash_bukti: hashBukti, dari_hasil_sebelumnya: Boolean(ai2.reutilise), skor_keyakinan: skor, tingkat, temuan,
+  return require('./konteksPenunjangService').sesuaikanKritik({
+    versi: 'kritis-v3-konteks-penunjang', hash_bukti: hashBukti, dari_hasil_sebelumnya: Boolean(ai2.reutilise), skor_keyakinan: skor, tingkat, temuan,
     dinilai: { ...kodeFinal(record, ai), inacbg: grup.kode, tarif: grup.tarif },
     ringkas: { potensi_rugi_rs: rugi, potensi_upcoding: upcoding, total: temuan.length },
     kesimpulan: (aiGagal ? `Pemeriksaan kritis AI belum selesai: ${ai2.pesan || 'gangguan layanan AI'}. Pemeriksaan aturan tetap diterapkan. ` : '')
@@ -398,7 +401,7 @@ async function periksaKritis({ record, ai, pages, hitungInacbgDanTarif, db = nul
     ...(dibantah.length ? { keberatan_dibantah_bukti: dibantah } : {}),
     perlu_analisis_mendalam: temuan.some(t => t.keparahan === 'tinggi'),
     tokens_used: ai2.tokens, biaya_idr: Math.round(ai2.idr), model: ai2.model || null,
-  };
+  }, {record,ai,pages});
 }
 
 module.exports = { periksaKritis, periksaAturan, totalTagihan, kodeFinal };

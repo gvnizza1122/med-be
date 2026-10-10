@@ -51,6 +51,7 @@ function perbaruiRisikoTampilan(record = {}, errors = [], options = {}) {
         usia:require('./referensiKlaimService').usiaRecord(record) });
     ai.referensi_klaim = require('./referensiKlaimService').evaluasiReferensiKlaim(recordReferensi,options.pages,{profil:options.profil,kegawatdaruratan:ai.kegawatdaruratan_assessment});
     ai.analisis_kritis = require('./baTkmkbService').perbaruiKritik(ai.analisis_kritis,recordReferensi,options.pages,ai.referensi_klaim.temuan,{profil:options.profil});
+    ai.analisis_kritis = require('./konteksPenunjangService').sesuaikanKritik(ai.analisis_kritis,{record:recordReferensi,ai,pages:options.pages});
     ai.kesesuaian_stt = require('./kesesuaianSttService').nilaiKesesuaianStt({ jenisKlaim: record.jenis_klaim || record.JENIS_KLAIM,
       dx: final.dx, px: final.px, pages: options.pages, tanggal: require('./referensiKlaimService').tanggalRecord(record) });
     ai.pneumonia_anak = require('./pneumoniaAnakService').nilaiPneumoniaAnak({ record, dx: final.dx, pages: options.pages,

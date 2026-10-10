@@ -17,7 +17,8 @@ const { KONVENSI_KODING_RS } = require('./konvensiKodingRs');
 
 const STATUS = ['terkonfirmasi', 'diagnosis_banding', 'riwayat', 'perlu_klarifikasi', 'belum_cukup_bukti'];
 
-const SYSTEM = `
+const SYSTEM = `${require('./konteksPenunjangService').KEBIJAKAN}
+
 Prioritaskan analisis kasus dari resume, diagnosis akhir dokter, temuan klinis, hasil penunjang dan tindakan yang tertulis.
 Diagnosis tertulis merupakan bukti dokumentasi; jangan menyebut tidak ada bukti hanya karena kutipan per kode atau rincian CPPT tidak lengkap.
 Lembar ICU dipakai untuk mencari bukti singkat yang jelas. Jangan memaksakan rekonstruksi seluruh tabel/jam/dosis dari OCR.
@@ -33,8 +34,9 @@ Status per diagnosis:
 - riwayat: kondisi lama yang tidak ditangani pada episode ini.
 - perlu_klarifikasi: ada pertentangan nyata atau istilah dokter ambigu terhadap kode; rincian CPPT saja yang belum terbaca bukan pertentangan.
 - belum_cukup_bukti: tidak ada diagnosis dokter maupun dasar kasus yang dapat dikutip.
-Kondisi yang tersirat dari bukti tetapi TIDAK ditulis dokter (mis. Hb sangat rendah + transfusi, tanpa diagnosis anemia):
-masukkan ke kondisi_tersirat dan buat pertanyaan untuk dokter. JANGAN mengusulkan kode untuknya.
+Kondisi yang tersirat memerlukan telaah konteks, bukan daftar diagnosis dari setiap hasil abnormal.
+Jika masalah klinis tersendiri memang perlu diklarifikasi, buat pertanyaan terarah; jangan menuntut diagnosis
+tambahan hanya dari angka lab, koreksi elektrolit atau transfusi. JANGAN mengusulkan kode untuk kondisi yang tidak ditulis dokter.
 Jangan memilih atau menambah diagnosis karena tarif. Tanda [aturan RS] berarti kode berasal dari konvensi koding RS:
 nilai "terkonfirmasi" bila fakta sesuai konvensi, dan sebutkan konvensinya di alasan.
 ${KONVENSI_KODING_RS}
@@ -97,7 +99,7 @@ FAKTA KLINIS (per kategori, dengan halaman):\n${faktaUntukPrompt(faktaKlinis)}${
 POLA KEPUTUSAN CASEMIX RS PADA KASUS LAIN (pola, BUKAN bukti pasien ini; status tetap ditentukan fakta berkas ini,
 tetapi bila fakta lemah dan casemix RS biasa tidak mengode, pertimbangkan perlu_klarifikasi):
 ${pelajaran.map(p => `- ${p.pesan}`).join('\n')}` : ''}${pedoman.teks ? `\n\n${pedoman.teks}` : ''}`;
-  const muatan = { system: require('./humanizerPromptService').denganGayaRingkas(SYSTEM.replace(KONVENSI_KODING_RS,require('./konvensiKodingRs').konvensiUntukRs(record,pages))), prompt, json: true, maxTokens: 2500, dikenal, jenisKlaim: record.jenis_klaim || record.JENIS_KLAIM, versi: pedoman.teks ? 'penalaran-v3-pnpk' : 'penalaran-v2-referensi' };
+  const muatan = { system: require('./humanizerPromptService').denganGayaRingkas(SYSTEM.replace(KONVENSI_KODING_RS,require('./konvensiKodingRs').konvensiUntukRs(record,pages))), prompt, json: true, maxTokens: 2500, dikenal, jenisKlaim: record.jenis_klaim || record.JENIS_KLAIM, versi: pedoman.teks ? 'penalaran-v4-konteks-pnpk' : 'penalaran-v4-konteks-referensi' };
   muatan.prioritasKlinis=true;
   // Setiap diagnosis menambah penalaran + bukti mendukung/melemahkan; jatah
   // keluaran ikut jumlah diagnosis agar jawaban tidak terpotong.
