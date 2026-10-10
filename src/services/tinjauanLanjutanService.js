@@ -43,8 +43,10 @@ function ambilPemicu(record, ai, { paksaSol = false, persenSampel } = {}) {
   // diselesaikan Sol.
   const kodeAi = ai.inacbg_result?.code || null;
   const kodeCasemix = ai.lembar_grouper?.inacbg?.kode || null;
+  const bedaKelompok = kodeCasemix && (ai.inacbg_result?.severity_estimasi
+    ? kodeCasemix.replace(/-I{1,3}$/,'') !== kodeAi?.replace(/-I{1,3}$/,'') : kodeCasemix !== kodeAi);
   if (kodeAi && (ai.tariff_result?.amount == null || ai.tariff_result?.kelas_asumsi
-    || (kodeCasemix && kodeCasemix !== kodeAi))) pemicu.push('inacbg_atau_tarif_belum_pasti');
+    || bedaKelompok)) pemicu.push('inacbg_atau_tarif_belum_pasti');
   // Agen tinjau (Luna + alat) sudah menyelidiki tetapi belum yakin.
   if (ai.agen_tinjau?.perlu_analisis_mendalam === true) pemicu.push('agen_belum_yakin');
   // Pemeriksa kritis menemukan keberatan berat (rugi RS / upcoding / inkonsistensi).

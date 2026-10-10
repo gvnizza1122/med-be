@@ -62,6 +62,7 @@ function bagianInacbg(raw, ai) {
       tarif: lembar.total_tarif != null ? lembar.total_tarif : lembar.inacbg.tarif,
       versi_eklaim: lembar.versi_eklaim || null,
       halaman: lembar.halaman || null,
+      severity: lembar.inacbg.kode.split('-').pop(),
     };
   } else if (raw && raw.INACBG && String(raw.INACBG).trim() && String(raw.INACBG).trim() !== '-') {
     resmi = {
@@ -78,7 +79,9 @@ function bagianInacbg(raw, ai) {
   const tarifHitung = ai && ai.tariff_result;
   const hitungan = hasil && hasil.code ? {
     kode: hasil.code,
-    deskripsi: hasil.description || null,
+    deskripsi: hasil.severity_estimasi ? String(hasil.description||'').replace(/\s*\((?:RINGAN|SEDANG|BERAT)\)/ig,'') : hasil.description || null,
+    severity_estimasi: hasil.severity_estimasi === true,
+    skenario_severity: tarifHitung?.skenario_severity || [],
     tarif: tarifHitung && tarifHitung.amount != null ? Number(tarifHitung.amount) : null,
     catatan: (tarifHitung && tarifHitung.note) || null,
     sumber_tarif: (tarifHitung && tarifHitung.source) || null,
@@ -97,10 +100,12 @@ function bagianInacbg(raw, ai) {
       status: hitungan.tarif == null ? 'tarif_belum_tersedia' : 'tersedia',
       label: 'Perkiraan klaim kasus ini',
       keterangan: hasil.severity_estimasi
-        ? 'Tingkat keparahan I merupakan acuan sementara. Nilai ini belum merupakan hasil final grouper E-Klaim.'
+        ? 'Severity aplikasi belum ditetapkan. Tarif tingkat I, II dan III adalah skenario; cocokkan kode dan episode dengan hasil E-Klaim.'
         : 'Perkiraan berdasarkan diagnosis dan prosedur kasus ini; perlu verifikasi dengan hasil E-Klaim.',
     } : null,
     cocok: resmi && hitungan ? resmi.kode === hitungan.kode : null,
+    cocok_base: resmi && hitungan
+      ? resmi.kode.replace(/-(?:III|II|I|0)$/,'') === hitungan.kode.replace(/-(?:III|II|I|0)$/,'') : null,
   };
 }
 

@@ -157,7 +157,7 @@ function rincikanJenisHernia(daftar, halaman, perubahan) {
 }
 
 /**
- * Berkas memuat operasi (laporan operasi, lembar anestesi, atau tagihan
+ * Berkas memuat tindakan bedah terlaksana (isi laporan operasi atau tagihan
  * "Operasi ...") tetapi tidak ada satu pun kode tindakan operasi. Isian
  * laporan operasi umumnya tulisan tangan dan sering tidak terbaca OCR --
  * operasinya tetap terjadi, jadi koder diingatkan, bukan dipending.
@@ -168,14 +168,7 @@ function rincikanJenisHernia(daftar, halaman, perubahan) {
 function periksaOperasiTanpaKode(saran, halaman, proclist = '') {
   const { adalahProsedurBedah } = require('./inacbgGroupingService');
   const pool = Array.isArray(halaman) ? halaman : [];
-  let bukti = null;
-  for (const p of pool) {
-    const teks = String(p.ocr_text || p.text || '');
-    const jenis = classifyPageDocumentType(teks);
-    const tagihan = jenis === 'rincian_biaya' && (teks.split(/\r?\n/).find(b => /\boperasi\s+(?:kecil|sedang|besar|khusus|canggih)\b|\bjasa\s+operator\b|\bsewa\s+(?:ok|kamar\s+operasi)\b/i.test(b)));
-    if (tagihan) { bukti = { kutipan: tagihan.trim().slice(0, 160), page_number: p.page_number }; break; }
-    if (!bukti && jenis === 'laporan_operasi') bukti = { kutipan: /lembar\s+anest/i.test(teks) ? 'Lembar anestesi' : 'Laporan operasi', page_number: p.page_number };
-  }
+  const bukti = require('./buktiOperasiService').cariBuktiOperasi(pool);
   if (!bukti) return null;
   const kode = [
     ...(Array.isArray(saran) ? saran.filter(s => s && s.type === 'procedure' && s.code && s.disangkal !== true).map(s => String(s.code)) : []),

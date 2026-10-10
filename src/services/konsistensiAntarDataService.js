@@ -265,6 +265,7 @@ function evaluasiKonsistensi(record, halaman = [], tindakan = []) {
   for (const aturan of ATURAN.aturan || []) {
     if (aturan.aktif === false) continue;
     if (['KD-09','KD-12','KD-13','KD-15'].includes(aturan.id) && require('./usiaPasienService').resolveUsia(record).kelompok !== 'dewasa') continue;
+    if (aturan.id === 'KD-05' && !require('./buktiOperasiService').cariBuktiOperasi(halaman)) continue;
     const jika = cekKondisi(aturan.jika, konteks);
     if (!jika.benar) continue; // aturan ini tidak berlaku untuk klaim ini
 
@@ -273,6 +274,7 @@ function evaluasiKonsistensi(record, halaman = [], tindakan = []) {
 
     temuan.push({
       id: aturan.id,
+      ...(aturan.id === 'KD-10' ? { tanpa_putusan: true, catatan: 'Temuan pada waktu/pemeriksa berbeda ditelaah dalam perjalanan kasus, bukan konflik diagnosis otomatis.' } : {}),
       nama: aturan.nama,
       keparahan: aturan.keparahan || 'sedang',
       pesan: aturan.pesan,

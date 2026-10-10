@@ -51,7 +51,7 @@ test('berkas tidak ada/tidak terbaca -> lengkapi dokumen, tanpa panggilan Sol', 
 });
 test('belum dinilai karena bukti diagnosis tidak ada tidak memboroskan Sol', async () => {
   const g = gateway();
-  const hasil = await tinjauLanjutan(record, { tinjauan_diagnosis: { status: 'belum_dinilai' } }, pages, [2], null, { gateway: g });
+  const hasil = await tinjauLanjutan(record, { tinjauan_diagnosis: { status: 'belum_dinilai' } }, [{page_number:2,ocr_text:'Resume Medis\nAnamnesis: sesak dan batuk'}], [2], null, { gateway: g });
   expect(hasil.metadata.status).toBe('perlu_lengkapi_berkas');
   expect(g.panggilModel).not.toHaveBeenCalled();
 });

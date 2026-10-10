@@ -30,7 +30,7 @@ const hierarki = require('../data/inacbg/grouperHierarki.json');
 const tarifTable = require('../data/inacbg/tarif.json');
 const META = require('../data/inacbg/meta.json');
 const tambahan = require('../data/inacbg/referensiTambahan.json');
-const VERSI_PERKIRAAN = '2026-10-07.1';
+const VERSI_PERKIRAAN = '2026-10-10.1';
 // Dua tingkat prioritas prosedur OP terpisah. ID di hierarchy3 dimulai ulang
 // dari 1; tidak boleh dibandingkan langsung dengan ID hierarchy2.
 const hierarkiOp = Object.fromEntries([2, 3].flatMap((n) =>
@@ -95,6 +95,10 @@ function tentukanBase(dxs, pxs, rawatInap) {
   const kandidat = [];
   for (const p of procs) {
     for (const g of baseProsedur(p, rawatInap)) {
+      if(rawatInap && norm(p)==='9672') {
+        const trakeostomi=procs.some(k=>['311','3121','3129'].includes(norm(k)));
+        if(g==='J-1-01'&&!trakeostomi || g==='J-1-02'&&trakeostomi || g==='P-8-07'&&!/^P/.test(diags[0])) continue;
+      }
       if (!rawatInap && prioritas[g] == null && !opsi.includes(g)) continue;
       kandidat.push({ grup: g, prosedur: p });
     }
